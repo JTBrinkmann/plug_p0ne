@@ -357,16 +357,16 @@ module \customAvatars, do
 
         @connect 'https://p0ne.com/_'
 
+    connectAttemps: 1
     connect: (url, reconnecting, reconnectWarning) ->
         if not reconnecting and @socket
             return if url == @socket.url and @socket.readyState == 1
             @socket.close!
         console.log "[p0ne avatars] using socket as ppCAS avatar server"
         reconnect = true
-        connectAttemps = 1
 
         if reconnectWarning
-            setTimeout (-> if connectAttemps==0 then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
+            setTimeout (~> if @connectAttemps==0 then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
 
         @socket = new SockJS(url)
         @socket.url = url
@@ -432,7 +432,7 @@ module \customAvatars, do
                         console.info "[ppCAS] blurb reset."
 
         @socket.on \authAccepted, ~>
-            connectAttemps := 0
+            @connectAttemps := 0
             reconnecting := false
             @changeBlurb @oldBlurb, do
                 success: ~>
@@ -499,16 +499,15 @@ module \customAvatars, do
             API.trigger \ppCAS:disconnected
             if e.wasClean
                 reconnect := false
-            else if reconnect
-                if connectAttemps==0
-                    console.log "[ppCAS] reconnecting…"; @connect(url, true, true)
-                else
-                    sleep (5_000ms + Math.random!*5_000ms)*connectAttemps, ~>
-                        console.log "[ppCAS] reconnecting…"
-                        connectAttemps++
-                        @connect(url, true, false)
-                        _$context.trigger \ppCAS:connecting
-                        API.trigger \ppCAS:connecting
+            else if reconnect and not @disabled
+                timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps)
+                console.info "[ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
+                @reconnectTimer = sleep timeout, ~>
+                    console.log "[ppCAS] reconnecting…"
+                    @connectAttemps++
+                    @connect(url, true, @connectAttemps==1)
+                    _$context.trigger \ppCAS:connecting
+                    API.trigger \ppCAS:connecting
         _$context.trigger \ppCAS:connecting
         API.trigger \ppCAS:connecting
 
@@ -522,11 +521,12 @@ module \customAvatars, do
             success: options.success
             error: options.error
 
-        #setTimeout (-> @socket.emit \reqAuthToken if connectAttemps), 5_000ms
+        #setTimeout (-> @socket.emit \reqAuthToken if @connectAttemps), 5_000ms
 
     disable: ->
         @changeBlurb @oldBlurb if @blurbIsChanged
         @socket? .close!
+        clearTimeout @reconnectTimer
         for avatarID, avi of p0ne._avatars
             avi.inInventory = false
         @updateAvatarStore!

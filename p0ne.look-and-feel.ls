@@ -37,7 +37,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=19"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=20"
 
 /*####################################
 #          ANIMATED DIALOGS          #

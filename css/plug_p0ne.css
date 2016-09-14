@@ -58,6 +58,9 @@
     left: 0;
     text-align: center;
 }
+.playlist-icon-view .media-list .in-history .meta .author {
+  color: #f46b40;
+}
 .playlist-icon-view .media-list .meta .title,
 .playlist-icon-view .history .meta .author {
     white-space: normal;
@@ -123,18 +126,21 @@
 .playlist-icon-view #media-panel .drag-over .row.hover::before,
 .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
     content: " ";
-    border-left: 2px solid rgba(255,255,255, .5);
     position: absolute;
     height: 100%;
+    width: 10px;
+}
+.playlist-icon-view #media-panel .drag-over .row.hover::before {
     left: -10px;
+    border-left: 2px solid rgba(255,255,255, .5);
 }
 .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::before {
     content: none;
 }
 .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
-    left: auto;
     right: -10px;
     top: 0;
+    border-right: 2px solid rgba(255,255,255, .5);
 }
 .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover {
     transform: translateX(-10px);
@@ -235,6 +241,10 @@
     transition: opacity .2s ease-out, transform .2s ease-out;
     transform: scale(1.2);
 }
+#dialog-container.dragged #dialog-preview {
+  left: 40%;
+  top: 20%;
+}
 .dialog.opaque {
     opacity: 1;
     transform: scale(1);
@@ -262,19 +272,18 @@
     color: #aaa;
     z-index: 3;
     top: 54px;
-    left: 445px;
+    left: 495px;
     right: 345px;
     min-width: 300px;
     bottom: 200px;
     padding: 0 10px;
     overflow-x: hidden;
     overflow-y: auto;
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
     max-height: 0;
     transition: max-height .7s ease-out;
     z-index: 6;
 }
+/* .plugCubed + .p0ne-song-info { seems to work just fine }*/
 .p0ne-song-info.expanded {
     max-height: 100%;
 }
@@ -351,8 +360,9 @@
     content: " ";
     float: right;
     display: inline-block;
-    width: 40px;
+    width: 50px;
     height: 1px;
+    /* background: red; */
 }
 .legacy-chat #chat .badge-box {
     display: none;
@@ -381,6 +391,10 @@
     display: inline;
     position: static;
     vertical-align: middle;
+}
+.legacy-chat .from.gift {
+  display: block !important;
+  margin-left: 5px
 }
 .legacy-chat #chat .from .icon {
     position: absolute;
@@ -424,11 +438,8 @@
     cursor: pointer;
     font-family: arial;
     position: absolute;
-    top: -54px;
+    top: -50px;
     z-index: 20;
-}
-.plugcubed + .p0ne_icon {
-    margin-left: 110px;
 }
 .p0ne_icon_sub {
     font-size: .5em;
@@ -438,6 +449,8 @@
     color: #12A9E0;
     font-weight: bold;
 }
+#p0ne_menu + #plugcubed { left: 100px; }
+#plugcubed + #p0ne_menu .p0ne_icon { left: 50px; }
 
 
 
@@ -466,84 +479,6 @@
     background: #2a2a2a;
 }
 
-.p0ne_settings_item .checkbox {
-    display: none;
-}
-.p0ne_settings_item .togglebox {
-    width: 73px;
-    height: 26px;
-    background: #333;
-    position: relative;
-    border-radius: 50px;
-    box-shadow: inset 0px 1px 1px rgba(0, 0, 0, 0.5), 0px 1px 0px rgba(255, 255, 255, 0.2);
-    display: inline-block;
-    top: -2px;
-    margin-right: 5px;
-    padding-top: 1px;
-    overflow: hidden;
-    margin-bottom: -10px;
-    transition:
-        padding .4s ease-out,
-        height .4s ease-out;
-}
-.p0ne_settings_item.updated .togglebox {
-    padding-top: 28px;
-    height: 0;
-}
-.p0ne_settings_item .togglebox:after {
-    content: 'OFF';
-    color: #aaa;
-    position: absolute;
-    right: 7px;
-    z-index: 0;
-    font: 12px/26px Arial, sans-serif;
-    font-weight: bold;
-    text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.15);
-}
-.p0ne_settings_item .togglebox:before {
-    content: 'ON';
-    color: #4EC2FF;
-    position: absolute;
-    left: 10px;
-    z-index: 0;
-    font: 12px/26px Arial, sans-serif;
-    font-weight: bold;
-}
-.p0ne_settings_item .knob {
-    display: block;
-    width: 34px;
-    height: 20px;
-    position: absolute;
-    margin-top: 4px;
-    left: 3px;
-    z-index: 21;
-    background: #fcfff4;
-    background: linear-gradient(to bottom, #fcfff4 0%, #dfe5d7 40%, #b3bead 100%);
-    border-radius: 50px;
-    transition: left 0.2s ease;
-box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3);
-}
-.p0ne_settings_item .checkbox:checked + .togglebox>.knob {
-    left: 36px;
-}
-.p0ne_settings_item .knob::before {
-    content: "updated";
-    position: absolute;
-    top: -31px;
-    left: -3px;
-    width: 73px;
-    height: 24px;
-    padding-top: 2px;
-    text-align: center;
-    font-size: 15px;
-    font-size: bold;
-    color: #fff;
-    border-radius: 50px;
-    background: linear-gradient(to bottom, #59C6FF 0%,#158CCB 100%);
-}
-.p0ne_settings_item .checkbox:checked + .togglebox>.knob::before {
-    left: -36px !important;
-}
 .p0ne_settings_icons {
     /* position: absolute; */
     right: 0;
@@ -623,6 +558,10 @@ box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3);
     transform: rotate(90deg) translate(3px, 5px);
 }
 
+.p0ne_settings_popup > img {
+    max-height: 350px;
+    max-width: 100%;
+}
 
 
 
@@ -664,6 +603,12 @@ box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3);
 .p0ne_img {
     max-width: 95%;
     max-height: 300px;
+}
+.p0ne_img_large {
+  position: absolute;
+  z-index: 6;
+  cursor: pointer;
+  box-shadow: 0 0 35px black, 0 0 5px black;
 }
 
 
@@ -729,3 +674,188 @@ box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3);
 .mention-other.mention-ambassador {
 	color: #8b6;
 }
+
+
+
+
+/*== fancy togglebox ==*/
+.togglebox {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  -ms-appearance: none;
+  -o-appearance: none;
+  appearance: none;
+  height: 23px;
+  width: 35px;
+  position: relative;
+  display: inline-block;
+  border-radius: 11.5px;
+  vertical-align: top;
+  cursor: pointer;
+  outline: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background-color: #555;
+  transition-duration: 600ms;
+  transition-timing-function: ease-in-out;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+.togglebox::before {
+  height: 19px;
+  width: 31px;
+  content: ' ';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  background-color: #444;
+  border-radius: 9.5px;
+  z-index: 1;
+  transition-duration: 300ms;
+  transform: scale(1);
+}
+.togglebox::after {
+  height: 19px;
+  width: 19px;
+  content: ' ';
+  position: absolute;
+  border-radius: 9.5px;
+  background: #ffffff;
+  z-index: 2;
+  top: 2px;
+  left: 3px;
+  box-shadow: 0px 0px 1px 0px rgba(0, 0, 0, 0.25), 0px 4px 11px 0px rgba(0, 0, 0, 0.08), -1px 3px 3px 0px rgba(0, 0, 0, 0.14);
+  transition: transform 300ms, width 280ms;
+  transform: translateX(0);
+  transition-timing-function: cubic-bezier(0.42, 0.8, 0.58, 1.2);
+}
+.checkbox:checked + .togglebox::after {
+  transform: translateX(14px);
+  left: auto;
+}
+.togglebox:active::after {
+  width: 21.875px;
+}
+.checkbox:checked + .togglebox::before, .togglebox:active::before {
+  transform: scale(0);
+}
+
+.togglebox {
+  background-color: #555;
+}
+.togglebox::before {
+  background-color: #444;
+}
+.togglebox::after {
+  background: #ffffff;
+}
+.checkbox:checked + .togglebox {
+  background-color: #2AA1C6;
+  background-image: linear-gradient(-180deg,#2AA1C6 0%, #2ba0c5 100%);
+}
+
+.p0ne_settings .togglebox {
+  margin-bottom: 0;
+  margin-right: 5px;
+}
+
+.p0ne_settings .checkbox {
+  display: none;
+}
+
+
+
+/*== AFK Timers ==*/
+.p0ne-last-activity {
+    color: #aaa;
+  
+    position: absolute;
+    font-size: .8em;
+    bottom: 0;
+    text-shadow: none;
+    transition: text-shadow 3s linear;
+}
+#waitlist .bouncer .p0ne-last-activity,
+#waitlist .manager .p0ne-last-activity,
+#user-lists .p0ne-last-activity {
+    right: 40px;
+}
+.p0ne-last-activity-update {
+  text-shadow: 0 0 7px #fff, 0 0 1px #fff;
+    transition: none;
+}
+.p0ne-last-activity-warn {
+  color: #D29074;
+}
+
+/*== first/last played ==*/
+.p0ne-last-played {
+    position: absolute;
+    right: 250px;
+    top: 30px;
+    font-size: .9em;
+    color: #ddd;
+}
+
+
+/*== Stream Settings ==*/
+#playback .button.p0ne-stream-select {
+    background: rgba(28,31,37,.7) !important;
+}
+
+#playback-controls .p0ne-stream-select .box {
+    width: 100%;
+    text-align: center;
+    white-space: normal;
+    top: -3px;
+}
+
+.p0ne-stream-buttons {
+    box-sizing: border-box;
+    text-align: justify;
+    height: 35px;
+    margin-top: -7px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.p0ne-stream-fancy {
+    display: inline-block;
+    width: 100%;
+    height: 2px;
+}
+
+#playback-controls .p0ne-stream-select .icon {
+    float: none !important;
+    width: 30px;
+    display: inline-block;
+    margin: 0 !important;
+    z-index: 1;
+}
+/*~ active bubble ~*/
+.p0ne-stream-fancy::before, .p0ne-stream-fancy::after {
+  content: " ";
+  display: block;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(150, 150, 150, .5);
+  position: absolute;
+  top: 26px;
+  left: 0;
+  margin-left: 8px;
+  z-index: 0;
+  transition: left .3s ease-out .1s, margin-left .3s ease-out .1s;
+}
+.p0ne-stream-fancy::after {
+  background: #ccc;
+}
+.p0ne-stream-audio .p0ne-stream-fancy::before, .p0ne-stream-audio .p0ne-stream-fancy::after { left: 33%; }
+.p0ne-stream-off .p0ne-stream-fancy::before, .p0ne-stream-off .p0ne-stream-fancy::after { left: 66%; }
+#playback-controls .p0ne-stream-select .icon-stream-video:hover ~ .p0ne-stream-fancy::before { left: 0%; }
+#playback-controls .p0ne-stream-select .icon-stream-audio:hover ~ .p0ne-stream-fancy::before { left: 33%; }
+#playback-controls .p0ne-stream-select .icon-stream-off:hover   ~ .p0ne-stream-fancy::before { left: 66%; }
+
+

@@ -6,6 +6,8 @@
 */
 
 module \streamSettings, do
+    settings: \dev
+    displayName: 'Audio-Only Stream'
     require: <[ app currentMedia _$context ]>
     optional: <[ database ]>
     audioOnly: false
@@ -55,12 +57,16 @@ module \streamSettings, do
         audio.addEventListener \canplay, ->
             console.log "[audioStream] finished buffering"
             if currentMedia.get(\media) == audio.media
-                if audio.init
+                diff = currentMedia.get(\elapsed) - audio.currentTime
+                if diff > 4s
                     audio.init = false
                     seek!
+                    sleep 2_000ms, -> if audio.paused
+                        console.warn "[audioStream] still not playing. forcing audio.play()"
+                        audio.play!
                 else
                     audio.play!
-                    console.log "[audioStream] audio.play()"
+                    console.log "[audioStream] playing song (diff #{humanTime(diff, true)})"
             else
                 console.warn "[audioStream] next song already started"
 
@@ -68,7 +74,7 @@ module \streamSettings, do
             audio.volume = currentMedia.get(\volume) / 100perc
             oVC_ ...
 
-        replace Playback::, \onMediaChange, -> return ->
+        replace Playback::, \onMediaChange, (oMC_) -> return ->
             @reset!
             @$controls.removeClass \snoozed
             media = currentMedia.get \media
@@ -78,11 +84,11 @@ module \streamSettings, do
                 @$noDJ.hide!
                 return if currentMedia.get \streamDisabled
 
+                audio.failed = audio.failed and audio.media == media
+
                 @ignoreComplete = true
-                console.log "[audioStream] B"
                 sleep 1_000ms, ~> @resetIgnoreComplete!
                 if media.get(\format) == 1 # youtube
-                    console.log "[audioStream] C"
                     if streamSettings.audioOnly and not audio.failed
                         /*== audio only streaming ==*/
                         console.log "[audioStream] looking for URL"
@@ -92,7 +98,7 @@ module \streamSettings, do
                             audio.init = true
                             mediaDownload media, true
                                 .then (d) ->
-                                    console.log "[audioStream] found url", d
+                                    console.log "[audioStream] found url. Buffering…", d
                                     media.src = d.preferredDownload.url
 
                                     audio.media = media
@@ -101,7 +107,9 @@ module \streamSettings, do
                                     audio.load!
                                 .fail (err) ->
                                     console.error "[audioStream] couldn't get audio stream", err
-                                    audio.failed := true
+                                    API.chatLog "[audioStream] couldn't load audio-only stream, using video instead", true
+                                    audio.failed = true
+                                    audio.media = media
                                     refresh!
                                     API.once \advance, ->
                                         audio.failed = false
@@ -123,6 +131,8 @@ module \streamSettings, do
                                 .load @ytFrameLoadedBind
                 else if media.get(\format) == 2 # soundcloud
                     console.log "[audioStream] loading Soundcloud"
+                    oMC_ ...
+                    /*
                     if soundcloud.r
                         if soundcloud.sc
                             @$container.empty!.append do
@@ -144,9 +154,10 @@ module \streamSettings, do
                                     .css do
                                         position: \absolute
                                         left: 46px
+                    _$context.on \sc:ready, @onSCReady, this
+                    */
                 else
                     console.log "[audioStream] wut", media.get(\format), typeof media.get(\format)
-                    _$context.on \sc:ready, @onSCReady, this
             else
                 @$noDJ.show!
                 @$controls.hide!
@@ -156,7 +167,7 @@ module \streamSettings, do
             s_ ...
 
         replaceListener currentMedia, \change:media, Playback, -> return app.room.playback~onMediaChange
-        replaceListener currentMedia, \change:streamDisabled, Playback, -> return app.room.playback~onMediaChange
+        replaceListener _$context, \change:streamDisabled, Playback, -> return app.room.playback~onMediaChange
         replaceListener currentMedia, \change:volume, Playback, -> return app.room.playback~onVolumeChange
 
         if streamSettings.audioOnly
@@ -164,7 +175,9 @@ module \streamSettings, do
 
         function seek
             startTime = currentMedia.get \elapsed
-            audio.currentTime = if startTime < 4s then 0s else startTime
+            startTime = if startTime < 4s then 0s else startTime
+            audio.currentTime = startTime
+            console.log "[audioStream] seeking…", mediaTime(startTime)
     changeStream: (mode) ->
         prevMode =
             if currentMedia.get \streamDisabled

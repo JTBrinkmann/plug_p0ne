@@ -11,14 +11,33 @@
 #                FIXES               #
 ####################################*/
 module \simpleFixes, do
-    setup: ({replace}) ->
+    setup: ({addListener, replace}) ->
         # hide social-menu (because personally, i only accidentally click on it. it's just badly positioned)
         @scm = $ '#twitter-menu, #facebook-menu' .detach! # not using .social-menu in case other scripts use this class to easily add buttons
 
         # add tab-index to chat-input
         replace $(\#chat-input-field).0, \tabIndex, -> return 1
+
+        # why would plug such a horrible thing as cleaning the localStorage?! Q~Q
+        replace localStorage, \clear, -> return $.noop
+
+        # close Connection Error dialog when reconnected
+        # otherwise the dialog FORCES you to refresh the page
+        addListener API, \socket:reconnected, ->
+            if app?.dialog.dialog?.options.title == Lang.alerts.connectionError
+                app.dialog.$el.hide!
     disable: ->
         @scm .insertAfter \#playlist-panel
+
+module \fixChatLT_GT, do
+    require: <[ auxiliaries ]>
+    setup: ({replace}) ->
+        cTS = auxiliaries.cleanTypedString
+        replace chatAuxiliaries, \sendChat, (sC_) -> return ->
+            auxiliaries.cleanTypedString = (it) -> it
+            res = sC_ ...
+            auxiliaries.cleanTypedString = cTS
+            return res
 
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>

@@ -27,6 +27,7 @@ module \songNotifRuleskip, do
                 API.sendChat "!ruleskip #num"
 
 module \fimstats, do
+    settings: \pony
     setup: ({addListener, $create}) ->
         $el = $create '<span class=p0ne-last-played>' .appendTo \#now-playing-bar
         addListener API, \advance, @updateStats = (d) ->

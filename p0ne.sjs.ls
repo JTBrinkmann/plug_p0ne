@@ -7,27 +7,33 @@
  */
 #== patch socket ==
 module \socketListeners, do
-    require: <[ socketEvents SockJS ]>
+    require: <[ socketEvents ]>
     optional: <[ _$context auxiliaries ]>
     setup: ({replace}) ->
-        return if window.socket?._base_url == "https://shalamar.plug.dj:443/socket" # 2015-01-25
+        # base_url = "https://shalamar.plug.dj:443/socket" # 2015-01-25
+        base_url = "wss://godj.plug.dj/socket" # 2015-02-12
+        return if window.socket?.url == base_url
         onRoomJoinQueue2 = []
-        for let event in <[ send dispatchEvent ]>
-            replace SockJS::, event, (e_) -> return ->
+        for let event in <[ send dispatchEvent close ]> # of WebSocket:: 
+            replace WebSocket::, event, (e_) -> return ->
                 e_ ...
+                console.info "socket stuff", event, this
 
-                if window.socket != this and this._base_url == "https://shalamar.plug.dj:443/socket"
+                if window.socket != this and this.url == base_url
                     # patch
                     replace window, \socket, ~> return this
                     replace this, \onmessage, (msg_) -> return (t) ->
-                        for el in t.data || []
+                        return if t.data == \h
+                        for el in d = JSON.parse(t.data)
                             _$context.trigger "socket:#{el.a}", el
                             API.trigger "socket:#{el.a}", el
 
-                        type = t.data?.0?.a
+                        type = d?.0?.a
                         console.warn "[SOCKET:WARNING] socket message format changed", t if not type
 
                         msg_ ...
+
+
                     _$context .on \room:joined, ->
                         while onRoomJoinQueue2.length
                             forEach onRoomJoinQueue2.shift!
@@ -42,6 +48,8 @@ module \socketListeners, do
                             d: n
 
                     console.info "[Socket] socket patched (using .#event)", this
+                else if window.socket != this
+                    console.warn "socket found, but url differs '#{@url}'"
 
 
 
