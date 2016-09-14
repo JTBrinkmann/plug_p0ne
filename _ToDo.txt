@@ -6,11 +6,11 @@
 - Playlist Manager
 
 == COMPLETE ==
+- separate fimplug.css and p0ne.css
 - Chat
-	- http://www.bronyland.com/emoticon-guide/
-	- show country icon in #user-rollover
-	- instead of rendering messages by the user twice (once when pending, once when received) only move (animated) pending messages and add CID
-	- make it NOT entirely based on t.message, as it might be different (@mentions get wrapped, other scripts like plugCubed convert inline-images, …)
+	- fix emoticons like :<3
+	// - instead of rendering messages by the user twice (once when pending, once when received) only move (animated) pending messages and add CID
+	// - make it NOT entirely based on t.message, as it might be different (@mentions get wrapped, other scripts like plugCubed convert inline-images, …)
 	- have better compatibility for inline images by other scripts (e.g. plug³'s)
 		- without disabling p³'s setting
 	- warn on posting messages that won't go through
@@ -49,19 +49,36 @@
 - Ponymotes
 	- after adding the message, check if it's wider than the chat (328px) and adjust its size.
 	- add CSS .bpm-emote {max-width: 100%} (do NOT add bg-size: contain! it breaks most ponymotes)
+- Song-Info
+	- play stats (first played, …)
+		- nice little graph with dots?
+	- tags (WD-only, PMV)
+	- related videos (remixes, original, PMV)
+	- howMuchPony (has pony video, pony inspired, ponified lyrics, …)
+	- share buttons, lyrics, picture searches, comments, …
+
 
 - PerformanceEnhancements
 	- animate avatars
 	- fix icon CSS
 		- fix dynamic look up
 		- compress the CSS: set "background" property of all .from's and only change the -position
-- ?BB
-	- improve timeout
-		- somethingsomething per user
-		- timeout becomes exponentially larger
-	- make ?BB check what CIDs each send message has
-		- add a "?blame #chat-id" command, to find out who/what triggered a message send by ?BB with the specified CID
 
+- Moderation Helper
+	- warn on new users before their play
+	- evaluate users
+		- check for pony terms in their name & previous chat
+		- check if previously in the room
+		- check if previously skipped / played pony
+		- check joinDate
+		- check play-history (using profile)
+	- evaluate songs
+		- check if previously played in the room
+		- check who played it first (e.g. if by Pacman than likely accepted)
+		- check if played on WD
+		- check for pony terms in name 6 description
+		- check if artist is pony
+		- check lyrics for pony terms
 - etc
 	- warn on/fix not working join-waitlist
 	- show userlist when hovering the woot/grab/meh button (showing who wooted/grabed/meh'd)

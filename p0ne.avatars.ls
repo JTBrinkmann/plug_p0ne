@@ -1,5 +1,12 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license all rights reserved. you may use it but not look at/edit/copy/share the code */
+/**
+ * plug_p0ne Custom Avatars
+ * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license all rights reserved! You may run the bookmarklet provided to you to run this.
+ *          You may NOT read, copy or edit this file. STOP EVEN LOOKING AT IT!
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
 
 /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
 /* (this includes things mentioned in the "notes" section below) */
@@ -30,71 +37,15 @@ Notes for Socket Servers:
     - if you however STILL manually change something, you might need to do updateAvatarStore() to update it
 */
 
-#=======================
-# for Standalone testing
-if not window.p0ne
-    window.p0ne = {}
-
-    window.module ||= (name, {require, setup}:module) ->
-        # poor man's module()
-        failedRequirements = [r for r in require||[] when !r or (typeof r == \string and not window[r])]
-        if failedRequirements.length
-            console.error "[#name] didn't initialize (#failedRequirements #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
-            return module
-        replacements = []
-        aux =
-            replace: (target, attr, repl) ->
-                replacements[*] = [target, attr, repl]
-                target["#{attr}_"] ||= target[attr]
-                repl = module[repl] if typeof repl == \string and module[repl]
-                if typeof repl == \function
-                    target[attr] = repl(target["#{attr}_"])
-                else
-                    target[attr] = repl
-        module.disable = ->
-            for [target, attr] in replacements
-                target[attr] = target["#{attr}_"]
-            delete window[name]
-        window[name] = module
-        setup(aux)
-    window.requireHelper ||= ({name, id, test}:a) !->
-        if typeof a == \function
-            test = a
-        module = require.s.contexts._.defined[id] if id
-        if module and test module
-            module.id ||= id
-            window[name] = module
-            return module
-        else
-            for id, module of require.s.contexts._.defined when module
-                if test module, id
-                    module.id ?= id
-                    console.warn "[requireHelper] module '#{module.name}' updated to ID '#id'"
-                    window[name] = module
-                    return module
-    window.requireAll ||= (test) ->
-        return [m for id, m of require.s.contexts._.defined when m and test(m, id)]
-
-
-    window.css = do ->
-        styles = {}; $el = $ \<style> .appendTo \head
-        return (name, css) ->
-            styles[name] = css
-            res = ""
-            for n,css of styles
-                res += "/* #n */\n#css\n\n"
-            $el.text res
-
-    # users
-    requireHelper do
-        name: \users
-        id: \ce221/cfb6f/b8135 # 2014-09-22
-        test: (it) ->
-            return it.models?.0?.attributes.avatarID
-                and \isTheUserPlaying not of it
-                and \lastFilter not of it
-    window.userID = API.getUser!.id
-    window.user_ = users.get(userID) if users?
+# users
+requireHelper do
+    name: \users
+    test: (it) ->
+        return it.models?.0?.attributes.avatarID
+            and \isTheUserPlaying not of it
+            and \lastFilter not of it
+window.userID ||= API.getUser!.id
+window.user_ ||= users.get(userID) if users?
 #=======================
 
 if window.updateAvatarStore
@@ -125,7 +76,7 @@ requireHelper do
     test: (.comparator == \id) # (_) -> _.comparator == \id and _._events?.reset and (!_.length || _.models[0].attributes.type == \avatar)
 
 window.Cells = requireAll (m) -> m::?.className == \cell and m::getBlinkFrame
-console.log "loaded Lang, myAvatars and Cells", Lang, myAvatars, Cells
+console.log "[p0ne avatars] loaded Lang, myAvatars and Cells", Lang, myAvatars, Cells
 
 module \customAvatars, do
     require: <[ users Lang avatarAuxiliaries Avatar myAvatars ]>
@@ -173,7 +124,7 @@ module \customAvatars, do
                 #dancingLength: d.dancingLength || 20frames
                 #dancingFn: if typeof d.dancingFn == \function then d.dancingFn
             }
-            avatar.sw = avatar.w * (avatar.standingLength + avatar.dancingLength)
+            #avatar.sw = avatar.w * (avatar.standingLength + avatar.dancingLength) # sw is SourceWidth
             if d.isVanilla
                 avatar."" = getAvatarUrl_(avatarID, "")
                 avatar.dj = getAvatarUrl_(avatarID, \dj)
@@ -216,7 +167,7 @@ module \customAvatars, do
         window.changeAvatar = (userID, avatarID) ->
             avatar = p0ne._avatars[avatarID]
             if not avatar
-                console.warn "can't load avatar from last time: '#{avatarID}'"
+                console.warn "[p0ne avatars] can't load avatar: '#{avatarID}'"
                 return
             if not avatar.permissions or API.hasPermissions(userID, avatar.permissions)
                 users.get userID .set \avatarID, avatarID
@@ -224,7 +175,7 @@ module \customAvatars, do
                 throw "user with ID #userID doesn't have permissions for avatar '#{avatarID}'"
 
             if userID == user_.id
-                p0ne.socket? .emit \changeAvatarID, avatarID
+                ppCAS.socket? .emit \changeAvatarID, avatarID
                 localStorage.avatarID = avatarID
 
         window.updateAvatarStore = ->
@@ -259,11 +210,10 @@ module \customAvatars, do
             # update store
             vanilla = []; l=0
             categories = {}
-            for avatarID, avi of p0ne._avatars
+            for avatarID, avi of p0ne._avatars when avi.inInventory /*TEMP FIX*/ or not avi.isVanilla
+                # the `or not avi.isVanilla` should be removed as soon as the server is fixed
                 if avi.isVanilla
-                    if avi.inInventory
-                        vanilla[l++] = new Avatar(id: avatarID, category: avi.category, type: \avatar)
-                    # otherwise ignore
+                    vanilla[l++] = new Avatar(id: avatarID, category: avi.category, type: \avatar)
                 else
                     categories[][avi.category][*] = avatarID
             myAvatars.models.splice 0 # empty it
@@ -274,10 +224,10 @@ module \customAvatars, do
             myAvatars.models ++= vanilla
             myAvatars.length = myAvatars.models.length
             myAvatars.trigger \reset, false
-            console.log "store updated"
+            console.log "[p0ne avatars] store updated"
             return true
         myAvatars.on \reset, (vanillaTrigger) ->
-            console.log "store reset"
+            console.log "[p0ne avatars] store reset"
             updateAvatarStore! if vanillaTrigger
 
 
@@ -292,13 +242,13 @@ module \customAvatars, do
                 category: category
                 #category: avatarID.replace /\d+$/, ''
                 #category: avatarID.substr(0,avatarID.length-2) damn you "tastycat"
-        console.log "added internal avatars", p0ne._avatars
+        console.log "[p0ne avatars] added internal avatars", p0ne._avatars
         # - fix Avatar selection -
         for Cell in window.Cells
             replace Cell::, \onClick, (oC_) -> return ->
-                console.log "[Avatar Cell click]", this
+                console.log "[p0ne avatars] Avatar Cell click", this
                 avatarID = this.model.get("id")
-                if not this.$el.closest \.my-avatars .length or p0ne._avatars[avatarID].inInventory
+                if /*not this.$el.closest \.inventory .length or*/ p0ne._avatars[avatarID].isVanilla and p0ne._avatars[avatarID].inInventory
                     # if avatatar is in the Inventory or not bought, properly select it
                     oC_ ...
                 else
@@ -317,8 +267,7 @@ module \customAvatars, do
                             avatarID: avatar.id
                             isVanilla: true
                             category: avatar.category
-                    p0ne._avatars[avatar.id]
-                        .inInventory = true
+                    p0ne._avatars[avatar.id] .inInventory = true
                         #..category = d.category
                 updateAvatarStore!
                 /*requireAll (m) ->
@@ -334,9 +283,11 @@ module \customAvatars, do
 #== ppCAS compatibility ==
 # e.g.
 # p0ne.ppCAS 'https://p0ne.com/_'
-if not p0ne.ppCAS
-    let a = document.createElement "a"
-        API.on API.CHAT_COMMAND, (str) ->
+module \ppCAS, do
+    oldBlurb: API.getUser!.blurb
+    setup: ({addListener}) ->
+        urlParser = document.createElement "a"
+        addListener API, \chatCommand, (str) ~>
             str = "/ppcas https://p0ne.com/_" if str == "//" # FOR TESTING ONLY
             if 0 == str .toLowerCase! .indexOf "/ppcas"
                 server = $.trim str.substr(6)
@@ -362,158 +313,163 @@ if not p0ne.ppCAS
                                 base_url: base_url
                                 thumbOffsetTop: -10px
 
-                    p0ne.socket = close: ->
+                    @socket = close: ->
                         helper \removeAvatar
-                        delete p0ne.socket
+                        delete @socket
                     helper \addAvatar
-                a.href = server
-                if a.host != location.host
+                urlParser.href = server
+                if urlParser.host != location.host
                     console.log "[p0ne avatars] connecting to", server
                     p0ne.ppCAS server
                 else
                     console.warn "[p0ne avatars] invalid ppCAS server"
 
-p0ne.ppCAS = (url, reconnecting, reconnectWarning) ->
-    if not reconnecting and p0ne.socket
-        return if url == p0ne.socket.url
-        p0ne.socket.close!
-    console.log "[p0ne avatars] using socket as ppCAS avatar server"
-    user = API.getUser!
-    reconnect = true
-    connected = false
+        window.p0ne.ppCAS = @~connect
 
-    if reconnectWarning
-        setTimeout (-> if not connected then API.chatLog "[p0ne avatars] lost connection to avatar server =("), 10_000ms
+    connect: (url, reconnecting, reconnectWarning) ->
+        if not reconnecting and @socket
+            return if url == @socket.url
+            @socket.close!
+        console.log "[p0ne avatars] using socket as ppCAS avatar server"
+        reconnect = true
+        connected = false
 
-    socket = p0ne.socket = new SockJS(url)
-    socket.url = url
-    socket.on = socket.addEventListener
-    socket.off = socket.removeEventListener
-    socket.once = (type, callback) -> @on type, -> @off type, callback; callback ...
+        if reconnectWarning
+            setTimeout (-> if not connected then API.chatLog "[p0ne avatars] lost connection to avatar server =("), 10_000ms
 
-    socket.emit = (type, ...data) ->
-        console.log "[ppCAS] < [#type]", data
-        this.send JSON.stringify {type, data}
+        @socket = new SockJS(url)
+        @socket.url = url
+        @socket.on = @socket.addEventListener
+        @socket.off = @socket.removeEventListener
+        @socket.once = (type, callback) -> @on type, -> @off type, callback; callback ...
 
-    socket.trigger = (type, args) ->
-        args = [args] if typeof args != \object or not args.length
-        listeners = @_listeners[type]
-        if listeners.length
-            for fn in listeners
-                fn .apply this, args
-        else
-            console.error "[ppCAS] unknown event '#type'"
+        @socket.emit = (type, ...data) ->
+            console.log "[ppCAS] < [#type]", data
+            this.send JSON.stringify {type, data}
 
-    socket.onmessage = ({data: message}) ->
-        try
-            {type, data} = JSON.parse(message)
-            console.log "[ppCAS] > [#type]", data
-        catch e
-            console.warn "[ppCAS] invalid message received", message, e
-            return
-
-        socket.trigger type, data
-
-    let close = socket.close
-        socket.close = ->
-            socket.trigger close
-            close ...
-
-
-    socket.on \authToken, (authToken) ->
-        console.log "[ppCAS] authToken: ", authToken
-        user.oldBlurb = user.blurb || ""
-        if not user.blurb # user.blurb is actually `null` by default, not ""
-            newBlurb = authToken
-        else if user.blurb.length >= 73
-            newBlurb = "#{user.blurb.substr(0, 72)}… #authToken"
-        else
-            newBlurb = "#{user.blurb} #authToken"
-
-        changeBlurb newBlurb, do
-            success: ->
-                socket.emit \auth, userID
-            error: ->
-                console.error "[ppCAS] failed to authenticate by changing the blurb."
-                changeBlurb user.oldBlurb, success: ->
-                    console.info "[ppCAS] blurb reset."
-
-    socket.on \authAccepted, ->
-        console.log "[ppCAS] authAccepted"
-        connected := true
-        reconnecting := false
-        changeBlurb user.oldBlurb, do
-            error: ->
-                API.chatLog "[p0ne avatars] failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?"
-                changeBlurb user.oldBlurb, error: ->
-                    console.error "[ppCAS] failed to reset the blurb."
-    socket.on \authDenied, ->
-        console.warn "[ppCAS] authDenied"
-        API.chatLog "[p0ne avatars] "
-        changeBlurb user.oldBlurb, do
-            error: ->
-                changeBlurb user.oldBlurb, error: ->
-                    console.error "[ppCAS] failed to reset the blurb."
-        API.chatLog "[p0ne avatars] Failed to authenticate with user id '#userID'", true
-
-    socket.on \avatars, (avatars) ->
-        console.log "[avatars]", avatars
-        socket.avatars = avatars
-        requestAnimationFrame initUsers if socket.users
-        for avatarID, avatar of avatars
-            addAvatar avatarID, avatar
-        if localStorage.avatarID of avatars
-            changeAvatar userID, localStorage.avatarID
-        else if user.avatarID of avatars
-            socket.emit \changeAvatarID, user.avatarID
-
-    socket.on \users, (users) ->
-        console.log "[users]", users
-        socket.users = users
-        requestAnimationFrame initUsers if socket.avatars
-
-    # initUsers() is used by socket.on \users and socket.on \avatars
-    function initUsers avatarID
-        for userID, avatarID of socket.users
-            console.log "[ppCAS] change other's avatar", userID, avatarID
-            users.get userID ?.set \avatarID, avatarID
-        #API.chatLog "[p0ne avatars] connected to ppCAS"
-        if reconnecting
-            API.chatLog "[p0ne avatars] reconnected"
-        else
-            API.chatLog "[p0ne avatars] avatars loaded. Click on your name in the bottom right corner and then 'Avatars' to become a :horse: pony!"
-
-    socket.on \changeAvatarID, (userID, avatarID) ->
-        console.log "[ppCAS] change other's avatar:", userID, avatarID
-        users.get userID ?.set \avatarID, avatarID
-
-    socket.on \disconnect, (userID) ->
-        console.log "[ppCAS] user disconnected:", userID
-        users.get userID ?.set \avatarID, avatarID
-
-    socket.on \close, (reason) ->
-        console.warn "[ppCAS] connection closed", reason
-        reconnect := false
-    socket.onclose = (e) ->
-        console.warn "[ppCAS] DISCONNECTED", e
-        return if e.wasClean
-        if reconnect
-            if connected
-                console.log "[ppCAS] reconnecting…"; p0ne.ppCAS(url, true, true)
+        @socket.trigger = (type, args) ->
+            args = [args] if typeof args != \object or not args.length
+            listeners = @_listeners[type]
+            if listeners
+                for fn in listeners
+                    fn .apply this, args
             else
-                setTimeout (-> console.log "[ppCAS] reconnecting…"; p0ne.ppCAS(url, true, false)),  5_000ms + Math.random()*5_000ms
+                console.error "[ppCAS] unknown event '#type'"
+
+        @socket.onmessage = ({data: message}) ~>
+            try
+                {type, data} = JSON.parse(message)
+                console.log "[ppCAS] > [#type]", data
+            catch e
+                console.warn "[ppCAS] invalid message received", message, e
+                return
+
+            @socket.trigger type, data
+
+        replace @socket, close, (close_) ~> return ->
+                @trigger close
+                close_ ...
 
 
-    function changeBlurb newBlurb, options
+        @socket.on \authToken, (authToken) ~>
+            console.log "[ppCAS] authToken: ", authToken
+            user = API.getUser!
+            @oldBlurb = user.blurb || ""
+            if not user.blurb # user.blurb is actually `null` by default, not ""
+                newBlurb = authToken
+            else if user.blurb.length >= 73
+                newBlurb = "#{user.blurb.substr(0, 72)}… #authToken"
+            else
+                newBlurb = "#{user.blurb} #authToken"
+
+            @changeBlurb newBlurb, do
+                success: ~>
+                    @socket.emit \auth, userID
+                error: ~>
+                    console.error "[ppCAS] failed to authenticate by changing the blurb."
+                    @changeBlurb @oldBlurb, success: ->
+                        console.info "[ppCAS] blurb reset."
+
+        @socket.on \authAccepted, ~>
+            console.log "[ppCAS] authAccepted"
+            connected := true
+            reconnecting := false
+            @changeBlurb @oldBlurb, do
+                error: ~>
+                    API.chatLog "[p0ne avatars] failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?"
+                    @changeBlurb @oldBlurb, error: ->
+                        console.error "[ppCAS] failed to reset the blurb."
+        @socket.on \authDenied, ~>
+            console.warn "[ppCAS] authDenied"
+            API.chatLog "[p0ne avatars] authentification failed"
+            @changeBlurb @oldBlurb, do
+                error: ~>
+                    @changeBlurb @oldBlurb, error: ->
+                        console.error "[ppCAS] failed to reset the blurb."
+            API.chatLog "[p0ne avatars] Failed to authenticate with user id '#userID'", true
+
+        @socket.on \avatars, (avatars) ~>
+            console.log "[ppCAS] avatars", avatars
+            user = API.getUser!
+            @socket.avatars = avatars
+            requestAnimationFrame initUsers if @socket.users
+            for avatarID, avatar of avatars
+                addAvatar avatarID, avatar
+            if localStorage.avatarID of avatars
+                changeAvatar userID, localStorage.avatarID
+            else if user.avatarID of avatars
+                @socket.emit \changeAvatarID, user.avatarID
+
+        @socket.on \users, (users) ~>
+            console.log "[ppCAS] users", users
+            @socket.users = users
+            requestAnimationFrame initUsers if @socket.avatars
+
+        # initUsers() is used by @socket.on \users and @socket.on \avatars
+        ~function initUsers avatarID
+            for userID, avatarID of @socket.users
+                console.log "[ppCAS] change other's avatar", userID, avatarID
+                users.get userID ?.set \avatarID, avatarID
+            #API.chatLog "[p0ne avatars] connected to ppCAS"
+            if reconnecting
+                API.chatLog "[p0ne avatars] reconnected"
+            else
+                API.chatLog "[p0ne avatars] avatars loaded. Click on your name in the bottom right corner and then 'Avatars' to become a :horse: pony!"
+
+        @socket.on \changeAvatarID, (userID, avatarID) ->
+            console.log "[ppCAS] change other's avatar:", userID, avatarID
+            users.get userID ?.set \avatarID, avatarID
+
+        @socket.on \disconnect, (userID) ->
+            console.log "[ppCAS] user disconnected:", userID
+            users.get userID ?.set \avatarID, avatarID
+
+        @socket.on \close, (reason) ->
+            console.warn "[ppCAS] connection closed", reason
+            reconnect := false
+        @socket.onclose = (e) ->
+            console.warn "[ppCAS] DISCONNECTED", e
+            return if e.wasClean
+            if reconnect
+                if connected
+                    console.log "[ppCAS] reconnecting…"; p0ne.ppCAS(url, true, true)
+                else
+                    setTimeout (-> console.log "[ppCAS] reconnecting…"; p0ne.ppCAS(url, true, false)),  5_000ms + Math.random()*5_000ms
+
+
+    changeBlurb: (newBlurb, options) ->
         $.ajax do
             method: \PUT
-            url: "/_/profile/blurb"
+            url: '/_/profile/blurb'
             contentType: \application/json
             data: JSON.stringify(blurb: newBlurb)
             success: options.success
             error: options.error
 
-    #setTimeout (-> socket.emit \reqAuthToken if not connected), 5_000ms
+        #setTimeout (-> @socket.emit \reqAuthToken if not connected), 5_000ms
 
+    disable: ->
+        @changeBlurb @oldBlurb
+        @socket .close!
 #API.chatLog "[ppCAS] custom avatar script loaded. type '/ppCAS <url>' into chat to connect to an avatar server"
-p0ne.ppCAS "https://p0ne.com/_"
+p0ne.ppCAS? 'https://p0ne.com/_'

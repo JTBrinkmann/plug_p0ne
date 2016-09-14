@@ -1,3 +1,10 @@
+/**
+ * propagate Socket Events to the API Event Emitter for custom event listeners
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
 #== patch socket ==
 module \socketListeners, do
     require: <[ socketEvents SockJS ]>
@@ -60,7 +67,7 @@ module \socketListeners, do
 /*
 # from app.8cf130d413df133d47c418a818ee8cd60e05a2a0.js (2014-11-25)
 # with minor improvements
-define \plug_p0ne/socket, [ \underscore, \sockjs, \dc35f/a4773/f715b, \dc35f/f5947/fc2b9, \dc35f/f5947/efb31, \dc35f/f5947/e56cf, \dc35f/f2003/aff53, \dc35f/f2003/aa514, \dc35f/c0af0/c9e58, \dc35f/dd896/cb055/c3bb9, \dc35f/ec45b/c631b, \lang/Lang ], ( _, SockJS, context, AlertEvent, RoomEvent, UserEvent, room, user, socketEvents, AuthReq, auxiliaries, lang ) ->
+define \plug_p0ne/socket, [ "underscore", "sockjs", "da676/df0c1/b4fa4", "da676/df0c1/fe7d6", "da676/ae6e4/a8215", "da676/ae6e4/fee3c", "da676/ae6e4/ac243", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/e0fc4/b75b7", "da676/eb13a/cd12f/d3fee", "da676/b0e2b/e9c55", "lang/Lang" ], ( _, SockJS,, context, AlertEvent, RoomEvent, UserEvent, room, user, socketEvents, AuthReq, auxiliaries, lang ) ->
         var socketURL, retries, sessionWasKilled, socket, onRoomJoinQueue
         if window._sjs
             init window._sjs

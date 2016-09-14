@@ -1,8 +1,14 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+/**
+ * Auxiliary-functions for plug_p0ne
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
 /*####################################
 #            AUXILIARIES             #
 ####################################*/
+console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
 window.p0ne = {
     version: \1.0.0
     host: 'https://dl.dropboxusercontent.com/u/4217628/plug_p0ne'
@@ -13,20 +19,24 @@ window.p0ne = {
     modules: {}
     lsBound: {}
 }
+p0ne.dependencies ||= {}
 
 # helper for defining non-enumerable functions via Object.defineProperty
 let (d = (property, fn) -> if @[property] != fn then Object.defineProperty this, property, { enumerable: false, writable: true, configurable: true, value: fn })
     d.call Object::, \define, d
 
+$window = $ window
+$body = $ document.body
+
 Array::define \remove, (i) -> return @splice i, 1
 Array::define \random, -> return this[~~(Math.random! * @length)]
-
 String::define \reverse, ->
     res = ""
     i = @length
     while i--
         res += @[i]
     return res
+
 jQuery.fn.fixSize = ->
     for el in this
         el.style .width = "#{el.width}px"
@@ -34,12 +44,11 @@ jQuery.fn.fixSize = ->
     return this
 
 window.localStorageBind = (name, defaultVal={}) ->
-    return p0ne.lsBound[name] = do
+    return p0ne.lsBound[name] ||= do
         if localStorage[name]
             JSON.parse(localStorage[name])
         else
             defaultVal
-
 window.localStorageSave = !->
     err = ""
     for k,v of p0ne.lsBound
@@ -48,7 +57,7 @@ window.localStorageSave = !->
         catch
             err += "failed to store '#k' to localStorage"
     alert err if err
-$ window .on \beforeunload, localStorageSave
+$window .on \beforeunload, localStorageSave
 setInterval localStorageSave, 15min *60_000ms_to_min
 
 window <<<<
@@ -122,68 +131,6 @@ window <<<<
     requireAll: (test) ->
         return [m for id, m of require.s.contexts._.defined when m and test(m, id)]
 
-    addListener: ({name, setup, update, callback, disable}:data, b) ->
-        # will either set-up or update the listener
-        # will be disabled if window.disable is true
-        if typeof data == \string
-            b.name = data
-            {name, setup, update, callback, disable} = data = b
-        disabled = false
-
-        name ||= "unnamed_#{generateID!}"
-
-        if not window[name]
-            wrapper = -> window[name] ... if not window.disable and not window.disable and not disabled
-            setup? wrapper, update
-            console.warn "[#name] initialized"
-        else if update or callback && window[name] != callback
-            update? window[name]
-            console.warn "[#name] updated"
-        else
-            #console.warn "[#name] already loaded!"
-            return
-        if callback
-            window[name] = callback
-            window[name]?.disable = ->
-                return console.warn "[#name] already disabled" if disabled
-                disabled := true
-                disable? wrapper
-                console.warn "[#name] disabled"
-        else
-            window[name] = true
-
-    replace_$Listener: (type, callback) ->
-        if not _$context
-            console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
-            return false
-        if not evts = _$context._events[type]
-            console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no such event)"
-            return false
-        for e in evts
-            if e.context?.cid
-                e.callback_ ||= e.callback
-                e.callback = callback
-                disabled = false
-                console.warn "[#name] replaced eventlistener", e
-                return do
-                    type: type
-                    listener: e
-                    callback: callback
-                    original: e.callback_
-                    disable: ->
-                        return console.warn "[#name] already disabled" if disabled
-                        e.callback = e.callback_
-                        disabled = true
-                    enable: ->
-                        return console.warn "[#name] already enabled" if not disabled
-                        e.callback = callback
-                        disabled = false
-                    update: (fn) ->
-                        callback := fn
-                        e.callback = fn if not disabled
-
-        console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no vanilla callback found)"
-        return false
 
     /* callback gets called with the arguments cb(errorCode, response, event) */
     ajax: (url,  data, cb) ->
@@ -214,7 +161,65 @@ window <<<<
         <- ban userID
         <- sleep 1_000ms
         unban userID, cb
+    mediaLookup: ({format, id, cid}, {success, fail}:cb) ->
+        cid ||= id
+        if format == 1 # youtube
+            $.ajax do
+                url: "https://gdata.youtube.com/feeds/api/videos/#cid?v=2&alt=json"
+                fail: fail
+                success: (d) -> success do
+                    data:         d
+                    uploader:
+                        name:     d.author.0.name.$t
+                        id:       d.author.0.yt$userId.$t
+                        picture:  "https://i.ytimg.com/vi/#{media.cid}/0.jpg"
+                    title:        d.title.$t
+                    uploadedOn:   d.published.$t
+                    url:          "http://youtube.com/watch?v=#cid"
+                    description:  d.media$group.media$description.$t
+        else if format == 2
+            $.ajax do
+                url: "https://api.soundcloud.com/tracks/#{cid}.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
+                fail: fail
+                success: (d) ->
+                    success do
+                        data:         d
+                        uploader:
+                            id:       d.user.id
+                            name:     d.user.username
+                            picture:  d.user.avatar_url
+                        title:        d.title
+                        uploadedOn:   d.created_at
+                        url:          d.permalink_url
+                        description:  d.description
+                        duration:     d.duration # in s
+                        #download:     d.download_url
+                        #downloadSize: d.original_content_size
+        else
+            return fail "unsupported format"
+        success = cb if typeof cb == \function
 
+    mediaDownload: ({format, cid, id}, {success, fail}) ->
+        # success(downloadURL, downloadSize)
+        cid ||= id
+        if format == 1 # youtube
+            $.ajax do
+                url: "http://www.youtube.com/get_video_info?video_id=#cid"
+                fail: fail
+                success: (d) ->
+                    if unescape d.match(/url_encoded_fmt_stream_map=url%3D(.*?)%26/)
+                        success that
+                    else
+                        fail "unkown error"
+        else if format == 2
+            $.ajax do
+                url: "https://api.soundcloud.com/tracks/#{cid}.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
+                fail: fail
+                success: (d) ->
+                    if d.downloadable
+                        success d.download_url, d.original_content_size
+                    else
+                        fail "Song is not downloadable"
     getChat: (cid) ->
         return $ \#chat-messages .children "[data-cid='#cid']"
 
@@ -240,6 +245,19 @@ window <<<<
 
         names.toString = -> return humanList this
         return names
+
+    mediaSearch: (query) ->
+        $ '#playlist-button .icon-playlist'
+            .click! # will silently fail if playlist is already open
+        $ \#search-input-field
+            .val query
+            .trigger do
+                type: \keyup
+                which: 13 # Enter
+        /*app.footer.playlist.onBarClick!
+        app.footer.playlist.playlist.search.searchInput.value = query
+        app.footer.playlist.playlist.search.onSubmitSearch!
+        */
 
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
@@ -270,6 +288,32 @@ window <<<<
                 return ":#that:"
             else
                 return _
+
+    formatPlainText: (text) -> # used for song-notif and song-info
+        lvl = 0
+        text .= replace /([\s\S]*?)($|https?:(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, (,pre,url,post) ->
+            pre = pre
+                .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
+                .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
+                .replace /(lyrics|download|original|re-?upload)/gi, "<b>$1</b>"
+                .replace /(\s)((?:0x|#)[0-9a-fA-F]+|\d+)(\w*|%|\+)?(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
+                .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
+                .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
+                .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
+                .replace /(.?)([\(\)])(.?)/g, (x,a,b,c) ->
+                    if "=^".indexOf(x) == -1 or a == ":"
+                        return x
+                    else if b == \(
+                        lvl++
+                        return "#a<i class='song-description-comment'>(#c" if lvl == 1
+                    else if lvl
+                            lvl--
+                            return "#a)</i>#c" if lvl == 0
+                    return x
+            return pre if not url
+            return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
+        text += "</i>" if lvl
+        return text .replace /\n/g, \<br>
 
     #== RTL emulator ==
     # str = "abc\u202edef\u202dghi"
@@ -312,8 +356,8 @@ window <<<<
     # formatting
     getTime: (t = new Date) ->
         return t.toISOString! .replace(/.+?T|\..+/g, '')
-    getISOTime: ->
-        return new Date! .toISOString! .replace(/T|\..+/g, " ")
+    getISOTime: (t = new Date)->
+        return t.toISOString! .replace(/T|\..+/g, " ")
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff) ->
         return "-#{humanTime -diff}" if diff < 0
@@ -353,19 +397,6 @@ window <<<<
             else
                 return \BA
         return <[ user RDJ bouncer manager co-host host ]>[user.role || user.get?(\role) || 0]
-
-    getArgs: ->
-        f = &callee
-        i = 0
-        stack = []
-        res = []
-        while -1 == stack.indexOf(f=f.caller) && f
-            stack[i] = f
-            res[i] = [f]
-            for a, o in f.arguments
-                res[i][1+o] = a
-            i++
-        return res
 
 
 
@@ -430,7 +461,7 @@ window._$context.onEarly = (type, callback, context) ->
 
 #= app =
 window.app = null if window.app?.nodeType
-<-  (cb) ->
+<-   (cb) ->
     return cb! if window.app
 
     requireHelper do
@@ -438,14 +469,11 @@ window.app = null if window.app?.nodeType
         test: (.::?.el == \body)
         fallback: {prototype:{}}
     App::animate = let animate_ = App::animate then !->
-        window.app = p0ne.app = this
         console.log "[p0ne] got `app`"
-        App::animate = animate_
-        return animate_ ...
-
-    do waitForApp = ->
-        return cb! if window.app
-        sleep 50ms, waitForApp
+        export p0ne.app = this
+        App::animate = animate_ # restore App::animate
+        animate_ ...
+        cb!
 
 # continue only after `app` was loaded
 #= room =
@@ -517,7 +545,7 @@ requireHelper do
     test: (.ack)
 requireHelper do
     name: \permissions
-    test: (.::?canModChat)
+    test: (.canModChat)
 
 
 requireHelper do # the friendslist as rendered in .app-right
@@ -564,6 +592,7 @@ window <<<<
         else
             $cm!.append div
         chatScrollDown! if wasAtBottom
+        chat.lastID = -1
 
         #playChatSound isMention
 
@@ -611,43 +640,39 @@ replace jQuery, \Deferred, (Deferred_) -> return ->
 #     Listener for other Scripts     #
 ####################################*/
 # plug³
-let d = $.Deferred!
-    var rR_
-    onLoaded = ->
-        console.info "[p0ne] plugCubed detected"
-        rR_ = Math.randomRange
-        #window.plugCubed = null
-        do waiting = ->
-            # wait for plugCube to finish loading
-            requestAnimationFrame ->
-                if window.plugCubed and not window.plugCubed.plug_p0ne
-                    d.resolve!
-                    replace plugCubed, \close, (close_) -> return !->
-                        close_!
-                        if Math.randomRange != rR_
-                            # plugCubed got reloaded
-                            onLoaded!
-                        else
-                            window.plugCubed = {close: onLoaded}
+var rR_
+onLoaded = ->
+    console.info "[p0ne] plugCubed detected"
+    rR_ = Math.randomRange
+
+    # wait for plugCubed to finish loading
+    requestAnimationFrame waiting = ->
+        if window.plugCubed and not window.plugCubed.plug_p0ne
+            API.trigger \plugCubedLoaded, window.plugCubed
+            replace plugCubed, \close, (close_) -> return !->
+                close_ ...
+                if Math.randomRange != rR_
+                    # plugCubed got reloaded
+                    onLoaded!
                 else
-                    waiting!
-    if window.plugCubed
-        onLoaded!
-    else
-        window.plugCubed = {close: onLoaded, plug_p0ne: true}
-    window.plugCubedLoaded = d.promise!
+                    window.plugCubed = dummyP3
+        else
+            requestAnimationFrame waiting
+dummyP3 = {close: onLoaded, plug_p0ne: true}
+if window.plugCubed and not window.plugCubed.plug_p0ne
+    onLoaded!
+else
+    window.plugCubed = dummyP3
 
 # plugplug
-let d = $.Deferred!
-    onLoaded = ->
-        console.info "[p0ne] plugplug detected"
-        d.resolve!
-        sleep 5_000ms, -> ppStop = onLoaded
-    if window.ppSaved
-        onLoaded!
-    else
-        ppStop = onLoaded
-    window.plugplugLoaded = d.promise!
+onLoaded = ->
+    console.info "[p0ne] plugplug detected"
+    API.trigger \plugplugLoaded, window.plugplug
+    sleep 5_000ms, -> ppStop = onLoaded
+if window.ppSaved
+    onLoaded!
+else
+    export ppStop = onLoaded
 
 /*####################################
 #          GET PLUG³ VERSION         #
@@ -659,15 +684,9 @@ window.getPlugCubedVersion = ->
         return plugCubed.version
     else if v = $ '#p3-settings .version' .text!
         void
-    else if plugCubed.settings # plug³ stable
-        plugCubed.onMenuClick!
-        v = $ \#p3-settings
-            .stop!
-            .css left: -271px
-            .find \.version .text!
     else # plug³ alpha
         v = requireHelper do
-            name: \plugCubedAlphaVersion
+            name: \plugCubedVersion
             test: (.major)
         return v if v
 
@@ -680,11 +699,10 @@ window.getPlugCubedVersion = ->
 
 
     if typeof v == \string
-        v .replace /^(\d+)\.(\d+)\.(\d+)(?:-(\w+))?(_min)? \(Build (\d+)\)$/,
-            (,major, minor, patch, prerelease="", !!minified, build) ->
-                v := {major, minor, patch, prerelease, minified, build}
-                v.toString = ->
-                    return "#{@major}.#{@minor}.#{@patch}#{@prerelease && '-'+@prerelease}#{@minified && '_min' || ''} (Build #{@build})"
+        if v .match /^(\d+)\.(\d+)\.(\d+)(?:-(\w+))?(_min)? \(Build (\d+)\)$/
+            v := that{major, minor, patch, prerelease, minified, build}
+            v.toString = ->
+                return "#{@major}.#{@minor}.#{@patch}#{@prerelease && '-'+@prerelease}#{@minified && '_min' || ''} (Build #{@build})"
     return plugCubed.version = v
 
 
