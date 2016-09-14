@@ -6,6 +6,7 @@
  * @copyright (c) 2014 J.-T. Brinkmann
  */
 
+
 /*####################################
 #           DISABLE/STATUS           #
 ####################################*/
@@ -62,12 +63,13 @@ module \yellowMod, do
     setup: ({css}) ->
         id = API.getUser! .id
         css \yellowMod, "
-            \#chat .from-#id .from,
-            \#chat .fromID-#id .from,
-            \#chat .fromID-#id .un {
+            \#chat .fromID-#id .un,
+            .user[data-uid='#id'] .name > span {
                 color: \#ffdd6f !important;
             }
         "
+            # \#chat .from-#id .from,
+            # \#chat .fromID-#id .from,
 
 
 /*####################################
@@ -75,10 +77,11 @@ module \yellowMod, do
 ####################################*/
 module \autojoin, do
     settings: \base
+    disabled: true
     setup: ({addListener}) ->
         do addListener API, \advance, ->
             if join!
-                console.log "[autojoin] joined waitlist", API.getWaitListPosition!
+                console.log "#{getTime!} [autojoin] joined waitlist"
 
 
 
@@ -97,6 +100,13 @@ module \friendslistUserPopup, do
                 chat.getExternalUser id, data, (user) ->
                     chat.onShowChatUser user, data
         #replace friendsList, \drawBind, -> return _.bind friendsList.drawRow, friendsList
+# adds a user-rollover to the FriendsList when clicking someone's name
+module \waitlistUserPopup, do
+    require: <[ WaitlistRow ]>
+    setup: ({replace}) ->
+        replace WaitlistRow::, "render", (r_) -> return ->
+            r_ ...
+            @$ '.name, .image' .click @clickBind
 
 module \titleCurrentSong, do
     disable: ->
@@ -112,11 +122,27 @@ module \titleCurrentSong, do
 /*####################################
 #       MEH-ICON IN USERLIST         #
 ####################################*/
-module \userlistMehIcon, do
+module \userlistIcons, do
     require: <[ RoomUserRow ]>
     setup: ({replace})  ->
         replace RoomUserRow::, \vote, -> return ->
-            vote = @model.get \vote
+            if @model.id == API.getDJ!
+                @$icon.addClass \icon-woot
+            if @model.get \grab
+                vote = \grab
+            else
+                vote = @model.get \vote
+                vote = 0 if vote == -1 and (user = API.getUser!).role == user.gRole == 0
+            if @model.id == API.getDJ!.id
+                if vote # stupid haxxy edge-cases… well to be fair, I don't see many other people but me abuse that >3>
+                    if not @$djIcon
+                        @$djIcon = $ '<i class="icon icon-current-dj" style="right: 35px">'
+                            .appendTo @$el
+                        API.once \advance, ~>
+                            @$djIcon .remove!
+                            delete @$djIcon
+                else
+                    vote = \dj
             if vote != 0
                 @$icon ||= $ \<i>
                 @$icon
@@ -126,14 +152,16 @@ module \userlistMehIcon, do
 
                 if vote == -1
                     @$icon.addClass \icon-meh
-                else if @model.get \grab
+                else if vote == \grab
                     @$icon.addClass \icon-grab
+                else if vote == \dj
+                    @$icon.addClass \icon-current-dj
                 else
                     @$icon.addClass \icon-woot
-
             else if @$icon
                 @$icon .remove!
                 delete @$icon
+
 
 /*####################################
 #      DISABLE MESSAGE DELETE        #
@@ -161,12 +189,10 @@ module \disableChatDelete, do
             }
         '
 
-        if socketListeners
-            addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
-                markAsDeleted(c, users.get(mi)?.get(\username) || mi)
-        else
-            replace_$Listener \chat:delete, -> return (cid) ->
-                markAsDeleted(cid)
+        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
+            markAsDeleted(c, users.get(mi)?.get(\username) || mi)
+        addListener \early, _$context, \chat:delete, -> return (cid) ->
+            markAsDeleted(cid) if not socketListeners
 
         function markAsDeleted cid, moderator
             $msg = getChat cid
@@ -177,6 +203,7 @@ module \disableChatDelete, do
             try
                 wasAtBottom = isChatAtBottom?!
                 $msg
+                    .removeClass \deletable
                     .addClass \deleted
                 d = $create \<time>
                     .addClass \deleted-message
@@ -197,10 +224,10 @@ module \disableChatDelete, do
 ####################################*/
 module \chatDblclick2Mention, do
     require: <[ chat ]>
-    optional: <[ PopoutListener ]>
+    #optional: <[ PopoutListener ]>
     settings: \chat
     displayName: 'DblClick username to Mention'
-    setup: ({replace}) ->
+    setup: ({replace, addListener}) ->
         newFromClick = (e) ~>
             if not @timer # single click
                 @timer = sleep 200ms, ~> if @timer
@@ -211,8 +238,22 @@ module \chatDblclick2Mention, do
                 @timer = 0
                 chat.onInputMention e.target.textContent
             e .stopPropagation!; e .preventDefault!
-        replace chat, \fromClick, ~> return newFromClick
-        replace chat, \fromClickBind, ~> return newFromClick
+
+        replace chat, \fromClick, (@fC_) ~> return newFromClick
+        replace chat, \fromClickBind, -> return newFromClick
+
+        # patch event listeners on old messages
+        $cm! .find \.un
+            .off \click, @fC_
+            .on \click, newFromClick
+
+        addListener chatDomEvents, \click, \.un, newFromClick
+    disable: -> if @fC_
+        cm = $cm!
+        cm  .find \.un
+            .off \click, newFromClick
+        cm  .find '.mention .un, .message .un' # note: here we actually have to pay attention as to what to re-enable
+            .on \click, @fC_
 
 
 
@@ -246,25 +287,27 @@ module \chatCommands, do
                 if not automute?
                     API.chatLog "automute is not yet implemented", true
                 else
-                    media = API.getMedia!
-                    if media.id not in automute.songlist
-                        automute.songlist[*] = media.id
-                        API.chat "'#{media.author} - #{media.title}' added to automute list."
-                    else
-                        automute.songlist.removeItem media.id
-                        API.chat "'#{media.author} - #{media.title}' removed from the automute list."
+                    automute!
 
 /*####################################
 #              AUTOMUTE              #
 ####################################*/
 module \automute, do
+    songlist: dataLoad \p0ne_automute, {}
+    module: (media) ->
+        media ||= API.getMedia!
+        if @songlist[media.id]
+            delete @songlist[media.id]
+            API.chat "'#{media.author} - #{media.title}' removed from the automute list."
+        else
+            @songlist[media.id] = true
+            API.chat "'#{media.author} - #{media.title}' added to automute list."
     setup: ({addListener}) ->
-        @automutelist = dataLoad \automute, []
         isAutomuted = false
         addListener API, \advance, ({media}) ~>
             wasAutomuted = isAutomuted
             isAutomuted := false
-            if media and media.id in @automutelist
+            if media and media.id in @songlist
                 isAutomuted := true
             if isAutomuted
                 mute!
@@ -278,14 +321,12 @@ module \automute, do
 ####################################*/
 module \joinLeaveNotif, do
     optional: <[ chatDomEvents chat auxiliaries database ]>
+    settings: \base
+    displayName: 'Join/Leave Notifications'
+    help: '''
+        Shows notifications for when users join/leave the room in the chat.
+    '''
     setup: ({addListener, css},,,update) ->
-        css \joinNotif, '
-            .p0ne-joinLeave-notif {
-                color: rgb(51, 102, 255);
-                font-weight: bold;
-            }
-        '
-
         if update
             lastMsg = $cm! .children! .last!
             if lastMsg .hasClass \p0ne-joinLeave-notif
@@ -308,8 +349,8 @@ module \joinLeaveNotif, do
                 $msg = $ "
                     <span data-uid=#{user.id}>
                         #{if event == \userJoin then '+ ' else '- '}
-                        <span class=from>#{resolveRTL user.username}</span> #verb the room
-                        #{if not (window.auxiliaries and window.database) then '' else
+                        <span class=un>#{resolveRTL user.username}</span> #verb the room
+                        #{if not (auxiliaries? and database?) then '' else
                             '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS == 24) + '</div>'
                         }
                     </span>

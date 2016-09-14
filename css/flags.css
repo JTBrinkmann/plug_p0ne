@@ -1,0 +1,29 @@
+#chat.flags-enabled .message:hover .from::before {
+	background: url(//ssl.gstatic.com/i18n/phonenumbers/phoneinputwidget/flags4.png) no-repeat 5px center;
+	width: 16px;
+	height: 11px;
+	overflow: hidden;
+}
+#chat.flags-enabled .lang-bs:hover .from::before { background-position: 0px -1584px; } /* Bosnian */
+#chat.flags-enabled .lang-bg:hover .from::before { background-position: 0px -2586px; } /* Bulgarian */
+#chat.flags-enabled .lang-zh:hover .from::before { background-position: 0px -825px; }  /* Chinese */
+#chat.flags-enabled .lang-hr:hover .from::before { background-position: 0px -902px; }  /* Croatian */
+#chat.flags-enabled .lang-cs:hover .from::before { background-position: 0px -2256px }  /* Czech */
+#chat.flags-enabled .lang-da:hover .from::before { background-position: 0px -1386px }  /* Danish */
+#chat.flags-enabled .lang-nl:hover .from::before { background-position: 0px -1441px }  /* Dutch */
+#chat.flags-enabled .lang-en:hover .from::before { background-position: 0px -55px }    /* English */
+#chat.flags-enabled .lang-et:hover .from::before { background-position: 0px -2410px }  /* Estonian */
+#chat.flags-enabled .lang-fi:hover .from::before { background-position: 0px -1903px }  /* Finnish */
+#chat.flags-enabled .lang-fr:hover .from::before { background-position: 0px -1012px }  /* French */
+#chat.flags-enabled .lang-de:hover .from::before { background-position: 0px -2509px }  /* German */
+#chat.flags-enabled .lang-hu:hover .from::before { background-position: 0px -682px }   /* Hungarian */
+#chat.flags-enabled .lang-it:hover .from::before { background-position: 0px -143px }   /* Italian */
+#chat.flags-enabled .lang-ja:hover .from::before { background-position: 0px -429px }   /* Japanese */
+#chat.flags-enabled .lang-ko:hover .from::before { background-position: 0px -2245px }  /* Korean */
+#chat.flags-enabled .lang-ms:hover .from::before { background-position: 0px -1870px }  /* Malay */
+#chat.flags-enabled .lang-no:hover .from::before { background-position: 0px -836px }   /* Norwegian */
+#chat.flags-enabled .lang-pt:hover .from::before { background-position: 0px -517px }   /* Portuguese */
+#chat.flags-enabled .lang-ru:hover .from::before { background-position: 0px -660px }   /* Russian */
+#chat.flags-enabled .lang-sr:hover .from::before { background-position: 0px -2465px }  /* Serbian */
+#chat.flags-enabled .lang-sk:hover .from::before { background-position: 0px -1221px }  /* Slovak */
+#chat.flags-enabled .lang-es:hover .from::before { background-position: 0px -1155px }  /* Spanish */

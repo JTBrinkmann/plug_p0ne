@@ -10,6 +10,34 @@
 /*####################################
 #            AUXILIARIES             #
 ####################################*/
+module \getActivePlaylist, do
+    require: <[ playlists ]>
+    module: ->
+        return playlists.findWhere active: true
+module \_API_, do
+    optional: <[]>
+    setup: ->
+        for k,v of API when not @[k]
+            @[k] = v
+    chatLog: API.chatLog
+    on: API.on
+    once: API.once
+    off: API.off
+    _events: API.{}_events
+    getAdmins: -> ...
+    getAmbassadors: -> ...
+    getAudience: -> ...
+    getBannedUsers: -> ...
+    getDJ: -> ...
+    getHistory: -> return roomHistory
+    getHost: -> ...
+    getMedia: -> ...
+    getNextMedia: -> ...
+    getUser: -> return user_
+    getUsers: -> return users
+    getPlaylists: -> ...
+    getStaff: -> ...
+    getWaitList: -> ...
 module \updateUserData, do
     require: <[ user_ users _$context ]>
     setup: ({addListener}) ->
@@ -55,7 +83,7 @@ module \chatDomEvents, do
             cm.off .apply cm, arguments
 
         patchCM = ~>
-            PopoutListener.chat
+            cm = PopoutListener.chat
             for event, callbacks of @_events
                 for cb in callbacks
                     #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
@@ -92,13 +120,15 @@ module \grabMedia, do
 
         # add media to playlist
         function addMedia media
-            console.log "[grabMedia] add '#{media.author} - #{media.title}' to playlist: #playlist"
+            console.log "[grabMedia] add '#{media.author} - #{media.title}' to playlist:", playlist
             playlist.set \syncing, true
+            media.get = l("it -> this[it]")
             ajax \POST, "playlists/#{playlist.id}/media/insert", media: auxiliaries.serializeMediaItems([media]), append: !!appendToEnd
-                .then (e) ->
+                .then ({[e]:data}) ->
                     if playlist.id != e.id
+                        console.warn "playlist mismatch", playlist.id, e.id
                         playlist.set \syncing, false
-                        playlist := playlists.get(e.id)
+                        playlist := playlists.get(e.id) || playlist
                     playlist.set \count, e.count
                     if playlist.id == currentPlaylist.id
                         _$context? .trigger \PlaylistActionEvent:load, playlist.id, do
@@ -150,7 +180,7 @@ module \p0neCSS, do
                     $popoutEl .first! .text res
 
         export @loadStyle = (url) ->
-            console.log "[loadStyle]", url
+            console.log "[loadStyle] %c#url", "color: #009cdd"
             if urlMap[url]
                 return urlMap[url]++
             else
@@ -170,13 +200,14 @@ module \p0neCSS, do
             if urlMap[url] > 0
                 urlMap[url]--
             if urlMap[url] == 0
+                console.log "[loadStyle] unload %c#url", "color: #009cdd"
                 delete urlMap[url]
-                i = $el        .index "[href='#url']"
-                $el.eq(i).remove!
-                $el.splice(i, 1)
-                i = $popoutEl  .index "[href='#url']"
-                $popoutEl.eq(i).remove!
-                $popoutEl.splice(i, 1)
+                if -1 != i = $el       .indexOf "[href='#url']"
+                    $el.eq(i).remove!
+                    $el.splice(i, 1)
+                if -1 != i = $popoutEl .indexOf "[href='#url']"
+                    $popoutEl.eq(i).remove!
+                    $popoutEl.splice(i, 1)
         @disable = ->
             $el       .remove!
             $popoutEl .remove!

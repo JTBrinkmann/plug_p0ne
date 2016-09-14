@@ -10,6 +10,7 @@ module \socketListeners, do
     require: <[ socketEvents SockJS ]>
     optional: <[ _$context auxiliaries ]>
     setup: ({replace}) ->
+        return if window.socket?._base_url == "https://shalamar.plug.dj:443/socket" # 2015-01-25
         onRoomJoinQueue2 = []
         for let event in <[ send dispatchEvent ]>
             replace SockJS::, event, (e_) -> return ->

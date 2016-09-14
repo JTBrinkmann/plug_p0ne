@@ -25,16 +25,18 @@ module \logEventsToConsole, do
     setup: ({addListener, replace}) ->
         logEventsToConsole = this
         addListener API, \chat, (data) ->
-            message = htmlUnescape(data.message) .replace(/\u202e/g, '\\u202e')
+            message = cleanMessage data.message
             if data.un
-                name = data.un .replace(/\u202e/g, '\\u202e')
+                name = data.un .replace(/\u202e/g, '\\u202e') |> collapseWhitespace
                 name = " " * (24 - name.length) + name
                 if data.type == \emote
                     console.log "#{getTime!} [CHAT] #name: %c#message", "font-style: italic;"
                 else
                     console.log "#{getTime!} [CHAT] #name: #message"
-            else
+            else if data.type.has \system
                 console.info "#{getTime!} [CHAT] [system] %c#message", "font-size: 1.2em; color: red; font-weight: bold"
+            else
+                console.log "#{getTime!} [CHAT] %c#message", 'color: #36F'
 
         addListener API, \userJoin, (data) ->
             name = htmlUnescape(data.username) .replace(/\u202e/g, '\\u202e')
@@ -62,7 +64,7 @@ module \logEventsToConsole, do
             try
                 return trigger_ ...
             catch e
-                console.error "[_$context] Error when triggering '#type'", window.e=e
+                console.error "[_$context] Error when triggering '#type'", (export e).stack
 
         #= try-catch API event listeners =
         replace API, \trigger, (trigger_) -> return (type) ->

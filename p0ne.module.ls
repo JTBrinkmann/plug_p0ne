@@ -5,7 +5,7 @@
  * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
  */
-p0ne.moduleSettings = dataLoad \moduleSettings, {}
+p0ne.moduleSettings = dataLoad \p0ne_moduleSettings, {}
 window.module = (name, data) ->
     try
         # setup(helperFNs, module, args)
@@ -19,7 +19,7 @@ window.module = (name, data) ->
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.persistent ||= {}
-        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName, moduleSettings} = data
+        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName, disabled, _settings} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -30,7 +30,7 @@ window.module = (name, data) ->
             else if typeof module == \object
                 module <<<< data
             else
-                console.warn "[#name] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
+                console.warn "#{getTime!} [#name] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
                 module = data
         else
             module = data
@@ -67,7 +67,7 @@ window.module = (name, data) ->
                 if not early
                     target.on .apply target, args
                 else if not target.onEarly
-                    console.warn "[#name] cannot use .onEarly on", target
+                    console.warn "#{getTime!} [#name] cannot use .onEarly on", target
                 else
                     target.onEarly .apply target, args
                 return args[*-1] # return callback so one can do `do addListener(…)` to initially trigger the callback
@@ -79,15 +79,15 @@ window.module = (name, data) ->
 
             replace_$Listener: (type, callback) ->
                 if not window._$context
-                    console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
+                    console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
                     return false
                 if not evts = _$context._events[type]
-                    console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no such event)"
+                    console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no such event)"
                     return false
                 for e in evts when e.context?.cid
                     return @replace e, \callback, callback
 
-                console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no vanilla callback found)"
+                console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no vanilla callback found)"
                 return false
 
             add: (target, callback, options) ->
@@ -118,18 +118,19 @@ window.module = (name, data) ->
             enable: ->
                 return if not @disabled
                 @disabled = false
-                delete p0ne.moduleSettings[name].disabled
+                moduleSettings.disabled = false
                 try
                     setup.call module, helperFNs, module, data, module
                     API.trigger \p0neModuleEnabled, module
-                    console.info "[#name] enabled", setup != null
+                    console.info "#{getTime!} [#name] enabled", setup != null
                 catch err
-                    console.error "[#name] error while re-enabling", err.stack
+                    console.error "#{getTime!} [#name] error while re-enabling", err.stack
+                return this
             disable: (newModule) ->
                 return if module.disabled
                 try
                     module.disabled = true
-                    disable?.call module, helperFNs, newModule, data
+                    disable.call module, helperFNs, newModule, data if typeof disable == \function
                     for {target, args} in cbs.listeners ||[]
                         target.off .apply target, args
                     for [target, attr /*, repl*/] in cbs.replacements ||[]
@@ -146,16 +147,18 @@ window.module = (name, data) ->
                     for m in p0ne.dependencies[name] ||[]
                         m.disable!
                     if not newModule
-                        p0ne.moduleSettings[name].disabled = true
+                        moduleSettings.disabled = true
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         API.trigger \p0neModuleDisabled, module
-                        console.info "[#name] disabled"
+                        console.info "#{getTime!} [#name] disabled"
+                        dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
                 catch err
-                    console.error "[module] failed to disable '#name' cleanly", err.stack
+                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
                     delete window[name]
                 delete p0ne.dependencies[name]
+                return this
 
         module.disable = helperFNs.disable
         module.enable = helperFNs.enable
@@ -164,6 +167,7 @@ window.module = (name, data) ->
                 for k in persistent ||[]
                     module[k] = module_[k]
             module._$settings = module_._$settings
+            _settings_ = module_._settings
             module_.disable? module
         failedRequirements = []; l=0
         for r in require ||[]
@@ -173,11 +177,11 @@ window.module = (name, data) ->
                 p0ne.dependencies[][r][*] = this
                 failedRequirements[l++] = r
         if failedRequirements.length
-            console.error "[#name] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
+            console.error "#{getTime!} [#name] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
             return module
         optionalRequirements = [r for r in optional ||[] when !r or (typeof r == \string and not window[r])]
         if optionalRequirements.length
-            console.warn "[#name] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
+            console.warn "#{getTime!} [#name] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
 
         try
             window[name] = module
@@ -185,25 +189,30 @@ window.module = (name, data) ->
             # set up Help and Settings
             module.help? .= replace /\n/g, "<br>\n"
 
-            if p0ne.moduleSettings{}[name].disabled
-                module.disabled = true
+            moduleSettings = p0ne.moduleSettings[name]
+            if moduleSettings
+                module.disabled = moduleSettings.disabled
+            else
+                moduleSettings = p0ne.moduleSettings[name] = {disabled: !!disabled}
+            @moduleSettings = moduleSettings
 
             # initialize module
             if not module.disabled
+                module._settings = _settings_ || dataLoad "p0ne_#name", _settings if _settings
                 setup?.call module, helperFNs, module, data, module_
             module.getSetup = ->
                 return setup
 
-            p0ne.modules[*] = module
+            p0ne.modules[name] = module
             if module_
                 API.trigger \p0neModuleUpdated, module
-                console.info "[#name] updated"
+                console.info "#{getTime!} [#name] updated"
             else
                 API.trigger \p0neModuleLoaded, module
-                console.info "[#name] initialized"
+                console.info "#{getTime!} [#name] initialized"
         catch e
-            console.error "[#name] error initializing", e.stack
+            console.error "#{getTime!} [#name] error initializing", e.stack
 
         return module
     catch e
-        console.error "[module] error initializing '#name':", e.message
+        console.error "#{getTime!} [module] error initializing '#name':", e.message

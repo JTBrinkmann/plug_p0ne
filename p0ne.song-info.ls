@@ -27,7 +27,7 @@ module \songInfo, do
                 media = API.getMedia!
                 if not media
                     @$el .html "Cannot load information if No song playing!"
-                else if @lastMedia == media.id
+                else if @lastMediaID == media.id
                     API.once \advance, @loadBind
                 else
                     @$el .html "loading…"
@@ -49,10 +49,10 @@ module \songInfo, do
             API.off \advance, @loadBind
     load: ({media}, isRetry) ->
         console.log "[song-info]", media
-        if @lastMedia == media
+        if @lastMediaID == media.id
             @showInfo media
         else
-            @lastMedia = media
+            @lastMediaID = media.id
             @mediaData = null
             mediaLookup media, do
                 fail: (err) ~>
@@ -67,42 +67,46 @@ module \songInfo, do
                     @showInfo media
             API.once \advance, @loadBind
     showInfo: (media) ->
+        return if @lastMediaID != media.id or @disabled # skip if another song is already playing
         d = @mediaData
-        return if @lastMedia.id != media.id or @disabled # skip if another song is already playing
 
         @$el .html ""
         $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
         $parts = {}
 
-        @$create \<span> .addClass \p0ne-song-info-author      .appendTo $meta
+        $ \<span> .addClass \p0ne-song-info-author      .appendTo $meta
             .click -> mediaSearch media.author
             .attr \title, "search for '#{media.author}'"
             .text media.author
-        @$create \<span> .addClass \p0ne-song-info-title       .appendTo $meta
+        $ \<span> .addClass \p0ne-song-info-title       .appendTo $meta
             .click -> mediaSearch media.title
             .attr \title, "search for '#{media.title}'"
             .text media.title
-        @$create \<br>                                         .appendTo $meta
-        @$create \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
+        $ \<br>                                         .appendTo $meta
+        $ \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
             .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
             .attr \target, \_blank
             .attr \title, "open channel of '#{d.uploader.name}'"
             .text d.uploader.name
-        @$create \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
+        $ \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
             .attr \href, "http://youtube.com/watch?v=#{media.cid}"
             .attr \target, \_blank
             .attr \title, "open video on Youtube"
             .text d.title
-        @$create \<br>                                         .appendTo $meta
-        @$create \<span> .addClass \p0ne-song-info-date        .appendTo $meta
+        $ \<br>                                         .appendTo $meta
+        $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
             .text getISOTime new Date(d.uploadDate)
-        @$create \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
+        $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
             .text mediaTime +d.duration
-        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-        #@$create \<div> .addClass \p0ne-song-info-tags    #ToDo
-        @$create \<div> .addClass \p0ne-song-info-description  .appendTo @$el
+        if media.format == 1
+            for r in d.data.entry.media$group.media$restriction ||[]
+                $ \<span> .addClass \p0ne-song-info-blocked     .appendTo @$el
+                    .text "blocked (#{r.type}): #{r.$t}"
+        #$ \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #$ \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #$ \<div> .addClass \p0ne-song-info-tags    #ToDo
+        $ \<div> .addClass \p0ne-song-info-description  .appendTo @$el
             .html formatPlainText(d.description)
-        #@$create \<ul> .addClass \p0ne-song-info-remixes      #ToDo
+        #$ \<ul> .addClass \p0ne-song-info-remixes      #ToDo
     disable: ->
         @$el .remove!

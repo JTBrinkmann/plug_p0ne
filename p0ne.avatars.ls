@@ -103,9 +103,9 @@ module \customAvatars, do
             #   soon also {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn}
             avatarID = d.avatarID
             if p0ne._avatars[avatarID]
-                console.info "[p0ne avatars] updating '#avatarID'"
+                console.info "[p0ne avatars] updating '#avatarID'", d
             else if not d.isVanilla
-                console.info "[p0ne avatars] adding '#avatarID'"
+                console.info "[p0ne avatars] adding '#avatarID'", d
 
             avatar =
                 inInventory: false
@@ -190,12 +190,8 @@ module \customAvatars, do
                 avatarIDs[l++] = avatarID
                 styles += "
                     .avi-#avatarID {
-                        background-image: url('#{avi['']}')
-                "
-                if avi.thumbOffsetTop
-                    styles += ";background-position-y: #{avi.thumbOffsetTop}px"
-                if avi.thumbOffsetLeft
-                    styles += ";background-position-x: #{avi.thumbOffsetLeft}px"
+                        background-image: url('#{avi['']}');
+                        background-position: #{avi.thumbOffsetLeft ||0}px #{avi.thumbOffsetTop ||0}px"
                 styles += "}\n"
             if l
                 css \p0ne_avatars, "
@@ -229,10 +225,9 @@ module \customAvatars, do
             myAvatars.models ++= vanilla
             myAvatars.length = myAvatars.models.length
             myAvatars.trigger \reset, false
-            console.log "[p0ne avatars] store updated"
+            console.log "[p0ne avatars] avatar inventory updated"
             return true
         addListener myAvatars, \reset, (vanillaTrigger) ->
-            console.log "[p0ne avatars] store reset"
             updateAvatarStore! if vanillaTrigger
 
         #== patch avatar inventory view ==
@@ -381,7 +376,7 @@ module \customAvatars, do
             this.send JSON.stringify {type, data}
 
         @socket.trigger = (type, args) ->
-            args = [args] if typeof args != \object or not args.length
+            args = [args] if typeof args != \object or not args?.length
             listeners = @_listeners[type]
             if listeners
                 for fn in listeners
@@ -414,7 +409,6 @@ module \customAvatars, do
                         console.info "[ppCAS] removed old authToken from user blurb"
 
         @socket.on \authToken, (authToken) ~>
-            console.log "[ppCAS] authToken: ", authToken
             user = API.getUser!
             @oldBlurb = user.blurb || ""
             if not user.blurb # user.blurb is actually `null` by default, not ""
@@ -435,7 +429,6 @@ module \customAvatars, do
                         console.info "[ppCAS] blurb reset."
 
         @socket.on \authAccepted, ~>
-            console.log "[ppCAS] authAccepted"
             connected := true
             reconnecting := false
             @changeBlurb @oldBlurb, do
@@ -457,7 +450,6 @@ module \customAvatars, do
             API.chatLog "[p0ne avatars] Failed to authenticate with user id '#userID'", true
 
         @socket.on \avatars, (avatars) ~>
-            console.log "[ppCAS] avatars", avatars
             user = API.getUser!
             @socket.avatars = avatars
             requestAnimationFrame initUsers if @socket.users
@@ -469,7 +461,6 @@ module \customAvatars, do
                 @socket.emit \changeAvatarID, user.avatarID
 
         @socket.on \users, (users) ~>
-            console.log "[ppCAS] users", users
             @socket.users = users
             requestAnimationFrame initUsers if @socket.avatars
 
@@ -488,11 +479,11 @@ module \customAvatars, do
 
             users.get userID ?.set \avatarID, avatarID
 
-        @socket.on \disconnect, (userID) ->
+        @socket.on \disconnect, (userID) ~>
             console.log "[ppCAS] user disconnected:", userID
             @changeAvatarID userID, avatarID
 
-        @socket.on \disconnected, (reason) ->
+        @socket.on \disconnected, (reason) ~>
             @socket.trigger \close, reason
         @socket.on \close, (reason) ->
             console.warn "[ppCAS] connection closed", reason

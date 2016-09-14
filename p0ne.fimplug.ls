@@ -6,6 +6,7 @@
  * @copyright (c) 2014 J.-T. Brinkmann
  */
 
+/*not really implemented yet*/
 module \songNotifRuleskip, do
     require: <[ songNotif ]>
     setup: ({replace, addListener}) ->

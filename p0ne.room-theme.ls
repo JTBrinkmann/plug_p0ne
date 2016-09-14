@@ -63,7 +63,7 @@ module \roomTheme, do
     setup: ({addListener, replace, css, loadStyle}) ->
         roles = <[ residentdj bouncer manager cohost host ambassador admin ]> #TODO
         @$playbackBackground = $ '#playback .background img'
-            ..data \_o, ..data(\_o) || ..attr(\src)
+        @playbackBackgroundVanilla = @$playbackBackground .attr(\src)
 
         console.log "#{getTime!} [roomTheme] initializing"
         addListener roomSettings, \loaded, (d) ~>
@@ -75,14 +75,16 @@ module \roomTheme, do
 
             /*== colors ==*/
             if d.colors
-                for role, color of d.colors.chat when role in roles and isColor(color)
+                styles += "\n/*== colors ==*/\n"
+                for role, color of d.colors.chat when /*role in roles and*/ isColor(color)
                     styles += """
                     /* #role => #color */
-                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name, .cm.from-#role ~ .from {
+                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name, .cm.from-#role .from
+                    \#waitlist .icon-chat-#role + span, \#user-rollover .icon-chat-cohost + span {
                             color: #color !important;
-                    }\n""" #ToDo add custom colors
+                    }\n"""
                 colorMap =
-                    background: \#app
+                    background: \.room-background
                     header: \.app-header
                     footer: \#footer
                 for k, selector of colorMap when isColor(d.colors[k])
@@ -90,6 +92,7 @@ module \roomTheme, do
 
             /*== CSS ==*/
             if d.css
+                styles += "\n/*== custom CSS ==*/\n"
                 for rule,attrs of d.css.rule
                     styles += "#rule {"
                     for k, v of attrs
@@ -111,8 +114,14 @@ module \roomTheme, do
 
             /*== images ==*/
             if d.images
-                if isURL(d.images.background)
+                styles += "\n/*== images ==*/\n"
+                /* custom p0ne stuff */
+                if isURL(d.images.backgroundScalable)
                     styles += "\#app { background-image: url(#{d.images.background}) fixed center center / cover }\n"
+
+                    /* original plug³ stuff */
+                else if isURL(d.images.background)
+                    styles += ".room-background { background-image: url(#{d.images.background}) !important }\n"
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image
                         ..onload = ~>
@@ -160,9 +169,9 @@ module \roomTheme, do
             delete [@_cbs.replacements, @_cbs.css, @_cbs.loadedStyles]
 
         @currentRoom = null
-        if roomLoader? and Layout?
-            roomLoader?.onVideoResize Layout.getSize!
         @$playbackBackground
-            .attr \src, @$playbackBackground.data(\_o)
+            .one \load ->
+                roomLoader?.onVideoResize Layout.getSize! if Layout?
+            .attr \src, @playbackBackgroundVanilla
 
     disable: -> @clear true
