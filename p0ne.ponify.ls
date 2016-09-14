@@ -10,35 +10,11 @@
 /*####################################
 #            PONIFY CHAT             #
 ####################################*/
-module ||= (name, {setup, require}) ->
-    # module() for the poor
-    if not window[name]
-        target.on event, -> window[name] ...
-    window[name] = callback
-requireHelper ||= ({id, test, fallback}:a) ->
-    if typeof a == \function
-        test = a
-    module = require.s.contexts._.defined[id] if id
-    if module and test module
-        module.id ||= id
-        return module
-    else
-        for id, module of require.s.contexts._.defined when module
-            if test module, id
-                module.id ?= id
-                console.warn "[requireHelper] module '#{module.name}' updated to ID '#id'"
-                return module
-        return fallback
-
-requireHelper do
-    name: \emoticons
-    test: (.emojify)
-
 module \ponify, do
     optional: <[ emoticons ]>
     /*== TEXT ==*/
     map:
-        # "america":    "amareica"
+        # "america":    "amareica" # this one was driving me CRAZY
         "anybody":      "anypony"
         "anyone":       "anypony"
         "ass":          "flank"
@@ -141,7 +117,7 @@ module \ponify, do
             hasReplacement = false
             replacement = null
             lastPos = 0
-            str.replace @regexp, (s, i) ->
+            str.replace @regexp, (s, i) ~>
                 w = @map[s.toLowerCase!]
                 r = ""
 
@@ -149,9 +125,13 @@ module \ponify, do
                     replacement := document.createElement \span
 
                 /*preserve upper/lower case*/
+                lastUpperCaseLetters = 0
                 l = s.length <? w.length
                 for o from 0 til l
                     if s[o].toLowerCase! != s[o]
+                        r += w[o].toUpperCase!
+                        lastUpperCaseLetters++
+                    else if l >= s.length and lastUpperCaseLetters == 3
                         r += w[o].toUpperCase!
                     else
                         r += w[o]
@@ -235,11 +215,8 @@ module \ponify, do
 
     setup: ({addListener, replace}) ->
         @regexp = new RegExp "\\b(?:#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})\\b", \gi
-        addListener do
-            target: API
-            event: \chat
-            callback: ({cid}) ~>
-                @ponifyNode $("\#chat-messages > .message[data-cid=#{cid}] .text").0
+        addListener API, \chat, ({cid}) ~> if cid
+            @ponifyNode $("\#chat-messages > [data-cid=#{cid}] .text").0
         if emoticons?
             aEM = ^^emoticons.autoEmoteMap #|| {}
             for emote, url of @autoEmotiponies

@@ -1,34 +1,38 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc-sa/4.0/ */
-/*
-    based on BetterPonymotes https://ponymotes.net/bpm/
-    note: even though this is part of the plug_p0ne script, it can also run on it's own with no dependencies 
-    only the autocomplete feature will be missing without plug_p0ne
-
-    for a ponymote tutorial see: http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
-*/
-
-if not window.bpm
+/**
+ * BetterPonymotes - a script add ponymotes to the chat on plug.dj
+ * based on BetterPonymotes https://ponymotes.net/bpm/
+ * for a ponymote tutorial see: http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
+do ->
+    window.bpm?.disable!
+    window.emote_map ||= {}
     host = window.p0ne?.host or "https://dl.dropboxusercontent.com/u/4217628/plug_p0ne"
-    window.emote_map = {}
 
     /*== external sources ==*/
-    $.getScript "#host/bpm-resources.js"
+    $.getScript "#host/bpm-resources.js" .then ->
+        $ window .trigger \p0ne_emotes_map
 
     $ \body .append "
-        <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
-        <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
-        <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
-        <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
-        <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
-        <style>
-        \#chat-suggestion-items .bpm-emote {
-            max-width: 27px;
-            max-height: 27px
-        }
-        </style>
+        <div id='bpm-resources'>
+            <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
+            <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
+            <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
+            <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
+            <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
+        </div>
     "
-
+    /*
+            <style>
+            \#chat-suggestion-items .bpm-emote {
+                max-width: 27px;
+                max-height: 27px
+            }
+            </style>
+    */
 
     /*== constants ==*/
     _FLAG_NSFW = 1
@@ -39,7 +43,7 @@ if not window.bpm
      * others. It will not permit text in the [] portion, but alt-text quotes don't
      * have to match each other.
      */
-    /*                 [](/   <    emote   >   <    alt-text   >  )*/
+    /*                 [](/  <   emote   >   <     alt-text    >  )*/
     emote_regexp = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g
 
 
@@ -56,21 +60,21 @@ if not window.bpm
     #== main BPM plugin ==
     lookup_core_emote = (name, altText) ->
         # Refer to bpgen.py:encode() for the details of this encoding
-        data = emote_map[name]
+        data = emote_map["/"+name]
         return null if not data
 
-        nameWithSlash = "/#name"
-        parts = data.split '|'
+        nameWithSlash = name
+        parts = data.split ','
         flag_data = parts.0
         tag_data = parts.1
 
         flags = parseInt(flag_data.slice(0, 1), 16)     # Hexadecimal
         source_id = parseInt(flag_data.slice(1, 3), 16) # Hexadecimal
-        size = parseInt(flag_data.slice(3, 7), 16)      # Hexadecimal
+        #size = parseInt(flag_data.slice(3, 7), 16)      # Hexadecimal
         is_nsfw = (flags .&. _FLAG_NSFW)
         is_redirect = (flags .&. _FLAG_REDIRECT)
 
-        tags = []
+        /*tags = []
         start = 0
         while (str = tag_data.slice(start, start+2)) != ""
             tags.push(parseInt(str, 16)) # Hexadecimal
@@ -79,19 +83,19 @@ if not window.bpm
         if is_redirect
             base = parts.2
         else
-            base = name
+            base = name*/
 
         return
             name: nameWithSlash,
             is_nsfw: !!is_nsfw
             source_id: source_id
-            source_name: sr[source_id]
-            max_size: size
+            source_name: sr_id2name[source_id]
+            #max_size: size
 
-            tags: tags
+            #tags: tags
 
             css_class: "bpmote-#{sanitize_emote name}"
-            base: base
+            #base: base
 
             altText: altText
 
@@ -107,7 +111,8 @@ if not window.bpm
             title = "[NSFW] #title"
             flags += " bpm-nsfw"
 
-        return "<span class='bpflag-in bpm-emote #{info.css_class} #flags' title='#title' data-bpm_emotename='#{info.name}'>#{info.altText or ''}</span>"
+        return "<span class='bpflag-in bpm-emote #{info.css_class} #flags' title='#title'>#{info.altText || ''}</span>"
+        # data-bpm_emotename='#{info.name}'
         # data-bpm_srname='#{info.source_name}'
 
 
@@ -120,6 +125,19 @@ if not window.bpm
                 return _
             else
                 return convert_emote_element info, parts
+    window.bpm.disable = (revertPonimotes) ->
+        $ \#bpm-resources .remove!
+        if revertPonimotes
+            $ \.bpm-emote .replaceAll ->
+                return document.createTextNode do
+                    this.className
+                        .replace /bpflag-in|bpm-emote|^\s+|\s+$/g, ''
+                        .replace /\s+/g, '-'
+            if window.bpm.callback
+                for e, i in window._$context._events.\chat:receive when e == window.bpm.callback
+                        window._$context._events.\chat:receive
+                            .splice i, 1
+                        break
         /*
         # in case it is required to avoid replacing in HTML tags
         # usually though, there shouldn't be ponymotes in links / inline images / converted ponymotes
@@ -153,8 +171,8 @@ if not window.bpm
                     window._$context = module
                     break
 
-        window._$context._events[\chat:receive] .unshift do
-            callback: (d) !->
+        window._$context._events.\chat:receive .unshift do
+            window.bpm.callback = callback: (d) !->
                 d.message = bpm(d.message)
 
     $(window) .one \p0ne_emotes_map, ->

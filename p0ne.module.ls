@@ -19,7 +19,7 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.callbacks ||= []
         data.persistent ||= {}
-        {name, require, optional, callback, callbacks, setup, update, persistent, enable, disable, module} = data
+        {name, require, optional, callback, callbacks, setup, update, persistent, enable, disable, module, settings, displayName} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -36,7 +36,7 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
             module = data
 
 
-        module.displayName = name
+        module.displayName = displayName || name
         # sanitize module name (to alphanum-only camel case)
         # UPDATE: the developers should be able to do this for themselves >_>
         #dataName = name
@@ -57,37 +57,21 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
             for k of a
                 return false if a[k] != b[k]
             return true
+        apply_ = Function::apply
         toggle = (fn, d) ->
             if d.length
                 [target, event, ...args, callback] = d
             else
                 {target, event, args, callback} = d
             if args
-                target[fn].apply target, [event] ++ args ++ [callback]
+                apply_.apply target[fn], d
             else
                 target[fn] event, callback
             return callback
 
         helperFNs =
-            addListener: ({target, event, bound, args, callback}:d) ->
-                cbs.[]listeners[*] = d
-                callback = module[callback] if typeof callback == \string
-                if not typeof callback == \function
-                    console.error "[#name] can't add listener", callback, "for '#event' on", target, " (callback must be a function)"
-                if bound
-                    d = ^^d
-                    d.callback = callback.bound or (callback.bound = callback .bind module)
-                return toggle \on, d
-            removeListener: ({/*target, args, event*/, bound, callback:cbName}:d) ->
-                d.callback = cbName.bound if typeof cbName == \function and bound
-                for listener, i in cbs.listeners||[] when objEqual d, listener
-                    cbs.listeners .remove i
-                    return toggle \off, arguments
-                if typeof cbName == \string
-                    d.callback = module[cbName]
-                    return removeListener d
-                console.error "[#name] couldn't remove listener '#cbName' for '#{event}' from", d.target, "(not found)"
-                return false
+            addListener: (/*target, event, ...args, callback*/) ->
+                return toggle \on, (cbs.[]listeners[*] = [] <<<< arguments)
 
             replace: (target, attr, repl) ->
                 cbs.[]replacements[*] = [target, attr, repl]
@@ -97,8 +81,18 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
                     target[attr] = repl(target["#{attr}_"])
                 else
                     target[attr] = repl
-            replace_$Listener: ->
-                cbs.[]_$context[*] = window.replace_$Listener ...
+            replace_$Listener: (type, callback) ->
+                if not window._$context
+                    console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
+                    return false
+                if not evts = _$context._events[type]
+                    console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no such event)"
+                    return false
+                for e in evts when e.context?.cid
+                    return @replace e, \callback, callback
+
+                console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no vanilla callback found)"
+                return false
 
             add: (target, callback, options) ->
                 d = [target, callback, options]
@@ -106,41 +100,35 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
                 d.index = target.length # not part of the Array, so arrEqual ignores it
                 target[d.index] = callback
                 cbs.[]adds[*] = d
-            remove: (target, callback, {bound}) ->
-                # note: when adding the same callback to the same target multiple times,
-                # remove() will always remove the first one in the target
-                callback .= bind module if bound
-                for d, i in cbs.adds||[] when arrEqual d, arguments
-                    target .remove d.index if d.index != -1
-                    cbs.adds .remove i
-                    return true
-                console.error "[#name] can't find callback '#callback' in", target
+
+            $create: (str) ->
+                return cbs.[]$elements[*] = $ str
 
             disable: ->
                 return if module.disabled
                 module.disabled = true
                 disable?.call module, helperFNs, module, data
-                for d in cbs.listeners||[]
+                for d in cbs.listeners ||[]
                     toggle \off, d
-                for listener in cbs._$context||[]
-                    listener.disable!
-                for [target, attr /*, repl*/] in cbs.replacements||[]
+                for [target, attr /*, repl*/] in cbs.replacements ||[]
                     target[attr] = target["#{attr}_"]
-                for [target /*, callback, options*/]:d in cbs.adds||[]
+                for [target /*, callback, options*/]:d in cbs.adds ||[]
                     target .remove d.index
                     d.index = -1
-                for m in p0ne.dependencies[name]||[]
+                for $el in cbs.$elements ||[]
+                    $el .remove!
+                for m in p0ne.dependencies[name] ||[]
                     m.disable!
                 delete! p0ne.dependencies[name]
 
         module.disable = helperFNs.disable
         if module_ = window[name]
             if persistent
-                for k in persistent || []
+                for k in persistent ||[]
                     module[k] = module_[k]
             module_.disable!
         failedRequirements = []; l=0
-        for r in require||[]
+        for r in require ||[]
             if !r
                 failedRequirements[l++] = r
             else if (typeof r == \string and not window[r])
@@ -149,7 +137,7 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
         if failedRequirements.length
             console.error "[#name] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
             return module
-        optionalRequirements = [r for r in optional||[] when !r or (typeof r == \string and not window[r])]
+        optionalRequirements = [r for r in optional ||[] when !r or (typeof r == \string and not window[r])]
         if optionalRequirements.length
             console.warn "[#name] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
 
@@ -159,6 +147,8 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
                 d.isModuleCallback = true
                 helperFNs.addListener d
             setup?.call module, helperFNs, module, data, module_
+
+            API.trigger \p0neModuleLoaded, module
             if module_
                 console.info "[#name] updated"
             else

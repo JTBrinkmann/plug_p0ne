@@ -1,32 +1,14 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+/**
+ * get fancy song notifications in the chat (with preview thumbnail, description, buttons, …)
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
+
 #ToDo add proper SoundCloud Support
 #   $.ajax url: "https://api.soundcloud.com/tracks/#cid.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
 #   => {permalink_url, artwork_url, description, downloadable}
-
-/*
-module ||= (name, {callback:{target, event, callback}}) ->
-    # module() for the poor
-    if not window[name]
-        target.on event, -> window[name] ...
-    window[name] = callback
-requireHelper = ({id, test, fallback}:a) ->
-    if typeof a == \function
-        test = a
-    module = require.s.contexts._.defined[id] if id
-    if module and test module
-        module.id ||= id
-        return module
-    else
-        for id, module of require.s.contexts._.defined when module
-            if test module, id
-                module.id ?= id
-                console.warn "[requireHelper] module '#{module.name}' updated to ID '#id'"
-                return module
-        return fallback
-getTime = (t = new Date) ->
-    return t.toISOString! .replace(/.+?T|\..+/g, '')
-*/
 
 module \songNotifications, do
     optional: <[ database auxiliaries app ]>
@@ -61,8 +43,7 @@ module \songNotifications, do
                         html +=     "<span class='song-skipped-reason'>#reason</span>" if reason
                         html += "</div>"
                 */
-                if d.media
-                    media = d.media
+                if media = d.media
                     ytCID = ""; timestamp = ""
                     if media.format == 1  # YouTube
                         ytCID = "data-yt-cid='#{media.cid}'"
@@ -83,7 +64,7 @@ module \songNotifications, do
 
                     time = getTime!
                     console.logImg image .then ->
-                        console.log "#time [DV_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#{humanTime media.duration*1000})", d
+                        console.log "#time [DV_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#{mediaTime media.duration*1000})", d
 
                     if window.auxiliaries and window.database
                         timestamp = "<div class='timestamp'>#{auxiliaries.getChatTimestamp(database.settings.chatTS == 24)}</div>"
@@ -123,7 +104,7 @@ module \songNotifications, do
                 appendChat $div
             catch e
                 console.error "[p0ne.notif]" e
-    setup: ({addListener}) ->
+    setup: ({addListener},,,module_) ->
         #== apply stylesheets ==
         loadStyle "#{p0ne.host}/css/p0ne.notif.css"
 
@@ -133,18 +114,15 @@ module \songNotifications, do
             .insertBefore $ '#playback .background'
 
         #== show current song ==
-        if API.getMedia!
+        if not module_ and API.getMedia!
             @callback.callback media: that, dj: API.getDJ!
 
         # hide non-playable videos
-        addListener do
-            target: _$context
-            event: \RestrictedSearchEvent:search
-            callback: ->
-                if window.app?.room?.playback?
-                    that .onSnoozeClick!
-                else
-                    $ '#playback-controls .snooze' .click!
+        addListener _$context, \RestrictedSearchEvent:search, ->
+            if window.app?.room?.playback?
+                that .onSnoozeClick!
+            else
+                $ '#playback-controls .snooze' .click!
 
         #== Grab Songs ==
         window.popMenu = requireHelper do
@@ -171,22 +149,12 @@ module \songNotifications, do
 
                 popMenu.isShowing = false
                 popMenu.show $el, obj
-            addListener do
-                target: $ \#chat-messages
-                event: \click
-                args: <[ .song-add ]>
-                callback: songNotifications.addSong
+            addListener $ \#chat-messages, \click, <[ .song-add ]>, songNotifications.addSong
 
         #== search for author ==
         songNotifications.search = ->
-            app.footer.playlist.onBarClick!
-            app.footer.playlist.playlist.search.searchInput.value = @innerText
-            app.footer.playlist.playlist.search.onSubmitSearch!
-        addListener do
-            target: $ \#chat-messages
-            event: \click
-            args: <[ .song-author ]>
-            callback: songNotifications.search
+            mediaSearch @innerText
+        addListener $ \#chat-messages, \click, <[ .song-author ]>, songNotifications.search
 
         #== description ==
         # disable previous listeners (for debugging)
@@ -226,30 +194,7 @@ module \songNotifications, do
             function showDescription $description, text, formatted
                     # let's get fancy
                     if not formatted
-                        text += " http:a"
-                        lvl = 0
-                        text .= replace /([\s\S]*?)(https?:[^\s\)\]]+)([\.\?\!\,])?/g, (,pre,url,post) ->
-                            pre = pre
-                                .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
-                                .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
-                                .replace /(\s)((?:0x|#)[0-9a-fA-F]+|\d+)(\w*|%|\+)?(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
-                                .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
-                                .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
-                                .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
-                                .replace /(.?)([\(\)])(.?)/g, (x,a,b,c) ->
-                                    if "=^".indexOf(x) == -1 or a == ":"
-                                        return x
-                                    else if b == \(
-                                        lvl++
-                                        return "#a<i class='song-description-comment'>(#c" if lvl == 1
-                                    else if lvl
-                                            lvl--
-                                            return "#a)</i>#c" if lvl == 0
-                                    return x
-                            return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
-                        text .= substr(0, text.length - 39) # remove the http:a
-                        text += "</i>" if lvl
-                        text .= replace "\n", \<br>
+                        text = formatPlainText text
                         $description .data \description, text
 
                     # create description element
@@ -306,15 +251,7 @@ module \songNotifications, do
 
         # $ ".song-description-btn, .song-description" .remove!
         # $ "<div class='song-description-btn'>Description</div>" .insertAfter \.song-author
-        addListener do
-            target: $ \#chat-messages
-            event: \click
-            args: <[ .song-description-btn]>
-            callback: songNotifications.showDescription
-        addListener do
-            target: $ \#chat-messages
-            event: \click
-            args: <[ .song-description ]>
-            callback: songNotifications.hideDescription
+        addListener $ \#chat-messages, \click, <[ .song-description-btn]>, songNotifications.showDescription
+        addListener $ \#chat-messages, \click, <[ .song-description ]>, songNotifications.hideDescription
 
 

@@ -1,40 +1,57 @@
+/**
+ * performance enhancements for plug.dj
+ * the perfEmojify module also adds custom emoticons
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
 module \jQueryPerf, do
-    setup: ->
+    setup: ({replace}) ->
         core_rnotwhite = /\S+/g
         if \classList of document.body #ToDo is document.body.classList more performant?
-            replace jQuery.fn, \addClass, (value) ->
+            replace jQuery.fn, \addClass, -> return (value) ->
+                /* performance improvements */
                 if jQuery.isFunction(value)
-                    return this.each (j) ->
+                    for j in this
                         jQuery(this).addClass value.call(this, j, this.className)
 
-                if typeof value == \string and value
+                else if typeof value == \string and value
                     classes = value.match(core_rnotwhite) || []
 
                     i = 0
-                    while elem = this[i++] when elem.nodeType == 1
+                    while elem = this[i++] when (not elem && console.error(\missingElem, \addClass, this) || !0) and elem.nodeType == 1
                         j = 0
                         while clazz = classes[j++]
                             elem.classList.add clazz
                 return this
 
-            replace jQuery.fn, \removeClass, (value) ->
+            replace jQuery.fn, \removeClass, -> return (value) ->
+                /* performance improvements */
                 if jQuery.isFunction(value)
-                    return this.each (j) ->
+                    for j in this
                         jQuery(this).removeClass value.call(this, j, this.className)
 
-                if typeof value == \string and value
+                else if value ~= null
+                    i = 0
+                    while elem = this[i++] when (not elem && console.error(\missingElem, \removeClass, this) || !0) and elem.nodeType == 1
+                        j = elem.classList .length
+                        while clazz = elem.classList[--j]
+                            elem.classList.remove clazz
+                else if typeof value == \string and value
                     classes = value.match(core_rnotwhite) || []
 
                     i = 0
-                    while elem = this[i++] when elem.nodeType == 1
+                    while elem = this[i++] when (not elem && console.error(\missingElem, \removeClass, this) || !0) and elem.nodeType == 1
                         j = 0
                         while clazz = classes[j++]
                             elem.classList.remove clazz
                 return this
 
-            replace jQuery.fn, \hasClass, (className) ->
+            replace jQuery.fn, \hasClass, -> return (className) ->
+                /* performance improvements */
                 i = 0
-                while elem = this[i++] when elem.nodeType == 1 and elem.classList.contains className
+                while elem = this[i++] when (not elem && console.error(\missingElem, \hasClass, this) || !0) and elem.nodeType == 1 and elem.classList.contains className
                         return true
                 return false
 
