@@ -31,10 +31,7 @@ module \songNotif, do
                 skipper = reason = "" #ToDo
 
                 media = d.media
-                if not media
-                    @$playbackImg .css backgroundImage: null
-                    return
-                if media.id == lastMedia
+                if not media or media.id == lastMedia
                     return
                 lastMedia := media.id
 
@@ -43,13 +40,9 @@ module \songNotif, do
                 time = getTime!
                 if media.format == 1  # YouTube
                     mediaURL = "http://youtube.com/watch?v=#{media.cid}"
-                    image = "https://i.ytimg.com/vi/#{media.cid}/0.jpg"
                 else # if media.format == 2 # SoundCloud
-                    #ToDo improve this
+                    # note: this gets replaced by a proper link as soon as data is available
                     mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent media.author+' - '+media.title}"
-                    image = media.image
-                @$playbackImg
-                    .css backgroundImage: "url(#image)"
 
                 duration = mediaTime media.duration
                 console.logImg media.image.replace(/^\/\//, 'https://') .then ->
@@ -61,11 +54,12 @@ module \songNotif, do
                     timestamp = ""
                 html += "
                     <div class='song-thumb-wrapper'>
-                        <img class='song-thumb' src='#image' />
+                        <img class='song-thumb' src='#{media.image}' />
                         <span class='song-duration'>#duration</span>
                         <div class='song-add btn'><i class='icon icon-add'></i></div>
                         <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
                         <!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> -->
+                        <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
                     </div>
                     #timestamp
                     <div class='song-dj un'></div>
@@ -83,21 +77,21 @@ module \songNotif, do
                     #$.ajax url: "https://api.soundcloud.com/tracks/#{media.id}.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
                     mediaLookup media, then: (d) ->
                         .then (d) ->
-                            $div .removeClass \loading
-                            $div .find \.song-open .attr \href, d.url
-                            $div .data \description, d.description
+                            $div
+                                .removeClass \loading
+                                .data \description, d.description
+                                .find \.song-open .attr \href, d.url
                             if d.download
-                                $div .find \.song-download
-                                    .attr \href, d.download
-                                    .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
-                                $div .addClass \downloadable
+                                $div
+                                    .addClass \downloadable
+                                    .find \.song-download
+                                        .attr \href, d.download
+                                        .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
 
                 appendChat $div
             catch e
                 console.error "[p0ne.notif]" e
 
-        #== add video thumbnail to #playback ==
-        @$playbackImg = $ \#playback-container
         #$create \<div>
         #    .addClass \playback-thumb
         #    .insertBefore $ '#playback .background'
@@ -108,7 +102,7 @@ module \songNotif, do
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=13"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=14"
 
 
         #== show current song ==
@@ -117,9 +111,9 @@ module \songNotif, do
 
         # hide non-playable videos
         addListener _$context, \RestrictedSearchEvent:search, ->
-            muteonce!
+            snooze!
 
-        #== Grab Songs ==        if not popMenu?
+        #== Grab Songs ==
         if popMenu?
             addListener chatDomEvents, \click, \.song-add, ->
                 $el = $ this
@@ -221,12 +215,12 @@ module \songNotif, do
                         -> $description .css height: \auto
 
                 # smooth scroll
-                $cm = $ \#chat-messages
+                cm = $cm!
                 offsetTop = $notif.offset!?.top - 100px
-                ch = $cm .height!
+                ch = cm .height!
                 if offsetTop + h > ch
                     $cm.animate do
-                        scrollTop: $cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
+                        scrollTop: cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
                         # 100px is height of .song-notif without .song-description
 
         function hideDescription
@@ -252,7 +246,7 @@ module \songNotif, do
             if offsetTop < 0px
                 cm = $cm!
                 cm.animate do
-                    scrollTop: $cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
+                    scrollTop: cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
 
         @showDescription = showDescription
         @hideDescription = hideDescription

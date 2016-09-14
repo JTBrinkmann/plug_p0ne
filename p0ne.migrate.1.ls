@@ -67,7 +67,17 @@ do ->
 
         migrated \1.3.9
         fallthrough
-    #| compareVersions v, \1.4.0 =>
+    | compareVersions v, \1.5.0 =>
+        console.info "[p0ne migrate] fixed a bug introduced by the plug.dj update on 2015-02-05 causing CSS classes to be incorrect added to the chat"
+        # settings
+
+        # runtime
+        $ \#chat-messages .removeClass!
+        PopoutView?.chat?.$el .removeClass!
+
+        migrated \1.5.0
+        fallthrough
+    #| compareVersions v, \1.6.0 =>
     #    ...
     #    migrated \1.4.0
     #    fallthrough

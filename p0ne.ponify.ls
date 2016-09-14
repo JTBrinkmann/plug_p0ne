@@ -166,8 +166,8 @@ module \ponify, do
         ':B': name: \twistnerd         , url: "https://i.imgur.com/57VFd38.png"
         ':D': name: \pinkiehappy       , url: "https://i.imgur.com/uFwZib6.png"
         ':S': name: \unsuresweetie     , url: "https://i.imgur.com/EATu0iu.png"
-        ':o': name: \pinkiegasp        , url: "https://i.imgur.com/b9G2kaz.png"
-        ':x': name: \fluttershbad      , url: "https://i.imgur.com/mnJHnsv.png"
+        ':O': name: \pinkiegasp        , url: "https://i.imgur.com/b9G2kaz.png"
+        ':X': name: \fluttershybad     , url: "https://i.imgur.com/mnJHnsv.png"
         ':|': name: \ajbemused         , url: "https://i.imgur.com/8SLymiw.png"
         ';)': name: \raritywink        , url: "https://i.imgur.com/9fo7ZW3.png"
         '<3': name: \heart             , url: "https://i.imgur.com/aPBXLob.png"
@@ -222,7 +222,7 @@ module \ponify, do
         @regexp = ///(?:^|https?:)(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
-            aEM = ^^emoticons.autoEmoteMap #|| {}
+            aEM = {}<<<<emoticons.autoEmoteMap
             for emote, {name, url} of @autoEmotiponies
                 aEM[emote] = name
                 @emotiponies[name] = url

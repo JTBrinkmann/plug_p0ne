@@ -120,11 +120,14 @@ module \titleCurrentSong, do
 
 
 /*####################################
-#       MEH-ICON IN USERLIST         #
+#       MORE ICON IN USERLIST        #
 ####################################*/
 module \userlistIcons, do
     require: <[ RoomUserRow ]>
+    _settings:
+        forceMehIcon: false
     setup: ({replace})  ->
+        settings = @_settings
         replace RoomUserRow::, \vote, -> return ->
             if @model.id == API.getDJ!
                 @$icon.addClass \icon-woot
@@ -150,7 +153,8 @@ module \userlistIcons, do
                     .addClass \icon
                     .appendTo @$el
 
-                if vote == -1
+                if vote == -1 and API.getUser!.role > 0 or settings.forceMehIcon
+                    # i think RDJs should be able to see mehs as well
                     @$icon.addClass \icon-meh
                 else if vote == \grab
                     @$icon.addClass \icon-grab
@@ -163,61 +167,6 @@ module \userlistIcons, do
                 delete @$icon
 
 
-/*####################################
-#      DISABLE MESSAGE DELETE        #
-####################################*/
-module \disableChatDelete, do
-    require: <[ _$context ]>
-    optional: <[ socketListeners ]>
-    settings: \chat
-    displayName: 'Show deleted messages'
-    setup: ({replace_$Listener, addListener, $create, css}) ->
-        $body .addClass \p0ne_showDeletedMessages
-        css \disableChatDelete, '
-            .deleted {
-                border-left: 2px solid red;
-                display: none;
-            }
-            .p0ne_showDeletedMessages .deleted {
-                display: block;
-            }
-            .deleted-message {
-                display: block;
-                text-align: right;
-                color: red;
-                font-family: monospace;
-            }
-        '
-
-        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
-            markAsDeleted(c, users.get(mi)?.get(\username) || mi)
-        addListener \early, _$context, \chat:delete, -> return (cid) ->
-            markAsDeleted(cid) if not socketListeners
-
-        function markAsDeleted cid, moderator
-            $msg = getChat cid
-            #ToDo add scroll down
-            console.log "[Chat Delete]", cid, $msg.text!
-            t  = getISOTime!
-            t += " by #moderator" if moderator
-            try
-                wasAtBottom = isChatAtBottom?!
-                $msg
-                    .removeClass \deletable
-                    .addClass \deleted
-                d = $create \<time>
-                    .addClass \deleted-message
-                    .attr \datetime, t
-                    .text t
-                    .appendTo $msg
-                #cm = $cm!
-                #cm.scrollTop cm.scrollTop! + d.height!
-                scrollChatDown?! if wasAtBottom
-
-    disable: ->
-        $body .removeClass \p0ne_showDeletedMessages
-
-
 
 /*####################################
 #        DBLCLICK to @MENTION        #
@@ -228,14 +177,28 @@ module \chatDblclick2Mention, do
     settings: \chat
     displayName: 'DblClick username to Mention'
     setup: ({replace, addListener}) ->
-        newFromClick = (e) ~>
-            if not @timer # single click
-                @timer = sleep 200ms, ~> if @timer
-                    @timer = 0
-                    chat.onFromClick e
+        module = this
+        newFromClick = (e) ->
+            if not module.timer # single click
+                module.timer = sleep 200ms, ~> if module.timer
+                    try
+                        module.timer = 0
+                        $this = $ this
+                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || (i = getUserInternal $this.text!).id
+                            pos =
+                                x: chat.getPosX!
+                                y: $this .offset!.top
+                            if i = getUserInternal(r)
+                                chat.onShowChatUser i, pos
+                            else
+                                chat.getExternalUser r, pos, chat.showChatUserBind
+                        else
+                            console.warn "[DblCLick username to Mention] couldn't get userID", this
+                    catch err
+                        console.error err.stack
             else # double click
-                clearTimeout @timer
-                @timer = 0
+                clearTimeout module.timer
+                module.timer = 0
                 chat.onInputMention e.target.textContent
             e .stopPropagation!; e .preventDefault!
 
@@ -256,38 +219,98 @@ module \chatDblclick2Mention, do
             .on \click, @fC_
 
 
-
 /*####################################
 #           CHAT COMMANDS            #
 ####################################*/
 module \chatCommands, do
+    optional: <[ currentMedia ]>
     setup: ({addListener}) ->
-        addListener API, \chatCommand, (c) ->
-            switch /\/\w+/.exec(c)?.0
-            | \/avail, \/available =>
+        addListener API, \chatCommand, (c) ~>
+            @_commands[/^\/(\w+)/.exec(c)?.1]?(c)
+        @updateCommands!
+
+    updateCommands: ->
+        @_commands = {}
+        for k,v of @commands
+            @_commands[k] = v.callback
+            for k in v.aliases ||[]
+                @_commands[k] = v.callback
+    commands:
+        help:
+            aliases: <[ commands ]>
+            description: "show this list of commands"
+            callback: ->
+                res = ""
+                for k,command of chatCommands.commands
+                    if command.aliases?.length
+                        aliases = "aliases: #{humanList command.aliases}"
+                    else
+                        aliases = ''
+                    res += "<div class='p0ne-help-command' alt='#aliases'><b>/#k</b> #{command.params ||''} - #{command.description}</div>"
+                appendChat($ "<div class=p0ne-help>" .html res)
+        available:
+            aliases: <[ avail ]>
+            description: "change your status to <b>available</b>"
+            callback: ->
                 API.setStatus 0
-            | \/afk, \/away =>
+
+        away:
+            aliases: <[ afk ]>
+            description: "change your status to <b>away</b>"
+            callback: ->
                 API.setStatus 1
-            | \/work, \/busy =>
+
+        busy:
+            aliases: <[ work working ]>
+            description: "change your status to <b>busy</b>"
+            callback:  ->
                 API.setStatus 2
-            | \/gaming, \/ingame, \/game =>
+
+        gaming:
+            aliases: <[ game ingame ]>
+            description: "change your status to <b>gaming</b>"
+            callback:  ->
                 API.setStatus 3
-            | \/join =>
-                join!
-            | \/leave =>
-                leave!
-            | \/mute =>
-                mute!
-            | \/muteonce, \/onemute =>
-                muteonce!
-            | \/unmute =>
-                unmute!
-            | \/automute =>
-                muteonce!
-                if not automute?
-                    API.chatLog "automute is not yet implemented", true
+
+        join:
+            description: "join the waitlist"
+            callback: join
+        leave:
+            description: "leave the waitlist"
+            callback: leave
+
+        stream:
+            parameters: " [on|off]"
+            description: "enable/disable the stream (just '/stream' toggles it)"
+            callback: ->
+                if currentMedia?
+                    stream c.has \on || not (c.has \off || \toggle)
                 else
+                    API.chatLog "couldn't load required module for enabling/disabling the stream.", true
+
+        snooze:
+            description: "snoozes the current song"
+            callback: snooze
+        mute:
+            description: "mutes the audio"
+            callback: mute
+        unmute:
+            description: "unmutes the audio"
+            callback: unmute
+
+        muteonce:
+            aliases: <[ muteonce ]>
+            description: "mutes the current song"
+            callback: muteonce
+
+        automute:
+            description: "adds/removes this song from the automute list"
+            callback:  ->
+                muteonce!
+                if automute?
                     automute!
+                else
+                    API.chatLog "automute is not yet implemented", true
 
 /*####################################
 #              AUTOMUTE              #
@@ -303,16 +326,9 @@ module \automute, do
             @songlist[media.id] = true
             API.chat "'#{media.author} - #{media.title}' added to automute list."
     setup: ({addListener}) ->
-        isAutomuted = false
         addListener API, \advance, ({media}) ~>
-            wasAutomuted = isAutomuted
-            isAutomuted := false
-            if media and media.id in @songlist
-                isAutomuted := true
-            if isAutomuted
-                mute!
-            else if wasAutomuted
-                unmute!
+            if media and @songlist[media.id]
+                muteonce!
 
 
 

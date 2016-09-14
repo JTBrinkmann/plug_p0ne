@@ -31,7 +31,7 @@ Array::define \unique, ->
             break if @[o] == el
         else
             res[l++] = el
-    return
+    return res
 String::define \reverse, ->
     res = ""
     i = @length
@@ -152,14 +152,13 @@ window <<<<
     getUser: (user) !->
         return if not user
         if typeof user == \object
+            return that if user.id and getUser(user.id)
             if user.username
                 return user
             else if user.attributes and user.toJSON
                 return user.toJSON!
-            else if user.un
-                return getUser(user.id) || getUser(user.un)
-            else if user.id
-                return getUser(user.id)
+            else if user.username || user.dj || user.user
+                return getUser(that)
             return null
         userList = API.getUsers!
         if +user
@@ -168,30 +167,34 @@ window <<<<
             else
                 for u in userList when u.id == user
                     return u
-
-        for u in userList when u.username == user
-            return u
-        user .= toLowerCase!
-        for u in userList when u.username .toLowerCase! == user
-            return u
+        else if typeof user == \string
+            for u in userList when u.username == user
+                return u
+            user .= toLowerCase!
+            for u in userList when u.username .toLowerCase! == user
+                return u
+        else
+            console.warn "unknown user format", user
     getUserInternal: (user) !->
         return if not user or not users
         if typeof user == \object
+            return that if user.id and getUserInternal(user.id)
             if user.attributes
                 return user
-            else if user.username
-                return users.get(user.id)
+            else if user.username || user.dj || user.user || user.id
+                return getUserInternal(that)
             return null
 
         if +user
             users.get user
-        else
-            users = users.models
-            for u in users when u.username == user
+        else if typeof user == \string
+            for u in users.models when u.get(\username) == user
                 return u
             user .= toLowerCase!
-            for u in users when u.username .toLowerCase! == user
+            for u in users.models when u.get(\username) .toLowerCase! == user
                 return u
+        else
+            console.warn "unknown user format", user
 
     logger: (loggerName, fn) ->
         if typeof fn == \function
@@ -311,25 +314,69 @@ window <<<<
 
     $djButton: $ \#dj-button
     mute: ->
-        return $ '.icon-volume-half, .icon-volume-on' .click! .length
+        return $ '#volume .icon-volume-half, #volume .icon-volume-on' .click! .length
     muteonce: ->
-        return $ \.snooze .click! .length
+        mute!
+        muteonce.last = API.getMedia!.id
+        API.once \advance, ->
+            unmute! if API.getMedia!.id != muteonce.last
     unmute: ->
-        return $ '.playback-controls.snoozed .refresh, .icon-volume-off, .icon-volume-mute-once'.click! .length
+        return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click! .length
+    snooze: ->
+        return $ '#playback .snooze' .click! .length
+    refresh: ->
+        return $ '#playback .refresh' .click! .length
+    stream: (val) ->
+        if not currentMedia
+            console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
+        else
+            currentMedia?.set \streamDisabled, (val != true and (val == false or currentMedia.get(\streamDisabled)))
     join: ->
+        # for this, performance might be essential
+        # return $ '#dj-button.is-wait' .click! .length != 0
         if $djButton.hasClass \is-wait
             $djButton.click!
             return true
         else
             return false
     leave: ->
-        if $djButton.hasClass \is-leave
-            $djButton.click!
-            return true
-        else
-            return false
+        return $ '#dj-button.is-leave' .click! .length != 0
 
+    ytItags: do ->
+        resolutions = [ 72p, 144p, 240p,  360p, 480p, 720p, 1080p, 1440p, 2160p, 3072p ]
+        list =
+            # DASH-only content is commented out, as it is not yet required
+            * ext: \flv, minRes: 240p, itags: <[ 5 ]>
+            * ext: \3gp, minRes: 144p, itags:  <[ 17 36 ]>
+            * ext: \mp4, minRes: 240p, itags:  <[ 83 18,82 _ 22,84 85 ]>
+            #* ext: \mp4, minRes: 240p, itags:  <[ 133 134 135 136 13 138 160 264 ]>, type: \video
+            #* ext: \mp4, minRes: 720p, itags:  <[ 298 299 ]>, fps: 60, type: \video
+            #* ext: \mp4, minRes: 128kbps, itags:  <[ 140 ]>, type: \audio
+            * ext: \webm, minRes: 360p, itags:  <[ 43,100 ]>
+            #* ext: \webm, minRes: 240p, itags:  <[ 242 243 244 247 248 271 272 ]>, type: \video
+            #* ext: \webm, minRes: 720p, itags:  <[ 302 303 ]>, fps: 60, type: \video
+            #* ext: \webm, minRes: 144p, itags:  <[ 278 ]>, type: \video
+            #* ext: \webm, minRes: 128kbps, itags:  <[ 171 ]>, type: \audio
+            * ext: \ts, minRes: 240p, itags:  <[ 151 132,92 93 94 95 96 ]> # used for live streaming
+        res = {}
+        for format in list
+            for itags, i in format.itags when itag != \_
+                # formats with type: \audio not taken into account ignored here
+                startI = resolutions.indexOf format.minRes
+                for itag in itags.split ","
+                    res[itag] =
+                        ext: format.ext
+                        resolution: resolutions[startI + i]
+        return res
 
+    mediaSearch: (query) ->
+        $ '#playlist-button .icon-playlist'
+            .click! # will silently fail if playlist is already open
+        $ \#search-input-field
+            .val query
+            .trigger do
+                type: \keyup
+                which: 13 # Enter
     mediaLookup: ({format, id, cid}:url, cb) ->
         if typeof cb == \function
             success = cb
@@ -357,20 +404,20 @@ window <<<<
                 .fail fail
                 .success (d) ->
                     cid = d.entry.id.$t.substr(27)
-                    window.mediaLookup.lastData =
-                        format:       1
-                        data:         d
-                        cid:          cid
-                        uploader:
-                            name:     d.entry.author.0.name.$t
-                            id:       d.entry.media$group.yt$uploaderId.$t
-                        image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                        title:        d.entry.title.$t
-                        uploadDate:   d.entry.published.$t
-                        url:          "https://youtube.com/watch?v=#cid"
-                        description:  d.entry.media$group.media$description.$t
-                        duration:     d.entry.media$group.yt$duration.seconds # in s
-                    success window.mediaLookup.lastData
+                    success do
+                        window.mediaLookup.lastData =
+                            format:       1
+                            data:         d
+                            cid:          cid
+                            uploader:
+                                name:     d.entry.author.0.name.$t
+                                id:       d.entry.media$group.yt$uploaderId.$t
+                            image:        "https://i.ytimg.com/vi/#cid/0.jpg"
+                            title:        d.entry.title.$t
+                            uploadDate:   d.entry.published.$t
+                            url:          "https://youtube.com/watch?v=#cid"
+                            description:  d.entry.media$group.media$description.$t
+                            duration:     d.entry.media$group.yt$duration.seconds # in s
         else if format == 2
             if cid
                 req = $.getJSON "https://api.soundcloud.com/tracks/#cid.json", do
@@ -382,82 +429,224 @@ window <<<<
             return req
                 .fail fail
                 .success (d) ->
-                    window.mediaLookup.lastData =
-                        format:         2
-                        data:           d
-                        cid:            cid
-                        uploader:
-                            id:         d.user.id
-                            name:       d.user.username
-                            image:      d.user.avatar_url
-                        image:          d.artwork_url
-                        title:          d.title
-                        uploadDate:     d.created_at
-                        url:            d.permalink_url
-                        description:    d.description
-                        duration:       d.duration / 1000ms_to_s # in s
+                    success do
+                        window.mediaLookup.lastData =
+                            format:         2
+                            data:           d
+                            cid:            cid
+                            uploader:
+                                id:         d.user.id
+                                name:       d.user.username
+                                image:      d.user.avatar_url
+                            image:          d.artwork_url
+                            title:          d.title
+                            uploadDate:     d.created_at
+                            url:            d.permalink_url
+                            description:    d.description
+                            duration:       d.duration / 1000ms_to_s # in s
 
-                        download:       d.download_url + "?client_id=#{p0ne.SOUNDCLOUD_KEY}"
-                        downloadSize:   d.original_content_size
-                        downloadFormat: d.original_format
-                    success window.mediaLookup.lastData
+                            download:       d.download_url + "?client_id=#{p0ne.SOUNDCLOUD_KEY}"
+                            downloadSize:   d.original_content_size
+                            downloadFormat: d.original_format
         else
             return $.Deferred()
                 .fail fail
-                .rejectWith"unsupported format"
+                .reject "unsupported format"
 
-    mediaDownload: (media, cb) ->
-        media ||= API.getMedia!
-        {format, cid, id} = media
-        if typeof media == \function or media.success or media.fail
-            cb = media; media = false
-        media ||= API.getMedia!
+    mediaDownload: (media, audioOnly, cb) ->
+        # arguments parsing
+        if not media or typeof media == \boolean or typeof media == \function or media.success or media.error # if `media` is left out
+            [media, audioOnly, cb] = [false, media, cb]
+        else if typeof audioOnly != \boolean # if audioOnly is left out
+            cb = audioOnly; audioOnly = false
+
+        # parsing cb
         if typeof cb == \function
             success = cb
         else if cb
-            {success, fail} = cb
-        success ||= logger \mediaDownload # success(downloadURL, downloadSize)
-        error ||= logger \mediaDownloadError
+            {success, error} = cb
+
+        # defaulting arguments
+        if media?.attributes
+            {format, cid, id} = media.attributes
+        else
+            media ||= API.getMedia!
+            {format, cid, id} = media
+
+
+        res =  $.Deferred()
+        res
+            .then success || logger \mediaDownload
+            .fail error || logger \mediaDownloadError
+            .fail (err) ->
+                if audioOnly or format == 2
+                    media.downloadAudioError = err
+                else
+                    media.downloadError = err
+
+        if audioOnly or format == 2
+            return res.resolve media.downloadAudio if media.downloadAudio
+            return res.reject media.downloadAudioError if media.downloadAudioError
+        else
+            return res.resolve media.download if media.download
+            return res.reject media.downloadError if media.downloadError
 
         cid ||= id
         if format == 1 # youtube
+            url = p0ne.proxy "https://www.youtube.com/get_video_info?video_id=#cid"
+            console.info "[mediaDownload] YT lookup", url
             $.ajax do
-                url: p0ne.proxy "https://www.youtube.com/get_video_info?video_id=#cid"
-                fail: fail
+                url: url
+                error: res.reject
                 success: (d) ->
-                    if d.match(/url_encoded_fmt_stream_map=.*url%3D(.*?)%26/)
-                        success? unescape(unescape(that.1))
+                    /*== Parser ==
+                    # useful for debugging
+                    parse = (d) ->
+                      if d.startsWith "http"
+                        return d
+                      else if d.has(",")
+                        return d.split(",").map(parse)
+                      else if d.has "&"
+                        res = {}
+                        for a in d.split "&"
+                          a .= split "="
+                          if res[a.0]
+                            res[a.0] = [res[a.0]] if not $.isArray res[a.0]
+                            res[a.0][*] = parse unescape(a.1)
+                          else
+                            res[a.0] = parse unescape(a.1)
+                        return res
+                      else if not isNaN(d)
+                        return +d
+                      else if d in <[ True False ]>
+                        return d == \True
+                      else
+                        return d
+                    parse(d)
+                    */
+                    basename = d.match(/title=(.*?)(?:&|$)/)?.1 || cid
+                    basename = unescape(basename).replace /\++/g, ' '
+                    files = {}
+                    bestVideo = null
+                    bestVideoSize = 0
+                    if not audioOnly
+                        if d.match(/adaptive_fmts=(.*?)(?:&|$)/)
+                            for file in unescape(that.1) .split ","
+                                url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
+                                if file.match(/type=(.*?)%3B/)
+                                    mimeType = unescape that.1
+                                    filename = "#basename.#{mimeType.substr 6}"
+                                    if file.match(/size=(.*?)(?:&|$)/)
+                                        resolution = unescape(that.1)
+                                        size = resolution.split \x
+                                        size = size.0 * size.1
+                                        (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
+                                        if size > bestVideoSize
+                                            bestVideo = video
+                                            bestVideoSize = size
+                        else if d.match(/url_encoded_fmt_stream_map=(.*?)(?:&|$)/)
+                            console.warn "[mediaDownload] only a low quality stream could be found for", cid
+                            for file in unescape(that.1) .split ","
+                                url = that.1 if d.match(/url=(.*?)(?:&|$)/)
+                                if ytItags[d.match(/itag=(.*?);/)?.1]
+                                    (files[that.ext] ||= [])[*] = video =
+                                        file: "#basename.#{that.ext}"
+                                        url: httpsify $baseurl.text!
+                                        mimeType: "#{that.type}/#{that.ext}"
+                                        resolution: that.resolution
+                                    if that.resolution > bestVideoSize
+                                        bestVideo = video
+                                        bestVideoSize = that.resolution
+
+                        files.preferredDownload = bestVideo
+                        console.log "[mediaDownload] resolving", files
+                        res.resolve media.download = files
+
+                    # audioOnly
+                    else if d.match(/dashmpd=(http.+?)(?:&|$)/)
+                        url = p0ne.proxy(unescape that.1 /*parse(d).dashmpd*/)
+                        console.info "[mediaDownload] DASHMPD lookup", url
+                        $.get url
+                            .then (dashmpd) ->
+                                $dash = $ $.parseXML dashmpd
+                                bestVideo = size: 0
+                                $dash .find \AdaptationSet .each ->
+                                    $set = $ this
+                                    mimeType = $set .attr \mimeType
+                                    type = mimeType.substr(0,5) # => \audio or \video
+                                    return if type != \audio #and audioOnly
+                                    files[mimeType] = []; l=0
+                                    $set .find \BaseURL .each ->
+                                        $baseurl = $ this
+                                        $representation = $baseurl .parent!
+                                        #height = $representation .attr \height
+                                        files[mimeType][l++] = m =
+                                            file: "#basename.#{mimeType.substr 6}"
+                                            url: httpsify $baseurl.text!
+                                            mimeType: mimeType
+                                            size: $baseurl.attr(\yt:contentLength) / 1_000_000B_to_MB
+                                            samplingRate: "#{$representation .attr \audioSamplingRate}Hz"
+                                            #height: height
+                                            #width: height && $representation .attr \width
+                                            #resolution: height && "#{height}p"
+                                        if audioOnly and ~~m.size > ~~bestVideo.size and (window.chrome or mimeType != \audio/webm)
+                                                bestVideo := m
+                                files.preferredDownload = bestVideo
+                                console.log "[mediaDownload] resolving", files
+                                res.resolve media.downloadAudio = files
+
+                                /*
+                                html = ""
+                                for mimeType, files of res
+                                    html += "<h3 class=AdaptationSet>#mimeType</h3>"
+                                    for f in files
+                                        html += "<a href='#{$baseurl.text!}' download='#file' class='download"
+                                        html += " preferred-download" if f.preferredDownload
+                                        html += "'>#file</a> (#size; #{f.samplingRate || f.resolution})<br>"
+                                */
+                            .fail res.reject
                     else
-                        fail? "unkown error"
+                        console.error "[mediaDownload] no download found"
+                        res.reject "no download found"
+                        #window.open(htmlUnescape(/.+>(http.+?)<\/BaseURL>/i.exec(d)[1]))
         else if format == 2 # soundcloud
+            audioOnly = true
             mediaLookup media
                 .then (d) ->
                     if d.download
-                        success? d.download, d.downloadSize, downloadFormat
+                        d =
+                            "#{d.downloadFormat}":
+                                url: d.download
+                                size: d.downloadSize
+                        res.resolve media.downloadAudio = d
                     else
-                        fail? "download disabled"
-                .fail ->
-                    fail? ...
+                        res.reject "download disabled"
+                .fail res.reject
+        else
+            console.error "[mediaDownload] unknown format", media
+            res.reject "unknown format"
 
-    mediaSearch: (query) ->
-        $ '#playlist-button .icon-playlist'
-            .click! # will silently fail if playlist is already open
-        $ \#search-input-field
-            .val query
-            .trigger do
-                type: \keyup
-                which: 13 # Enter
+        return res.promise!
 
-    httpsify: (url) ->
+    proxify: (url) ->
         if url.startsWith("http:")
             return p0ne.proxy url
         else
             return url
+    httpsify: (url) ->
+        if url.startsWith("http:")
+            return "https://#{url.substr 7}"
+        else
+            return url
 
     getChatText: (cid) ->
-        return $! if not cid
-        # if cid is undefined, it will return the last .cid-undefined (e.g. on .moderations, etc)
-        return $cm! .find ".cid-#cid" .last!
+        if not cid
+            return $!
+        else
+            res = $cm! .find ".cid-#cid" .last!
+            if not res.hasClass \.text
+                res .= find \.text .last!
+            return res
     getChat: (cid) ->
         return getChatText cid .parent! .parent!
     #ToDo test this
@@ -493,7 +682,7 @@ window <<<<
 
         mentions = [getUser(data)] if not mentions.length and not safeOffsets
         mentions.toString = ->
-            res = [user.username for user in this]
+            res = ["@#{user.username}" for user in this]
             return humanList res # both lines seperate for performance optimization
         data[attr] = mentions
         return mentions
@@ -637,12 +826,15 @@ window <<<<
     getISOTime: (t = new Date)->
         return t.toISOString! .replace(/T|\..+/g, " ")
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
-    humanTime: (diff) ->
+    humanTime: (diff, short) ->
         return "-#{humanTime -diff}" if diff < 0
         b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
         diff /= 1000to_s
         while diff > 2*b[c] then diff /= b[c++]
-        return plural ~~diff, <[ second minute hour day ]>[c]
+        if short
+            return "#{~~diff}#{<[ s m h d ]>[c]}"
+        else
+            return plural ~~diff, <[ second minute hour day ]>[c]
     # show a timespan (in s) in a format like "mm:ss" or "hh:mm:ss" etc
     mediaTime: (~~dur) ->
         return "-#{mediaTime -dur}" if dur < 0
@@ -694,8 +886,9 @@ window <<<<
         fn = (className) ->
             $icon.addClass className
             res =
-                image:    $icon .css \background-image
-                position: $icon .css \background-position
+                background: $icon .css \background
+                image:      $icon .css \background-image
+                position:   $icon .css \background-position
             $icon.removeClass className
             return res
         fn.enableCaching = -> res = _.memoize(fn); res.enableCaching = $.noop; window.getIcon = res
@@ -758,10 +951,15 @@ requireHelper \Layout, (.getSize)
 requireHelper \DialogAlert, (.::?.id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
 requireHelper \ActivateEvent, (.ACTIVATE)
+requireHelper \votes, (.attributes?.grabbers)
 requireHelper \tracker, (.identify)
+requireHelper \currentMedia, (.updateElapsedBind)
+requireHelper \settings, (.settings)
+requireHelper \soundcloud, (.sc)
+requireHelper \userList, (.id == \user-lists)
 requireHelper \FriendsList, (.::?.className == \friends)
 requireHelper \RoomUserRow, (.::?.vote)
-requireHelper \WaitlistRow, (.::?.onDJClick)
+requireHelper \WaitlistRow, (.::?.onAvatar)
 requireHelper \PlaylistItemRow, (.::?.listClass == \playlist-media)
 requireHelper \room, (.attributes?.hostID?)
 

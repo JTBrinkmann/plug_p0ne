@@ -92,7 +92,7 @@
     return lambda;
 });
 
-window.l = function(expression) {
+window.l = window.l_ = function(expression) {
     var vars = [], refs = 0
     var replacedNCO = true
     expression = expression

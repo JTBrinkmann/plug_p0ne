@@ -19,12 +19,6 @@ MAX_IMAGE_HEIGHT = 300px # should be kept in sync with p0ne.css
 roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
 
 
-window.imgError = (elem) ->
-    console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
-    $ elem .parent!
-        ..text ..attr \href
-        ..addClass \p0ne_img_failed
-
 
 /*####################################
 #      UNREAD CHAT NOTIFICAITON      #
@@ -32,6 +26,8 @@ window.imgError = (elem) ->
 module \unreadChatNotif, do
     require: <[ _$context chatDomEvents ]>
     bottomMsg: $!
+    settings: \chat
+    displayName: 'Mark Unread Chat'
     setup: ({addListener}) ->
         $chatButton = $ \#chat-button
         @bottomMsg = $cm! .children! .last!
@@ -49,8 +45,7 @@ module \unreadChatNotif, do
             message.addClass \unread
         @throttled = false
         addListener chatDomEvents, \scroll, updateUnread
-        addListener $chatButton, \click, ->
-            updateUnread
+        addListener $chatButton, \click, updateUnread
         ~function updateUnread
             return if @throttled
             @throttled := true
@@ -221,12 +216,18 @@ module \p0neChatInput, do
 
         sleep 2_000ms, @fixIndent
 
+        chatHidden = $cm!.parent!.css(\display) == \none
         if _$context
             addListener _$context, \chat:send, -> requestAnimationFrame ->
                 chat.$chatInputField .trigger \input
+            if chatHidden
+                _$context.once \show:chat, @fixIndent
+        else if chatHidden
+            $ \#chat-button .one \click, @fixIndent
 
         if user_?
             addListener user_, \change:username, @fixIndent
+
 
         function onInput
             content = chat.$chatInputField .val!
@@ -270,31 +271,32 @@ module \chatPlugin, do
                 onload = 'onload="chatScrollDown()"'
             else
                 onload = ''
-            msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,domain,url)->
-                [domain, url] = [url, domain]
+            msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,url, domain, offset)->
                 domain .= toLowerCase!
-                &6 = onload
-                &7 = msg
-                for plugin in p0ne.chatLinkPlugins
-                    try
-                        return that if plugin ...
-                    catch err
-                        console.error "[p0ne] error while processing chat link plugin", plugin, err
+                for ctx in [_$context, API] when ctx._events[\chat:image]
+                    for plugin in ctx._events[\chat:image]
+                        try
+                            return that if plugin.callback.call plugin.ctx, {all,pre,completeURL,protocol,domain,url, offset,  onload,msg}
+                        catch err
+                            console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
                 return all
 
         addListener _$context, \chat:receive, (e) ->
             getChat(e.cid) .addClass Object.keys(e.classes).join(' ')
 
         function addClass classes
-            console.log "#{@cid} add class '#classes'"
             if typeof classes == \string
                 for className in classes.split /\s+/g when className
-                    console.log "\t- added class #className"
                     @classes[className] = true
         function removeClass classes
             if typeof classes == \string
                 for className in classes.split /\s+/g
                     delete @classes[className]
+    imgError: (elem) ->
+        console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
+        $ elem .parent!
+            ..text ..attr \href
+            ..addClass \p0ne_img_failed
 
 
 /*####################################
@@ -314,7 +316,11 @@ module \chatMessageClasses, do
                         role = getRank(fromUser)
                         if role != -1
                             fromRole = "from-#{roles[role]}"
-                            fromRole += " from-staff" if role > 1 # RDJ
+                            if role == 0
+                                fromRole += " from"
+                                # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                            else
+                                fromRole += " from-staff"
                     if not fromRole
                         for r in ($this .find \.icon .prop(\className) ||"").split " " when r.startsWith \icon-chat-
                             fromRole = "from-#{r.substr 10}"
@@ -369,25 +375,29 @@ module \chatInlineImages, do
     help: '''
         Converts image links to images in the chat, so you can see a preview
     '''
-    setup: ({add}) ->
-        add p0ne.chatLinkPlugins, (all,pre,completeURL,protocol,domain,url, onload) ~>
+    setup: ({addListener}) ->
+        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, msg, offset}) ~>
+            return if msg.message.hasAny <[ nsfw no-inline noinline ]> or msg.message[offset + all.length] == ";"
             # images
             if @plugins[domain] || @plugins[domain .= substr(1 + domain.indexOf(\.))]
-                [rgx, repl] = that
+                [rgx, repl, forceProtocol] = that
                 img = url.replace(rgx, repl)
                 if img != url
                     console.log "[inline-img]", "#completeURL ==> #protocol#img"
-                    return "<a #pre><img src='#protocol#img' class=p0ne_img #onload onerror='imgError(this)'></a>"
+                    return "<a #pre><img src='#{forceProtocol||protocol}#img' class=p0ne_img #onload onerror='chatInlineImages.imgError(this)'></a>"
 
-            # direct images (the revision suffix si required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest?cb=20131206071408)
-            #   <URL stuff><    image suffix                hires       image.php   revision suffix     query/hash
-            if /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)(?:@\dx)?|image\.php)(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i .test url
+            # direct images (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest?cb=20131206071408)
+            #   <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
+            if /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i .test url
+                if domain in @forceHTTPSDomains
+                    completeURL .= replace /^.+\/\//, 'https://'
                 console.log "[inline-img]", "[direct] #completeURL"
-                return "<a #pre><img src='#completeURL' class=p0ne_img #onload onerror='imgError(this)'></a>"
+                return "<a #pre><img src='#completeURL' class=p0ne_img #onload onerror='chatInlineImages.imgError(this)'></a>"
 
             console.log "[inline-img]", "NO MATCH FOR #completeURL (probably isn't an image)"
             return false
 
+    forceHTTPSDomains: <[ i.imgur.com ]>
     plugins:
         \imgur.com :       [/^imgur.com\/(?:r\/\w+\/)?(\w\w\w+)/g, "i.imgur.com/$1.gif"]
         \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/g, "$1/direct"]
@@ -535,7 +545,7 @@ module \imageLightbox, do
 #        \sta.sh :            [/^sta.sh\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
 #        \gfycat.com :        [/^gfycat.com\/(.+)/, "https://api.plugCubed.net/redirect/gfycat/$1"]
 
-
+/*
 module \chatYoutubeThumbnails, do
     settings: \chat
     help: '''
@@ -543,28 +553,31 @@ module \chatYoutubeThumbnails, do
         When hovering the thumbnail, it will animate, alternating between three frames of the video.
     '''
     setup: ({add, addListener}) ->
-        add p0ne.chatLinkPlugins, @plugin
-        addListener $(\#chat), 'mouseenter mouseleave', \.p0ne_yt_img, (e) ~>
+        addListener chatDomEvents, \mouseenter, \.p0ne_yt_img, (e) ~>
             clearInterval @interval
-            # assuming that `e.target` always refers to the .p0ne_yt_img
-            id = e.parentElement.dataset.ytCid
-            img = e.target
-            if e.type == \mouseenter
-                if id != @lastID
-                    @frame = 1
-                    @lastID = id
+            img = this
+            id = this.parentElement
+
+            if id != @lastID
+                @frame = 1
+                @lastID = id
+            img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
+            @interval = repeat 1_000ms, ~>
+                console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
+                @frame = (@frame % 3) + 1
                 img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-                @interval = repeat 1_000ms, ~>
-                    console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
-                    @frame = (@frame % 3) + 1
-                    img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-                console.log "[p0ne_yt_preview]", "started", e, id, @interval
-                #ToDo show YT-options (grab, open, preview, [automute])
-            else
-                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
-                console.log "[p0ne_yt_preview]", "stopped"
-                #ToDo hide YT-options
-    plugin: (all,pre,completeURL,protocol,domain,url, onload) ->
+            console.log "[p0ne_yt_preview]", "started", e, id, @interval
+            #ToDo show YT-options (grab, open, preview, [automute])
+
+        addListener chatDomEvents, \mouseleave, \.p0ne_yt_img, (e) ~>
+            clearInterval @interval
+            img = this
+            id = this.parentElement.dataset.ytCid
+            img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
+            console.log "[p0ne_yt_preview]", "stopped"
+            #ToDo hide YT-options
+
+        addListener API, \chat:image, ({pre, url, onload}) ->
         yt = YT_REGEX .exec(url)
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
@@ -580,3 +593,4 @@ module \chatYoutubeThumbnails, do
     interval: -1
     frame: 1
     lastID: ''
+*/

@@ -66,6 +66,10 @@ module \PopoutListener, do
             r_ ...
             _$context?.trigger \popout:open, PopoutView._window, PopoutView
             API.trigger \popout:open, PopoutView._window, PopoutView
+        replace PopoutView, \close, (c_) -> return ->
+            c_ ...
+            _$context?.trigger \popout:close, PopoutView._window, PopoutView
+            API.trigger \popout:close, PopoutView._window, PopoutView
 
 module \chatDomEvents, do
     require: <[ backbone ]>
@@ -83,7 +87,7 @@ module \chatDomEvents, do
             cm.off .apply cm, arguments
 
         patchCM = ~>
-            cm = PopoutListener.chat
+            cm = PopoutView.chat
             for event, callbacks of @_events
                 for cb in callbacks
                     #cm .off event, cb.callback, cb.context #ToDo test if this is necessary

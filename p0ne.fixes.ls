@@ -20,7 +20,7 @@ module \simpleFixes, do
     disable: ->
         @scm .insertAfter \#playlist-panel
 
-module \soundCloudThumbnailFix, do
+module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
     help: '''
         Plug.dj changed the Soundcloud thumbnail file location several times, but never updated the paths in their song database, so many songs have broken thumbnail images.
@@ -35,8 +35,12 @@ module \soundCloudThumbnailFix, do
                     if parseURL(e.image).host in <[ plug.dj cdn.plug.dj ]>
                         e.image = "https://i.imgur.com/41EAJBO.png"
                         #"https://cdn.plug.dj/_/static/images/soundcloud_thumbnail.c6d6487d52fe2e928a3a45514aa1340f4fed3032.png" # 2014-12-22
-                else if e.image.startsWith("http:") or e.image.startsWith("//")
-                    e.image = "https:#{e.image.substr(e.image.indexOf('//'))}"
+                else
+                    if e.image.startsWith("http:") or e.image.startsWith("//")
+                        e.image = "https:#{e.image.substr(e.image.indexOf('//'))}"
+                    #if window.webkitURL # use webp on webkit browsers, for moar speed
+                    #    not available on all videos
+                    #    e.image = "https://i.ytimg.com/vi_webp/#{e.cid}/sddefault.webp
 
 
 module \fixGhosting, do
@@ -147,7 +151,8 @@ module \fixOthersGhosting, do
                     console.error "[fixOthersGhosting] cannot load user data:", status, data
 
 module \fixStuckDJ, do
-    require: <[ Playback socketEvents ]>
+    require: <[ socketEvents ]>
+    optional: <[ votes ]>
     displayName: "Fix Stuck Advance"
     settings: \fixes
     settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
@@ -161,29 +166,23 @@ module \fixStuckDJ, do
     setup: ({replace, addListener}) ->
         _settings = @_settings
         fixStuckDJ = this
-        fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
-        replace Playback::, \playbackComplete, (pC_) -> return ->
-            args = arguments
-            replace Playback::, \playbackComplete, ~>
-                fn = ->
-                    # wait 5s before checking if advance is stuck
-                    fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ
-                    clearTimeout fixStuckDJ.timer
-                    pC_ ...
-                fn.apply this, args
-                return fn
+        @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
-        addListener API, \advance, ~>
+        addListener API, \advance, (d) ~>
+            console.log "#{getTime!} [API.advance]"
             clearTimeout @timer
+            if d.media
+                @timer = sleep d.media.duration*1_000s_to_ms + 2_000ms, fixStuckDJ
     module: ->
         # no new song played yet (otherwise this change:media would have cancelled this)
         fixStuckDJ = this
-        console.warn "[fixNoAdvance] song seems to be stuck, trying to fix…"
-        ajax \GET, \rooms/state, (data) ~>
-            if not status == 200
+        if showWarning = API.getTimeRemaining! == 0s
+            console.warn "[fixNoAdvance] song seems to be stuck, trying to fix…"
+        ajax \GET, \rooms/state, do
+            error: (data) ~>
                 console.error "[fixNoAdvance] cannot load room data:", status, data
                 @timer := sleep 5_000ms, fixStuckDJ
-            else
+            success: (data) ~>
                 # "manually" trigger socket event for DJ advance
                 data.0.playback ||= {}
                 socketEvents.advance do
@@ -194,8 +193,16 @@ module \fixStuckDJ, do
                     t: data.0.playback.startTime
                     p: data.0.playback.playlistID
 
-                API.chatLog "[p0ne] fixed DJ not advancing", true if @_settings.warnings
+                if votes?
+                    for uid of data.0.grabs
+                        votes.grab uid
+                    for i,v of data.0.votes
+                        votes.vote {i,v}
+                else
+                    console.warn "[fixNoAdvance] cannot properly set votes, because optional requirement `votes` is missing"
+                API.chatLog "[p0ne] fixed DJ not advancing", true if @_settings.warnings and showWarning
 
+/*
 module \fixNoPlaylistCycle, do
     require: <[ _$context ActivateEvent ]>
     displayName: "Fix No Playlist Cycle"
@@ -212,7 +219,7 @@ module \fixNoPlaylistCycle, do
         addListener API, \socket:reconnected, ->
             _$context.dispatch new LoadEvent(LoadEvent.LOAD)
             _$context.dispatch new ActivateEvent(ActivateEvent.ACTIVATE)
-        /*
+        / *
         # manual check
         addListener API, \advance, ({dj, lastPlay}) ~>
             #ToDo check if spelling is correctly
@@ -221,7 +228,8 @@ module \fixNoPlaylistCycle, do
                 #_$context .trigger \MediaMoveEvent:move
                 ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
                 API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
-        */
+        * /
+*/
 
 
 
@@ -265,9 +273,10 @@ module \warnOnAdblockPopoutBlock, do
                         warningShown = false
 
 module \disableIntercomTracking, do
+    require: <[ tracker ]>
     disabled: true
     settings: \dev
-    require: <[ tracker ]>
+    displayName: 'Disable Tracking'
     setup: ({replace}) ->
         for k,v of tracker when typeof v == \function
             replace tracker, k, -> return -> return $.noop

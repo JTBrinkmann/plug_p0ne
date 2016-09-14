@@ -1,10 +1,58 @@
 ==== To Do ====
 == SUMMARY ==
-- Chatlog manager
-- options menu
-- Playlist Manager
 
 == TEMP ==
+
+== 1.5 ==
+- fix reconnect reloading media & resetting avatar
+- settings sub-menus
+
+== 2.0 ==
+- website
+- bugtracker
+- how to
+- FAQ
+- auto-prevent history play / >10min
+- ETA timer
+- Custom Avatars
+	- only send change:avatarID for users in the same room
+	- emit changed:room events
+	- throttle avatarID changes
+	- room specific avatars
+- /mod-commands
+
+== 2.5 ==
+- AFK number (a little icon above the waitlist showing how many people are > AFK-limit)
+- unread Chat number
+- song-notif without thumbnails
+- hax mutelist
+- BPM search function
+- make BPM always uptodate?
+
+== 3.0 ==
+- Playlist Manager
+- sharing playlists / media
+- custom avatars
+- fancy animations
+- Room Theme Editor
+- OAuth
+- Chatlog manager
+- add songs by drag'n'dropping links
+
+== SUGGESTION QUEUE ==
+- Think of shorter names for you features, like
+	Chat tracker
+	Deleted chat
+	Quick mention
+	Chat input+
+	@mentions highlight
+	Inline Images
+	Chat thumbnails
+	Compact chat
+- improve smaller chat http://pastebin.com/a41h5BmD
+- Moderation chat commands are always good, not sure if there is anything, because I'm not a mod
+	/skip, /ban [time], /lock and /unlock, /lockskip (skips and moves to a set position, traditionally used to lock waitlist if it's full), /mute [time], /move [position], can't remember what else
+
 
 == COMPLETE ==
 - p0ne.close()
@@ -16,29 +64,21 @@
 	- song in history
 	- song >10min
 	- user info (when joined, how often meh'd)
-- separate fimplug.css and p0ne.css
 - FIXES
 	- remember video stream on/off
 	- spinning wheel of death when editing playlists
 	- @mentions /me-emotes
+	- fix no-playlist-update
 - p0ne Bugfixes
 	- make plug_p0ne work with Popout Chat (legacyChat & ChatInput)
 	- add-icon derps in .history in icon-view
+	- improve no-leave
+		- in the require with .execute, the .onError sends you to "/" on auth-error
 - Options Menu
-	- save settings
 	- module options
 		- replace <toggle> with "<label><input type=checkbox class=checkbox val=...><div class=togglebox><div class=knob></div></div>#{$el .text!}</label>"
 			- add listener to save settings
-	- advanced options (hide tech-savy options by default)
-- Fixes
-	- fix no-playlist-update
-		- test if works
-	- improve no-leave
-		- in the require with .execute, the .onError sends you to "/" on auth-error
-- Custom Avatars
-	- only send change:avatarID for users in the same room
-	- emit changed:room events
-	- throttle avatarID changes
+	- [x] advanced options (hide tech-savy options by default)
 - Chat
 	- fix emoticons like :<3
 	// - instead of rendering messages by the user twice (once when pending, once when received) only move (animated) pending messages and add CID
@@ -52,8 +92,6 @@
 		- replace #\d+-\d+ with a quote of responding messages (preferably in a Skype-like fashion)
 	- fix notifications on messages that are @someoneElse, but who's name starts with yours ("@https" shouldn't trigger a notification for @http)
 - Chat-inline-Images
-	- apply to messages loaded before chatScript
-	- collapse long images
 	- filter images by tags
 	- add Media-Options to youtube and soundcloud links
 		- requires superpowered grab()

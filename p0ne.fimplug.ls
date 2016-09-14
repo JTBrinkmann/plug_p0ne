@@ -25,3 +25,27 @@ module \songNotifRuleskip, do
             songNotif.hideDescription!
             if num = $ btn .data \rule
                 API.sendChat "!ruleskip #num"
+
+module \fimstats, do
+    setup: ({addListener, $create}) ->
+        $el = $create '<span class=p0ne-last-played>' .appendTo \#now-playing-bar
+        addListener API, \advance, @updateStats = (d) ->
+            d ||= media: API.getMedia!
+            if d.media
+                $.getJSON "https://fimstats.anjanms.com/_/media/#{d.media.format}/#{d.media.cid}"
+                    .then (d) ->
+                        first = "#{d.data.0.firstPlay.user} #{ago d.data.0.firstPlay.time*1000}"
+                        last = "#{d.data.0.lastPlay.user} #{ago d.data.0.lastPlay.time*1000}"
+                        if first != last
+                            $el.text "last played by #last \xa0 - \xa0 first played by #first"
+                        else
+                            $el.text "first&last played by #first"
+                    .fail (,,status) ->
+                        if status == "Not Found"
+                            $el.text "first played just now!"
+                        else
+                            $el.text ""
+
+            else
+                $el.text ""
+        @updateStats!

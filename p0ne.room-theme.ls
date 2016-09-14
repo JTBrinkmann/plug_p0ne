@@ -27,7 +27,7 @@ module \roomSettings, do
             console.warn "[p0ne] no p³ compatible Room Settings found"
         else if url = /@p3=(.*)/i .exec roomDescription
             console.log "[p0ne] p³ compatible Room Settings found", url.1
-            $.getJSON httpsify(url.1)
+            $.getJSON proxify(url.1)
                 .then (@_data) ~>
                     console.log "#{getTime!} [p0ne] loaded p³ compatible Room Settings"
                     @_room = roomslug
