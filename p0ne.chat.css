@@ -1,0 +1,188 @@
+/*@author jtbrinkmann aka. Brinkie Pie */
+/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+#chat .text a {
+	text-decoration: none;
+	color: #0DD;
+}
+#chat .text a:visited {
+	color: #009cdd;
+}
+#chat .message .from {
+	vertical-align: top;
+	text-decoration: none; /* so we can omit .clickable*/
+	cursor: pointer;
+	padding-right: 4px;
+	white-space: nowrap;
+}
+#chat .text .p0ne_img {
+	max-width: 100%;
+}
+#chat .text .p0ne_img_failed {
+	color: #B50 !important;
+}
+#chat .text .p0ne_img_failed:visited {
+	color: #950 !important;
+}
+
+/* p0ne_chat_icons */
+#chat-messages .icon { display:none; }
+#chat .from::before {
+	content: " ";
+	width: 15px;
+	height: 15px;
+	position: absolute;
+	left: 7px;
+	cursor: default;
+	background-image: url(https://plug.dj/_/static/images/icons.26d92b9.png);
+}
+#chat .from-none .from::before {
+    content: "";
+    background: none;
+}
+/*
+#chat .from-dj .from::before
+	{ background-position: -85px -350px }
+#chat .from-bouncer .from::before
+	{ background-position: -70px -350px }
+#chat .from-manager .from::before
+	{ background-position: -50px -350px }
+#chat .from-cohost .from::before, #chat .from-host .from::before
+	{ background-position: -35px -350px }
+#chat .from-volunteer .from::before, #chat .from-ambassador .from::before, #chat .from-leader .from::before
+	{ background-position: -15px -350px }
+#chat .from-admin .from::before
+	{ background-position:   0   -350px }
+
+
+#chat .from-you .from
+	{ color: #ffdd6f; }
+#chat .from-dj .from, #chat .from-bouncer .from, #chat .from-manager .from, #chat .from-cohost .from, #chat .from-host .from
+	{ color: #ac76ff }
+#chat .from-volunteer .from, #chat .from-ambassador .from, #chat .from-leader .from
+	{ color: #89be6c }
+#chat .from-admin .from
+	{ color: #42a5dc }
+*/
+/*
+#chat .from-ambassador {
+	background: url("http://plug.unnoen.com/images/ranks/Ambassador.png") 7px 7px no-repeat;
+}
+#chat .from-cohost {
+	background: url("http://plug.unnoen.com/images/ranks/CoHost.png") 7px 7px no-repeat;
+}
+#chat .from-host {
+	background: url("http://plug.unnoen.com/images/ranks/Host.png") 7px 7px no-repeat;
+}
+#chat .from-manager {
+	background: url("http://plug.unnoen.com/images/ranks/Manager.png") 7px 7px no-repeat;
+}
+#chat .from-bouncer {
+	background: url("http://plug.unnoen.com/images/ranks/Bouncer.png") 7px 7px no-repeat;
+}
+#chat .from-residentdj {
+	background: url("http://plug.unnoen.com/images/ranks/RDJ.png") 7px 7px no-repeat;
+}*/
+
+/* pending messages */
+.pending .spinner {
+	position: absolute;
+	margin-top: 10px;
+	margin-left: -15px;
+}
+.pending {
+	color: #777;
+}
+#chat .pending .from {
+	color: #ca4 !important;
+}
+
+/* p0ne_yt */
+#chat .p0ne_yt {
+	display: block;
+}
+#chat .p0ne_yt::before {
+	width: 45px;
+	content: " ";
+	height: 32px;
+	position: absolute;
+	margin-top: 95px;
+	margin-left: 130px;
+	background: red;
+	padding-left: 20px;
+	padding-top: 11px;
+	border-radius: 10px;
+	opacity: .5;
+	-webkit-transition: opacity .5s ease-out;
+}
+#chat .p0ne_yt:hover::before {
+	opacity: 1;
+}
+#chat .p0ne_yt_icon {
+	position: absolute;
+	margin-top: 107px;
+	margin-left: 155px;
+	border: 10px solid transparent;
+	border-left: 20px solid white;
+}
+#chat .p0ne_yt_img {
+	width: 300px;
+	height: 225px;
+	-webkit-background-size: cover;
+	background-size: cover;
+}
+
+/* fancy CSS from fimplug p³ RSS */
+@-webkit-keyframes fadein {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes fadein {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+#chat .text a {
+	color: #0DD;
+	text-decoration: none
+}
+#chat .text a:hover, a:focus {
+	text-decoration: none;
+	color: #0DD;
+	-webkit-transition: 250ms linear 0s;
+	transition: 250ms linear 0s;
+	outline: 0 none;
+	text-shadow:
+}
+#chat .text a:visited {
+	color: #09d
+}
+#chat .message:hover, #chat .emote:hover, #chat .update:hover {
+	text-decoration: none;
+	-webkit-transition: 100ms linear 50ms;
+	transition: 100ms linear 50ms;
+	border-left: #FFF 3px solid;
+	padding-left: 25px
+}
+#chat .emote, #chat .mention, #chat .message, #chat .moderation, #chat .skip, #chat .system, #chat .update, #chat .welcome {
+	border-radius: 10px;
+	background-color: #0E0E0F;
+	margin-top: 2px;
+	-webkit-animation: fadein 0.25s;
+	animation: fadein 0.25s;
+}
+#chat .emote:nth-child(2n+1), #chat .mention:nth-child(2n+1), #chat .message:nth-child(2n+1), #chat .moderation:nth-child(2n+1), #chat .skip:nth-child(2n+1), #chat .update:nth-child(2n+1), #chat .welcome:nth-child(2n+1) {
+	background-color: #111317;
+}
+#chat-messages {
+	border: none;
+}
+#chat-button .bar-divider {
+	display: none;
+}
+#user-lists .list {
+	-webkit-animation: fadein 0.5s;
+	animation: fadein 0.5s
+}
+#waitlist .list {
+	-webkit-animation: fadein 0.5s;
+	animation: fadein 0.5s
+}

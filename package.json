@@ -1,0 +1,29 @@
+{
+  "name": "plug_p0ne",
+  "version": "0.1.0",
+  "description": "With over 100 features, bugfixes, improvements, customizations and autowoot, plug_p0ne sets the bar higher than any plug.dj script that came before. p0 takes your plug.dj experience to a whole new level, like (⊃｡•́‿•̀｡)⊃━☆ﾟ.*･｡ﾟ",
+  "main": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jtbrinkmann/plug_p0ne.git"
+  },
+  "keywords": [
+    "plug_p0ne",
+    "p0ne",
+    "plug.dj",
+    "autowoot",
+    "script",
+    "addon",
+    "extention",
+    "enhancement",
+    "custom",
+    "avatars",
+    "audio-only"
+  ],
+  "author": "JTBrinkmann",
+  "license": "ISC",
+  "homepage": "https://p0ne.com/plug_p0ne/"
+}
