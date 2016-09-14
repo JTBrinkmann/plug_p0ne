@@ -1,9 +1,9 @@
 /**
  * Settings pane for plug_p0ne
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 module \p0neSettings, do
     _settings:
@@ -11,20 +11,20 @@ module \p0neSettings, do
     setup: ({$create, addListener},,,oldModule) ->
         @$create = $create
 
-        groupToggles = @groupToggles = @_settings.groupToggles
+        groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
 
         # ToDo: add a little plug_p0ne banner saying the version
 
         # create DOM elements
-        $ppM = $create "<div id=p0ne_menu>"
+        $ppM = $create "<div id=p0ne-menu>"
             .insertAfter \#app-menu
-        $ppI = $create "<div class=p0ne_icon>p<div class=p0ne_icon_sub>0</div></div>"
+        $ppI = $create "<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>"
             .appendTo $ppM
-        $ppS = @$ppS = $create "<div class=p0ne_settings>"
+        $ppS = @$ppS = $create "<div class=p0ne-settings>"
             .appendTo do
-                $ "<div class=p0ne_settings_wrapper>"
+                $ "<div class=p0ne-settings-wrapper>"
                     .appendTo $ppM
-        $ppP = $create "<div class=p0ne_settings_popup>"
+        $ppP = $create "<div class=p0ne-settings-popup>"
             .appendTo $ppM
             .fadeOut 0
 
@@ -42,7 +42,7 @@ module \p0neSettings, do
         $ppI .click ~> @toggleMenu!
 
         # toggle groups
-        addListener $body, \click, \.p0ne_settings_summary, (e) ->
+        addListener $body, \click, \.p0ne-settings-summary, (e) ->
           $s = $ this .parent!
           if $s.data \open # close
             $s
@@ -54,7 +54,7 @@ module \p0neSettings, do
             $s
                 .data \open, true
                 .addClass \open
-                .stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne_settings_item*/
+                .stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
             groupToggles[$s.data \group] = true
           e.preventDefault!
 
@@ -62,7 +62,7 @@ module \p0neSettings, do
             # note: this gets triggered when anything in the <label> is clicked
             $this = $ this
             enable = this .checked
-            $el = $this .closest \.p0ne_settings_item
+            $el = $this .closest \.p0ne-settings-item
             module = $el.data \module
             console.log "[p0neSettings] toggle", module.displayName, "=>", enable
             if enable
@@ -70,12 +70,12 @@ module \p0neSettings, do
             else
                 module.disable!
 
-        addListener $ppS, \mouseover, \.p0ne_settings_has_more, ->
+        addListener $ppS, \mouseover, \.p0ne-settings-has-more, ->
             $this = $ this
             module = $this .data \module
             $ppP
                 .html "
-                    <div class=p0ne_settings_popup_triangle></div>
+                    <div class=p0ne-settings-popup-triangle></div>
                     <h3>#{module.displayName}</h3>
                     #{if!   module.screenshot   then'' else
                         '<img src='+module.screenshot+'>'
@@ -96,9 +96,9 @@ module \p0neSettings, do
             $ppP
                 .css top: tt, left: l
                 .stop!.fadeIn!
-            $ppP .find \.p0ne_settings_popup_triangle
+            $ppP .find \.p0ne-settings-popup-triangle
                 .css top: t
-        addListener $ppS, \mouseout, \.p0ne_settings_has_more, ->
+        addListener $ppS, \mouseout, \.p0ne-settings-has-more, ->
             $ppP .stop!.fadeOut!
         addListener $ppP, \mouseover, ->
             $ppP .stop!.fadeIn!
@@ -113,13 +113,13 @@ module \p0neSettings, do
             module._$settings? .find \.checkbox .0 .checked=true
         addListener API, \p0neModuleUpdated, (module) ~>
             if module._$settings
-                module._$settings .find \.checkbox .0 .checked=true
                 module._$settings .addClass \updated
                 sleep 2_000ms, ->
                     module._$settings .removeClass \updated
             else if module.settings
                 @addModule module
 
+        addListener $body, \click, \#app-menu, ~> @toggleMenu false
         if _$context?
             addListener _$context, 'show:user show:history show:dashboard dashboard:disable', ~> @toggleMenu false
 
@@ -135,27 +135,30 @@ module \p0neSettings, do
         @groupToggles.p0neSettings = state
 
     groups: {}
+    moderationGroup: $!
     addModule: (module) !->
         if module.settings
             module.more = typeof module.settings == \function
-            itemClasses = \p0ne_settings_item
+            itemClasses = \p0ne-settings-item
             icons = ""
             for k in <[ more help screenshot ]> when module[k]
-                icons += "<div class=p0ne_settings_#k></div>"
+                icons += "<div class=p0ne-settings-#k></div>"
             if icons.length
-                icons = "<div class=p0ne_settings_icons>#icons</div>"
-                itemClasses += ' p0ne_settings_has_more'
+                icons = "<div class=p0ne-settings-icons>#icons</div>"
+                itemClasses += ' p0ne-settings-has-more'
 
             if not $s = @groups[module.settings]
-                $s = @groups[module.settings] = $ '<div class=p0ne_settings_group>'
+                $s = @groups[module.settings] = $ '<div class=p0ne-settings-group>'
                     .data \group, module.settings
                     .append do
-                        $ '<div class=p0ne_settings_summary>' .text module.settings.toUpperCase!
+                        $ '<div class=p0ne-settings-summary>' .text module.settings.toUpperCase!
                     .appendTo @$ppS
                 if @_settings.groupToggles[module.settings]
                     $s
                         .data \open, true
                         .addClass \open
+                if module.settings == \moderation
+                    $s .addClass \p0ne-settings-group-moderation
 
             $s .append do
                 # $create doesn't have to be used, because the resulting elements are appended to a $create'd element
@@ -174,11 +177,11 @@ module \p0neSettings, do
         @$ppS .html ""
         for module in p0ne.modules
             @addModule module
-    /*
+/*
     updateSettingsThrottled: (m) ->
         return if throttled or not m.settings
         @throttled = true
         requestAnimationFrame ~>
             @updateSettings!
             @throttled = false
-    */
+*/

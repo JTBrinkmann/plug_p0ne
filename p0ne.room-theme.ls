@@ -3,9 +3,12 @@
  * made to be compatible with plugCubes Room Settings
  * so room hosts don't have to bother with mutliple formats
  * that also means, that a lot of inspiration came from and credits go to the PlugCubed team ♥
+ *
+ * for more information, see https://issue.plugcubed.net/wiki/Plug3%3ARS
+ *
  * @author jtbrinkmann aka. Brinkie Pie
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
 */
 
 module \roomSettings, do
@@ -33,7 +36,7 @@ module \roomSettings, do
                     @_room = roomslug
                     @_trigger!
                 .fail ->
-                    API.chatLog "[p0ne] cannot load Room Settings", true
+                    chatWarn "cannot load Room Settings", "p0ne"
     _trigger: ->
         for fn in @_listeners
             fn @_data
@@ -79,10 +82,12 @@ module \roomTheme, do
                 for role, color of d.colors.chat when /*role in roles and*/ isColor(color)
                     styles += """
                     /* #role => #color */
-                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name, .cm.from-#role .from
-                    \#waitlist .icon-chat-#role + span, \#user-rollover .icon-chat-cohost + span {
+                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name,
+                    .cm.from-#role .from, \#waitlist .icon-chat-#role + span,
+                    \#user-rollover .icon-chat-cohost + span, .#role {
                             color: #color !important;
                     }\n"""
+                    #ToDo @mention other colours
                 colorMap =
                     background: \.room-background
                     header: \.app-header

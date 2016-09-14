@@ -1,0 +1,71 @@
+#footer-user .buttons .button {
+    display: none;
+    width: 100%;
+    position: static;
+    height: 54px;
+    float: none;
+    background: #222;
+    text-align: left;
+    padding-left: 15px;
+}
+#footer-user.menu .buttons .button {
+    display: block;
+}
+
+#footer-user .info {
+    display: block;
+    top: 0;
+    background: transparent;
+    cursor: pointer;
+}
+#footer-user.showing .info {
+    visibility: hidden;
+}
+
+
+#footer-user .info .name {
+    left: 60px;
+}
+
+#footer-user .info .meta div {
+    left: 45px;
+}
+
+#footer-user .buttons .inventory {
+    display: block !important;
+    position: absolute;
+    width: 60px;
+    box-shadow: none;
+    padding-left: 0;
+    background: transparent;
+}
+
+#footer-user .info .meta div.bar {
+    width: 130px;
+}
+
+#footer-user .info .meta .label {
+    display: none;
+}
+
+#footer-user .level .value::before {
+    content: "Lv ";
+    color: #808691;
+}
+
+#footer-user.menu .buttons {
+    bottom: 54px;
+    height: auto;
+    top: auto;
+}
+
+
+#footer-user.menu .buttons .button::after {
+    font-size: 18px;
+    padding-left: 10px;
+    top: 2px;
+}
+#footer-user .buttons .profile::after { content: "Profile"; }
+#footer-user .buttons .store::after { content: "Shop"; }
+#footer-user .buttons .played::after { content: "Personal History"; }
+#footer-user .buttons .settings::after { content: "Settings"; }

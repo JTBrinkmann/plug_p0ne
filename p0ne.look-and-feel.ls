@@ -1,16 +1,16 @@
 /**
  * plug_p0ne modules to add styles.
  * This needs to be kept in sync with plug_pony.css
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=35"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=38"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -30,6 +30,7 @@ window.moduleStyle = (name, d) ->
         options.setup = d
     module name, options
 */
+
 /*####################################
 #            FIMPLUG THEME           #
 ####################################*/
@@ -37,7 +38,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=20"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=23"
 
 /*####################################
 #          ANIMATED DIALOGS          #
@@ -58,6 +59,19 @@ module \animatedUI, do
             @$el.removeClass \opaque
             sleep 200ms, ~> close_.call this
             return this
+
+/*####################################
+#        FIX HIGH RESOLUTIONS        #
+####################################*/
+module \fixHiRes, do
+    displayName: "Fix high resolutions"
+    help: '''
+        This will fix some odd looking things on larger screens
+    '''
+    setup: ({}) ->
+        $body .addClass \p0ne-fix-hires
+    disable: ->
+        $body .removeClass \p0ne-fix-hires
 
 
 /*####################################
@@ -192,6 +206,28 @@ module \legacyChat, do
     disable: ->
         $body .removeClass \legacy-chat
 
+module \legacyFooter, do
+    displayName: "Info Footer"
+    settings: \look&feel
+    help: '''
+        Restore the old look of the footer (the thing below the chat) and transform it into a more useful information panel.
+        To get to the settings etc, click anywhere on the panel.
+    '''
+    disabled: true
+    setup: ->
+        $body .addClass \legacy-footer
+
+        foo = $ \#footer-user
+        info = foo.find \.info
+        info.on \click, ->
+        info.on \click, ->
+            foo.addClass \menu
+            <- requestAnimationFrame
+            $body.one \click, -> foo.removeClass \menu
+        foo.find '.back span'
+            ..text Lang?.userMeta.backToCommunity || "Back To Community" if not /\S/.test ..text!
+    disable: ->
+        $body .removeClass \legacy-footer
 
 module \djIconChat, do
     require: <[ chatPlugin ]>
@@ -199,12 +235,7 @@ module \djIconChat, do
     displayName: "Current-DJ-icon in Chat"
     setup: ({addListener, css}) ->
         icon = getIcon \icon-current-dj
-        css \djIconChat, "
-            \#chat .from-current-dj .un::before {
-                background-image: #{icon.image};
-                background-position: #{icon.position};
-            }
-        "
+        css \djIconChat, "\#chat .from-current-dj .timestamp::before { background: #{icon.background}; }"
         addListener _$context, \chat:plugin, (message) ->
             if message.uid and message.uid == API.getDJ!?.id
                 message.addClass \from-current-dj

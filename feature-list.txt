@@ -2,34 +2,32 @@
 legend:
 - already implemented
 * still pending
+https://docs.google.com/document/d/1ZYg-59THA4Q8n6cNag3RFWQ_4T4OwYwwG9xDnvAHTes/edit#
 
 = Features =
 - fix plug.dj bugs
 	- have a yellow name even when being mod
 	- Zalgo fix (Zalgo messages won't "bleed" out of the senders message)
 	- bugs with autocomplete (e.g. @mention autocomplete not working when there's something infront of the "@")
-	* fix unmuting after previewing a song/video
-	* move social-menu to a less annoying place
 * show songs stats in chat (with thumbnails and add-to-playlist button)
 - vastly improve the chat
-	- Restore Chat Script
+	* Restore Chat Script
 		* load chat from when the user was offline (if the room offers it)
 		* dynamically load older messages
-	* offer an option to show/hide deleted messages
+	- offer an option to show/hide deleted messages
 	- disable event that clears the chat (ChatFacadeEvent:clear)
 	- inline images
 		- direct images, Imgur, PrntScrn, Dropbox, Twitter
 		- doesn't break if the image can't be loaded
 		* filter on tags (e.g. #nsfw)
-	- Youtube thumbnails
-		- animated when hovering
+	* Youtube thumbnails
+		* animated when hovering
 		* add-to-playlist button
-	- show pending messages (ones that are still sending)
+	* show pending messages (ones that are still sending)
 	* warn on problematic messages
 		* e.g. containing a link, if the user just joined (there's a timeout)
-		* e.g. containing characters that will be removed
 	- Ponymotes (without requiring the BetterPonymotes Addon)
-	- improved autocomplete (for @mentions, /commands, :emoticons:, !botcommands, [](/ponymotes), …)
+	* improved autocomplete (for @mentions, /commands, :emoticons:, !botcommands, [](/ponymotes), …)
 	* don't remove chat messages after 512
 	* optionally get an alert on all messages / messages with trigger-keywords
 	* custom colors (also affecting the icons)
@@ -39,7 +37,6 @@ legend:
 		* improved Chat-Autocomplete (when writing ":cat: bla bla" it will check for emotes on each keydown, because there's a colon somewhere in the text)
 * show a galery of images/videos/files/links, linked in the chat
 * Waitlist ETA
-* in playlists, show songs that are in history
 * avoid playing songs that are in history
 * fix autowoot to not prevent voteskips
 * audio-only streams (if the room offers it)

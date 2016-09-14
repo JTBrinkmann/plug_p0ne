@@ -79,6 +79,20 @@ type %file%             >> "%output%.ls"
 echo.>> "%output%.ls"
 echo.>> "%output%.ls"
 
+set file=p0ne.stream.ls
+echo - %file%
+echo /*@source %file% */>> "%output%.ls"
+type %file%             >> "%output%.ls"
+echo.>> "%output%.ls"
+echo.>> "%output%.ls"
+
+set file=p0ne.chat-commands.ls
+echo - %file%
+echo /*@source %file% */>> "%output%.ls"
+type %file%             >> "%output%.ls"
+echo.>> "%output%.ls"
+echo.>> "%output%.ls"
+
 set file=p0ne.base.ls
 echo - %file%
 echo /*@source %file% */>> "%output%.ls"
@@ -135,13 +149,6 @@ type %file%             >> "%output%.ls"
 echo.>> "%output%.ls"
 echo.>> "%output%.ls"
 
-set file=p0ne.stream.ls
-echo - %file%
-echo /*@source %file% */>> "%output%.ls"
-type %file%             >> "%output%.ls"
-echo.>> "%output%.ls"
-echo.>> "%output%.ls"
-
 set file=p0ne.settings.ls
 echo - %file%
 echo /*@source %file% */>> "%output%.ls"
@@ -184,10 +191,10 @@ type %file%             >> "%output%.ls"
 echo.>> "%output%.ls"
 echo.>> "%output%.ls"
 
-
 echo ^>^>
 del /Q "%output%.js"
 CMD /C lsc -b -c "%output%.ls"
+sleep 1
 rename "%output%" "%output%.js"
 :: CMD /C uglifyjs -o "%output%.min.js" --source-map "%output%.js.map" "%output%.js"
 echo ^>^> %output%.ls

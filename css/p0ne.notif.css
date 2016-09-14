@@ -1,19 +1,20 @@
 /*@author jtbrinkmann aka. Brinkie Pie */
 /*@license https://creativecommons.org/licenses/by-nc/4.0/ */
-.song-notif {
+.p0ne-song-notif {
 	border-left: #1c2 3px solid;
 	box-sizing: border-box;  width: 100% !important;
 	overflow: hidden;
 	padding-left: 130px;
 	padding-right: 5px;
 	min-height: 90px !important;
+	position: relative;
 }
-.song-notif.skipped {
+.p0ne-song-notif.skipped {
 	background: #400;
 	border-left: #db182e 3px solid;
 }
 
-.song-notif::before {
+.p0ne-song-notif::before {
 	content: "next song played by:";
 	color: #aaa;
 }
@@ -45,7 +46,7 @@
 .song-add, .song-open, .song-skip {
 	opacity: 0;
 	position: absolute;
-	left: -58px; /* -(@width + .song-notif::padding-left + .song-notif::border-left) = -(50px + 25px + 3px) */
+	left: -58px; /* -(@width + .p0ne-song-notif::padding-left + .p0ne-song-notif::border-left) = -(50px + 25px + 3px) */
 	width: 50px;
 	height: 45px;
 	cursor: pointer;
@@ -82,7 +83,7 @@
 	white-space: nowrap;
 }
 
-#chat-messages .song-notif .timestamp {
+#chat-messages .p0ne-song-notif .timestamp {
 	display: inline;
 	float: right;
 }
@@ -110,7 +111,7 @@
 	opacity: 0;
 	transition: opacity 100ms linear 50ms;
 }
-.song-notif:hover .song-description-btn {
+.p0ne-song-notif:hover .song-description-btn {
 	opacity: 1;
 	transition: opacity 300ms linear 50ms;
 }
@@ -125,7 +126,7 @@
 	color: #d1d1d1;
 	font-weight: 700;
 }
-#chat .song-notif .icon-clear-input {
+#chat .p0ne-song-notif .icon-clear-input {
 	/* position: absolute; */
 	/* left: 125px; */
 	/* top: 60px !important; */

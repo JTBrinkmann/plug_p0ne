@@ -1,10 +1,10 @@
 /**
  * ponify chat - a script to ponify some words in the chat on plug.dj
  * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 /*####################################
@@ -20,6 +20,8 @@ module \ponify, do
 
         It also replaces some of the emoticons with pony emoticons.
     '''
+    disabled: true
+
     /*== TEXT ==*/
     map:
         # "america":    "amareica" # this one was driving me CRAZY
@@ -119,7 +121,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replace @regexp, (_, pre, s, post, i) ~>
+        msg.message .= replace @regexp, (_, prepre, pre, s, post, i) ~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -147,13 +149,13 @@ module \ponify, do
                     r = "a #r"
 
             if post
-                if "szxß".has(w[*-1])
+                if "szx".has(w[*-1])
                     r += "' "
                 else
                     r += "'s "
 
             console.log "replaced '#s' with '#r'", msg.cid
-            return r
+            return prepre+r
 
 
     /*== EMOTICONS ==*/
@@ -219,7 +221,10 @@ module \ponify, do
 
 
     setup: ({addListener, replace, css}) ->
-        @regexp = ///(?:^|https?:)(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
+        @regexp = //
+            ((?:^|<.+?>.+?</.+?>).*?) # avoid ponifying urls
+            (\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
+            //gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
             aEM = {}<<<<emoticons.autoEmoteMap

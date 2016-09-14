@@ -1,9 +1,9 @@
 /**
  * Base plug_p0ne modules
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 
@@ -11,23 +11,23 @@
 #           DISABLE/STATUS           #
 ####################################*/
 module \disableCommand, do
-    modules: <[ autojoin ]> # autorespond 
+    modules: <[ autojoin ]> # autorespond
     setup: ({addListener}) ->
         addListener API, \chat, (data) ~>
             if data.message.has("!disable") and data.message.has("@#{user.username}") and API.hasPermission(data.uid, API.ROLE.BOUNCER)
-                console.warn "[DISABLE] '#status'"
-                enabledModules = []
-                for m in @modules
-                    if window[m] and not window[m].disabled
-                        enabledModules[*] = m
-                        window[m].disable!
+                console.warn "[DISABLE] '#{status}'"
+                enabledModules = []; disabledModules = []
+                for m in @modules when module = window[m]
+                    if module and not module.disabled
+                        enabledModules[*] = module.displayName || module.name
+                        module.disable!
                     else
-                        disabledModules[*] = m
+                        disabledModules[*] = module.displayName || module.name
                 response = "#{data.un} - "
                 if enabledModules.length
                     response += "disabled #{humanList enabledModules}."
                 if disabledModules.length
-                    response += " #{humanList enabledModules} were already disabled."
+                    response += " #{humanList disabledModules} #{if disabledModules.length then 'was' else 'were'} already disabled."
                 API.sendChat response
 
 module \getStatus, do
@@ -54,22 +54,6 @@ module \statusCommand, do
                     console.info "[status] timeout reset"
 
 
-/*####################################
-#             YELLOW MOD             #
-####################################*/
-module \yellowMod, do
-    settings: \chat
-    displayName: 'Have yellow name as mod'
-    setup: ({css}) ->
-        id = API.getUser! .id
-        css \yellowMod, "
-            \#chat .fromID-#id .un,
-            .user[data-uid='#id'] .name > span {
-                color: \#ffdd6f !important;
-            }
-        "
-            # \#chat .from-#id .from,
-            # \#chat .fromID-#id .from,
 
 
 /*####################################
@@ -79,9 +63,15 @@ module \autojoin, do
     settings: \base
     disabled: true
     setup: ({addListener}) ->
-        do addListener API, \advance, ->
-            if join!
-                console.log "#{getTime!} [autojoin] joined waitlist"
+        addListener API, \advance, (d) ->
+            # this way, if you get removed from the waitlist by staff, autojoin will not trigger
+            if d.dj?.id == userID
+                addListener \once, API, \advance, ->
+                    if join!
+                        console.log "#{getTime!} [autojoin] joined waitlist"
+                    else
+                        console.error "#{getTime!} [autojoin] failed to join waitlist"
+        console.log "#{getTime!} [autojoin] init: joined waitlist" if join!
 
 
 
@@ -113,7 +103,7 @@ module \titleCurrentSong, do
         $ \#now-playing-media .prop \title, ""
     setup: ({addListener}) ->
         addListener API, \advance, (d) ->
-            if d
+            if d.media
                 $ \#now-playing-media .prop \title, "#{d.media.author} - #{d.media.title}"
             else
                 $ \#now-playing-media .prop \title, null
@@ -129,14 +119,15 @@ module \userlistIcons, do
     setup: ({replace})  ->
         settings = @_settings
         replace RoomUserRow::, \vote, -> return ->
-            if @model.id == API.getDJ!
+            dj = API.getDJ!
+            if @model.id == dj
                 @$icon.addClass \icon-woot
             if @model.get \grab
                 vote = \grab
             else
                 vote = @model.get \vote
                 vote = 0 if vote == -1 and (user = API.getUser!).role == user.gRole == 0
-            if @model.id == API.getDJ!.id
+            if dj and @model.id == dj.id
                 if vote # stupid haxxy edge-cases… well to be fair, I don't see many other people but me abuse that >3>
                     if not @$djIcon
                         @$djIcon = $ '<i class="icon icon-current-dj" style="right: 35px">'
@@ -166,11 +157,16 @@ module \userlistIcons, do
                 @$icon .remove!
                 delete @$icon
 
+            # fix username
+            if chatPolyfixEmoji?.fixedUsernames[@model.id]
+                @$el .find \.name .html that
+
 
 
 /*####################################
 #        DBLCLICK to @MENTION        #
 ####################################*/
+/*note: this is also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
 module \chatDblclick2Mention, do
     require: <[ chat ]>
     #optional: <[ PopoutListener ]>
@@ -184,22 +180,22 @@ module \chatDblclick2Mention, do
                     try
                         module.timer = 0
                         $this = $ this
-                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || (i = getUserInternal $this.text!).id
+                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || ($this .data \uid) || (i = getUserInternal $this.text!).id
                             pos =
                                 x: chat.getPosX!
                                 y: $this .offset!.top
-                            if i = getUserInternal(r)
+                            if i ||= getUserInternal(r)
                                 chat.onShowChatUser i, pos
                             else
                                 chat.getExternalUser r, pos, chat.showChatUserBind
                         else
-                            console.warn "[DblCLick username to Mention] couldn't get userID", this
+                            console.warn "[dblclick2Mention] couldn't get userID", this
                     catch err
                         console.error err.stack
             else # double click
                 clearTimeout module.timer
                 module.timer = 0
-                chat.onInputMention e.target.textContent
+                (PopoutView?.chat? || chat).onInputMention e.target.textContent
             e .stopPropagation!; e .preventDefault!
 
         replace chat, \fromClick, (@fC_) ~> return newFromClick
@@ -211,124 +207,98 @@ module \chatDblclick2Mention, do
             .on \click, newFromClick
 
         addListener chatDomEvents, \click, \.un, newFromClick
+        addListener $(\#waitlist), \click, \.name, newFromClick
     disable: -> if @fC_
         cm = $cm!
         cm  .find \.un
             .off \click, newFromClick
-        cm  .find '.mention .un, .message .un' # note: here we actually have to pay attention as to what to re-enable
+
+        # note: here we actually have to pay attention as to what to re-enable
+        cm  .find '.mention .un, .message .un'
             .on \click, @fC_
 
-
-/*####################################
-#           CHAT COMMANDS            #
-####################################*/
-module \chatCommands, do
-    optional: <[ currentMedia ]>
-    setup: ({addListener}) ->
-        addListener API, \chatCommand, (c) ~>
-            @_commands[/^\/(\w+)/.exec(c)?.1]?(c)
-        @updateCommands!
-
-    updateCommands: ->
-        @_commands = {}
-        for k,v of @commands
-            @_commands[k] = v.callback
-            for k in v.aliases ||[]
-                @_commands[k] = v.callback
-    commands:
-        help:
-            aliases: <[ commands ]>
-            description: "show this list of commands"
-            callback: ->
-                res = ""
-                for k,command of chatCommands.commands
-                    if command.aliases?.length
-                        aliases = "aliases: #{humanList command.aliases}"
-                    else
-                        aliases = ''
-                    res += "<div class='p0ne-help-command' alt='#aliases'><b>/#k</b> #{command.params ||''} - #{command.description}</div>"
-                appendChat($ "<div class=p0ne-help>" .html res)
-        available:
-            aliases: <[ avail ]>
-            description: "change your status to <b>available</b>"
-            callback: ->
-                API.setStatus 0
-
-        away:
-            aliases: <[ afk ]>
-            description: "change your status to <b>away</b>"
-            callback: ->
-                API.setStatus 1
-
-        busy:
-            aliases: <[ work working ]>
-            description: "change your status to <b>busy</b>"
-            callback:  ->
-                API.setStatus 2
-
-        gaming:
-            aliases: <[ game ingame ]>
-            description: "change your status to <b>gaming</b>"
-            callback:  ->
-                API.setStatus 3
-
-        join:
-            description: "join the waitlist"
-            callback: join
-        leave:
-            description: "leave the waitlist"
-            callback: leave
-
-        stream:
-            parameters: " [on|off]"
-            description: "enable/disable the stream (just '/stream' toggles it)"
-            callback: ->
-                if currentMedia?
-                    stream c.has \on || not (c.has \off || \toggle)
-                else
-                    API.chatLog "couldn't load required module for enabling/disabling the stream.", true
-
-        snooze:
-            description: "snoozes the current song"
-            callback: snooze
-        mute:
-            description: "mutes the audio"
-            callback: mute
-        unmute:
-            description: "unmutes the audio"
-            callback: unmute
-
-        muteonce:
-            aliases: <[ muteonce ]>
-            description: "mutes the current song"
-            callback: muteonce
-
-        automute:
-            description: "adds/removes this song from the automute list"
-            callback:  ->
-                muteonce!
-                if automute?
-                    automute!
-                else
-                    API.chatLog "automute is not yet implemented", true
 
 /*####################################
 #              AUTOMUTE              #
 ####################################*/
 module \automute, do
+    optional: <[ streamSettings ]>
     songlist: dataLoad \p0ne_automute, {}
-    module: (media) ->
+    module: (media, addRemove) ->
+        if typeof media == \boolean
+            addRemove = media; media = false
         media ||= API.getMedia!
-        if @songlist[media.id]
-            delete @songlist[media.id]
-            API.chat "'#{media.author} - #{media.title}' removed from the automute list."
-        else
-            @songlist[media.id] = true
-            API.chat "'#{media.author} - #{media.title}' added to automute list."
-    setup: ({addListener}) ->
-        addListener API, \advance, ({media}) ~>
-            if media and @songlist[media.id]
+
+        if not addRemove? # default to toggle
+            addRemove = not @songlist[media.cid]
+
+        $msg = $ "<div class='p0ne-automute-notif'>"
+        if addRemove # add to automute list
+            @songlist[media.cid] = media{title, author}
+            $msg
+                .text "+ '#{media.author} - #{media.title}' added to automute list."
+                .addClass \p0ne-automute-added
+        else # remove from automute list
+            delete @songlist[media.cid]
+            $msg
+                .text "- '#{media.author} - #{media.title}' removed from the automute list."
+                .addClass \p0ne-automute-removed
+        $msg .append getTimestamp!
+        appendChat $msg
+        @updateBtn!
+
+    setup: ({addListener}, automute) ->
+        media = API.getMedia!
+        addListener API, \advance, (d) ~>
+            media := d.media
+            if media and @songlist[media.cid]
                 muteonce!
+
+        #== Turn SNOOZE button into add/remove AUTOMUTE button when media is snoozed ==
+        $snoozeBtn = $ '#playback .snooze'
+        @$box_ = $snoozeBtn .children!
+        $box = $ "<div class='box'></div>"
+        streamOff = isSnoozed!
+        addListener API, \p0ne:changeMode, onModeChange = (mode) ~>
+            newStreamOff = (mode == \off)
+            <~ requestAnimationFrame
+            if newStreamOff
+                if not streamOff
+                    $snoozeBtn
+                        .empty!
+                        .append $box
+                if not media
+                    # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
+                    console.warn "[automute] uw0tm8?"
+                else if @songlist[media.cid] # btn "remove from automute"
+                    console.log "[automute] change automute-btn to REMOVE"
+                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
+                    $box .html "remove from<br>automute"
+                else # btn "add to automute"
+                    console.log "[automute] change automute-btn to ADD"
+                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
+                    $box .html "add to<br>automute"
+            else if streamOff
+                console.log "[automute] change automute-btn to SNOOZE"
+                $snoozeBtn
+                    .empty!
+                    .append @$box_
+                    .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
+            streamOff := newStreamOff
+
+        @updateBtn = (mode) ->
+            onModeChange(streamOff && \off)
+
+        addListener $snoozeBtn, \click, (e) ~>
+            if streamOff
+                console.info "[automute] snoozy", media.cid, @songlist[media.cid], streamOff
+                automute!
+
+    disable: ->
+        $ '#playback .snooze'
+            .empty!
+            .append @$box_
+
 
 
 
@@ -345,49 +315,215 @@ module \joinLeaveNotif, do
     setup: ({addListener, css},,,update) ->
         if update
             lastMsg = $cm! .children! .last!
-            if lastMsg .hasClass \p0ne-joinLeave-notif
+            if lastMsg .hasClass \p0ne-notif-joinleave
                 $lastNotif = lastMsg
 
         verbRefreshed = 'refreshed'
         usersInRoom = {}
         for let event, verb_ of {userJoin: 'joined', userLeave: 'left'}
-            addListener API, event, (user) ->
+            addListener API, event, (u) ->
                 verb = verb_
                 if event == \userJoin
-                    if usersInRoom[user.id]
+                    if usersInRoom[u.id]
                         verb = verbRefreshed
                     else
-                        usersInRoom[user.id] = Date.now!
+                        usersInRoom[u.id] = Date.now!
                 else
-                    delete usersInRoom[user.id]
+                    delete usersInRoom[u.id]
 
 
                 $msg = $ "
-                    <span data-uid=#{user.id}>
+                    <div class=p0ne-notif-#{if event == \userJoin then \join else \leave} data-uid=#{u.id}>
                         #{if event == \userJoin then '+ ' else '- '}
-                        <span class=un>#{resolveRTL user.username}</span> #verb the room
-                        #{if not (auxiliaries? and database?) then '' else
-                            '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS == 24) + '</div>'
-                        }
-                    </span>
+                        #{formatUserHTML u, user.isStaff, false}
+                        #{getTimestamp!}
+                    </div>
                     "
-                if false #chat?.lastType == \joinLeave
+                if chat?.lastType == \p0ne_joinLeave and $lastNotif
+                    isAtBottom = chatIsAtBottom!
                     $lastNotif .append $msg
+                    chatScrollDown! if isAtBottom
                 else
-                    $lastNotif := $ "<div class='cm update p0ne-joinLeave-notif'></div>"
+                    $lastNotif := $ "<div class='cm update p0ne-notif p0ne-notif-joinleave'></div>"
                         .append $msg
                     appendChat $lastNotif
                     if chat?
-                        $lastNotif .= find \.message
-                        chat.lastType = \joinLeave
-        if chat? and chatDomEvents?
-            addListener chatDomEvents, \click, '.p0ne-join-notif, .p0ne-leave-notif', (e) ->
-                chat.fromClick e
-
+                        chat.lastType = \p0ne-notif-joinleave
+        addListener API, 'popout:open popout:close', (,PopoutView) ->
+            $lastNotif = $cm! .find \.p0ne-notif-joinleave:last
         if not update
             d = Date.now!
-            for user in API.getUsers!
-                usersInRoom[user.id] = -1
+            for u in API.getUsers!
+                usersInRoom[u.id] = -1
+
+        export get$lastNotif = ->
+            return $lastNotif
+
+# note: the avg. song duration seems to be off
+#ToDo: on advance, check if historyID is different from the last play's
+module \etaTimer, do
+    displayName: 'ETA Timer'
+    settings: \base
+    setup: ({css, addListener, $create}) ->
+        css \etaTimer, '
+            #your-next-media>span {
+                width: auto !important;
+                right: 50px;
+            }
+        '
+        sum = lastSongDur = 0
+        $nextMediaLabel = $ '#your-next-media > span'
+        $eta = $create '<div class=p0ne-eta>'
+            .append $etaText = $ '<span class=p0ne-eta-text>ETA: </span>'
+            .append $etaTime = $ '<span class=p0ne-eta-time></span>'
+            .appendTo \#footer
+
+
+        # note: the ETA timer cannot be shown while the room's history is 0
+        # because you need to be in the waitlist to see the ETA timer
+
+
+        # attach event listeners
+        addListener API, \waitListUpdate, updateETA
+        addListener API, \advance, (d) ->
+            # update average song duration. This is to avoid having to loop through the whole song history on each update
+            if d.media
+                sum -= lastSongDur
+                sum += d.media.duration
+                lastSongDur := API.getHistory![l - 1].media.duration
+            # note: we don't trigger updateETA() because each advance is accompanied with a waitListUpdate
+
+        # initialize average song length
+        # (this is AFTER the event listeners, because tinyhist() has to run after it)
+        for m in hist = API.getHistory!
+            sum += m.media.duration
+        l = hist.length
+
+        # handle the case that history length is < 50
+        if l < 51 # 51 because it includes the currently playing song
+            #lastSongDur = 0
+            do tinyhist = ->
+                addListener \once, API, \advance, (d) ->
+                    if d.media
+                        lastSongDur := 0
+                        l++
+                    tinyhist! if l < 51
+        else
+            lastSongDur = API.getHistory![l - 1].media.duration
+
+
+        # show the ETA timer
+        updateETA!
+
+        export test = ->
+            p = API.getWaitListPosition()
+            avg_ = (API.getTimeRemaining!  +  sum * p / l)
+            avg = avg_ / 60 |> Math.round
+            return {l, avg, avg_, sum, p}
+
+        ~function updateETA
+            # update what the ETA timer says
+            #clearTimeout @timer
+            p = API.getWaitListPosition()
+            if p == 0
+                #console.log "[ETA] updated to 'you are next DJ!'"
+                $etaText .text "you are next DJ!"
+                $etaTime .text ''
+                return
+            else if p == -1
+                if API.getDJ!?.id == userID
+                    #console.log "[ETA] updated 'you are DJ'"
+                    $etaText .text "you are DJ!"
+                    $etaTime .text ''
+                    return
+                else
+                    p = API.getWaitList!.length
+            # calculate average duration
+            avg_ = (API.getTimeRemaining!  +  sum * p / l)
+            avg = avg_ / 60 |> Math.round
+
+            #console.log "[ETA] updated to (#avg min)"
+            $etaText .text "ETA ca. "
+            if avg > 60min
+                $etaTime .text "#{~~(avg / 60min_to_h)}h#{avg % 60}min"
+            else
+                $etaTime .text "#avg min"
+
+            $nextMediaLabel .css right: $eta.width! - 50px
+
+            # setup timer to update ETA
+            clearTimeout @timer
+            @timer = sleep ((avg_ % 60s)+31s).s, updateETA
+    disable: ->
+        clearTimeout @timer
+/*
+
+        lastSongDur = API.getHistory![*-1].media.duration
+        nextSong = API.getMedia!
+        # calculate average song duration
+        sum = 0
+        hist = API.getHistory!
+        for i from 1 til hist.length
+            sum += hist[i].media.duration
+        l = hist.length - 1
 
 
 
+
+
+
+                avg_ = API.getMedia!.duration + p * sum / l
+*/
+
+module \votelist, do
+    settings: \base
+    displayName: 'Votelist'
+    disabled: true
+    help: '''
+        Moving your mouse above the woot/grab/meh icon shows a list of users who have wooted, grabbed or meh'd respectively.
+    '''
+    setup: ({addListener, $create}) ->
+        currentFilter = false
+        $vote = $(\#vote)
+        $vl = $create '<div class=p0ne-votelist>'
+            .hide!
+            .appendTo $vote
+
+        addListener $(\#woot), \mouseenter, changeFilter 'left: 0', (userlist) ->
+            for u in API.getAudience! when u.vote == +1
+                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+            return userlist
+
+        addListener $(\#grab), \mouseenter, changeFilter 'left: 50%; transform: translateX(-50%)', (userlist) ->
+            for u in API.getAudience! when u.grab
+                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+            return userlist
+
+        addListener $(\#meh), \mouseenter, changeFilter 'right: 0', (userlist) -> if user.isStaff
+            for u in API.getAudience! when u.vote == -1
+                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+            return userlist
+
+
+        addListener $vote, \mouseleave, ->
+            currentFilter := false
+            $vl.hide!
+
+        addListener API, \voteUpdate, updateVoteList
+
+        function changeFilter styles, filter
+            return ->
+                currentFilter := filter
+                css \votelist, ".p0ne-votelist { #{styles} }"
+                updateVoteList!
+
+        function updateVoteList
+            if currentFilter
+                userlist = currentFilter('')
+                if userlist
+                    $vl
+                        .html userlist
+                        .show!
+                    $ \#tooltip .hide!
+                else
+                    $vl.hide!

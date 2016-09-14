@@ -11,7 +11,6 @@
  * so it is expected, that window.compareVersions is defined
  */
 do ->
-    /* lastCompatibleVersion = \1.3.3 */
     var vArr
     migrated = (v) ->
         API.trigger \p0ne_migrated, v
@@ -21,6 +20,12 @@ do ->
         # no previous version of p0ne found, looks like we're good to go
         # p0ne.migrate should not be run if there's no previous version to migrate from
         return
+
+
+    if window.chrome
+        window{compress, decompress} = LZString
+    else
+        window{compressToUTF16:compress, decompressFromUTF16:decompress} = LZString
 
     console.info "[p0ne migrate] migrating p0ne…"
     switch false
@@ -77,7 +82,71 @@ do ->
 
         migrated \1.5.0
         fallthrough
+    | compareVersions v, \1.6.1 =>
+        console.info "[p0ne migrate] renamed a few modules and CSS classes"
+        #= settings =
+        # renamed modules
+        editSettings \moduleSettings, (moduleSettings) ->
+            renameMap =
+                _API_: \InternalAPI
+                p0neChatInput: \betterChatInput
+            for oldModuleName, newModuleName of renameMap
+                localStorage["p0ne_#newModuleName"] = localStorage["p0ne_#oldModuleName"]
+                moduleSettings[newModuleName] = moduleSettings[oldModuleName]
+                delete localStorage["p0ne_#oldModuleName"]
+                delete moduleSettings[oldModuleName]
+
+            # renamed settings.warnings => settings.verbose
+            for module in <[ fixGhosting fixOthersGhosting fixNoPlaylistCycle ]>
+                editSettings module, (settings) ->
+                    settings.verbose = settings.warnings
+                    delete settings.warnings
+
+            # force-enable p0ne.stream
+            moduleSettings.streamSettings.disabled = false
+
+        #= runtime =
+        renameMap =
+            \p0ne-joinleave-notif : \p0ne-notif-joinleave
+            \p0ne_img_failed : \p0ne-img-failed
+            \p0ne_img : \p0ne-img
+            \p0ne_img_large : \p0ne-img-large
+            \p0ne_yt_img : \p0ne-yt-img
+            \p0ne_yt : \p0ne-yt
+            \song-notif : \p0ne-song-notif
+        for oldClass, newClass of renameMap
+            $(".#oldClass").removeClass(oldClass).addClass(newClass)
+        # renamed events
+        if API?._events?
+            API._events[\p0ne:songInHistory] = API._events[\p0ne_songInHistory]
+            delete API._events[\p0ne_songInHistory]
+
+        migrated \1.6.1
+        fallthrough
+    | compareVersions v, \1.6.5 =>
+        console.info "[p0ne migrate] added perCommunity settings, fixed a bunch of bugs"
+        # settings
+        perCommunityModules = <[ autojoin customAvatars fimstats ponify bpm ]>
+        editSettings \moduleSettings, (moduleSettings) ->
+            for module in perCommunityModules
+                localStorage["p0ne__friendshipismagic_#module"] = localStorage["p0ne_#module"]
+                delete moduleSettings[module].disabled if moduleSettings[module]
+
+        # runtime
+
+        migrated \1.6.5
+        fallthrough
     #| compareVersions v, \1.6.0 =>
     #    ...
     #    migrated \1.4.0
     #    fallthrough
+function editSettings moduleName, cb
+    try
+        return false if not settings = localStorage["p0ne_#moduleName"]
+        settings = settings |> decompress |> JSON.parse
+        cb settings
+        localStorage["p0ne_#moduleName"] = settings |> JSON.stringify |> compress
+        return true
+    catch err
+        console.error "[p0ne migrate] error while editing settings for '#moduleName'", err.stack
+        return false
