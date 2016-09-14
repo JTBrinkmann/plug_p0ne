@@ -57,7 +57,7 @@ module \statusCommand, do
 #             YELLOW MOD             #
 ####################################*/
 module \yellowMod, do
-    settings: true
+    settings: \chat
     displayName: 'Have yellow name as mod'
     setup: ({css}) ->
         id = API.getUser! .id
@@ -74,9 +74,9 @@ module \yellowMod, do
 #         08/15 PLUG SCRIPTS         #
 ####################################*/
 module \autojoin, do
-    settings: true
+    settings: \base
     setup: ({addListener}) ->
-        addListener API, \advance, ->
+        do addListener API, \advance, ->
             if join!
                 console.log "[autojoin] joined waitlist", API.getWaitListPosition!
 
@@ -141,7 +141,7 @@ module \userlistMehIcon, do
 module \disableChatDelete, do
     require: <[ _$context ]>
     optional: <[ socketListeners ]>
-    settings: true
+    settings: \chat
     displayName: 'Show deleted messages'
     setup: ({replace_$Listener, addListener, $create, css}) ->
         $body .addClass \p0ne_showDeletedMessages
@@ -161,14 +161,16 @@ module \disableChatDelete, do
             }
         '
 
-        replace_$Listener \chat:delete, -> return (cid) ->
-            if not window.socket
+        if socketListeners
+            addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
+                markAsDeleted(c, users.get(mi)?.get(\username) || mi)
+        else
+            replace_$Listener \chat:delete, -> return (cid) ->
                 markAsDeleted(cid)
-        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
-            markAsDeleted(c, users.get(mi)?.get(\username) || mi)
 
         function markAsDeleted cid, moderator
             $msg = getChat cid
+            #ToDo add scroll down
             console.log "[Chat Delete]", cid, $msg.text!
             t  = getISOTime!
             t += " by #moderator" if moderator
@@ -196,7 +198,7 @@ module \disableChatDelete, do
 module \chatDblclick2Mention, do
     require: <[ chat ]>
     optional: <[ PopoutListener ]>
-    settings: true
+    settings: \chat
     displayName: 'DblClick username to Mention'
     setup: ({replace}) ->
         newFromClick = (e) ~>
@@ -275,7 +277,7 @@ module \automute, do
 #      JOIN/LEAVE NOTIFICATION       #
 ####################################*/
 module \joinLeaveNotif, do
-    optional: <[ chatDomEvents chat ]>
+    optional: <[ chatDomEvents chat auxiliaries database ]>
     setup: ({addListener, css},,,update) ->
         css \joinNotif, '
             .p0ne-joinLeave-notif {
@@ -301,10 +303,17 @@ module \joinLeaveNotif, do
                         usersInRoom[user.id] = Date.now!
                 else
                     delete usersInRoom[user.id]
-                $msg = $ "<span data-uid=#{user.id}>"
-                        .append document.createTextNode "#{if event == \userJoin then '+ ' else '- '}"
-                        .append $ "<span class=from>#{user.username}</span>" .text user.username
-                        .append document.createTextNode " just #verb the room"
+
+
+                $msg = $ "
+                    <span data-uid=#{user.id}>
+                        #{if event == \userJoin then '+ ' else '- '}
+                        <span class=from>#{resolveRTL user.username}</span> #verb the room
+                        #{if not (window.auxiliaries and window.database) then '' else
+                            '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS == 24) + '</div>'
+                        }
+                    </span>
+                    "
                 if false #chat?.lastType == \joinLeave
                     $lastNotif .append $msg
                 else
@@ -325,60 +334,3 @@ module \joinLeaveNotif, do
 
 
 
-
-/*####################################
-#      UNREAD CHAT NOTIFICAITON      #
-####################################*/
-module \unreadChatNotif, do
-    require: <[ _$context chatDomEvents ]>
-    bottomMsg: $!
-    setup: ({addListener}) ->
-        @bottomMsg = $cm! .children! .last!
-        addListener \early, _$context, \chat:receive, (message) ->
-            message.wasAtBottom ?= chatIsAtBottom!
-            if message.wasAtBottom
-                @bottomMsg = message.cid
-            else
-                delete @bottomMsg
-                cm = $cm!
-                cm .addClass \has-unread
-                message.unread = true
-                message.type += " unread"
-        @throttled = false
-        addListener chatDomEvents, \scroll, ~>
-            return if @throttled
-            @throttled := true
-            sleep 200ms, ~>
-                try
-                    cm = $cm!
-                    cmHeight = cm .height!
-                    lastMsg = msg = @bottomMsg
-                    $readMsgs = $!; l=0
-                    while ( msg .=next! ).length
-                        if msg .position!.top > cmHeight
-                            @bottomMsg = lastMsg
-                            break
-                        else if msg.hasClass \unread
-                            $readMsgs[l++] = msg.0
-                        lastMsg = msg
-                    if l
-                        unread = cm.find \.unread
-                        sleep 1_500ms, ~>
-                            $readMsgs.removeClass \unread
-                            if (unread .= filter \.unread) .length
-                                @bottomMsg = unread .removeClass \unread .last!
-                    if not msg.length
-                        cm .removeClass \has-unread
-                @throttled := false
-    fix: ->
-        @throttled = false
-        cm = $cm!
-        cm
-            .removeClass \has-unread
-            .find \.unread .removeClass \unread
-        @bottomMsg = cm.children!.last!
-    disable: ->
-        $cm!
-            .removeClass \has-unread
-            .find \.unread .removeClass \unread
- 

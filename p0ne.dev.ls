@@ -12,18 +12,29 @@
 ####################################*/
 module \logEventsToConsole, do
     optional: <[ _$context  socketListeners ]>
-    displayName: "[dev] Log Events to Console"
-    settings: true
+    displayName: "Log Events to Console"
+    settings: \dev
+    help: '''
+        This will log events to the JavaScript console.
+        This is mainly for programmers. If you are none, keep this disabled for better performance.
+
+        By default this will leave out some events to avoid completly spamming the console.
+        You can force-enable logging ALL events by running `logEventsToConsole.logAll = true`
+    '''
+    disabledByDefault: true
     setup: ({addListener, replace}) ->
+        logEventsToConsole = this
         addListener API, \chat, (data) ->
             message = htmlUnescape(data.message) .replace(/\u202e/g, '\\u202e')
             if data.un
-                name = data.un .replace(/\u202e/g, '\\u202e') + ":"
+                name = data.un .replace(/\u202e/g, '\\u202e')
                 name = " " * (24 - name.length) + name
-                console.log "#{getTime!} [CHAT]", "#name #message"
+                if data.type == \emote
+                    console.log "#{getTime!} [CHAT] #name: %c#message", "font-style: italic;"
+                else
+                    console.log "#{getTime!} [CHAT] #name: #message"
             else
-                name = "[system]"
-                console.info "#{getTime!} [CHAT]", "#name #message"
+                console.info "#{getTime!} [CHAT] [system] %c#message", "font-size: 1.2em; color: red; font-weight: bold"
 
         addListener API, \userJoin, (data) ->
             name = htmlUnescape(data.username) .replace(/\u202e/g, '\\u202e')
@@ -41,7 +52,7 @@ module \logEventsToConsole, do
         #= log (nearly) all _$context events
         replace _$context, \trigger, (trigger_) -> return (type) ->
             group = type.substr(0, type.indexOf ":")
-            if group not in <[ socket tooltip djButton chat sio playback playlist notify drag audience anim HistorySyncEvent user ShowUserRolloverEvent ]> and type not in <[ ChatFacadeEvent:muteUpdate PlayMediaEvent:play userPlaying:update context:update ]> or window.LOGALL
+            if group not in <[ socket tooltip djButton chat sio playback playlist notify drag audience anim HistorySyncEvent user ShowUserRolloverEvent ]> and type not in <[ ChatFacadeEvent:muteUpdate PlayMediaEvent:play userPlaying:update context:update ]> or logEventsToConsole.logAll
                 console.log "#{getTime!} [#type]", getArgs?! || arguments
             else if group == \socket and type not in <[ socket:chat socket:vote socket:grab socket:earn ]>
                 console.log "#{getTime!} [#type]", [].slice.call(arguments, 1)
@@ -78,16 +89,17 @@ module \downloadLink, do
                 background-image: url(/_/static/images/icons.26d92b9.png);
             }
         '
-    module: (name, filename, data) ->
-        if not data
-            data = filename; filename = name
-        data = JSON.stringify data if typeof data != \string
-        url = URL.createObjectURL new Blob([data], {type: \text/plain})
+    module: (name, filename, dataOrURL) ->
+        if not dataOrURL
+            dataOrURL = filename; filename = name
+        if dataOrURL and not isURL(dataOrURL)
+            dataOrURL = JSON.stringify dataOrURL if typeof dataOrURL != \string
+            dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
         (window.$cm || $ \#chat-messages) .append "
             <div class='message p0ne_downloadlink'>
                 <i class='icon'></i>
                 <span class='text'>
-                    <a href='#url' download='#filename'>#name</a>
+                    <a href='#dataOrURL' download='#filename'>#name</a>
                 </span>
             </div>
         "
@@ -116,20 +128,6 @@ window <<<<
     joinRoom: (slug) ->
         ajax \POST, \rooms/join, {slug}
 
-    getUserData: (user) !->
-        if typeof user == \number
-            return $.get "/_/users/#user"
-                .then ({[user]:data}) ->
-                    console.log "[userdata]", user
-                    console.log "[userdata] https://plug.dj/@/#{encodeURI user.slug}" if user.level >= 5
-                .fail ->
-                    console.warn "couldn't get slug for user with id '#{id}'"
-        else if typeof user == \string
-            user .= toLowerCase!
-            for u in API.getUsers! when u.username.toLowerCase! == user
-                return getUserData u.id
-            console.warn "[userdata] user '#user' not found"
-            return null
 
     findModule: (test) ->
         if typeof test == \string and window.l
@@ -137,7 +135,7 @@ window <<<<
         res = []
         for id, module of require.s.contexts._.defined when module
             if test module, id
-                module.id ||= id
+                module.requireID ||= id
                 console.log "[findModule]", id, module
                 res[*] = module
         return res
@@ -166,9 +164,9 @@ window <<<<
     getRequireArg: (haystack, needle) ->
         # this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
         # e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
-        [b, a] = haystack.split "], function("
-        a .= substr(b.0.indexOf('"')).split('", "')
-        b .= substr(0, b.1.indexOf(')')).split(', ')
+        [a, b] = haystack.split "], function("
+        a .= substr(a.indexOf('"')).split('", "')
+        b .= substr(0, b.indexOf(')')).split(', ')
         if b[a.indexOf(needle)]
             try window[that] = require needle
             return that
@@ -189,10 +187,27 @@ window <<<<
             console.log "[#{event .toUpperCase!}]", args
 
     usernameToSlug: (un) ->
-        htmlEscape(un).replace /[&;\s]+/g, '-'
+        lastCharWasLetter = false
+        res = ""
+        for char in htmlEscape(un)
+            if (lc = char.toLowerCase!) != char.toUpperCase!
+                if /\w/ .test lc
+                    res += char.toLowerCase!
+                else
+                    res += "\\u#{pad(lc.charCodeAt(0), 4)}"
+                lastCharWasLetter = true
+            else if lastCharWasLetter
+                res += "-"
+                lastCharWasLetter = false
+        if not lastCharWasLetter
+            res .= substr(0, res.length - 1)
+        return res
+        #htmlEscape(un).replace /[&;\s]+/g, '-'
         # some more characters get collapsed
         # some characters get converted to \u####
 
+    reconnectSocket: ->
+        _$context .trigger \force:reconnect
     ghost: ->
         $.get '/'
 

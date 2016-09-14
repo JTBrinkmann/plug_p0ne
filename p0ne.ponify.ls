@@ -12,8 +12,14 @@
 ####################################*/
 module \ponify, do
     optional: <[ emoticons ]>
-    settings: \enableDisable
     displayName: 'Ponify Chat'
+    settings: \pony
+    help: '''
+        Ponify the chat! (replace words like "anyone" with "anypony")
+        Replaced words will be underlined. Move your cursor over the word to see it's original.
+
+        It also replaces some of the emoticons with pony emoticons.
+    '''
     /*== TEXT ==*/
     map:
         # "america":    "amareica" # this one was driving me CRAZY
@@ -112,65 +118,43 @@ module \ponify, do
         "confound those dover boys":    "confound these ponies"
 
 
-    ponifyNode: (node) !->
-        #console.log "ponifying", node
-        if node.nodeType != 3
-            for n in node.childNodes ||[]
-                @ponifyNode n
+    ponifyMsg: (msg) !->
+        msg.message .= replace @regexp, (_, pre, s, post, i) ~>
+            w = @map[s.toLowerCase!]
+            r = ""
 
-        else
-            str = node.nodeValue
-            hasReplacement = false
-            replacement = null
-            lastPos = 0
-            #str.replace @regexp, (s, pre, i) ~>
-            str.replace @regexp, (_, pre, s, post, i) ~>
-                w = @map[s.toLowerCase!]
-                r = ""
+            /*preserve upper/lower case*/
+            lastUpperCaseLetters = 0
+            l = s.length <? w.length
+            for o from 0 til l
+                if s[o].toLowerCase! != s[o]
+                    r += w[o].toUpperCase!
+                    lastUpperCaseLetters++
+                else
+                    r += w[o]
+                    lastUpperCaseLetters = 0
+            if w.length >= s.length and lastUpperCaseLetters >= 3
+                r += w.substr(l) .toUpperCase!
+            else
+                r += w.substr(l)
 
-                if not replacement
-                    replacement := document.createElement \span
-                if str.substring(lastPos, i)
-                    replacement.appendChild document.createTextNode that
+            r = "<abbr class=ponified title='#s'>#r</abbr>"
 
-                if pre
-                    if "aeioujyh".has(w.0)
-                        replacement.appendChild document.createTextNode "an "
-                    else
-                        replacement.appendChild document.createTextNode "a "
+            if pre
+                if "aeioujyh".has(w.0)
+                    r = "an #r"
+                else
+                    r = "a #r"
 
-                /*preserve upper/lower case*/
-                lastUpperCaseLetters = 0
-                l = s.length <? w.length
-                for o from 0 til l
-                    if s[o].toLowerCase! != s[o]
-                        r += w[o].toUpperCase!
-                        lastUpperCaseLetters++
-                    else if l >= s.length and lastUpperCaseLetters == 3
-                        r += w[o].toUpperCase!
-                    else
-                        r += w[o]
+            if post
+                if "szxß".has(w[*-1])
+                    r += "' "
+                else
+                    r += "'s "
 
-                r += w.substr l
+            console.log "replaced '#s' with '#r'", msg.cid
+            return r
 
-                document.createElement \abbr
-                    ..textContent = "#r"
-                    ..classList.add \ponified
-                    ..title = s
-                    replacement.appendChild ..
-
-                if post
-                    if "szxß".has(w[*-1])
-                        replacement.appendChild document.createTextNode "' "
-                    else
-                        replacement.appendChild document.createTextNode "'s "
-
-                lastPos := i + _.length
-                console.log "replaced '#s' with '#r'", node
-
-            if replacement
-                replacement.appendChild document.createTextNode str.substr(lastPos)
-                node.parentNode?.replaceChild replacement, node
 
     /*== EMOTICONS ==*/
     autoEmotiponies:
@@ -233,15 +217,8 @@ module \ponify, do
 
 
     setup: ({addListener, replace, css}) ->
-        @regexp = //(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
-        addListener API, \chat, ({cid}) ~> if cid
-            try
-                if getChatText cid .0
-                    @ponifyNode that
-                else
-                    throw "couldn't find message"
-            catch err
-                console.error "[ponify] Error converting message ##cid", err.stack
+        @regexp = ///(?:^|https?:)(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
+        addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
             aEM = ^^emoticons.autoEmoteMap #|| {}
             for emote, url of @autoEmotiponies

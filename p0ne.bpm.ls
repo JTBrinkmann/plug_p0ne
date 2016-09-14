@@ -10,7 +10,7 @@
 do ->
     window.bpm?.disable!
     window.emote_map ||= {}
-    host = window.p0ne?.host or "https://dl.dropboxusercontent.com/u/4217628/plug_p0ne"
+    host = window.p0ne?.host or "https://cdn.p0ne.com"
 
     /*== external sources ==*/
     $.getScript "#host/script/bpm-resources.js" .then ->

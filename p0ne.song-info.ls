@@ -10,10 +10,11 @@
 # http://gdata.youtube.com/feeds/api/users/#{channel}/uploads?alt=json&max-results=10
 module \songInfo, do
     optional: <[ _$context ]>
-    settings: \enableDisable
+    settings: \base
     displayName: 'Song-Info Dropdown'
     help: '''
-        clicking on the now-playing-bar (in the top-center of the page) will open a panel with the song's description and links to the artist and song.
+        A panel with the song's description and links to the artist and song.
+        Click on the now-playing-bar (in the top-center of the page) to open it.
     '''
     setup: ({addListener, $create, css}) ->
         @$create = $create
@@ -48,52 +49,60 @@ module \songInfo, do
             API.off \advance, @loadBind
     load: ({media}, isRetry) ->
         console.log "[song-info]", media
-        @lastMedia = media
-        mediaLookup media, do
-            fail: ~>
-                if isRetry
-                    @$el .html "error loading, retrying…"
-                    load {media}, true
-                else
-                    @$el .html "Couldn't load song info, sorry =("
-            success: (d) ~>
-                console.log "[song-info] got data", @lastMedia != media
-                return if @lastMedia != media or @disabled # skip if another song is already playing
+        if @lastMedia == media
+            @showInfo media
+        else
+            @lastMedia = media
+            @mediaData = null
+            mediaLookup media, do
+                fail: (err) ~>
+                    console.error "[song-info]", err
+                    if isRetry
+                        @$el .html "error loading, retrying…"
+                        load {media}, true
+                    else
+                        @$el .html "Couldn't load song info, sorry =("
+                success: (@mediaData) ~>
+                    console.log "[song-info] got data", @mediaData
+                    @showInfo media
+            API.once \advance, @loadBind
+    showInfo: (media) ->
+        d = @mediaData
+        return if @lastMedia.id != media.id or @disabled # skip if another song is already playing
 
-                @$el .html ""
-                $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
-                $parts = {}
+        @$el .html ""
+        $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
+        $parts = {}
 
-                @$create \<span> .addClass \p0ne-song-info-author      .appendTo $meta
-                    .click -> mediaSearch media.author
-                    .attr \title, "search for '#{media.author}'"
-                    .text media.author
-                @$create \<span> .addClass \p0ne-song-info-title       .appendTo $meta
-                    .click -> mediaSearch media.title
-                    .attr \title, "search for '#{media.title}'"
-                    .text media.title
-                @$create \<br>                                         .appendTo $meta
-                @$create \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
-                    .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
-                    .attr \target, \_blank
-                    .attr \title, "open channel of '#{d.uploader.name}'"
-                    .text d.uploader.name
-                @$create \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
-                    .attr \href, "http://youtube.com/watch?v=#{media.cid}"
-                    .attr \target, \_blank
-                    .attr \title, "open video on Youtube"
-                    .text d.title
-                @$create \<br>                                         .appendTo $meta
-                @$create \<span> .addClass \p0ne-song-info-date        .appendTo $meta
-                    .text getISOTime new Date(d.uploadDate)
-                @$create \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
-                    .text mediaTime +d.duration
-                #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-                #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-                #@$create \<div> .addClass \p0ne-song-info-tags    #ToDo
-                @$create \<div> .addClass \p0ne-song-info-description  .appendTo @$el
-                    .html formatPlainText(d.description)
-                #@$create \<ul> .addClass \p0ne-song-info-remixes      #ToDo
-        API.once \advance, @loadBind
+        @$create \<span> .addClass \p0ne-song-info-author      .appendTo $meta
+            .click -> mediaSearch media.author
+            .attr \title, "search for '#{media.author}'"
+            .text media.author
+        @$create \<span> .addClass \p0ne-song-info-title       .appendTo $meta
+            .click -> mediaSearch media.title
+            .attr \title, "search for '#{media.title}'"
+            .text media.title
+        @$create \<br>                                         .appendTo $meta
+        @$create \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
+            .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
+            .attr \target, \_blank
+            .attr \title, "open channel of '#{d.uploader.name}'"
+            .text d.uploader.name
+        @$create \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
+            .attr \href, "http://youtube.com/watch?v=#{media.cid}"
+            .attr \target, \_blank
+            .attr \title, "open video on Youtube"
+            .text d.title
+        @$create \<br>                                         .appendTo $meta
+        @$create \<span> .addClass \p0ne-song-info-date        .appendTo $meta
+            .text getISOTime new Date(d.uploadDate)
+        @$create \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
+            .text mediaTime +d.duration
+        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #@$create \<div> .addClass \p0ne-song-info-tags    #ToDo
+        @$create \<div> .addClass \p0ne-song-info-description  .appendTo @$el
+            .html formatPlainText(d.description)
+        #@$create \<ul> .addClass \p0ne-song-info-remixes      #ToDo
     disable: ->
         @$el .remove!

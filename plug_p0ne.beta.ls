@@ -16,7 +16,7 @@
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
 window.p0ne =
-    version: \1.2.3
+    version: \1.3.1
     lastCompatibleVersion: \1.2.1 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -904,8 +904,63 @@ if( typeof module !== 'undefined' && module != null ) {
 
 $window = $ window
 $body = $ document.body
-window.s_to_ms = 1_000
-window.min_to_ms = 60_000
+
+
+/*####################################
+#         PROTOTYPE FUNCTIONS        #
+####################################*/
+# helper for defining non-enumerable functions via Object.defineProperty
+let (d = (property, value) -> if @[property] != value then Object.defineProperty this, property, {-enumerable, +writable, +configurable, value})
+    d.call Object::, \define, d
+Object::define \defineGetter, (property, get) -> if @[property] != get then Object.defineProperty this, property, {-enumerable, +configurable, get}
+
+Array::define \remove, (i) -> return @splice i, 1
+Array::define \removeItem, (el) ->
+    if -1 != (i = @indexOf(el))
+        @splice i, 1
+    return this
+Array::define \random, -> return this[~~(Math.random! * @length)]
+Array::define \unique, ->
+    res = []; l=0
+    for el, i in this
+        for o til i
+            break if @[o] == el
+        else
+            res[l++] = el
+    return
+String::define \reverse, ->
+    res = ""
+    i = @length
+    while i--
+        res += @[i]
+    return res
+String::define \has, (needle) -> return -1 != @indexOf needle
+String::define \startsWith, (str) ->
+    i=0
+    while char = str[i]
+        return false if char != this[i++]
+    return true
+String::define \endsWith, (str) ->
+    return this.lastIndexOf == @length - str.length
+
+Number::defineGetter \min, ->   return this * 60_000min_to_ms
+Number::defineGetter \s, ->     return this * 1_000min_to_ms
+
+
+jQuery.fn <<<<
+    fixSize: -> #… this is not really used?
+        for el in this
+            el.style .width = "#{el.width}px"
+            el.style .height = "#{el.height}px"
+        return this
+    concat: (arr2) ->
+        l = @length
+        return this if not arr2 or not arr2.length
+        return arr2 if not l
+        for el, i in arr2
+            @[i+l] = el
+        @length += arr2.length
+        return this
 
 /*####################################
 #            DATA MANAGER            #
@@ -935,52 +990,7 @@ if not window.dataSave?.p0ne
             console.log "[Data Manager] saved data"
     window.dataSave.p0ne = true
     $window .on \beforeunload, dataSave
-    setInterval dataSave, 15min *min_to_ms
-
-
-/*####################################
-#         PROTOTYPE FUNCTIONS        #
-####################################*/
-# helper for defining non-enumerable functions via Object.defineProperty
-let (d = (property, fn) -> if @[property] != fn then Object.defineProperty this, property, { enumerable: false, writable: true, configurable: true, value: fn })
-    d.call Object::, \define, d
-
-
-Array::define \remove, (i) -> return @splice i, 1
-Array::define \removeItem, (el) ->
-    if -1 != (i = @indexOf(el))
-        @splice i, 1
-    return this
-Array::define \random, -> return this[~~(Math.random! * @length)]
-String::define \reverse, ->
-    res = ""
-    i = @length
-    while i--
-        res += @[i]
-    return res
-String::define \has, (needle) -> return -1 != @indexOf needle
-String::define \startsWith, (str) ->
-    i=0
-    while char = str[i]
-        return false if char != this[i++]
-    return true
-String::define \endsWith, (str) ->
-    return this.lastIndexOf == @length - str.length
-
-jQuery.fn <<<<
-    fixSize: -> #… this is not really used?
-        for el in this
-            el.style .width = "#{el.width}px"
-            el.style .height = "#{el.height}px"
-        return this
-    concat: (arr2) ->
-        l = @length
-        return this if not arr2 or not arr2.length
-        return arr2 if not l
-        for el, i in arr2
-            @[i+l] = el
-        @length += arr2.length
-        return this
+    setInterval dataSave, 15.min
 
 
 /*####################################
@@ -991,43 +1001,71 @@ window <<<<
     YT_REGEX: /https?:\/\/(?:www\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|embed|e)\/|.*(?:\?|&amp;)v=)|youtu\.be\/)([^"&?\/<>\s]{11})(?:&.*?|#.*?|)$/i
     repeat: (timeout, fn) -> return setInterval (-> fn ... if not disabled), timeout
     sleep: (timeout, fn) -> return setTimeout fn, timeout
-    pad: (num) -> return switch true
-        | num < 0   => num
-        | num < 10  => "0#num"
-        | num == 0  => "00"
-        | otherwise => num
+    pad: (num, digits) ->
+        if digits
+            return "#num" if not isFinite num
+            a = ~~num
+            b = "#{num - a}"
+            num = "#a"
+            while num.length < digits
+                num = "0#num"
+            return "#num#{b .substr 1}"
+        else
+            return
+                if 0 <= num < 10 then "0#num"
+                else             then "#num"
 
     generateID: -> return (~~(Math.random!*0xFFFFFF)) .toString(16).toUpperCase!
 
 
-    getUser: (nameOrID) !->
-        return if not nameOrID
-        users = API.getUsers!
-        if +nameOrID
-            for user in users when user.id == nameOrID
+
+    getUser: (user) !->
+        return if not user
+        if typeof user == \object
+            if user.username
                 return user
-        else
-            for user in users when user.username == nameOrID
+            else if user.attributes and user.toJSON
+                return user.toJSON!
+            return null
+        userList = API.getUsers!
+        if +user
+            if users?.get? user
+                return that
+            else
+                for u in userList when u.id == user
+                    return u
+
+        for u in userList when u.username == user
+            return u
+        user .= toLowerCase!
+        for u in userList when u.username .toLowerCase! == user
+            return u
+    getUserInternal: (user) !->
+        return if not user or not users
+        if typeof user == \object
+            if user.attributes
                 return user
-            nameOrID .= toLowerCase!
-            for user in users when user.username .toLowerCase! == nameOrID
-                return user
-    getUserInternal: (nameOrID) !->
-        return if not users
-        if +nameOrID
-            users.get nameOrID
+            else if user.username
+                return users.get(user.id)
+            return null
+
+        if +user
+            users.get user
         else
             users = users.models
-            for user in users when user.username == nameOrID
-                return user
-            nameOrID .= toLowerCase!
-            for user in users when user.username .toLowerCase! == nameOrID
-                return user
+            for u in users when u.username == user
+                return u
+            user .= toLowerCase!
+            for u in users when u.username .toLowerCase! == user
+                return u
 
     logger: (loggerName, fn) ->
-        return ->
-            console.log "[#loggerName]", arguments
-            return fn? ...
+        if typeof fn == \function
+            return ->
+                console.log "[#loggerName]", arguments
+                return fn ...
+        else
+            return -> console.log "[#loggerName]", arguments
 
     replace: (context, attribute, cb) ->
         context["#{attribute}_"] ||= context[attribute]
@@ -1072,9 +1110,10 @@ window <<<<
 
 
     /* callback gets called with the arguments cb(errorCode, response, event) */
-    ajax: (type, url,  data, cb) ->
+    floodAPI_counter: 0
+    ajax: (type, url, data, cb) ->
         if typeof url != \string
-            [type, url, data] = [url, data, cb]
+            [url, data, cb] = [type, url, data]
             type = data?.type || \POST
         if typeof data == \function
             success = data; data = null
@@ -1086,20 +1125,33 @@ window <<<<
             delete data.error
         else if typeof cb == \object
             {success, fail} = cb if cb
-        delete data.type if data
+
         options = do
                 type: type
                 url: "https://plug.dj/_/#url"
                 success: ({data}) ->
-                    console.info "[#url]", data
+                    console.info "[#url]", data if not silent
                     success? data
                 error: (err) ->
-                    console.error "[#url]", data
+                    console.error "[#url]", data if not silent
                     error? data
+
         if data
-            options.contentType = \application/json
-            options.data = JSON.stringify(data)
-        return $.ajax options
+            silent = data.silent
+            delete data.type
+            delete data.silent
+            if Object.keys(data).length
+                options.contentType = \application/json
+                options.data = JSON.stringify(data)
+        def = $.Deferred!
+        do delay = ->
+            if window.floodAPI_counter >= 15 /* 20 requests / 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
+                sleep 1_000ms, delay
+            else
+                window.floodAPI_counter++; sleep 10_000ms, -> window.floodAPI_counter--
+                return $.ajax options
+                    .then def.resolve, def.reject, def.progress
+        return def
 
     befriend: (userID, cb) -> ajax \POST, "friends", id: userID, cb
     ban: (userID, cb) -> ajax \POST, "bans/add", userID: userID, duration: API.BAN.HOUR, reason: 1, cb
@@ -1113,6 +1165,15 @@ window <<<<
         <- sleep 1_000ms
         unban userID, cb
 
+    getUserData: (user, cb) !->
+        if typeof user != \number
+            user = getUser user
+        cb ||= (data) -> console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+        return $.get "/_/users/#user"
+            .then ({[data]:data}:arg) ->
+                return data
+            .fail ->
+                console.warn "couldn't get slug for user with id '#{id}'"
 
     $djButton: $ \#dj-button
     mute: ->
@@ -1211,13 +1272,19 @@ window <<<<
                 .fail fail
                 .rejectWith"unsupported format"
 
-    mediaDownload: ({format, cid, id}:media, cb) ->
-        if cb
+    mediaDownload: (media, cb) ->
+        media ||= API.getMedia!
+        {format, cid, id} = media
+        if typeof media == \function or media.success or media.fail
+            cb = media; media = false
+        media ||= API.getMedia!
+        if typeof cb == \function
+            success = cb
+        else if cb
             {success, fail} = cb
-        else
-            success = logger \mediaDownload
-            error = logger \mediaDownloadError
-        # success(downloadURL, downloadSize)
+        success ||= logger \mediaDownload # success(downloadURL, downloadSize)
+        error ||= logger \mediaDownloadError
+
         cid ||= id
         if format == 1 # youtube
             $.ajax do
@@ -1263,23 +1330,27 @@ window <<<<
     #ToDo test this
     getMentions: (data) ->
         names = []; l=0
-        data.message.replace /@(\w+)/g, (_, name, i) ->
-            helper = (name) ->
-                possibleMatches = [username for {username} in API.getUsers! when username.indexOf(name) == 0]
-                switch possibleMatches.length
-                | 0 =>
-                | 1 => if data.message.substr(i + 1, possibleMatches.0.length) == possibleMatches.0
-                    names[l++] = possibleMatches.0
-                | otherwise =>
-                    return helper(data.message.substr(i + 1, _.length))
-                return _
-            return helper(name)
+        users = API.getUsers!
+        msgLength = data.message.length
+        data.message.replace /@/g, (_, offset) ->
+            offset++
+            possibleMatches = users
+            i = 0
+            while possibleMatches.length and i < msgLength
+                possibleMatches2 = []; l3 = 0
+                for m in possibleMatches when m.username[i] == data.message[offset + i]
+                    console.log ">", data.message.substr(offset, 5), i, "#{m.username .substr(0,i)}#{m.username[i].toUpperCase!}#{m.username .substr i+1}"
+                    if m.username.length == i + 1
+                        res = m
+                        console.log ">>>", m.username
+                    else
+                        possibleMatches2[l3++] = m
+                possibleMatches = possibleMatches2
+                i++
+            if res and names.indexOf(res) == -1
+                names[l++] = res.username
 
-        if not names.length
-            names = [data.un]
-        else
-            names = $.unique names
-
+        names = [data.un] if not names.length
         names.toString = -> return humanList this
         return names
 
@@ -1376,12 +1447,21 @@ window <<<<
     isURL: (str) ->
         return false if typeof str != \string
         str.trim!
-        if parseURL().host != location.host
+        if parseURL(str).host != location.host
             return str
         else
             return false
 
 
+    mention: (list) ->
+        if not list?.length
+            return ""
+        else if list.0.username
+            return humanList ["@#{list[i].username}" for ,i in list]
+        else if list.0.attributes?.username
+            return humanList ["@#{list[i].get \username}" for ,i in list]
+        else
+            return humanList ["@#{list[i]}" for ,i in list]
     humanList: (arr) ->
         return "" if not arr.length
         arr = []<<<<arr
@@ -1438,14 +1518,16 @@ window <<<<
         return "#{it.toFixed(2)}MB"
 
     getRank: (user) -> # returns the name of a rank of a user
-        if typeof user == \number and user > 10_000
-            user = users.get(user)
-        if user.gRole || user.get?(\gRole)
+        user = getUser(user)
+        if not user or (role = user.role || user.get?(\role)) == -1
+            return \ghost
+        else if user.gRole || user.get?(\gRole)
             if that == 5
                 return \admin
             else
                 return \BA
-        return <[ user RDJ bouncer manager co-host host ]>[user.role || user.get?(\role) || 0]
+        else
+            return <[ none rdj bouncer manager cohost host ]>[role || 0]
 
     parseURL: (href) ->
         $dummy.0.href = href
@@ -1517,6 +1599,7 @@ requireHelper \Layout, (.getSize)
 requireHelper \RoomUserRow, (.::?.vote)
 requireHelper \DialogAlert, (.::?id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
+requireHelper \ActivateEvent, (.ACTIVATE)
 
 requireHelper \emoticons, (.emojify)
 emoticons.reverseMap = {[v, k] for k,v of emoticons.map} if window.emoticons
@@ -1748,6 +1831,7 @@ console.logImg = (src, customWidth, customHeight) ->
  * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
  */
+p0ne.moduleSettings = dataLoad \moduleSettings, {}
 window.module = (name, data) ->
     try
         # setup(helperFNs, module, args)
@@ -1761,7 +1845,7 @@ window.module = (name, data) ->
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.persistent ||= {}
-        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName} = data
+        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName, moduleSettings} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -1807,11 +1891,12 @@ window.module = (name, data) ->
                     [target, ...args] = args
                 cbs.[]listeners[*] = {target, args}
                 if not early
-                    return target.on .apply target, args
+                    target.on .apply target, args
                 else if not target.onEarly
                     console.warn "[#name] cannot use .onEarly on", target
                 else
-                    return target.onEarly .apply target, args
+                    target.onEarly .apply target, args
+                return args[*-1] # return callback so one can do `do addListener(…)` to initially trigger the callback
 
             replace: (target, attr, repl) ->
                 cbs.[]replacements[*] = [target, attr, repl]
@@ -1846,7 +1931,6 @@ window.module = (name, data) ->
                 p0neCSS.css name, str
                 cbs.{}css[name] = str
             loadStyle: (url) ->
-                return if p0neCSS.$el.filter "[href='#url']" .length
                 p0neCSS.loadStyle url
                 cbs.{}loadedStyles[url] = true
 
@@ -1860,9 +1944,13 @@ window.module = (name, data) ->
             enable: ->
                 return if not @disabled
                 @disabled = false
-                setup?.call module, helperFNs, module, data, module_
-                API.trigger \p0neModuleEnabled, module
-                console.info "[#name] enabled"
+                delete p0ne.moduleSettings[name].disabled
+                try
+                    setup.call module, helperFNs, module, data, module
+                    API.trigger \p0neModuleEnabled, module
+                    console.info "[#name] enabled", setup != null
+                catch err
+                    console.error "[#name] error while re-enabling", err.stack
             disable: (newModule) ->
                 return if module.disabled
                 try
@@ -1879,11 +1967,12 @@ window.module = (name, data) ->
                         p0neCSS.css style, "/* disabled */"
                     for url of cbs.loadedStyles
                         p0neCSS.unloadStyle url
-                    for m in p0ne.dependencies[name] ||[]
-                        m.disable!
                     for $el in cbs.$elements ||[]
                         $el .remove!
+                    for m in p0ne.dependencies[name] ||[]
+                        m.disable!
                     if not newModule
+                        p0ne.moduleSettings[name].disabled = true
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         API.trigger \p0neModuleDisabled, module
@@ -1900,6 +1989,7 @@ window.module = (name, data) ->
             if persistent
                 for k in persistent ||[]
                     module[k] = module_[k]
+            module._$settings = module_._$settings
             module_.disable? module
         failedRequirements = []; l=0
         for r in require ||[]
@@ -1921,9 +2011,14 @@ window.module = (name, data) ->
             # set up Help and Settings
             module.help? .= replace /\n/g, "<br>\n"
 
+            if p0ne.moduleSettings{}[name].disabled
+                module.disabled = true
+
             # initialize module
             if not module.disabled
                 setup?.call module, helperFNs, module, data, module_
+            module.getSetup = ->
+                return setup
 
             p0ne.modules[*] = module
             if module_
@@ -1952,11 +2047,23 @@ window.module = (name, data) ->
 /*####################################
 #            AUXILIARIES             #
 ####################################*/
-module \updateUserObj, do
-    require: <[ user_ ]>
+module \updateUserData, do
+    require: <[ user_ users _$context ]>
     setup: ({addListener}) ->
         addListener window.user_, \change:username, ->
             user.username = window.user_.get \username
+        addListener _$context, \user:join, ({id}) ->
+            users.get(id).set \joinedRoom, Date.now!
+        for user in users.models
+            user.set \joinedRoom, -1
+module \throttleOnFloodAPI, do
+    setup: ({addListener}) ->
+        addListener API, \socket:floodAPI, ->
+            /* all AJAX and Socket functions should check if the counter is AT LEAST below 20 */
+            window.floodAPI_counter += 20
+            sleep 15_000ms, ->
+                /* it is assumed, that the API counter resets every 10 seconds. 15s is to provide enough buffer */
+                window.floodAPI_counter -= 20
 
 module \PopoutListener, do
     require: <[ PopoutView ]>
@@ -1975,7 +2082,7 @@ module \chatDomEvents, do
     persistent: <[ _events ]>
     setup: ({addListener}) ->
         @ <<<< backbone.Events
-        @one = @once
+        @one = @once # because jQuery uses .one instead of .once
         cm = $cm!
         on_ = @on; @on = ->
             on_ ...
@@ -1993,7 +2100,7 @@ module \chatDomEvents, do
         addListener API, \popout:open, patchCM
 
 module \grabMedia, do
-    require: <[ playlists ]>
+    require: <[ playlists auxiliaries ]>
     optional: <[ _$context ]>
     module: (playlistIDOrName, media, appendToEnd) ->
         currentPlaylist = playlists.get(playlists.getActiveID!)
@@ -2001,11 +2108,10 @@ module \grabMedia, do
         if typeof playlistIDOrName == \string and not playlistIDOrName .startsWith \http
             for pl in playlists.models when playlistIDOrName == pl.get \name
                 playlist = pl; break
-        else if id = +playlistIDOrName
-            playlist = playlists.get(playlistIDOrName)
-        else
+        else if not playlist = playlists.get(playlistIDOrName)
             playlist = currentPlaylist # default to current playlist
             appendToEnd = media; media = playlistIDOrName
+
         if not playlist
             console.error "[grabMedia] could not find playlist", arguments
             return
@@ -2013,6 +2119,8 @@ module \grabMedia, do
         # get media
         if not media # default to current song
             addMedia API.getMedia!
+        else if media.id
+            addMedia media
         else
             mediaLookup media, do
                 success: addMedia
@@ -2023,7 +2131,7 @@ module \grabMedia, do
         function addMedia media
             console.log "[grabMedia] add '#{media.author} - #{media.title}' to playlist: #playlist"
             playlist.set \syncing, true
-            ajax \POST, "playlists/#{playlist.id}/media/insert", media: [media], append: !!appendToEnd
+            ajax \POST, "playlists/#{playlist.id}/media/insert", media: auxiliaries.serializeMediaItems([media]), append: !!appendToEnd
                 .then (e) ->
                     if playlist.id != e.id
                         playlist.set \syncing, false
@@ -2047,10 +2155,11 @@ module \p0neCSS, do
     optional: <[ PopoutListener PopoutView ]>
     $popoutEl: $!
     styles: {}
+    urlMap: {}
     persistent: <[ styles ]>
     setup: ({addListener, $create}) ->
         @$el = $create \<style> .appendTo \head
-        {$el, $popoutEl, styles} = this
+        {$el, $popoutEl, styles, urlMap} = this
         addListener API, \popout:open, (_window) ->
             $popoutEl := $el .clone! .appendTo _window.document.head
         PopoutView.render! if PopoutView?._window
@@ -2066,21 +2175,26 @@ module \p0neCSS, do
             return styles[name] if not css?
 
             styles[name] = css
-            res = ""
-            for n,css of styles
-                res += "/* #n */\n#css\n\n"
 
             if not throttled
                 throttled := true
                 requestAnimationFrame ->
                     throttled := false
+                    res = ""
+                    for n,css of styles
+                        res += "/* #n */\n#css\n\n"
                     $el       .first! .text res
                     $popoutEl .first! .text res
 
         export @loadStyle = (url) ->
             console.log "[loadStyle]", url
+            if urlMap[url]
+                return urlMap[url]++
+            else
+                urlMap[url] = 1
             s = $ "<link rel='stylesheet' >"
-                .attr \href, url
+                #.attr \href, "#url?p0=#{p0ne.version}" /* ?p0 to force redownload instead of using obsolete cached versions */
+                .attr \href, url /* ?p0 to force redownload instead of using obsolete cached versions */
                 .appendTo document.head
             $el       .push s.0
 
@@ -2090,9 +2204,16 @@ module \p0neCSS, do
                         .appendTo PopoutView?._window.document.head
 
         export @unloadStyle = (url) ->
-            $el       .find "[href='#url']" .remove!
-            $popoutEl .find "[href='#url']" .remove!
-                        .0
+            if urlMap[url] > 0
+                urlMap[url]--
+            if urlMap[url] == 0
+                delete urlMap[url]
+                i = $el        .index "[href='#url']"
+                $el.eq(i).remove!
+                $el.splice(i, 1)
+                i = $popoutEl  .index "[href='#url']"
+                $popoutEl.eq(i).remove!
+                $popoutEl.splice(i, 1)
         @disable = ->
             $el       .remove!
             $popoutEl .remove!
@@ -2109,7 +2230,6 @@ module \_$contextUpdateEvent, do
 
 
 module \login, do
-    settings: false
     persistent: <[ showLogin ]>
     module: ->
         if @showLogin
@@ -2523,7 +2643,8 @@ module \fixGhosting, do
     displayName: 'Fix Ghosting'
     require: <[ PlugAjax ]>
     optional: <[ login ]>
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Plug.dj sometimes marks you internally as "not in any room" even though you still are. This is also called "ghosting" because you can chat in a room that technically you are not in anymore. While ghosting you can still chat, but not join the waitlist or moderate. If others want to @mention you, you don't show up in the autocomplete.
 
@@ -2588,13 +2709,14 @@ module \fixGhosting, do
                                 | otherwise =>
                                     API.chatLog "[fixGhosting] cannot rejoin the room, unexpected error #{statusCode} (#{datastatus})", true
                             # don't try again for the next 10min
-                            sleep 10 *min_to_ms, ->
+                            sleep 10.min, ->
                                 rejoining := false
 
 module \fixOthersGhosting, do
     require: <[ users socketEvents ]>
     displayName: "Fix Other Users Ghosting"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes plug.dj does not properly emit join notifications, so that clients don't know another user joined a room. Thus they appear as "ghosts", as if they were not in the room but still can chat
 
@@ -2625,7 +2747,8 @@ module \fixOthersGhosting, do
 module \fixStuckDJ, do
     require: <[ Playback socketEvents ]>
     displayName: "Fix Stuck Advance"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes plug.dj does not automatically start playing the next song. Usually you would have to reload the page to fix this bug.
 
@@ -2636,13 +2759,13 @@ module \fixStuckDJ, do
     setup: ({replace, addListener}) ->
         _settings = @_settings
         fixStuckDJ = this
-        fixStuckDJ.timer := sleep 15s *s_to_ms, fixStuckDJ if API.getTimeRemaining! == 0s
+        fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
         replace Playback::, \playbackComplete, (pC_) -> return ->
             args = arguments
             replace Playback::, \playbackComplete, ~>
                 fn = ->
                     # wait 5s before checking if advance is stuck
-                    fixStuckDJ.timer := sleep 15s *s_to_ms, fixStuckDJ
+                    fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ
                     clearTimeout fixStuckDJ.timer
                     pC_ ...
                 fn.apply this, args
@@ -2657,9 +2780,10 @@ module \fixStuckDJ, do
         ajax \GET, \rooms/state, (data) ~>
             if not status == 200
                 console.error "[fixNoAdvance] cannot load room data:", status, data
-                @timer := sleep 5s *s_to_ms, fixStuckDJ
+                @timer := sleep 5_000ms, fixStuckDJ
             else
                 # "manually" trigger socket event for DJ advance
+                data.0.playback ||= {}
                 socketEvents.advance do
                     c: data.0.booth.currentDJ
                     d: data.0.booth.waitingDJs
@@ -2671,9 +2795,10 @@ module \fixStuckDJ, do
                 API.chatLog "[p0ne] fixed DJ not advancing", true if @_settings.warnings
 
 module \fixNoPlaylistCycle, do
-    require: <[ NOT_FINISHED ]>
+    require: <[ _$context ActivateEvent ]>
     displayName: "Fix No Playlist Cycle"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes after DJing, plug.dj does not move the played song to the bottom of the playlist.
 
@@ -2682,6 +2807,11 @@ module \fixNoPlaylistCycle, do
     _settings:
         warnings: true
     setup: ({addListener}) ->
+        addListener API, \sjs:reconnected, ->
+            _$context.dispatch new LoadEvent(LoadEvent.LOAD)
+            _$context.dispatch new ActivateEvent(ActivateEvent.ACTIVATE)
+        /*
+        # manual check
         addListener API, \advance, ({dj, lastPlay}) ~>
             #ToDo check if spelling is correctly
             #ToDo get currentPlaylist
@@ -2689,12 +2819,17 @@ module \fixNoPlaylistCycle, do
                 #_$context .trigger \MediaMoveEvent:move
                 ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
                 API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
+        */
 
 
 
 module \zalgoFix, do
-    settings: true
+    settings: \fixes
     displayName: 'Fix Zalgo Messages'
+    help: '''
+        This avoids messages' text bleeding out of the message, as it is the case with so called "Zalgo" messages.
+        Enable this if you are dealing with spammers in the chat who use Zalgo.
+    '''
     setup: ({css}) ->
         css \zalgoFix, '
             .message {
@@ -2772,7 +2907,7 @@ module \statusCommand, do
 #             YELLOW MOD             #
 ####################################*/
 module \yellowMod, do
-    settings: true
+    settings: \chat
     displayName: 'Have yellow name as mod'
     setup: ({css}) ->
         id = API.getUser! .id
@@ -2789,9 +2924,9 @@ module \yellowMod, do
 #         08/15 PLUG SCRIPTS         #
 ####################################*/
 module \autojoin, do
-    settings: true
+    settings: \base
     setup: ({addListener}) ->
-        addListener API, \advance, ->
+        do addListener API, \advance, ->
             if join!
                 console.log "[autojoin] joined waitlist", API.getWaitListPosition!
 
@@ -2856,7 +2991,7 @@ module \userlistMehIcon, do
 module \disableChatDelete, do
     require: <[ _$context ]>
     optional: <[ socketListeners ]>
-    settings: true
+    settings: \chat
     displayName: 'Show deleted messages'
     setup: ({replace_$Listener, addListener, $create, css}) ->
         $body .addClass \p0ne_showDeletedMessages
@@ -2876,14 +3011,16 @@ module \disableChatDelete, do
             }
         '
 
-        replace_$Listener \chat:delete, -> return (cid) ->
-            if not window.socket
+        if socketListeners
+            addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
+                markAsDeleted(c, users.get(mi)?.get(\username) || mi)
+        else
+            replace_$Listener \chat:delete, -> return (cid) ->
                 markAsDeleted(cid)
-        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
-            markAsDeleted(c, users.get(mi)?.get(\username) || mi)
 
         function markAsDeleted cid, moderator
             $msg = getChat cid
+            #ToDo add scroll down
             console.log "[Chat Delete]", cid, $msg.text!
             t  = getISOTime!
             t += " by #moderator" if moderator
@@ -2911,7 +3048,7 @@ module \disableChatDelete, do
 module \chatDblclick2Mention, do
     require: <[ chat ]>
     optional: <[ PopoutListener ]>
-    settings: true
+    settings: \chat
     displayName: 'DblClick username to Mention'
     setup: ({replace}) ->
         newFromClick = (e) ~>
@@ -2990,7 +3127,7 @@ module \automute, do
 #      JOIN/LEAVE NOTIFICATION       #
 ####################################*/
 module \joinLeaveNotif, do
-    optional: <[ chatDomEvents chat ]>
+    optional: <[ chatDomEvents chat auxiliaries database ]>
     setup: ({addListener, css},,,update) ->
         css \joinNotif, '
             .p0ne-joinLeave-notif {
@@ -3016,10 +3153,17 @@ module \joinLeaveNotif, do
                         usersInRoom[user.id] = Date.now!
                 else
                     delete usersInRoom[user.id]
-                $msg = $ "<span data-uid=#{user.id}>"
-                        .append document.createTextNode "#{if event == \userJoin then '+ ' else '- '}"
-                        .append $ "<span class=from>#{user.username}</span>" .text user.username
-                        .append document.createTextNode " just #verb the room"
+
+
+                $msg = $ "
+                    <span data-uid=#{user.id}>
+                        #{if event == \userJoin then '+ ' else '- '}
+                        <span class=from>#{resolveRTL user.username}</span> #verb the room
+                        #{if not (window.auxiliaries and window.database) then '' else
+                            '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS == 24) + '</div>'
+                        }
+                    </span>
+                    "
                 if false #chat?.lastType == \joinLeave
                     $lastNotif .append $msg
                 else
@@ -3039,6 +3183,35 @@ module \joinLeaveNotif, do
                 usersInRoom[user.id] = -1
 
 
+
+
+
+/*@source p0ne.chat.ls */
+/*@author jtbrinkmann aka. Brinkie Pie */
+/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+
+/*
+ * missing chat inline image plugins:
+ * Derpibooru
+ * imgur.com/a/
+ * tumblr
+ * deviantart
+ * e621.net
+ * paheal.net
+ * gfycat.com
+ * cloud-4.steampowered.com … .resizedimage
+ */
+
+
+chatWidth = 328px
+roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
+
+
+window.imgError = (elem) ->
+    console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
+    $ elem .parent!
+        ..text ..attr \href
+        ..addClass \p0ne_img_failed
 
 
 /*####################################
@@ -3098,39 +3271,16 @@ module \unreadChatNotif, do
             .find \.unread .removeClass \unread
  
 
-/*@source p0ne.chat.ls */
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
-
-/*
- * missing chat inline image plugins:
- * Derpibooru
- * imgur.com/a/
- * tumblr
- * deviantart
- * e621.net
- * paheal.net
- * gfycat.com
- * cloud-4.steampowered.com … .resizedimage
- */
-
-
-chatWidth = 328px
-roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
-
-
-window.imgError = (elem) ->
-    console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
-    $ elem .parent!
-        ..text ..attr \href
-        ..addClass \p0ne_img_failed
-
 
 module \p0ne_chat_input, do
     require: <[ chat user ]>
-    optional: <[ user_ _$context PopoutListener ]>
+    optional: <[ user_ _$context PopoutListener Lang ]>
     displayName: "Better Chat Input"
-    settings: true
+    settings: \chat
+    help: '''
+        Replaces the default chat input field with a multiline textfield.
+        This allows you to more accurately see how your message will actually look when send
+    '''
     setup: ({addListener, css, $create}) ->
         # apply styles
         css \p0ne_chat_input, '
@@ -3143,13 +3293,13 @@ module \p0ne_chat_input, do
             #chat-input-field {
                 position: static;
                 resize: none;
+                height: 16px;
                 overflow: hidden;
                 margin-left: 8px;
                 color: #eee;
                 background: rgba(0, 24, 33, .7);
                 box-shadow: inset 0 0 0 1px transparent;
                 transition: box-shadow .2s ease-out;
-                height: 16px; /* default before first resize */
             }
             #chat-input-field:focus {
                 box-shadow: inset 0 0 0 1px #009cdd !important;
@@ -3167,6 +3317,7 @@ module \p0ne_chat_input, do
             #chat-input-field, .autoresize_helper {
                 width: 295px;
                 padding: 8px 10px 5px 10px;
+                min-height: 16px;
                 font-weight: 400;
                 font-size: 12px;
                 font-family: Roboto,sans-serif;
@@ -3192,7 +3343,7 @@ module \p0ne_chat_input, do
             }
         '
 
-        var $form, $name, $autoresize_helper, chat
+        var $name, $autoresize_helper, chat
         chat = PopoutView.chat || window.chat
 
         # back up elements that are to be removed
@@ -3200,7 +3351,8 @@ module \p0ne_chat_input, do
 
 
         # fix permanent focus class
-        chat.$chatInput.removeClass \focused
+        chat.$chatInput .removeClass \focused
+        val = chat.$chatInput .val!
 
         # use $name's width to add proper indent to the input field
         @fixIndent = -> requestAnimationFrame -> # wait an animation frame so $name is properly added to the DOM
@@ -3209,13 +3361,17 @@ module \p0ne_chat_input, do
             $autoresize_helper   .css textIndent: indent
 
         # add new input text-area
-        addListener API, \popout:open, patchInput = ~>
-
+        oldHeight = 0
+        do addListener API, \popout:open, ~>
             chat := PopoutView.chat || window.chat
-            $form := chat.$chatInputField.parent!
-            chat.$chatInputField.remove!
+            @$form = chat.$chatInputField.parent!
+
+            oldHeight := chat.$chatInputField .height!
+            chat.$chatInputField.detach!
             chat.$chatInputField.0 = chat.chatInput = $create "<textarea id='chat-input-field' maxlength=256>"
-                .prop \tabIndex, 1
+                .attr \tabIndex, 1
+                .val val
+                .attr \placeholder, Lang?.chat.placeholder
                 # add DOM event Listeners from original input field (not using .bind to allow custom chat.onKey* functions)
                 .on \keydown, (e) ->
                     chat.onKeyDown e
@@ -3225,22 +3381,8 @@ module \p0ne_chat_input, do
                 #.on \blur, _.bind(chat.onBlur, chat)
 
                 # add event listeners for autoresizing
-                .on 'input', ->
-                    content = chat.$chatInputField .val!
-                    if (content2 = content.replace(/\n/g, "")) != content
-                        chat.$chatInputField .val (content=content2)
-                    $autoresize_helper.html(content + \<br>)
-                    oldHeight = chat.$chatInputField .height!
-                    newHeight = $autoresize_helper .height!
-                    return if oldHeight == newHeight
-                    console.log "[chat input] adjusting height"
-                    scrollTop = chat.$chatMessages.scrollTop!
-                    chat.$chatInputField
-                        .css height: newHeight
-                    chat.$chatMessages
-                        .css bottom: newHeight + 30px
-                        .scrollTop scrollTop + newHeight - oldHeight
-                .appendTo $form
+                .on 'input', onInput
+                .appendTo @$form
                 .after do
                     $autoresize_helper := $create \<div> .addClass \autoresize_helper
                 .0
@@ -3253,20 +3395,35 @@ module \p0ne_chat_input, do
 
             @fixIndent!
 
-        patchInput!
-        sleep 2s *s_to_ms, @fixIndent
+        sleep 2_000ms, @fixIndent
 
         if _$context
-            addListener _$context, \chat:send, ->
+            addListener _$context, \chat:send, -> requestAnimationFrame ->
                 chat.$chatInputField .trigger \input
 
         if user_?
             addListener user_, \change:username, @fixIndent
 
+        function onInput
+            content = chat.$chatInputField .val!
+            if (content2 = content.replace(/\n/g, "")) != content
+                chat.$chatInputField .val (content=content2)
+            $autoresize_helper.text("#content")
+            newHeight = $autoresize_helper .height!
+            return if oldHeight == newHeight
+            console.log "[chat input] adjusting height"
+            scrollTop = chat.$chatMessages.scrollTop!
+            chat.$chatInputField
+                .css height: newHeight
+            chat.$chatMessages
+                .css bottom: newHeight + 30px
+                .scrollTop scrollTop + newHeight - oldHeight
+            oldHeight := newHeight
+
 
     disable: ->
         chat.$chatInputField = $ @cIF_
-            .appendTo $cm!.parent!.find \.chat-input-form
+            .appendTo @$form
 
 module \chatPlugin, do
     require: <[ _$context ]>
@@ -3279,8 +3436,11 @@ module \chatPlugin, do
     cb: (msg) -> # run plugins that modify chat msgs
         msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
 
-        _$context .trigger \chat:plugin, msg
-        API .trigger \chat:plugin, msg
+        try
+            _$context .trigger \chat:plugin, msg
+            API .trigger \chat:plugin, msg
+        catch e
+            console.error "[chat:plugin] Error when triggering plugin", window.e=e
 
         for plugin in p0ne.chatMessagePlugins
             try
@@ -3311,25 +3471,29 @@ module \chatMessageClasses, do
     optional: <[ users ]>
     require: <[ chatPlugin ]>
     setup: ({addListener}) ->
-        $cm?! .children! .each ->
+        $cm! .children! .each ->
             if uid = this.dataset.cid
                 uid .= substr(0, 7)
-                if fromUser = getUser uid and fromUser.role != -1
-                    fromRole = roles[if fromUser.gRole then fromUser.gRole * 5 else fromUser.role]
-                else
-                    fromRole = \ghost
+                return if not uid
+                $this = $ this
+                if fromUser = users.get uid
+                    role = getRank(fromUser)
+                    if role != -1
+                        fromRole = "from-#{roles[role]}"
+                        fromRole += " from-staff" if role > 1 # RDJ
+                if not fromRole
+                    for r in ($this .find \.icon .prop \className ?.split " ") ||[] when r.startsWith \icon-chat-
+                        fromRole = "from-#{r.substr 10}"
+                    else
+                        fromRole = "from-none"
+                $this .addClass "fromID-#{uid} #fromRole"
 
-                $ this
-                    .addClass "fromID-#{uid}"
-                    .addClass "from-#{fromRole}"
-
-        addListener _$context, \chat:plugin, ({uid}:message) ->
-            fromUser = getUser uid
-            if fromUser
-                fromRole = roles[if fromUser.gRole then fromUser.gRole * 5 else fromUser.role]
-            else
-                fromRole = \ghost
-            message.type += " fromID-#{uid} from-#{fromRole}"
+        addListener _$context, \chat:plugin, ({type, uid}:message) -> if type == \message or type == \emote
+            user = getUser(uid)
+            fromRole  = "from-#{getRank(user || uid)}"
+            if user?.role > 1
+                fromRole += " from-staff"
+            message.type += " fromID-#{uid} #fromRole"
 
 # inline chat images & YT preview
 /*####################################
@@ -3339,6 +3503,11 @@ module \chatMessageClasses, do
 chatWidth = 500px
 module \chatInlineImages, do
     require: <[ chatPlugin ]>
+    settings: \chat
+    displayName: 'Inline Images'
+    help: '''
+        Converts image links to images in the chat, so you can see a preview
+    '''
     setup: ({add}) ->
         add p0ne.chatLinkPlugins, (all,pre,completeURL,protocol,domain,url, onload) ~>
             # images
@@ -3394,6 +3563,11 @@ module \chatInlineImages, do
 
 
 module \chatYoutubeThumbnails, do
+    settings: \chat
+    help: '''
+        Convert show thumbnails of linked Youtube videos in the chat.
+        When hovering the thumbnail, it will animate, alternating between three frames of the video.
+    '''
     setup: ({add, addListener}) ->
         add p0ne.chatLinkPlugins, @plugin
         addListener $(\#chat), 'mouseenter mouseleave', \.p0ne_yt_img, (e) ~>
@@ -3445,7 +3619,9 @@ module \chatYoutubeThumbnails, do
  */
 
 
-loadStyle "#{p0ne.host}/css/plug_p0ne.css?v=1.2"
+module \p0neStylesheet, do
+    setup: ({loadStyle}) ->
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?v=1.8"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -3469,18 +3645,16 @@ window.moduleStyle = (name, d) ->
 #            FIMPLUG THEME           #
 ####################################*/
 module \fimplugTheme, do
-    settings: true
+    settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
-    module: -> @toggle!
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css"
+        loadStyle "#{p0ne.host}/css/fimplug.css?v=1.2"
 
 /*####################################
 #          ANIMATED DIALOGS          #
 ####################################*/
 module \animatedUI, do
     require: <[ DialogAlert ]>
-    module: -> @toggle!
     setup: ({replace}) ->
         $ \.dialog .addClass \opaque
         # animate dialogs
@@ -3503,13 +3677,12 @@ module \animatedUI, do
 # fix drag'n'drop styles for playlist icon view
 module \playlistIconView, do
     displayName: "Playlist Icon View"
+    settings: \look&feel
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
-    settings: true
-    module: -> @toggle!
-    setup: ({addListener, replace, $create}, playlistIconView,, isUpdate) ->
-        $body .addClass \playlist-icon-view if not isUpdate
+    setup: ({addListener, replace, $create}, playlistIconView) ->
+        $body .addClass \playlist-icon-view
         $hovered = $!
         $mediaPanel = $ \#media-panel
         addListener $mediaPanel , \mouseover, \.row, ->
@@ -3533,13 +3706,12 @@ module \playlistIconView, do
 ####################################*/
 module \legacyChat, do
     displayName: "Legacy Chat"
+    settings: \chat
     help: '''
         Shows the chat in the old format, before badges were added to it in December 2014.
     '''
-    settings: true
-    module: -> @toggle!
-    setup: ({addListener},,, isUpdate) ->
-        $body .addClass \legacy-chat if not isUpdate
+    setup: ({addListener}) ->
+        $body .addClass \legacy-chat
         $cb = $ \#chat-button
         addListener $cb, \dblclick, (e) ~>
             @toggle!
@@ -3553,13 +3725,12 @@ module \legacyChat, do
 
 module \censor, do
     displayName: "Censor"
+    settings: \dev
     help: '''
         blurs some information like playlist names, counts, EP and Plug Notes.
         Great for taking screenshots
     '''
     disabled: true
-    settings: true
-    module: -> @toggle!
     setup: ->
         $body .addClass \censored
     disable: ->
@@ -3577,8 +3748,8 @@ module \censor, do
 */
 
 module \roomSettings, do
+    require: <[ room ]>
     optional: <[ _$context ]>
-    settings: false
     persistent: <[ _data _room ]>
     setup: ({addListener}) ->
         @_update!
@@ -3591,18 +3762,17 @@ module \roomSettings, do
         roomslug = getRoomSlug!
         return if @_data and roomslug == @_room
 
-        if not roomDescription = $ '#room-info .description .value' .text!
-            return
-        url = /@p3=(.*)/i .exec roomDescription
-        return if not url
-        $.getJSON p0ne.proxy(url.1)
-            .then (@_data) ~>
-                console.log "[p0ne] loaded p³ compatible Room Settings"
-                @_room = roomslug
-                @_trigger!
-            .fail fail
-        function fail
-            API.chatLog "[p0ne] cannot load Room Settings", true
+        if not roomDescription = room.get \description #$ '#room-info .description .value' .text!
+            console.warn "[p0ne] no p³ compatible Room Settings found"
+        else if url = /@p3=(.*)/i .exec roomDescription
+            console.log "[p0ne] p³ compatible Room Settings found", url.1
+            $.getJSON httpsify(url.1)
+                .then (@_data) ~>
+                    console.log "#{getTime!} [p0ne] loaded p³ compatible Room Settings"
+                    @_room = roomslug
+                    @_trigger!
+                .fail ->
+                    API.chatLog "[p0ne] cannot load Room Settings", true
     _trigger: ->
         for fn in @_listeners
             fn @_data
@@ -3624,13 +3794,19 @@ module \roomTheme, do
     displayName: "Room Theme"
     require: <[ roomSettings ]>
     optional: <[ roomLoader ]>
-    settings: true
+    settings: \look&feel
+    help: '''
+        Applies the room theme, if this room has one.
+        Room Settings and thus a Room Theme can be added by (co-) hosts of the room.
+    '''
     setup: ({addListener, replace, css, loadStyle}) ->
         roles = <[ residentdj bouncer manager cohost host ambassador admin ]> #TODO
         @$playbackBackground = $ '#playback .background img'
             ..data \_o, ..data(\_o) || ..attr(\src)
 
+        console.log "#{getTime!} [roomTheme] initializing"
         addListener roomSettings, \loaded, (d) ~>
+            console.log "#{getTime!} [roomTheme] loading theme"
             return if not d or @currentRoom == (roomslug = getRoomSlug!)
             @currentRoom = roomslug
             @clear!
@@ -3675,21 +3851,22 @@ module \roomTheme, do
             /*== images ==*/
             if d.images
                 if isURL(d.images.background)
-                    styles += "\#app { background-image: url(#{d.images.background}) }\n"
+                    styles += "\#app { background-image: url(#{d.images.background}) fixed center center / cover }\n"
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image
-                        ..onload ->
+                        ..onload = ~>
                             @$playbackBackground .attr \src, d.images.playback
                             replace roomLoader, \frameHeight,   -> return ..height - 10px
                             replace roomLoader, \frameWidth,    -> return ..width  - 18px
                             roomLoader.onVideoResize Layout.getSize!
-                            console.log "[roomTheme] loaded playback frame"
-                        ..onerror ->
-                            console.error "[roomTheme] failed to load playback frame"
+                            console.log "#{getTime!} [roomTheme] loaded playback frame"
+                        ..onerror = ->
+                            console.error "#{getTime!} [roomTheme] failed to load playback frame"
                         ..src = d.images.playback
                     replace roomLoader, \src, -> return d.images.playback
                 if isURL(d.images.booth)
                     styles += """
+                        /* custom booth */
                         \#avatars-container::before {
                             background-image: url(#{d.images.booth});
                         }\n"""
@@ -3705,10 +3882,12 @@ module \roomTheme, do
                 for key, text of d.text.plugDJ
                     for lang of Lang[key]
                         replace Lang[key], lang, -> return text
+
             css \roomTheme, styles
             @styles = styles
 
     clear: (skipDisables) ->
+        console.log "#{getTime!} [roomTheme] clearing RoomTheme"
         if not skipDisables
             # copied from p0ne.module
             for [target, attr /*, repl*/] in @_cbs.replacements ||[]
@@ -3719,6 +3898,7 @@ module \roomTheme, do
                 p0neCSS.unloadStyle url
             delete [@_cbs.replacements, @_cbs.css, @_cbs.loadedStyles]
 
+        @currentRoom = null
         if roomLoader? and Layout?
             roomLoader?.onVideoResize Layout.getSize!
         @$playbackBackground
@@ -3740,7 +3920,7 @@ module \roomTheme, do
 do ->
     window.bpm?.disable!
     window.emote_map ||= {}
-    host = window.p0ne?.host or "https://dl.dropboxusercontent.com/u/4217628/plug_p0ne"
+    host = window.p0ne?.host or "https://cdn.p0ne.com"
 
     /*== external sources ==*/
     $.getScript "#host/script/bpm-resources.js" .then ->
@@ -3949,8 +4129,18 @@ do ->
 module \songNotif, do
     require: <[ chatDomEvents ]>
     optional: <[ _$context database auxiliaries app popMenu ]>
-    settings: \enableDisable
+    settings: \base
+    help: '''
+        Shows notifications for playing songs in the chat.
+        Besides the songs' name, it also features a thumbnail and some extra buttons.
+
+        By clicking on the song's or author's name, a search on plug.dj for that name will be started, to easily find similar tracks.
+
+        By hovering the notification and clicking "description" the songs description will be loaded.
+        You can click anywhere on it to close it again.
+    '''
     setup: ({addListener, $create, $createPersistent, css},,,module_) ->
+        var lastMedia
         @callback = (d) ~>
             try
                 skipped = false #ToDo
@@ -3958,8 +4148,11 @@ module \songNotif, do
 
                 media = d.media
                 if not media
-                    @$playbackImg .hide!
+                    @$playbackImg .css backgroundImage: null
                     return
+                if media.id == lastMedia
+                    return
+                lastMedia := media.id
 
                 $div = $createPersistent "<div class='update song-notif' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
                 html = ""
@@ -3973,7 +4166,6 @@ module \songNotif, do
                     image = media.image
                 @$playbackImg
                     .css backgroundImage: "url(#image)"
-                    .show!
 
                 duration = mediaTime media.duration
                 console.logImg media.image.replace(/^\/\//, 'https://') .then ->
@@ -3987,8 +4179,9 @@ module \songNotif, do
                     <div class='song-thumb-wrapper'>
                         <img class='song-thumb' src='#image' />
                         <span class='song-duration'>#duration</span>
-                        <div class='song-add'><i class='icon icon-add'></i></div>
-                        <a class='song-open' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                        <div class='song-add btn'><i class='icon icon-add'></i></div>
+                        <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                        <div class='song-skip btn right'><i class='icon icon-skip'></i></div>
                     </div>
                     #timestamp
                     <div class='song-dj'></div>
@@ -4019,18 +4212,20 @@ module \songNotif, do
             catch e
                 console.error "[p0ne.notif]" e
 
+        #== add video thumbnail to #playback ==
+        @$playbackImg = $ \#playback-container
+        #$create \<div>
+        #    .addClass \playback-thumb
+        #    .insertBefore $ '#playback .background'
+
         addListener API, \advance, @callback
         if _$context
             addListener _$context, \room:joined, ~>
-                @callback media: API.getMedia!
+                @callback media: API.getMedia!, dj: API.getDJ!
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?v=1.2"
 
-        #== add video thumbnail to #playback ==
-        @$playbackImg = $create \<div>
-            .addClass \playback-thumb
-            .insertBefore $ '#playback .background'
 
         #== show current song ==
         if not module_ and API.getMedia!
@@ -4038,10 +4233,7 @@ module \songNotif, do
 
         # hide non-playable videos
         addListener _$context, \RestrictedSearchEvent:search, ->
-            if window.app?.room?.playback?
-                that .onSnoozeClick!
-            else
-                $ '#playback-controls .snooze' .click!
+            muteonce!
 
         #== Grab Songs ==        if not popMenu?
         if popMenu?
@@ -4065,6 +4257,19 @@ module \songNotif, do
                 popMenu.show $el, [obj]
         else
             css \songNotificationsAdd, '.song-add {display:none}'
+
+        #== fimplug ruleskip ==
+        addListener chatDomEvents, \click, \.song-add, ->
+            showDescription $(this).closest(".song-notif"), """
+                <span class='ruleskip'>!ruleskip 1 - nonpony</span>
+                <span class='ruleskip'>!ruleskip 2 - </span>
+                <span class='ruleskip'>!ruleskip 3 - </span>
+                <span class='ruleskip'>!ruleskip 4 - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+            """
 
         #== search for author ==
         addListener chatDomEvents, \click, \.song-author, ->
@@ -4165,10 +4370,11 @@ module \songNotif, do
                 cm.animate do
                     scrollTop: $cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
 
+        @showDescription = showDescription
         @hideDescription = hideDescription
 
     disable: ->
-        @hideDescription!
+        @hideDescription?!
 
 /*@source p0ne.song-info.ls */
 /**
@@ -4183,10 +4389,11 @@ module \songNotif, do
 # http://gdata.youtube.com/feeds/api/users/#{channel}/uploads?alt=json&max-results=10
 module \songInfo, do
     optional: <[ _$context ]>
-    settings: \enableDisable
+    settings: \base
     displayName: 'Song-Info Dropdown'
     help: '''
-        clicking on the now-playing-bar (in the top-center of the page) will open a panel with the song's description and links to the artist and song.
+        A panel with the song's description and links to the artist and song.
+        Click on the now-playing-bar (in the top-center of the page) to open it.
     '''
     setup: ({addListener, $create, css}) ->
         @$create = $create
@@ -4221,341 +4428,78 @@ module \songInfo, do
             API.off \advance, @loadBind
     load: ({media}, isRetry) ->
         console.log "[song-info]", media
-        @lastMedia = media
-        mediaLookup media, do
-            fail: ~>
-                if isRetry
-                    @$el .html "error loading, retrying…"
-                    load {media}, true
-                else
-                    @$el .html "Couldn't load song info, sorry =("
-            success: (d) ~>
-                console.log "[song-info] got data", @lastMedia != media
-                return if @lastMedia != media or @disabled # skip if another song is already playing
+        if @lastMedia == media
+            @showInfo media
+        else
+            @lastMedia = media
+            @mediaData = null
+            mediaLookup media, do
+                fail: (err) ~>
+                    console.error "[song-info]", err
+                    if isRetry
+                        @$el .html "error loading, retrying…"
+                        load {media}, true
+                    else
+                        @$el .html "Couldn't load song info, sorry =("
+                success: (@mediaData) ~>
+                    console.log "[song-info] got data", @mediaData
+                    @showInfo media
+            API.once \advance, @loadBind
+    showInfo: (media) ->
+        d = @mediaData
+        return if @lastMedia.id != media.id or @disabled # skip if another song is already playing
 
-                @$el .html ""
-                $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
-                $parts = {}
+        @$el .html ""
+        $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
+        $parts = {}
 
-                @$create \<span> .addClass \p0ne-song-info-author      .appendTo $meta
-                    .click -> mediaSearch media.author
-                    .attr \title, "search for '#{media.author}'"
-                    .text media.author
-                @$create \<span> .addClass \p0ne-song-info-title       .appendTo $meta
-                    .click -> mediaSearch media.title
-                    .attr \title, "search for '#{media.title}'"
-                    .text media.title
-                @$create \<br>                                         .appendTo $meta
-                @$create \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
-                    .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
-                    .attr \target, \_blank
-                    .attr \title, "open channel of '#{d.uploader.name}'"
-                    .text d.uploader.name
-                @$create \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
-                    .attr \href, "http://youtube.com/watch?v=#{media.cid}"
-                    .attr \target, \_blank
-                    .attr \title, "open video on Youtube"
-                    .text d.title
-                @$create \<br>                                         .appendTo $meta
-                @$create \<span> .addClass \p0ne-song-info-date        .appendTo $meta
-                    .text getISOTime new Date(d.uploadDate)
-                @$create \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
-                    .text mediaTime +d.duration
-                #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-                #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
-                #@$create \<div> .addClass \p0ne-song-info-tags    #ToDo
-                @$create \<div> .addClass \p0ne-song-info-description  .appendTo @$el
-                    .html formatPlainText(d.description)
-                #@$create \<ul> .addClass \p0ne-song-info-remixes      #ToDo
-        API.once \advance, @loadBind
+        @$create \<span> .addClass \p0ne-song-info-author      .appendTo $meta
+            .click -> mediaSearch media.author
+            .attr \title, "search for '#{media.author}'"
+            .text media.author
+        @$create \<span> .addClass \p0ne-song-info-title       .appendTo $meta
+            .click -> mediaSearch media.title
+            .attr \title, "search for '#{media.title}'"
+            .text media.title
+        @$create \<br>                                         .appendTo $meta
+        @$create \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
+            .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
+            .attr \target, \_blank
+            .attr \title, "open channel of '#{d.uploader.name}'"
+            .text d.uploader.name
+        @$create \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
+            .attr \href, "http://youtube.com/watch?v=#{media.cid}"
+            .attr \target, \_blank
+            .attr \title, "open video on Youtube"
+            .text d.title
+        @$create \<br>                                         .appendTo $meta
+        @$create \<span> .addClass \p0ne-song-info-date        .appendTo $meta
+            .text getISOTime new Date(d.uploadDate)
+        @$create \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
+            .text mediaTime +d.duration
+        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #@$create \<div> .addClass \p0ne-song-info-songStats   #ToDo
+        #@$create \<div> .addClass \p0ne-song-info-tags    #ToDo
+        @$create \<div> .addClass \p0ne-song-info-description  .appendTo @$el
+            .html formatPlainText(d.description)
+        #@$create \<ul> .addClass \p0ne-song-info-remixes      #ToDo
     disable: ->
         @$el .remove!
-
-/*@source p0ne.ponify.ls */
-/**
- * ponify chat - a script to ponify some words in the chat on plug.dj
- * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
- * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
- * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
- */
-
-/*####################################
-#            PONIFY CHAT             #
-####################################*/
-module \ponify, do
-    optional: <[ emoticons ]>
-    settings: \enableDisable
-    displayName: 'Ponify Chat'
-    /*== TEXT ==*/
-    map:
-        # "america":    "amareica" # this one was driving me CRAZY
-        "anybody":      "anypony"
-        "anyone":       "anypony"
-        "ass":          "flank"
-        "asses":        "flanks"
-        "boner":        "wingboner"
-        "boy":          "colt"
-        "boyfriend":    "coltfriend"
-        "boyfriends":   "coltfriends"
-        "boys":         "colts"
-        "bro fist":     "brohoof"
-        "bro-fist":     "brohoof"
-        "butt":         "flank"
-        "butthurt":     "saddle-sore"
-        "butts":        "flanks"
-        "child":        "foal"
-        "children":     "foals"
-        "cowboy":       "cowpony"
-        "cowboys":      "cowponies"
-        "cowgirl":      "cowpony"
-        "cowgirls":     "cowponies"
-        "disappoint":   "disappony"
-        "disappointed": "disappony"
-        "disappointment": "disapponyment"
-        "doctor who":   "doctor whooves"
-        "dr who":       "dr whooves"
-        "dr. who":      "dr. whooves"
-        "everybody":    "everypony"
-        "everyone":     "everypony"
-        "fap":          "clop"
-        "faps":         "clops"
-        "foot":         "hoof"
-        "feet":         "hooves"
-        "folks":        "foalks"
-        "fool":         "foal"
-        "foolish":      "foalish"
-        "germany":      "germaneigh"
-        "gentleman":    "gentlecolt"
-        "gentlemen":    "gentlecolts"
-        "girl":         "filly"
-        "girls":        "fillies"
-        "girlfriend":   "fillyfriend"
-        "girlfriends":  "fillyfriends"
-        "halloween":    "nightmare night"
-        "hand":         "hoof"
-        "hands":        "hooves"
-        "handed":       "hoofed"
-        "handedly":     "hoofedly"
-        "handers":      "hoofers"
-        "handmade":     "hoofmade"
-        "hey":          "hay"
-        "high-five":    "hoof-five"
-        "highfive":     "hoof-five"
-        "human":        "pony"
-        "humans":       "ponies"
-        "ladies":       "fillies"
-        # "lobby":      "shed"
-        "main":         "mane"
-        "man":          "stallion"
-        "men":          "stallions"
-        "manhattan":    "manehattan"
-        "marathon":     "mareathon"
-        "miracle":      "mareacle"
-        "miracles":     "mareacles"
-        "money":        "bits"
-        "naysayer":     "neighsayer"
-        "no one else":  "nopony else"
-        "no-one else":  "nopony else"
-        "noone else":   "nopony else"
-        "nobody":       "nopony"
-        "nottingham":   "trottingham"
-        "null":         "nullpony"
-        "old-timer":    "old-trotter"
-        "people":       "ponies"
-        "person":       "pony"
-        "persons":      "ponies"
-        "philadelphia": "fillydelphia"
-        "somebody":     "somepony"
-        "someone":      "somepony"
-        "stalingrad":   "stalliongrad"
-        "sure as hell": "sure as hay"
-        "tattoo":       "cutie mark"
-        "tattoos":      "cutie mark"
-        "da heck":      "da hay"
-        "the heck":     "the hay"
-        "the hell":     "the hay"
-        "troll":        "parasprite"
-        "trolls":       "parasprites"
-        "trolled":      "parasprited"
-        "trolling":     "paraspriting"
-        "trollable":    "paraspritable"
-        "woman":        "mare"
-        "women":        "mares"
-        "confound those dover boys":    "confound these ponies"
-
-
-    ponifyNode: (node) !->
-        #console.log "ponifying", node
-        if node.nodeType != 3
-            for n in node.childNodes ||[]
-                @ponifyNode n
-
-        else
-            str = node.nodeValue
-            hasReplacement = false
-            replacement = null
-            lastPos = 0
-            #str.replace @regexp, (s, pre, i) ~>
-            str.replace @regexp, (_, pre, s, post, i) ~>
-                w = @map[s.toLowerCase!]
-                r = ""
-
-                if not replacement
-                    replacement := document.createElement \span
-                if str.substring(lastPos, i)
-                    replacement.appendChild document.createTextNode that
-
-                if pre
-                    if "aeioujyh".has(w.0)
-                        replacement.appendChild document.createTextNode "an "
-                    else
-                        replacement.appendChild document.createTextNode "a "
-
-                /*preserve upper/lower case*/
-                lastUpperCaseLetters = 0
-                l = s.length <? w.length
-                for o from 0 til l
-                    if s[o].toLowerCase! != s[o]
-                        r += w[o].toUpperCase!
-                        lastUpperCaseLetters++
-                    else if l >= s.length and lastUpperCaseLetters == 3
-                        r += w[o].toUpperCase!
-                    else
-                        r += w[o]
-
-                r += w.substr l
-
-                document.createElement \abbr
-                    ..textContent = "#r"
-                    ..classList.add \ponified
-                    ..title = s
-                    replacement.appendChild ..
-
-                if post
-                    if "szxß".has(w[*-1])
-                        replacement.appendChild document.createTextNode "' "
-                    else
-                        replacement.appendChild document.createTextNode "'s "
-
-                lastPos := i + _.length
-                console.log "replaced '#s' with '#r'", node
-
-            if replacement
-                replacement.appendChild document.createTextNode str.substr(lastPos)
-                node.parentNode?.replaceChild replacement, node
-
-    /*== EMOTICONS ==*/
-    autoEmotiponies:
-        "8)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png"
-        ":(": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
-        ":)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
-        ":?": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowhuh.png"
-        ":B": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png"
-        ":D": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiehappy.png"
-        ":S": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
-        ":o": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png"
-        ":x": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png"
-        ":|": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajbemused.png"
-        ";)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
-        "<3": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/heart.png"
-        "B)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png"
-        "D:": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritydespair.png"
-    emotiponies:
-        "???": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackconfused.png"
-        aj: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png"
-        applebloom: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applecry.png"
-        applejack: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png"
-        blush: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png"
-        cool: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png"
-        cry: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritycry.png"
-        derp: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpyderp2.png"
-        derpy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpytongue2.png"
-        eek: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png"
-        evil: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png"
-        fluttershy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
-        fs: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
-        idea: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritystarry.png"
-        lol: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowlaugh.png"
-        loveme: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png"
-        mad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightangry2.png"
-        mrgreen: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesick.png"
-        oops: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png"
-        photofinish: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png"
-        pinkie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png"
-        pinkiepie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png"
-        rage: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png"
-        rainbowdash: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png"
-        rarity: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
-        razz: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowwild.png"
-        rd: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png"
-        roll: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackunsure.png"
-        sad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
-        scootaloo: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/scootangel.png"
-        shock: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png"
-        sweetie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
-        sweetiebelle: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
-        trixie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftright.png"
-        trixie2: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png"
-        trixieleft: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png"
-        twi: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
-        twilight: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
-        twist: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png"
-        twisted: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png"
-        wink: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
-
-
-    setup: ({addListener, replace, css}) ->
-        @regexp = //(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
-        addListener API, \chat, ({cid}) ~> if cid
-            try
-                if getChatText cid .0
-                    @ponifyNode that
-                else
-                    throw "couldn't find message"
-            catch err
-                console.error "[ponify] Error converting message ##cid", err.stack
-        if emoticons?
-            aEM = ^^emoticons.autoEmoteMap #|| {}
-            for emote, url of @autoEmotiponies
-                key = url .replace /.*\/(\w+)\..+/, '$1'
-                aEM[emote] = key
-                @emotiponies[key] = url
-            replace emoticons, \autoEmoteMap, -> return aEM
-
-            m = ^^emoticons.map
-            ponyCSS = """
-                .ponimoticon { width: 27px; height: 27px }
-                .chat-suggestion-item .ponimoticon { margin-left: -5px }
-                .emoji-glow { width: auto; height: auto }
-                .emoji { position: static; display: inline-block }
-
-            """
-            reversedMap = {}
-            for emote, url of @emotiponies
-                if reversedMap[url]
-                    m[emote] = "#{reversedMap[url]} ponimoticon" # hax to add .ponimoticon class
-                else
-                    reversedMap[url] = emote
-                    m[emote] = "#emote ponimoticon" # hax to add .ponimoticon class
-                ponyCSS += ".emoji-#emote { background: url(#url) }\n"
-            css \ponify, ponyCSS
-            replace emoticons, \map, -> return m
-            emoticons.update?!
-    disable: ->
-        emoticons.update?!
-
 
 /*@source p0ne.avatars.ls */
 /**
  * plug_p0ne Custom Avatars
  * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
+ *
  * @author jtbrinkmann aka. Brinkie Pie
  * @version 1.0
- * @license all rights reserved! You may run the bookmarklet provided to you to run this.
- *          You may NOT read, copy or edit this file. STOP EVEN LOOKING AT IT!
+ * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
+ *
+ * Developer's note: if you create your own custom avatar script or use a modified version of this,
+ * you are hereby granted permission connect to this one's default avatar server.
+ * However, please drop me an e-mail so I can keep an overview of things.
+ * I remain the right to revoke this right anytime.
  */
 
 /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
@@ -4604,6 +4548,7 @@ requireHelper \avatarAuxiliaries, (.getAvatarUrl)
 requireHelper \Avatar, (.AUDIENCE)
 requireHelper \AvatarList, (._byId?.admin01)
 requireHelper \myAvatars, (.comparator == \id) # (_) -> _.comparator == \id and _._events?.reset and (!_.length || _.models[0].attributes.type == \avatar)
+requireHelper \InventoryDropdown, (.selected)
 
 window.Lang = require \lang/Lang
 
@@ -4611,7 +4556,16 @@ window.Cells = requireAll (m) -> m::?.className == \cell and m::getBlinkFrame
 
 module \customAvatars, do
     require: <[ users Lang avatarAuxiliaries Avatar myAvatars ]>
-    settings: \enableDisable
+    displayName: 'Custom Avatars'
+    settings: \base
+    help: '''
+        This adds a few custom avatars to plug.dj
+
+        You can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".
+        Click on the Dropdown field in the top-left to select another category.
+
+        Everyone who uses plug_p0ne sees you with your custom avatar.
+    '''
     persistent: <[ socket ]>
     setup: ({addListener, replace, css}) ->
         @replace = replace
@@ -4638,7 +4592,6 @@ module \customAvatars, do
             #   soon also {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn}
             avatarID = d.avatarID
             if p0ne._avatars[avatarID]
-                delete Avatar.IMAGES[avatarID] # delete image cache
                 console.info "[p0ne avatars] updating '#avatarID'"
             else if not d.isVanilla
                 console.info "[p0ne avatars] adding '#avatarID'"
@@ -4672,6 +4625,8 @@ module \customAvatars, do
             if avatar.category not of Lang.userAvatars
                 Lang.userAvatars[avatar.category] = avatar.category
             #p0ne._myAvatars[*] = avatar
+
+            delete Avatar.IMAGES[avatarID] # delete image cache
             if not updateAvatarStore.loading
                 updateAvatarStore.loading = true
                 requestAnimationFrame -> # throttle to avoid updating every time when avatars get added in bulk
@@ -4769,6 +4724,31 @@ module \customAvatars, do
             console.log "[p0ne avatars] store reset"
             updateAvatarStore! if vanillaTrigger
 
+        #== patch avatar inventory view ==
+        replace InventoryDropdown::, \draw, (d_) -> return ->
+            html = ""
+            categories = {}
+
+            for avi in myAvatars.models
+                categories[avi.get \category] = true
+
+            for category of categories
+                html += """
+                    <div class="row" data-value="#category"><span>#{Lang.userAvatars[category]}</span></div>
+                """
+
+            @$el.html """
+                <dl class="dropdown">
+                    <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
+                    <dd>#html</dd>
+                </dl>
+            """
+
+            $ \dt   .on \click, (e) ~> @onBaseClick e
+            $ \.row .on \click, (e) ~> @onRowClick  e
+            @select InventoryDropdown.selected
+
+            @$el.show!
 
 
         Lang.userAvatars.p0ne = "Custom Avatars"
@@ -4908,10 +4888,19 @@ module \customAvatars, do
 
             @socket.trigger type, data
 
-        replace @socket, close, (close_) ~> return ->
+        @replace @socket, close, (close_) ~> return ->
                 @trigger close
                 close_ ...
 
+        # replace old authTokens
+        do ->
+            user = API.getUser!
+            oldBlurb = user.blurb || ""
+            newBlurb = oldBlurb .replace /🐎\w{4}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
+            if oldBlurb != newBlurb
+                @changeBlurb newBlurb, do
+                    success: ~>
+                        console.info "[ppCAS] removed old authToken from user blurb"
 
         @socket.on \authToken, (authToken) ~>
             console.log "[ppCAS] authToken: ", authToken
@@ -4919,8 +4908,8 @@ module \customAvatars, do
             @oldBlurb = user.blurb || ""
             if not user.blurb # user.blurb is actually `null` by default, not ""
                 newBlurb = authToken
-            else if user.blurb.length >= 73
-                newBlurb = "#{user.blurb.substr(0, 72)}… #authToken"
+            else if user.blurb.length >= 72
+                newBlurb = "#{user.blurb.substr(0, 71)}… 🐎#authToken"
             else
                 newBlurb = "#{user.blurb} #authToken"
 
@@ -4992,6 +4981,8 @@ module \customAvatars, do
             console.log "[ppCAS] user disconnected:", userID
             @changeAvatarID userID, avatarID
 
+        @socket.on \disconnected, (reason) ->
+            @socket.trigger \close, reason
         @socket.on \close, (reason) ->
             console.warn "[ppCAS] connection closed", reason
             reconnect := false
@@ -5002,7 +4993,7 @@ module \customAvatars, do
                 if connected
                     console.log "[ppCAS] reconnecting…"; @connect(url, true, true)
                 else
-                    sleep 5_000ms + Math.random()*5_000ms, ->
+                    sleep 5_000ms + Math.random()*5_000ms, ~>
                         console.log "[ppCAS] reconnecting…"
                         @connect(url, true, false)
 
@@ -5046,8 +5037,10 @@ module \p0neSettings, do
         @$ppI = $create "<div class=p0ne_icon>p<div class=p0ne_icon_sub>0</div></div>"
             .appendTo @$ppM
         @$ppS = $create "<div class=p0ne_settings>"
-            .appendTo @$ppM
-            .slideUp 0
+            .appendTo do
+                $ "<div class=p0ne_settings_wrapper>"
+                    .appendTo @$ppM
+            .slideUp 1ms
         @$ppP = $ppP = $create "<div class=p0ne_settings_popup>"
             .appendTo @$ppS
             .fadeOut 0
@@ -5080,6 +5073,7 @@ module \p0neSettings, do
             module = $this .data \module
             $ppP
                 .html "
+                    <div class=p0ne_settings_popup_triangle></div>
                     <h3>#{module.displayName}</h3>
                     #{if!   module.screenshot   then'' else
                         '<img src='+module.screenshot+'>'
@@ -5087,15 +5081,19 @@ module \p0neSettings, do
                     #{module.help}
                 "
             h = $ppP .height!
-            t = $this .offset! .top
+            t = $this .offset! .top - 50px
+            tt = t - h/2 >? 0px
             $ppP
-                .css \top, t - h >? 0px
+                .css top: tt
                 .stop!.fadeIn!
+            if tt == 0px
+                $ppP .find \.p0ne_settings_popup_triangle
+                    .css top: t
         addListener @$ppS, \mouseout, \.p0ne_settings_has_more, ->
             $ppP .stop!.fadeOut!
 
         # add p0ne.module listeners
-        addListener API, \p0neModuleLoaded, @~addModule
+        addListener API, \p0neModuleLoaded, (module) ~> @addModule module
         addListener API, \p0neModuleDisabled, (module) ~>
             module._$settings? .find \.checkbox .0 .checked=false
         addListener API, \p0neModuleEnabled, (module) ~>
@@ -5106,7 +5104,13 @@ module \p0neSettings, do
                 module._$settings .addClass \updated
                 sleep 2_000ms, ->
                     module._$settings .removeClass \updated
+            else if module.settings
+                @addModule module
 
+        if _$context?
+            addListener _$context 'show:user show:history show:dashboard dashboard:disable', @$ppS.~slideUp
+
+    groups: {}
     addModule: (module) !->
         if module.settings
             module.more = typeof module.settings == \function
@@ -5118,7 +5122,12 @@ module \p0neSettings, do
                 icons = "<div class=p0ne_settings_icons>#icons</div>"
                 itemClasses += ' p0ne_settings_has_more'
 
-            @$ppS .append do
+            @groups[module.settings] ||= $ \<details>
+                .append do
+                    $ \<summary> .text module.settings.toUpperCase!
+                .appendTo @$ppS
+
+            @groups[module.settings] .append do
                 # $create doesn't have to be used, because the resulting elements are appended to a $create'd element
                 module._$settings = $ "
                         <label class='#itemClasses'>
@@ -5157,18 +5166,29 @@ module \p0neSettings, do
 ####################################*/
 module \logEventsToConsole, do
     optional: <[ _$context  socketListeners ]>
-    displayName: "[dev] Log Events to Console"
-    settings: true
+    displayName: "Log Events to Console"
+    settings: \dev
+    help: '''
+        This will log events to the JavaScript console.
+        This is mainly for programmers. If you are none, keep this disabled for better performance.
+
+        By default this will leave out some events to avoid completly spamming the console.
+        You can force-enable logging ALL events by running `logEventsToConsole.logAll = true`
+    '''
+    disabledByDefault: true
     setup: ({addListener, replace}) ->
+        logEventsToConsole = this
         addListener API, \chat, (data) ->
             message = htmlUnescape(data.message) .replace(/\u202e/g, '\\u202e')
             if data.un
-                name = data.un .replace(/\u202e/g, '\\u202e') + ":"
+                name = data.un .replace(/\u202e/g, '\\u202e')
                 name = " " * (24 - name.length) + name
-                console.log "#{getTime!} [CHAT]", "#name #message"
+                if data.type == \emote
+                    console.log "#{getTime!} [CHAT] #name: %c#message", "font-style: italic;"
+                else
+                    console.log "#{getTime!} [CHAT] #name: #message"
             else
-                name = "[system]"
-                console.info "#{getTime!} [CHAT]", "#name #message"
+                console.info "#{getTime!} [CHAT] [system] %c#message", "font-size: 1.2em; color: red; font-weight: bold"
 
         addListener API, \userJoin, (data) ->
             name = htmlUnescape(data.username) .replace(/\u202e/g, '\\u202e')
@@ -5186,7 +5206,7 @@ module \logEventsToConsole, do
         #= log (nearly) all _$context events
         replace _$context, \trigger, (trigger_) -> return (type) ->
             group = type.substr(0, type.indexOf ":")
-            if group not in <[ socket tooltip djButton chat sio playback playlist notify drag audience anim HistorySyncEvent user ShowUserRolloverEvent ]> and type not in <[ ChatFacadeEvent:muteUpdate PlayMediaEvent:play userPlaying:update context:update ]> or window.LOGALL
+            if group not in <[ socket tooltip djButton chat sio playback playlist notify drag audience anim HistorySyncEvent user ShowUserRolloverEvent ]> and type not in <[ ChatFacadeEvent:muteUpdate PlayMediaEvent:play userPlaying:update context:update ]> or logEventsToConsole.logAll
                 console.log "#{getTime!} [#type]", getArgs?! || arguments
             else if group == \socket and type not in <[ socket:chat socket:vote socket:grab socket:earn ]>
                 console.log "#{getTime!} [#type]", [].slice.call(arguments, 1)
@@ -5223,16 +5243,17 @@ module \downloadLink, do
                 background-image: url(/_/static/images/icons.26d92b9.png);
             }
         '
-    module: (name, filename, data) ->
-        if not data
-            data = filename; filename = name
-        data = JSON.stringify data if typeof data != \string
-        url = URL.createObjectURL new Blob([data], {type: \text/plain})
+    module: (name, filename, dataOrURL) ->
+        if not dataOrURL
+            dataOrURL = filename; filename = name
+        if dataOrURL and not isURL(dataOrURL)
+            dataOrURL = JSON.stringify dataOrURL if typeof dataOrURL != \string
+            dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
         (window.$cm || $ \#chat-messages) .append "
             <div class='message p0ne_downloadlink'>
                 <i class='icon'></i>
                 <span class='text'>
-                    <a href='#url' download='#filename'>#name</a>
+                    <a href='#dataOrURL' download='#filename'>#name</a>
                 </span>
             </div>
         "
@@ -5261,20 +5282,6 @@ window <<<<
     joinRoom: (slug) ->
         ajax \POST, \rooms/join, {slug}
 
-    getUserData: (user) !->
-        if typeof user == \number
-            return $.get "/_/users/#user"
-                .then ({[user]:data}) ->
-                    console.log "[userdata]", user
-                    console.log "[userdata] https://plug.dj/@/#{encodeURI user.slug}" if user.level >= 5
-                .fail ->
-                    console.warn "couldn't get slug for user with id '#{id}'"
-        else if typeof user == \string
-            user .= toLowerCase!
-            for u in API.getUsers! when u.username.toLowerCase! == user
-                return getUserData u.id
-            console.warn "[userdata] user '#user' not found"
-            return null
 
     findModule: (test) ->
         if typeof test == \string and window.l
@@ -5282,7 +5289,7 @@ window <<<<
         res = []
         for id, module of require.s.contexts._.defined when module
             if test module, id
-                module.id ||= id
+                module.requireID ||= id
                 console.log "[findModule]", id, module
                 res[*] = module
         return res
@@ -5311,9 +5318,9 @@ window <<<<
     getRequireArg: (haystack, needle) ->
         # this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
         # e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
-        [b, a] = haystack.split "], function("
-        a .= substr(b.0.indexOf('"')).split('", "')
-        b .= substr(0, b.1.indexOf(')')).split(', ')
+        [a, b] = haystack.split "], function("
+        a .= substr(a.indexOf('"')).split('", "')
+        b .= substr(0, b.indexOf(')')).split(', ')
         if b[a.indexOf(needle)]
             try window[that] = require needle
             return that
@@ -5334,10 +5341,27 @@ window <<<<
             console.log "[#{event .toUpperCase!}]", args
 
     usernameToSlug: (un) ->
-        htmlEscape(un).replace /[&;\s]+/g, '-'
+        lastCharWasLetter = false
+        res = ""
+        for char in htmlEscape(un)
+            if (lc = char.toLowerCase!) != char.toUpperCase!
+                if /\w/ .test lc
+                    res += char.toLowerCase!
+                else
+                    res += "\\u#{pad(lc.charCodeAt(0), 4)}"
+                lastCharWasLetter = true
+            else if lastCharWasLetter
+                res += "-"
+                lastCharWasLetter = false
+        if not lastCharWasLetter
+            res .= substr(0, res.length - 1)
+        return res
+        #htmlEscape(un).replace /[&;\s]+/g, '-'
         # some more characters get collapsed
         # some characters get converted to \u####
 
+    reconnectSocket: ->
+        _$context .trigger \force:reconnect
     ghost: ->
         $.get '/'
 
@@ -5426,4 +5450,356 @@ window.copyChat = (copy) ->
         </body>
     """
     copy res
+
+/*@source p0ne.userHistory.ls */
+
+requireHelper \userRollover, (.id == \user-rollover)
+requireHelper \RoomHistory, ((it) -> it::?listClass == \history and it::hasOwnProperty \listClass) #((it) -> it.onPointsChange && it._events?.reset)
+#HistoryItem = RoomHistory::collection.model if RoomHistory
+
+ObjWrap = (obj) ->
+    obj.get = (name) -> return this[name]
+    return obj
+
+module \userHistory, do
+    require: <[ userRollover RoomHistory ]>
+    help: '''
+        Shows another user's song history when clicking on their username in the user-rollover.
+
+        Due to technical restrictions, only Youtube songs can be shown.
+    '''
+    setup: ({addListener, replace, css}) ->
+        css \userHistory, '#user-rollover .username { cursor: pointer }'
+        addListener $(\body), \click, '#user-rollover .username', ->
+            $ '#history-button.selected' .click! # hide history if already open
+            user = userRollover.user
+            userID = user.id
+            username = user.get \username
+            userlevel = user.get \level
+            userslug = user.get \slug
+            if userlevel < 5
+                userRollover.$level .text "#{userlevel} (user-history requires >4!)"
+                return
+            console.log "#{getTime!} [userHistory] loading #username's history"
+            if not userslug
+                getUserData userID .then (d) ->
+                    user.set \slug, d.slug
+                    loadUserHistory user
+            else
+                loadUserHistory user
+
+        function loadUserHistory user
+            $.get "https://plug.dj/@/#{user.get \slug}"
+                .fail ->
+                    console.error "! couldn't load user's history"
+                .then (d) ->
+                    userRollover.cleanup!
+                    songs = new backbone.Collection()
+                    d.replace /<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, (,img, author, roomName, positive, grabs, negative, listeners) ->
+                        if cid = /\/vi\/(.{11})\//.exec(img)
+                            cid = cid.1
+                            [title, author] = author.split " - "
+                            songs.add new ObjWrap do
+                                user: {id: user.id, username: "in #roomName"}
+                                room: {name: roomName}
+                                score:
+                                    positive: positive
+                                    grabs: grabs
+                                    negative: negative
+                                    listeners: listeners
+                                    skipped: 0
+                                media: new ObjWrap do
+                                    format: 1
+                                    cid: cid
+                                    author: author
+                                    title: title
+                                    image: img
+                    console.info "#{getTime!} [userHistory] loaded history for #{user.get \username}", songs
+                    export songs, d
+                    replace RoomHistory::, \collection, -> return songs
+                    _$context.trigger \show:history
+                    _.defer ->
+                        RoomHistory::.collection = RoomHistory::.collection_
+                        console.log "#{getTime!} [userHistory] restoring room's proper history"
+
+/*@source p0ne.ponify.ls */
+/**
+ * ponify chat - a script to ponify some words in the chat on plug.dj
+ * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
+
+/*####################################
+#            PONIFY CHAT             #
+####################################*/
+module \ponify, do
+    optional: <[ emoticons ]>
+    displayName: 'Ponify Chat'
+    settings: \pony
+    help: '''
+        Ponify the chat! (replace words like "anyone" with "anypony")
+        Replaced words will be underlined. Move your cursor over the word to see it's original.
+
+        It also replaces some of the emoticons with pony emoticons.
+    '''
+    /*== TEXT ==*/
+    map:
+        # "america":    "amareica" # this one was driving me CRAZY
+        "anybody":      "anypony"
+        "anyone":       "anypony"
+        "ass":          "flank"
+        "asses":        "flanks"
+        "boner":        "wingboner"
+        "boy":          "colt"
+        "boyfriend":    "coltfriend"
+        "boyfriends":   "coltfriends"
+        "boys":         "colts"
+        "bro fist":     "brohoof"
+        "bro-fist":     "brohoof"
+        "butt":         "flank"
+        "butthurt":     "saddle-sore"
+        "butts":        "flanks"
+        "child":        "foal"
+        "children":     "foals"
+        "cowboy":       "cowpony"
+        "cowboys":      "cowponies"
+        "cowgirl":      "cowpony"
+        "cowgirls":     "cowponies"
+        "disappoint":   "disappony"
+        "disappointed": "disappony"
+        "disappointment": "disapponyment"
+        "doctor who":   "doctor whooves"
+        "dr who":       "dr whooves"
+        "dr. who":      "dr. whooves"
+        "everybody":    "everypony"
+        "everyone":     "everypony"
+        "fap":          "clop"
+        "faps":         "clops"
+        "foot":         "hoof"
+        "feet":         "hooves"
+        "folks":        "foalks"
+        "fool":         "foal"
+        "foolish":      "foalish"
+        "germany":      "germaneigh"
+        "gentleman":    "gentlecolt"
+        "gentlemen":    "gentlecolts"
+        "girl":         "filly"
+        "girls":        "fillies"
+        "girlfriend":   "fillyfriend"
+        "girlfriends":  "fillyfriends"
+        "halloween":    "nightmare night"
+        "hand":         "hoof"
+        "hands":        "hooves"
+        "handed":       "hoofed"
+        "handedly":     "hoofedly"
+        "handers":      "hoofers"
+        "handmade":     "hoofmade"
+        "hey":          "hay"
+        "high-five":    "hoof-five"
+        "highfive":     "hoof-five"
+        "human":        "pony"
+        "humans":       "ponies"
+        "ladies":       "fillies"
+        # "lobby":      "shed"
+        "main":         "mane"
+        "man":          "stallion"
+        "men":          "stallions"
+        "manhattan":    "manehattan"
+        "marathon":     "mareathon"
+        "miracle":      "mareacle"
+        "miracles":     "mareacles"
+        "money":        "bits"
+        "naysayer":     "neighsayer"
+        "no one else":  "nopony else"
+        "no-one else":  "nopony else"
+        "noone else":   "nopony else"
+        "nobody":       "nopony"
+        "nottingham":   "trottingham"
+        "null":         "nullpony"
+        "old-timer":    "old-trotter"
+        "people":       "ponies"
+        "person":       "pony"
+        "persons":      "ponies"
+        "philadelphia": "fillydelphia"
+        "somebody":     "somepony"
+        "someone":      "somepony"
+        "stalingrad":   "stalliongrad"
+        "sure as hell": "sure as hay"
+        "tattoo":       "cutie mark"
+        "tattoos":      "cutie mark"
+        "da heck":      "da hay"
+        "the heck":     "the hay"
+        "the hell":     "the hay"
+        "troll":        "parasprite"
+        "trolls":       "parasprites"
+        "trolled":      "parasprited"
+        "trolling":     "paraspriting"
+        "trollable":    "paraspritable"
+        "woman":        "mare"
+        "women":        "mares"
+        "confound those dover boys":    "confound these ponies"
+
+
+    ponifyMsg: (msg) !->
+        msg.message .= replace @regexp, (_, pre, s, post, i) ~>
+            w = @map[s.toLowerCase!]
+            r = ""
+
+            /*preserve upper/lower case*/
+            lastUpperCaseLetters = 0
+            l = s.length <? w.length
+            for o from 0 til l
+                if s[o].toLowerCase! != s[o]
+                    r += w[o].toUpperCase!
+                    lastUpperCaseLetters++
+                else
+                    r += w[o]
+                    lastUpperCaseLetters = 0
+            if w.length >= s.length and lastUpperCaseLetters >= 3
+                r += w.substr(l) .toUpperCase!
+            else
+                r += w.substr(l)
+
+            r = "<abbr class=ponified title='#s'>#r</abbr>"
+
+            if pre
+                if "aeioujyh".has(w.0)
+                    r = "an #r"
+                else
+                    r = "a #r"
+
+            if post
+                if "szxß".has(w[*-1])
+                    r += "' "
+                else
+                    r += "'s "
+
+            console.log "replaced '#s' with '#r'", msg.cid
+            return r
+
+
+    /*== EMOTICONS ==*/
+    autoEmotiponies:
+        "8)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png"
+        ":(": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
+        ":)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
+        ":?": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowhuh.png"
+        ":B": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png"
+        ":D": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiehappy.png"
+        ":S": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
+        ":o": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png"
+        ":x": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png"
+        ":|": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajbemused.png"
+        ";)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
+        "<3": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/heart.png"
+        "B)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png"
+        "D:": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritydespair.png"
+    emotiponies:
+        "???": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackconfused.png"
+        aj: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png"
+        applebloom: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applecry.png"
+        applejack: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png"
+        blush: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png"
+        cool: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png"
+        cry: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritycry.png"
+        derp: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpyderp2.png"
+        derpy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpytongue2.png"
+        eek: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png"
+        evil: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png"
+        fluttershy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
+        fs: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
+        idea: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritystarry.png"
+        lol: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowlaugh.png"
+        loveme: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png"
+        mad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightangry2.png"
+        mrgreen: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesick.png"
+        oops: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png"
+        photofinish: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png"
+        pinkie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png"
+        pinkiepie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png"
+        rage: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png"
+        rainbowdash: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png"
+        rarity: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
+        razz: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowwild.png"
+        rd: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png"
+        roll: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackunsure.png"
+        sad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png"
+        scootaloo: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/scootangel.png"
+        shock: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png"
+        sweetie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
+        sweetiebelle: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png"
+        trixie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftright.png"
+        trixie2: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png"
+        trixieleft: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png"
+        twi: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
+        twilight: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png"
+        twist: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png"
+        twisted: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png"
+        wink: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
+
+
+    setup: ({addListener, replace, css}) ->
+        @regexp = ///(?:^|https?:)(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
+        addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
+        if emoticons?
+            aEM = ^^emoticons.autoEmoteMap #|| {}
+            for emote, url of @autoEmotiponies
+                key = url .replace /.*\/(\w+)\..+/, '$1'
+                aEM[emote] = key
+                @emotiponies[key] = url
+            replace emoticons, \autoEmoteMap, -> return aEM
+
+            m = ^^emoticons.map
+            ponyCSS = """
+                .ponimoticon { width: 27px; height: 27px }
+                .chat-suggestion-item .ponimoticon { margin-left: -5px }
+                .emoji-glow { width: auto; height: auto }
+                .emoji { position: static; display: inline-block }
+
+            """
+            reversedMap = {}
+            for emote, url of @emotiponies
+                if reversedMap[url]
+                    m[emote] = "#{reversedMap[url]} ponimoticon" # hax to add .ponimoticon class
+                else
+                    reversedMap[url] = emote
+                    m[emote] = "#emote ponimoticon" # hax to add .ponimoticon class
+                ponyCSS += ".emoji-#emote { background: url(#url) }\n"
+            css \ponify, ponyCSS
+            replace emoticons, \map, -> return m
+            emoticons.update?!
+    disable: ->
+        emoticons.update?!
+
+
+/*@source p0ne.fimplug.ls */
+/**
+ * fimplug related modules
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @version 1.0
+ * @license MIT License
+ * @copyright (c) 2014 J.-T. Brinkmann
+ */
+
+module \songNotifRuleskip, do
+    require: <[ songNotif ]>
+    setup: ({replace, addListener}) ->
+        replace songNotif, \skip, -> return ($notif) ->
+            songNotif.showDescription $notif, """
+                <span class="ruleskip-btn ruleskip-1" data-rule=1>!ruleskip 1 MLP-related only</span>
+                <span class="ruleskip-btn" data-rule=2>!ruleskip 2 Loops / Pictures</span>
+                <span class="ruleskip-btn" data-rule=3>!ruleskip 3 low-efford mixes</span>
+                <span class="ruleskip-btn" data-rule=4>!ruleskip 4 history</span>
+                <span class="ruleskip-btn" data-rule=6>!ruleskip 6 &gt;10min</span>
+                <span class="ruleskip-btn" data-rule=13>!ruleskip 13 clop/porn/gote</span>
+                <span class="ruleskip-btn" data-rule=14>!ruleskip 14 episode / not music</span>
+                <span class="ruleskip-btn" data-rule=23>!ruleskip 23 WD-only</span>
+            """
+        addListener chatDomEvents, \click, \.ruleskip-btn, (btn) ->
+            songNotif.hideDescription!
+            if num = $ btn .data \rule
+                API.sendChat "!ruleskip #num"
 

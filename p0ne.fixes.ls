@@ -44,7 +44,8 @@ module \fixGhosting, do
     displayName: 'Fix Ghosting'
     require: <[ PlugAjax ]>
     optional: <[ login ]>
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Plug.dj sometimes marks you internally as "not in any room" even though you still are. This is also called "ghosting" because you can chat in a room that technically you are not in anymore. While ghosting you can still chat, but not join the waitlist or moderate. If others want to @mention you, you don't show up in the autocomplete.
 
@@ -109,13 +110,14 @@ module \fixGhosting, do
                                 | otherwise =>
                                     API.chatLog "[fixGhosting] cannot rejoin the room, unexpected error #{statusCode} (#{datastatus})", true
                             # don't try again for the next 10min
-                            sleep 10 *min_to_ms, ->
+                            sleep 10.min, ->
                                 rejoining := false
 
 module \fixOthersGhosting, do
     require: <[ users socketEvents ]>
     displayName: "Fix Other Users Ghosting"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes plug.dj does not properly emit join notifications, so that clients don't know another user joined a room. Thus they appear as "ghosts", as if they were not in the room but still can chat
 
@@ -146,7 +148,8 @@ module \fixOthersGhosting, do
 module \fixStuckDJ, do
     require: <[ Playback socketEvents ]>
     displayName: "Fix Stuck Advance"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes plug.dj does not automatically start playing the next song. Usually you would have to reload the page to fix this bug.
 
@@ -157,13 +160,13 @@ module \fixStuckDJ, do
     setup: ({replace, addListener}) ->
         _settings = @_settings
         fixStuckDJ = this
-        fixStuckDJ.timer := sleep 15s *s_to_ms, fixStuckDJ if API.getTimeRemaining! == 0s
+        fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
         replace Playback::, \playbackComplete, (pC_) -> return ->
             args = arguments
             replace Playback::, \playbackComplete, ~>
                 fn = ->
                     # wait 5s before checking if advance is stuck
-                    fixStuckDJ.timer := sleep 15s *s_to_ms, fixStuckDJ
+                    fixStuckDJ.timer := sleep 15_000ms, fixStuckDJ
                     clearTimeout fixStuckDJ.timer
                     pC_ ...
                 fn.apply this, args
@@ -178,9 +181,10 @@ module \fixStuckDJ, do
         ajax \GET, \rooms/state, (data) ~>
             if not status == 200
                 console.error "[fixNoAdvance] cannot load room data:", status, data
-                @timer := sleep 5s *s_to_ms, fixStuckDJ
+                @timer := sleep 5_000ms, fixStuckDJ
             else
                 # "manually" trigger socket event for DJ advance
+                data.0.playback ||= {}
                 socketEvents.advance do
                     c: data.0.booth.currentDJ
                     d: data.0.booth.waitingDJs
@@ -192,9 +196,10 @@ module \fixStuckDJ, do
                 API.chatLog "[p0ne] fixed DJ not advancing", true if @_settings.warnings
 
 module \fixNoPlaylistCycle, do
-    require: <[ NOT_FINISHED ]>
+    require: <[ _$context ActivateEvent ]>
     displayName: "Fix No Playlist Cycle"
-    settings: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+    settings: \fixes
+    settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
         Sometimes after DJing, plug.dj does not move the played song to the bottom of the playlist.
 
@@ -203,6 +208,11 @@ module \fixNoPlaylistCycle, do
     _settings:
         warnings: true
     setup: ({addListener}) ->
+        addListener API, \sjs:reconnected, ->
+            _$context.dispatch new LoadEvent(LoadEvent.LOAD)
+            _$context.dispatch new ActivateEvent(ActivateEvent.ACTIVATE)
+        /*
+        # manual check
         addListener API, \advance, ({dj, lastPlay}) ~>
             #ToDo check if spelling is correctly
             #ToDo get currentPlaylist
@@ -210,12 +220,17 @@ module \fixNoPlaylistCycle, do
                 #_$context .trigger \MediaMoveEvent:move
                 ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
                 API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
+        */
 
 
 
 module \zalgoFix, do
-    settings: true
+    settings: \fixes
     displayName: 'Fix Zalgo Messages'
+    help: '''
+        This avoids messages' text bleeding out of the message, as it is the case with so called "Zalgo" messages.
+        Enable this if you are dealing with spammers in the chat who use Zalgo.
+    '''
     setup: ({css}) ->
         css \zalgoFix, '
             .message {

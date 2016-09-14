@@ -15,8 +15,10 @@ module \p0neSettings, do
         @$ppI = $create "<div class=p0ne_icon>p<div class=p0ne_icon_sub>0</div></div>"
             .appendTo @$ppM
         @$ppS = $create "<div class=p0ne_settings>"
-            .appendTo @$ppM
-            .slideUp 0
+            .appendTo do
+                $ "<div class=p0ne_settings_wrapper>"
+                    .appendTo @$ppM
+            .slideUp 1ms
         @$ppP = $ppP = $create "<div class=p0ne_settings_popup>"
             .appendTo @$ppS
             .fadeOut 0
@@ -49,6 +51,7 @@ module \p0neSettings, do
             module = $this .data \module
             $ppP
                 .html "
+                    <div class=p0ne_settings_popup_triangle></div>
                     <h3>#{module.displayName}</h3>
                     #{if!   module.screenshot   then'' else
                         '<img src='+module.screenshot+'>'
@@ -56,15 +59,19 @@ module \p0neSettings, do
                     #{module.help}
                 "
             h = $ppP .height!
-            t = $this .offset! .top
+            t = $this .offset! .top - 50px
+            tt = t - h/2 >? 0px
             $ppP
-                .css \top, t - h >? 0px
+                .css top: tt
                 .stop!.fadeIn!
+            if tt == 0px
+                $ppP .find \.p0ne_settings_popup_triangle
+                    .css top: t
         addListener @$ppS, \mouseout, \.p0ne_settings_has_more, ->
             $ppP .stop!.fadeOut!
 
         # add p0ne.module listeners
-        addListener API, \p0neModuleLoaded, @~addModule
+        addListener API, \p0neModuleLoaded, (module) ~> @addModule module
         addListener API, \p0neModuleDisabled, (module) ~>
             module._$settings? .find \.checkbox .0 .checked=false
         addListener API, \p0neModuleEnabled, (module) ~>
@@ -75,7 +82,13 @@ module \p0neSettings, do
                 module._$settings .addClass \updated
                 sleep 2_000ms, ->
                     module._$settings .removeClass \updated
+            else if module.settings
+                @addModule module
 
+        if _$context?
+            addListener _$context 'show:user show:history show:dashboard dashboard:disable', @$ppS.~slideUp
+
+    groups: {}
     addModule: (module) !->
         if module.settings
             module.more = typeof module.settings == \function
@@ -87,7 +100,12 @@ module \p0neSettings, do
                 icons = "<div class=p0ne_settings_icons>#icons</div>"
                 itemClasses += ' p0ne_settings_has_more'
 
-            @$ppS .append do
+            @groups[module.settings] ||= $ \<details>
+                .append do
+                    $ \<summary> .text module.settings.toUpperCase!
+                .appendTo @$ppS
+
+            @groups[module.settings] .append do
                 # $create doesn't have to be used, because the resulting elements are appended to a $create'd element
                 module._$settings = $ "
                         <label class='#itemClasses'>

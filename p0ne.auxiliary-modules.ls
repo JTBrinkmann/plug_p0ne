@@ -10,11 +10,23 @@
 /*####################################
 #            AUXILIARIES             #
 ####################################*/
-module \updateUserObj, do
-    require: <[ user_ ]>
+module \updateUserData, do
+    require: <[ user_ users _$context ]>
     setup: ({addListener}) ->
         addListener window.user_, \change:username, ->
             user.username = window.user_.get \username
+        addListener _$context, \user:join, ({id}) ->
+            users.get(id).set \joinedRoom, Date.now!
+        for user in users.models
+            user.set \joinedRoom, -1
+module \throttleOnFloodAPI, do
+    setup: ({addListener}) ->
+        addListener API, \socket:floodAPI, ->
+            /* all AJAX and Socket functions should check if the counter is AT LEAST below 20 */
+            window.floodAPI_counter += 20
+            sleep 15_000ms, ->
+                /* it is assumed, that the API counter resets every 10 seconds. 15s is to provide enough buffer */
+                window.floodAPI_counter -= 20
 
 module \PopoutListener, do
     require: <[ PopoutView ]>
@@ -33,7 +45,7 @@ module \chatDomEvents, do
     persistent: <[ _events ]>
     setup: ({addListener}) ->
         @ <<<< backbone.Events
-        @one = @once
+        @one = @once # because jQuery uses .one instead of .once
         cm = $cm!
         on_ = @on; @on = ->
             on_ ...
@@ -51,7 +63,7 @@ module \chatDomEvents, do
         addListener API, \popout:open, patchCM
 
 module \grabMedia, do
-    require: <[ playlists ]>
+    require: <[ playlists auxiliaries ]>
     optional: <[ _$context ]>
     module: (playlistIDOrName, media, appendToEnd) ->
         currentPlaylist = playlists.get(playlists.getActiveID!)
@@ -59,11 +71,10 @@ module \grabMedia, do
         if typeof playlistIDOrName == \string and not playlistIDOrName .startsWith \http
             for pl in playlists.models when playlistIDOrName == pl.get \name
                 playlist = pl; break
-        else if id = +playlistIDOrName
-            playlist = playlists.get(playlistIDOrName)
-        else
+        else if not playlist = playlists.get(playlistIDOrName)
             playlist = currentPlaylist # default to current playlist
             appendToEnd = media; media = playlistIDOrName
+
         if not playlist
             console.error "[grabMedia] could not find playlist", arguments
             return
@@ -71,6 +82,8 @@ module \grabMedia, do
         # get media
         if not media # default to current song
             addMedia API.getMedia!
+        else if media.id
+            addMedia media
         else
             mediaLookup media, do
                 success: addMedia
@@ -81,7 +94,7 @@ module \grabMedia, do
         function addMedia media
             console.log "[grabMedia] add '#{media.author} - #{media.title}' to playlist: #playlist"
             playlist.set \syncing, true
-            ajax \POST, "playlists/#{playlist.id}/media/insert", media: [media], append: !!appendToEnd
+            ajax \POST, "playlists/#{playlist.id}/media/insert", media: auxiliaries.serializeMediaItems([media]), append: !!appendToEnd
                 .then (e) ->
                     if playlist.id != e.id
                         playlist.set \syncing, false
@@ -105,10 +118,11 @@ module \p0neCSS, do
     optional: <[ PopoutListener PopoutView ]>
     $popoutEl: $!
     styles: {}
+    urlMap: {}
     persistent: <[ styles ]>
     setup: ({addListener, $create}) ->
         @$el = $create \<style> .appendTo \head
-        {$el, $popoutEl, styles} = this
+        {$el, $popoutEl, styles, urlMap} = this
         addListener API, \popout:open, (_window) ->
             $popoutEl := $el .clone! .appendTo _window.document.head
         PopoutView.render! if PopoutView?._window
@@ -124,21 +138,26 @@ module \p0neCSS, do
             return styles[name] if not css?
 
             styles[name] = css
-            res = ""
-            for n,css of styles
-                res += "/* #n */\n#css\n\n"
 
             if not throttled
                 throttled := true
                 requestAnimationFrame ->
                     throttled := false
+                    res = ""
+                    for n,css of styles
+                        res += "/* #n */\n#css\n\n"
                     $el       .first! .text res
                     $popoutEl .first! .text res
 
         export @loadStyle = (url) ->
             console.log "[loadStyle]", url
+            if urlMap[url]
+                return urlMap[url]++
+            else
+                urlMap[url] = 1
             s = $ "<link rel='stylesheet' >"
-                .attr \href, url
+                #.attr \href, "#url?p0=#{p0ne.version}" /* ?p0 to force redownload instead of using obsolete cached versions */
+                .attr \href, url /* ?p0 to force redownload instead of using obsolete cached versions */
                 .appendTo document.head
             $el       .push s.0
 
@@ -148,9 +167,16 @@ module \p0neCSS, do
                         .appendTo PopoutView?._window.document.head
 
         export @unloadStyle = (url) ->
-            $el       .find "[href='#url']" .remove!
-            $popoutEl .find "[href='#url']" .remove!
-                        .0
+            if urlMap[url] > 0
+                urlMap[url]--
+            if urlMap[url] == 0
+                delete urlMap[url]
+                i = $el        .index "[href='#url']"
+                $el.eq(i).remove!
+                $el.splice(i, 1)
+                i = $popoutEl  .index "[href='#url']"
+                $popoutEl.eq(i).remove!
+                $popoutEl.splice(i, 1)
         @disable = ->
             $el       .remove!
             $popoutEl .remove!
@@ -167,7 +193,6 @@ module \_$contextUpdateEvent, do
 
 
 module \login, do
-    settings: false
     persistent: <[ showLogin ]>
     module: ->
         if @showLogin
