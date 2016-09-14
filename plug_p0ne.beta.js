@@ -8,22 +8,38 @@
  * adds a variety of new functions, bugfixes, tweaks and developer tools/functions
  *
  * This script collection is written in LiveScript (a CoffeeScript descendend which compiles to JavaScript). If you are reading this in JavaScript, you might want to check out the LiveScript file instead for a better documented and formatted source; just replace the .js with .ls in the URL of this file
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.2.3
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
-*/
+ * @copyright (c) 2015 J.-T. Brinkmann
+ *
+ * further credits go to
+ *     the plugCubed Team - for coining a standard for the "Room Settings"
+ *     Christian Petersen - for the toggle boxes in the settings menu http://codepen.io/cbp/pen/FLdjI/
+ *     all the beta testers! <3
+ *     plug.dj - for it's horribly broken implementation of everything.
+ *               "If it wasn't THAT broken, i wouldn't have as much fun in coding plug_p0ne"
+ *                   --Brinkie Pie (2015)
+ *
+ * Not happy with plug_p0ne? contact me (the developer) at brinkiepie^gmail.com
+ * great alternative plug.dj scripts are
+ *     - TastyPlug (relatively lightweight but does a great job - https://fungustime.pw/tastyplug/)
+ *     - RCS (Radiant Community Script - https://radiant.dj/rcs)
+ *     - plugCubed (https://plugcubed.net/)
+ *     - plugplug (lightweight as heck - https://bitbucket.org/mateon1/plugplug/)
+ */
 var p0ne_, out$ = typeof exports != 'undefined' && exports || this, slice$ = [].slice;
 console.info("~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~");
 p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.5.7',
-  lastCompatibleVersion: '1.5.0',
+  version: '1.6.5',
+  lastCompatibleVersion: '1.6.5',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
   YOUTUBE_KEY: 'AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw',
+  YOUTUBE_KEY_V3: 'AIzaSyDaWL9emnR9R_qBWlDAYl-Z_h4ZPYBDjzk',
   proxy: function(url){
-    return "https://jsonp.nodejitsu.com/?raw=true&url=" + escape(url);
+    return "https://cors-anywhere.herokuapp.com/" + url.replace(/^.*\/\//, '');
   },
   started: new Date(),
   lsBound: {},
@@ -44,7 +60,6 @@ window.p0ne = {
 };
 console.info("plug_p0ne v" + p0ne.version);
 try {
-  /* save data of previous p0ne instances */
   if (typeof saveData == 'function') {
     saveData();
   }
@@ -63,7 +78,7 @@ window.compareVersions = function(a, b){
       return a[i] > b[i];
     }
   }
-  return b.length > a.length;
+  return b.length >= a.length;
 };
 (function(fn_){
   var fn, v, onMigrated;
@@ -72,52 +87,72 @@ window.compareVersions = function(a, b){
     if ((p0ne_ != null ? p0ne_.version : void 8) === window.p0ne.version) {
       return;
     } else {
-      if (typeof API.chatLog == 'function') {
-        API.chatLog("plug_p0ne automatically updated to v" + p0ne.version, true);
+      if (typeof chatWarn == 'function') {
+        chatWarn("automatically updated to v" + p0ne.version, 'plug_p0ne');
       }
     }
   }
-  if (console && typeof (console.group || console.groupCollapsed) === 'function') {
-    fn = function(){
-      var errors, warnings, error_, warn_;
-      if (console.groupCollapsed) {
-        console.groupCollapsed("[p0ne] initializing… (click on this message to expand/collapse the group)");
-      } else {
-        console.group("[p0ne] initializing…");
-      }
-      errors = warnings = 0;
-      error_ = console.error;
-      console.error = function(){
-        errors++;
-        return error_.apply(this, arguments);
-      };
-      warn_ = console.warn;
-      console.warn = function(){
-        warnings++;
-        return warn_.apply(this, arguments);
-      };
+  console.group || (console.group = $.noop);
+  console.groupEnd || (console.groupEnd = $.noop);
+  fn = function(){
+    var errors, warnings, error_, warn_, err, showWarning, name, ref$, m;
+    if (console.groupCollapsed) {
+      console.groupCollapsed("[p0ne] initializing… (click on this message to expand/collapse the group)");
+    } else {
+      console.groupCollapsed = console.group;
+      console.group("[p0ne] initializing…");
+    }
+    errors = warnings = 0;
+    error_ = console.error;
+    console.error = function(){
+      errors++;
+      return error_.apply(this, arguments);
+    };
+    warn_ = console.warn;
+    console.warn = function(){
+      warnings++;
+      return warn_.apply(this, arguments);
+    };
+    try {
       fn_();
       console.groupEnd();
       console.info("[p0ne] initialized!");
       console.error = error_;
       console.warn = warn_;
-      if (errors) {
-        console.error("[p0ne] There have been " + errors + " errors");
+    } catch (e$) {
+      err = e$;
+      console.groupEnd();
+      console.error("[p0ne] FATAL ERROR!", err.stack);
+    }
+    if (errors) {
+      console.error("[p0ne] There have been " + errors + " errors");
+    }
+    if (warnings) {
+      console.warn("[p0ne] There have been " + warnings + " warnings");
+    }
+    showWarning = true;
+    for (name in ref$ = p0ne.modules) {
+      m = ref$[name];
+      if (m.disabled && !m.settings && !(m.moderator && user.isStaff)) {
+        if (showWarning) {
+          console.groupCollapsed("[p0ne] there are disabled modules which are hidden from the settings");
+          showWarning = false;
+        }
+        console.warn("\t" + name, m);
       }
-      if (warnings) {
-        return console.warn("[p0ne] There have been " + warnings + " warnings");
-      }
-    };
-  } else {
-    fn = fn_;
-  }
+    }
+    if (!showWarning) {
+      console.groupEnd();
+    }
+    return typeof appendChat == 'function' ? appendChat("<div class='cm p0ne-notif p0ne-notif-loaded'>plug_p0ne v" + p0ne.version + " loaded " + (typeof getTimestamp == 'function' ? getTimestamp() : void 8) + "</div>") : void 8;
+  };
   if (!(v = localStorage.p0neVersion)) {
     return fn();
   }
   if (compareVersions(v, p0ne.lastCompatibleVersion)) {
     return fn();
   } else {
-    console.warn("[p0ne] obsolete p0ne version detected (" + v + "), loading migration script…");
+    console.warn("[p0ne] obsolete p0ne version detected (" + v + " < " + p0ne.lastCompatibleVersion + "), loading migration script…");
     API.off('p0ne_migrated');
     API.once('p0ne_migrated', onMigrated = function(newVersion){
       if (newVersion === p0ne.lastCompatibleVersion) {
@@ -129,7 +164,7 @@ window.compareVersions = function(a, b){
     return $.getScript(p0ne.host + "/script/plug_p0ne.migrate." + v.substr(0, v.indexOf('.')) + ".js?from=" + v + "&to=" + p0ne.version);
   }
 })(function(){
-  var p0ne, $window, $body, i$, ref$, len$, Constr, $dummy, user, userID, res$, k, ref1$, v, cb, app, friendsList, e, ref2$, cm, rR_, onLoaded, dummyP3, ppStop, CHAT_WIDTH, MAX_IMAGE_HEIGHT, roles, ObjWrap;
+  var p0ne, $window, $body, i$, ref$, len$, Constr, $dummy, userID, res$, k, ref1$, v, cb, app, friendsList, ref2$, e, cm, rR_, onLoaded, dummyP3, ppStop, CHAT_WIDTH, MAX_IMAGE_HEIGHT, roles;
   p0ne = window.p0ne;
   localStorage.p0neVersion = p0ne.version;
   /*setInterval do
@@ -978,10 +1013,10 @@ window.compareVersions = function(a, b){
   /*@source p0ne.auxiliaries.ls */
   /**
    * Auxiliary-functions for plug_p0ne
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
   */
   out$.$window = $window = $(window);
   out$.$body = $body = $(document.body);
@@ -1061,18 +1096,21 @@ window.compareVersions = function(a, b){
     return true;
   });
   String.prototype.define('endsWith', function(str){
-    return this.lastIndexOf === this.length - str.length;
+    return this.substr(this.length - str.length) === str;
   });
   for (i$ = 0, len$ = (ref$ = [String, Array]).length; i$ < len$; ++i$) {
     Constr = ref$[i$];
     Constr.prototype.define('has', fn$);
     Constr.prototype.define('hasAny', fn1$);
   }
+  Number.prototype.defineGetter('s', function(){
+    return this * 1000;
+  });
   Number.prototype.defineGetter('min', function(){
     return this * 60000;
   });
-  Number.prototype.defineGetter('s', function(){
-    return this * 1000;
+  Number.prototype.defineGetter('h', function(){
+    return this * 3600000;
   });
   importAll$(jQuery.fn, {
     indexOf: function(selector){
@@ -1118,6 +1156,14 @@ window.compareVersions = function(a, b){
         el.style.height = el.height + "px";
       }
       return this;
+    }
+  });
+  importAll$($.easing, {
+    easeInQuad: function(p){
+      return p * p;
+    },
+    easeOutQuad: function(p){
+      return 1 - (1 - p) * (1 - p);
     }
   });
   /*####################################
@@ -1481,11 +1527,37 @@ window.compareVersions = function(a, b){
       return ajax('DELETE', "chat/" + chatID, cb);
     },
     kick: function(userID, cb){
-      return ban(userID, function(){
-        return sleep(1000, function(){
-          return unban(userID, cb);
-        });
-      });
+      var def;
+      def = $.Deferred();
+      return ban(userID).then(function(){
+        return unban(userID, cb).then(def.resolve, def.reject);
+      }).fail(def.reject);
+    },
+    addDJ: function(userID, cb){
+      var i$, ref$, len$, yet$, u;
+      for (yet$ = true, i$ = 0, len$ = (ref$ = API.getWaitlist()).length; i$ < len$; ++i$) {
+        u = ref$[i$];
+        yet$ = false;
+        if (u.id === userID) {
+          cb('alreadyInWaitlist');
+          return $.Deferred().resolve('alreadyInWaitlist');
+        }
+      } if (yet$) {
+        return ajax('POST', "booth/add", {
+          id: userID
+        }, cb);
+      }
+    },
+    moveDJ: function(userID, position, cb){
+      var def;
+      def = $.Deferred;
+      addDJ(userID).then(function(){
+        return ajax('POST', "booth/move", {
+          userID: userID,
+          position: position
+        }, cb).then(def.resolve, def.reject);
+      }).fail(def.reject);
+      return def.promise();
     },
     getUserData: function(user, cb){
       if (typeof user !== 'number') {
@@ -1521,6 +1593,9 @@ window.compareVersions = function(a, b){
     snooze: function(){
       return $('#playback .snooze').click().length;
     },
+    isSnoozed: function(){
+      return $('#playback-container').children().length === 0;
+    },
     refresh: function(){
       return $('#playback .refresh').click().length;
     },
@@ -1528,7 +1603,7 @@ window.compareVersions = function(a, b){
       if (!currentMedia) {
         return console.error("[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'");
       } else {
-        return typeof currentMedia != 'undefined' && currentMedia !== null ? currentMedia.set('streamDisabled', val !== true && (val === false || currentMedia.get('streamDisabled'))) : void 8;
+        return typeof database != 'undefined' && database !== null ? database.settings.streamDisabled = val !== true && (val === false || currentMedia.get('streamDisabled')) : void 8;
       }
     },
     join: function(){
@@ -1543,7 +1618,7 @@ window.compareVersions = function(a, b){
       return $('#dj-button.is-leave').click().length !== 0;
     },
     ytItags: function(){
-      var resolutions, list, res, i$, len$, format, j$, ref$, len1$, i, itags, startI, k$, ref1$, len2$, itag;
+      var resolutions, list, ytItags, i$, len$, format, j$, ref$, len1$, i, itags, startI, k$, ref1$, len2$, itag;
       resolutions = [72, 144, 240, 360, 480, 720, 1080, 1440, 2160, 3072];
       list = [
         {
@@ -1568,25 +1643,27 @@ window.compareVersions = function(a, b){
           itags: ['151', '132,92', '93', '94', '95', '96']
         }
       ];
-      res = {};
+      ytItags = {};
       for (i$ = 0, len$ = list.length; i$ < len$; ++i$) {
         format = list[i$];
         for (j$ = 0, len1$ = (ref$ = format.itags).length; j$ < len1$; ++j$) {
           i = j$;
           itags = ref$[j$];
-          if (itag !== '_') {
+          if (itags !== '_') {
             startI = resolutions.indexOf(format.minRes);
             for (k$ = 0, len2$ = (ref1$ = itags.split(",")).length; k$ < len2$; ++k$) {
               itag = ref1$[k$];
-              res[itag] = {
+              ytItags[itag] = {
+                itag: itag,
                 ext: format.ext,
+                type: format.type || 'video',
                 resolution: resolutions[startI + i]
               };
             }
           }
         }
       }
-      return res;
+      return ytItags;
     }(),
     mediaSearch: function(query){
       $('#playlist-button .icon-playlist').click();
@@ -1594,6 +1671,42 @@ window.compareVersions = function(a, b){
         type: 'keyup',
         which: 13
       });
+    },
+    mediaParse: function(media, cb){
+      /* work in progress */
+      var cid, ref$, ref1$;
+      cb || (cb = logger(typeof media === 'string'
+        ? +media
+          ? cb({
+            format: 2,
+            cid: media
+          })
+          : media.length === 11
+            ? cb({
+              format: 1,
+              cid: media
+            })
+            : (cid = (ref$ = YT_REGEX.exec(media)) != null ? ref$[1] : void 8)
+              ? cb({
+                format: 1,
+                cid: cid
+              })
+              : (ref1$ = parseURL(media).hostname) === 'soundcloud.com' || ref1$ === 'i1.sndcdn.com' ? $.getJSON("https://api.soundcloud.com/resolve/", {
+                url: url,
+                client_id: p0ne.SOUNDCLOUD_KEY.then(function(d){
+                  return cb({
+                    format: 2,
+                    cid: d.id,
+                    data: d
+                  });
+                })
+              }) : void 8
+        : typeof media === 'object' && media
+          ? media.toJSON
+            ? cb(media.toJSON())
+            : media.format ? cb(media) : void 8
+          : !media ? cb(API.getMedia()) : void 8));
+      cb();
     },
     mediaLookup: function(url, cb){
       var format, id, cid, success, fail, ref$, ref1$, req;
@@ -1638,7 +1751,8 @@ window.compareVersions = function(a, b){
             cid: cid,
             uploader: {
               name: d.entry.author[0].name.$t,
-              id: d.entry.media$group.yt$uploaderId.$t
+              id: d.entry.media$group.yt$uploaderId.$t,
+              url: "https://www.youtube.com/channel/" + d.entry.media$group.yt$uploaderId.$t
             },
             image: "https://i.ytimg.com/vi/" + cid + "/0.jpg",
             title: d.entry.title.$t,
@@ -1667,7 +1781,8 @@ window.compareVersions = function(a, b){
             uploader: {
               id: d.user.id,
               name: d.user.username,
-              image: d.user.avatar_url
+              image: d.user.avatar_url,
+              url: d.user.permalink_url
             },
             image: d.artwork_url,
             title: d.title,
@@ -1684,213 +1799,370 @@ window.compareVersions = function(a, b){
         return $.Deferred().fail(fail).reject("unsupported format");
       }
     },
-    mediaDownload: function(media, audioOnly, cb){
-      var ref$, success, error, format, cid, id, res, url;
-      if (!media || typeof media === 'boolean' || typeof media === 'function' || media.success || media.error) {
-        ref$ = [false, media, cb], media = ref$[0], audioOnly = ref$[1], cb = ref$[2];
-      } else if (typeof audioOnly !== 'boolean') {
-        cb = audioOnly;
-        audioOnly = false;
+    mediaDownload: function(){
+      var regexNormal, regexUnblocked, i$, ref$, len$, key;
+      regexNormal = {};
+      regexUnblocked = {};
+      for (i$ = 0, len$ = (ref$ = ['title', 'url_encoded_fmt_stream_map', 'fmt_list', 'dashmpd', 'errorcode', 'reason']).length; i$ < len$; ++i$) {
+        key = ref$[i$];
+        regexNormal[key] = RegExp(key + '=(.*?)(?:&|$)');
+        regexUnblocked[key] = RegExp('"' + key + '":"(.*?)"');
       }
-      if (typeof cb === 'function') {
-        success = cb;
-      } else if (cb) {
-        success = cb.success, error = cb.error;
+      for (i$ = 0, len$ = (ref$ = ['url', 'itag', 'type', 'fallback_host']).length; i$ < len$; ++i$) {
+        key = ref$[i$];
+        regexNormal[key] = RegExp(key + '=(.*?)(?:&|$)');
+        regexUnblocked[key] = RegExp(key + '=(.*?)(?:\\\\u0026|$)');
       }
-      if (media != null && media.attributes) {
-        ref$ = media.attributes, format = ref$.format, cid = ref$.cid, id = ref$.id;
-      } else {
-        media || (media = API.getMedia());
-        format = media.format, cid = media.cid, id = media.id;
-      }
-      res = $.Deferred();
-      res.then(success || logger('mediaDownload')).fail(error || logger('mediaDownloadError')).fail(function(err){
-        if (audioOnly || format === 2) {
-          return media.downloadAudioError = err;
+      return function(media, audioOnly, cb){
+        /* status codes:
+            = success = (resolved)
+            0 - downloads found
+        
+            = error = (rejected)
+            1 - failed to receive video info
+            2 - video info loaded, but no downloads found (video likely blocked)
+            3 - (for audioOnly) dash.mpd found, but no downloads (basically like 2)
+        
+            note: itags are Youtube's code describing the data format
+                your browser may or may not be able to play them. resolution unknown
+                https://en.wikipedia.org/wiki/YouTube#Quality_and_formats
+                (click [show] in "Comparison of YouTube media encoding options" to see the whole table)
+         */
+        var ref$, success, error, blocked, format, cid, id, res, ref1$, url;
+        if (!media || typeof media === 'boolean' || typeof media === 'function' || media.success || media.error) {
+          ref$ = [false, media, cb], media = ref$[0], audioOnly = ref$[1], cb = ref$[2];
+        } else if (typeof audioOnly !== 'boolean') {
+          cb = audioOnly;
+          audioOnly = false;
+        }
+        if (typeof cb === 'function') {
+          success = cb;
+        } else if (cb) {
+          success = cb.success, error = cb.error;
+        }
+        if (media != null && media.attributes) {
+          blocked = media.blocked;
+          media = media.attributes;
+        } else if (!media) {
+          media = API.getMedia();
+          blocked = 0;
         } else {
-          return media.downloadError = err;
+          blocked = media.blocked;
         }
-      });
-      if (audioOnly || format === 2) {
-        if (media.downloadAudio) {
-          return res.resolve(media.downloadAudio);
+        format = media.format, cid = media.cid, id = media.id;
+        media.blocked = blocked = +blocked || 0;
+        if (format === 2) {
+          audioOnly = true;
         }
-        if (media.downloadAudioError) {
-          return res.reject(media.downloadAudioError);
+        res = $.Deferred();
+        res.then(function(data){
+          data.blocked = blocked;
+          if (audioOnly) {
+            return media.downloadAudio = data;
+          } else {
+            return media.download = data;
+          }
+        }).fail(function(err, status){
+          if (status) {
+            err = {
+              status: 1,
+              message: "network error or request rejected"
+            };
+          }
+          err.blocked = blocked;
+          if (audioOnly) {
+            return media.downloadAudioError = err;
+          } else {
+            return media.downloadError = err;
+          }
+        }).then(success || logger('mediaDownload')).fail(error || logger('mediaDownloadError'));
+        if (audioOnly) {
+          if (((ref$ = media.downloadAudio) != null ? ref$.blocked : void 8) === blocked) {
+            return res.resolve(media.downloadAudio);
+          }
+          if (media.downloadAudioError) {
+            return res.reject(media.downloadAudioError);
+          }
+        } else {
+          if (media.download) {
+            return res.resolve(media.download);
+          }
+          if (((ref1$ = media.downloadError) != null ? ref1$.blocked : void 8) === blocked) {
+            return res.reject(media.downloadError);
+          }
         }
-      } else {
-        if (media.download) {
-          return res.resolve(media.download);
-        }
-        if (media.downloadError) {
-          return res.reject(media.downloadError);
-        }
-      }
-      cid || (cid = id);
-      if (format === 1) {
-        url = p0ne.proxy("https://www.youtube.com/get_video_info?video_id=" + cid);
-        console.info("[mediaDownload] YT lookup", url);
-        $.ajax({
-          url: url,
-          error: res.reject,
-          success: function(d){
-            /*== Parser ==
-            # useful for debugging
-            parse = (d) ->
-              if d.startsWith "http"
-                return d
-              else if d.has(",")
-                return d.split(",").map(parse)
-              else if d.has "&"
-                res = {}
-                for a in d.split "&"
-                  a .= split "="
-                  if res[a.0]
-                    res[a.0] = [res[a.0]] if not $.isArray res[a.0]
-                    res[a.0][*] = parse unescape(a.1)
-                  else
-                    res[a.0] = parse unescape(a.1)
-                return res
-              else if not isNaN(d)
-                return +d
-              else if d in <[ True False ]>
-                return d == \True
-              else
-                return d
-            parse(d)
-            */
-            var basename, ref$, files, bestVideo, bestVideoSize, that, i$, ref1$, len$, file, url, mimeType, filename, resolution, size, ref2$, video, ref3$, key$;
-            basename = ((ref$ = d.match(/title=(.*?)(?:&|$)/)) != null ? ref$[1] : void 8) || cid;
-            basename = unescape(basename).replace(/\++/g, ' ');
-            files = {};
-            bestVideo = null;
-            bestVideoSize = 0;
-            if (!audioOnly) {
-              if (that = d.match(/adaptive_fmts=(.*?)(?:&|$)/)) {
-                for (i$ = 0, len$ = (ref1$ = unescape(that[1]).split(",")).length; i$ < len$; ++i$) {
-                  file = ref1$[i$];
-                  if (that = file.match(/url=(.*?)(?:&|$)/)) {
-                    url = unescape(that[1]);
-                  }
-                  if (that = file.match(/type=(.*?)%3B/)) {
-                    mimeType = unescape(that[1]);
-                    filename = basename + "." + mimeType.substr(6);
-                    if (that = file.match(/size=(.*?)(?:&|$)/)) {
-                      resolution = unescape(that[1]);
-                      size = resolution.split('x');
-                      size = size[0] * size[1];
-                      (ref2$ = files[resolution] || (files[resolution] = []))[ref2$.length] = video = {
-                        url: url,
-                        size: size,
-                        mimeType: mimeType,
-                        filename: filename,
-                        resolution: resolution
-                      };
-                      if (size > bestVideoSize) {
-                        bestVideo = video;
-                        bestVideoSize = size;
-                      }
+        cid || (cid = id);
+        if (format === 1) {
+          if (blocked === 2) {
+            url = p0ne.proxy("http://vimow.com/watch?v=" + cid);
+          } else if (blocked) {
+            url = p0ne.proxy("https://www.youtube.com/watch?v=" + cid);
+          } else {
+            url = p0ne.proxy("https://www.youtube.com/get_video_info?video_id=" + cid);
+          }
+          console.info("[mediaDownload] YT lookup", url);
+          $.ajax({
+            url: url,
+            error: res.reject,
+            success: function(d){
+              var file, files, bestVideo, bestVideoSize, that, title, i$, ref$, len$, src, resolution, mimeType, ref1$, key$, video, get, basename, error, reason, fmt_list_, url, fallback_host, itag, format, fmt_list, j$, len1$, e, original_url;
+              out$.d = d;
+              file = d;
+              files = {};
+              bestVideo = null;
+              bestVideoSize = 0;
+              if (blocked === 2) {
+                if (that = d.match(/<title>(.*?) - vimow<\/title>/)) {
+                  title = htmlUnescape(that[1]);
+                } else {
+                  title = cid;
+                }
+                files = {};
+                for (i$ = 0, len$ = (ref$ = d.match(/<source .*?>/g) || []).length; i$ < len$; ++i$) {
+                  file = ref$[i$];
+                  src = /src='(.*?)'/.match(file);
+                  resolution = /src='(.*?)'/.match(file);
+                  mimeType = /src='(\w+\/(\w+))'/.match(file);
+                  if (that = src && resolution && mimeType) {
+                    (ref1$ = files[key$ = that[5]] || (files[key$] = []))[ref1$.length] = video = {
+                      url: src[1],
+                      resolution: resolution[1],
+                      mimeType: mimeType[1],
+                      file: "basename." + mimeType[2]
+                    };
+                    if (that[2] > bestVideoSize) {
+                      bestVideo = video;
+                      bestVideoSize = video.resolution;
                     }
                   }
                 }
-              } else if (that = d.match(/url_encoded_fmt_stream_map=(.*?)(?:&|$)/)) {
-                console.warn("[mediaDownload] only a low quality stream could be found for", cid);
-                for (i$ = 0, len$ = (ref1$ = unescape(that[1]).split(",")).length; i$ < len$; ++i$) {
-                  file = ref1$[i$];
-                  if (that = d.match(/url=(.*?)(?:&|$)/)) {
-                    url = that[1];
+                if (bestVideo) {
+                  files.preferredDownload = bestVideo;
+                  files.status = 0;
+                  console.log("[mediaDownload] resolving", files);
+                  res.resolve(files);
+                } else {
+                  console.warn("[mediaDownload] vimow.com loaded, but no downloads found");
+                  res.reject({
+                    status: 2,
+                    message: 'no downloads found'
+                  });
+                }
+                return;
+              } else if (blocked) {
+                get = function(key){
+                  var val;
+                  val = (file || d).match(regexUnblocked[key]);
+                  if (key === 'url' || key === 'itag' || key === 'type' || key === 'fallback_host') {
+                    return decodeURIComponent(val[1]);
                   }
-                  if (that = ytItags[(ref2$ = d.match(/itag=(.*?);/)) != null ? ref2$[1] : void 8]) {
-                    (ref3$ = files[key$ = that.ext] || (files[key$] = []))[ref3$.length] = video = {
-                      file: basename + "." + that.ext,
-                      url: httpsify($baseurl.text()),
-                      mimeType: that.type + "/" + that.ext,
-                      resolution: that.resolution
-                    };
-                    if (that = that.resolution > bestVideoSize) {
-                      bestVideo = video;
-                      bestVideoSize = that.resolution;
+                  if (val) {
+                    return val[1];
+                  }
+                };
+                basename = get('title') || cid;
+              } else {
+                get = function(key, unescape){
+                  var val;
+                  val = file.match(regexNormal[key]);
+                  if (val) {
+                    if (unescape) {
+                      val = val[1].replace(/\++/g, ' ');
                     }
+                    return decodeURIComponent(val[1]);
+                  }
+                };
+                basename = get('title', true) || cid;
+                if (error = get('errorcode')) {
+                  reason = get('reason', true);
+                  switch (+error) {
+                  case 150:
+                    console.error("[mediaDownload] video_info error 150! Embedding not allowed on some websites");
+                    break;
+                  default:
+                    console.error("[mediaDownload] video_info error " + error + "! unkown error code", reason);
                   }
                 }
               }
-              files.preferredDownload = bestVideo;
-              console.log("[mediaDownload] resolving", files);
-              return res.resolve(media.download = files);
-            } else if (that = d.match(/dashmpd=(http.+?)(?:&|$)/)) {
-              url = p0ne.proxy(unescape(that[1]));
-              console.info("[mediaDownload] DASHMPD lookup", url);
-              return $.get(url).then(function(dashmpd){
-                var $dash, bestVideo;
-                $dash = $($.parseXML(dashmpd));
-                bestVideo = {
-                  size: 0
-                };
-                $dash.find('AdaptationSet').each(function(){
-                  var $set, mimeType, type, l;
-                  $set = $(this);
-                  mimeType = $set.attr('mimeType');
-                  type = mimeType.substr(0, 5);
-                  if (type !== 'audio') {
-                    return;
-                  }
-                  files[mimeType] = [];
-                  l = 0;
-                  return $set.find('BaseURL').each(function(){
-                    var $baseurl, $representation, m;
-                    $baseurl = $(this);
-                    $representation = $baseurl.parent();
-                    files[mimeType][l++] = m = {
-                      file: basename + "." + mimeType.substr(6),
-                      url: httpsify($baseurl.text()),
-                      mimeType: mimeType,
-                      size: $baseurl.attr('yt:contentLength') / 1000000,
-                      samplingRate: $representation.attr('audioSamplingRate') + "Hz"
-                    };
-                    if (audioOnly && ~~m.size > ~~bestVideo.size && (window.chrome || mimeType !== 'audio/webm')) {
-                      return bestVideo = m;
+              if (!audioOnly) {
+                /*if get \adaptive_fmts
+                    for file in unescape(that.1) .split ","
+                        url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
+                        if file.match(/type=(.*?)%3B/)
+                            mimeType = unescape that.1
+                            filename = "#basename.#{mimeType.substr 6}"
+                            if file.match(/size=(.*?)(?:&|$)/)
+                                resolution = unescape(that.1)
+                                size = resolution.split \x
+                                size = size.0 * size.1
+                                (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
+                                if size > bestVideoSize
+                                    bestVideo = video
+                                    bestVideoSize = size*/
+                fmt_list_ = get('fmt_list');
+                if (that = get('url_encoded_fmt_stream_map')) {
+                  for (i$ = 0, len$ = (ref$ = that.split(",")).length; i$ < len$; ++i$) {
+                    file = ref$[i$];
+                    url = get('url');
+                    if (that = file.match(/fallback_host=(.*?)(?:\\u0026|$)/)) {
+                      fallback_host = unescape(that[1]);
                     }
+                    itag = get('itag');
+                    if (that = ytItags[itag]) {
+                      format = that;
+                    } else {
+                      if (!fmt_list) {
+                        fmt_list = {};
+                        if (fmt_list_) {
+                          for (j$ = 0, len1$ = (ref1$ = fmt_list_.split(',')).length; j$ < len1$; ++j$) {
+                            e = ref1$[j$];
+                            e = e.split('/');
+                            fmt_list[e[0]] = e[1].split('x')[1];
+                          }
+                        } else {
+                          console.warn("[mediaDownload] no fmt_list found");
+                        }
+                      }
+                      if (that = fmt_list[itag] && get('type')) {
+                        format = {
+                          itag: itag,
+                          type: that[1],
+                          ext: that[2],
+                          resolution: fmt_list[itag]
+                        };
+                        console.warn("[mediaDownload] unknown itag found, found in fmt_list", itag);
+                      }
+                    }
+                    if (format) {
+                      original_url = url;
+                      url = url.replace(/^.*?googlevideo.com/, "https://" + fallback_host);
+                      (ref1$ = files[key$ = format.ext] || (files[key$] = []))[ref1$.length] = video = {
+                        file: basename + "." + format.ext,
+                        url: url,
+                        original_url: original_url,
+                        fallback_host: fallback_host,
+                        mimeType: format.type + "/" + format.ext,
+                        resolution: format.resolution,
+                        itag: format.itag
+                      };
+                      if (format.resolution > bestVideoSize) {
+                        bestVideo = video;
+                        bestVideoSize = video.resolution;
+                      }
+                    } else {
+                      console.warn("[mediaDownload] unknown itag found, not in fmt_list", itag);
+                    }
+                  }
+                }
+                if (bestVideo) {
+                  files.preferredDownload = bestVideo;
+                  files.status = 0;
+                  console.log("[mediaDownload] resolving", files);
+                  return res.resolve(files);
+                } else {
+                  console.warn("[mediaDownload] no downloads found");
+                  return res.reject({
+                    status: 2,
+                    message: 'no downloads found'
                   });
-                });
-                files.preferredDownload = bestVideo;
-                console.log("[mediaDownload] resolving", files);
-                return res.resolve(media.downloadAudio = files);
-              }).fail(res.reject);
-            } else {
-              console.error("[mediaDownload] no download found");
-              return res.reject("no download found");
+                }
+              } else {
+                if (that = blocked && d.match(/"dashmpd":"(.*?)"/)) {
+                  url = p0ne.proxy(that[1].replace(/\\\//g, '/'));
+                } else if (that = d.match(/dashmpd=(http.+?)(?:&|$)/)) {
+                  url = p0ne.proxy(unescape(that[1]));
+                }
+                if (url) {
+                  console.info("[mediaDownload] DASHMPD lookup", url);
+                  return $.get(url).then(function(dashmpd){
+                    var $dash, bestVideo;
+                    out$.dashmpd = dashmpd;
+                    $dash = jQuery(
+                    $.parseXML(
+                    dashmpd));
+                    bestVideo = {
+                      size: 0
+                    };
+                    $dash.find('AdaptationSet').each(function(){
+                      var $set, mimeType, type, ext, l;
+                      $set = $(this);
+                      mimeType = $set.attr('mimeType');
+                      type = mimeType.substr(0, 5);
+                      if (type !== 'audio') {
+                        return;
+                      }
+                      if (mimeType === 'audio/mp4') {
+                        ext = 'm4a';
+                      } else {
+                        ext = mimeType.substr(6);
+                      }
+                      files[mimeType] = [];
+                      l = 0;
+                      return $set.find('BaseURL').each(function(){
+                        var $baseurl, $representation, m;
+                        $baseurl = $(this);
+                        $representation = $baseurl.parent();
+                        files[mimeType][l++] = m = {
+                          file: basename + "." + ext,
+                          url: httpsify($baseurl.text()),
+                          mimeType: mimeType,
+                          size: $baseurl.attr('yt:contentLength') / 1000000,
+                          samplingRate: $representation.attr('audioSamplingRate') + "Hz"
+                        };
+                        if (audioOnly && ~~m.size > ~~bestVideo.size && (window.chrome || mimeType !== 'audio/webm')) {
+                          return bestVideo = m;
+                        }
+                      });
+                    });
+                    if (bestVideo) {
+                      files.preferredDownload = bestVideo;
+                      files.status = 0;
+                      console.log("[mediaDownload] resolving", files);
+                      return res.resolve(files);
+                    } else {
+                      console.warn("[mediaDownload] dash.mpd found, but no downloads");
+                      return res.reject({
+                        status: 3,
+                        message: 'dash.mpd found, but no downloads'
+                      });
+                    }
+                  }).fail(res.reject);
+                } else {
+                  console.error("[mediaDownload] no download found");
+                  return res.reject("no download found");
+                }
+              }
             }
-          }
-        });
-      } else if (format === 2) {
-        audioOnly = true;
-        mediaLookup(media).then(function(d){
-          var ref$;
-          if (d.download) {
-            d = (ref$ = {}, ref$[d.downloadFormat + ""] = {
-              url: d.download,
-              size: d.downloadSize
-            }, ref$);
-            return res.resolve(media.downloadAudio = d);
-          } else {
-            return res.reject("download disabled");
-          }
-        }).fail(res.reject);
-      } else {
-        console.error("[mediaDownload] unknown format", media);
-        res.reject("unknown format");
-      }
-      return res.promise();
-    },
+          });
+        } else if (format === 2) {
+          audioOnly = true;
+          mediaLookup(media).then(function(d){
+            var ref$;
+            if (d.download) {
+              return res.resolve(media.downloadAudio = (ref$ = {}, ref$[d.downloadFormat] = {
+                url: d.download,
+                size: d.downloadSize
+              }, ref$));
+            } else {
+              return res.reject("download disabled");
+            }
+          }).fail(res.reject);
+        } else {
+          console.error("[mediaDownload] unknown format", media);
+          res.reject("unknown format");
+        }
+        return res.promise();
+      };
+    }(),
     proxify: function(url){
-      if (url.startsWith("http:")) {
+      if (typeof url.startsWith == 'function' && url.startsWith("http:")) {
         return p0ne.proxy(url);
       } else {
         return url;
       }
     },
     httpsify: function(url){
-      if (url.startsWith("http:")) {
+      if (typeof url.startsWith == 'function' && url.startsWith("http:")) {
         return "https://" + url.substr(7);
       } else {
         return url;
@@ -1901,15 +2173,16 @@ window.compareVersions = function(a, b){
       if (!cid) {
         return $();
       } else {
-        res = $cm().find(".cid-" + cid).last();
-        if (!res.hasClass('.text')) {
-          res = res.find('.text').last();
-        }
+        res = $cms().find(".text.cid-" + cid);
         return res;
       }
     },
     getChat: function(cid){
-      return getChatText(cid).parent().parent();
+      if (typeof cid === 'object') {
+        return cid.$el || (cid.$el = getChat(cid.cid));
+      } else {
+        return getChatText(cid).parent().parent();
+      }
     },
     getMentions: function(data, safeOffsets){
       var attr, that, mentions, l, users, msgLength;
@@ -2051,13 +2324,13 @@ window.compareVersions = function(a, b){
     stripHTML: function(msg){
       return msg.replace(/<.*?>/g, '');
     },
-    unemotify: function(str){
+    unemojify: function(str){
       var map, ref$;
       map = (ref$ = window.emoticons) != null ? ref$.map : void 8;
       if (!map) {
         return str;
       }
-      return str.replace(/<span class="emoji-glow"><span class="emoji emoji-(\w+)"><\/span><\/span>/g, function(_, emoteID){
+      return str.replace(/(?:<span class="emoji-glow">)?<span class="emoji emoji-(\w+)"><\/span>(?:<\/span>)?/g, function(_, emoteID){
         var that;
         if (that = emoticons.reversedMap[emoteID]) {
           return ":" + that + ":";
@@ -2093,13 +2366,13 @@ window.compareVersions = function(a, b){
       resolveRTL(
       htmlUnescape(
       stripHTML(
-      unemotify(
+      unemojify(
       str)))));
     },
     formatPlainText: function(text){
       var lvl;
       lvl = 0;
-      text = text.replace(/([\s\S]*?)($|https?:(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, function(arg$, pre, url, post){
+      text = text.replace(/([\s\S]*?)($|(?:https?:|www\.)(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, function(arg$, pre, url, post){
         pre = pre.replace(/(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3").replace(/(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3").replace(/(lyrics|download|original|re-?upload)/gi, "<b>$1</b>").replace(/(\s)((?:0x|#)[0-9a-fA-F]+|\d+)(\w*|%|\+)?(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4").replace(/^={5,}$/mg, "<hr class='song-description-hr-double' />").replace(/^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />").replace(/^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>").replace(/(.?)([\(\)])(.?)/g, function(x, a, b, c){
           if ("=^".indexOf(x) === -1 || a === ":") {
             return x;
@@ -2199,7 +2472,7 @@ window.compareVersions = function(a, b){
       return arr.join(", ");
     },
     plural: function(num, singular, plural){
-      plural == null && (plural = singular + 's');
+      plural == null && (plural = singular + "s");
       if (num === 1) {
         return num + "\xa0" + singular;
       } else {
@@ -2221,6 +2494,83 @@ window.compareVersions = function(a, b){
         return i + "rd";
       }
       return i + "th";
+    }
+    /*fromCodePoints: (str) ->
+        res = ""
+        for codePoint in str.split \-
+            res += String.fromCodePoints(parseInt(codePoint, 16))
+        return res
+    */,
+    emojifyUnicode: function(str){
+      if (typeof str !== 'string') {
+        return str;
+      } else {
+        return str.replace(/\ud83c[\udf00-\udfff]|\ud83d[\udc00-\ude4f]|\ud83d[\ude80-\udeff]/g, function(emoji, all){
+          emoji = emoji.codePointAt(0).toString(16);
+          if (emoticons.reversedMap[emoji]) {
+            return emojifyUnicodeOne(emoji, true);
+          } else {
+            return all;
+          }
+        });
+      }
+    },
+    emojifyUnicodeOne: function(key){
+      return "<span class=\"emoji emoji-" + key + "\"></span>";
+    },
+    flag: function(language, unicode){
+      /*@security HTML injection possible, if Lang.languages[language] is maliciously crafted*/
+      if (language[0] === '\'' || language[1] === '\'') {
+        return "";
+      } else {
+        return "<span class='flag flag-" + language + "' title='" + (typeof Lang != 'undefined' && Lang !== null ? Lang.languages[language] : void 8) + "'></span>";
+      }
+    },
+    formatUser: function(user, showModInfo){
+      var info, d;
+      if (user.toJSON) {
+        user = user.toJSON();
+      }
+      info = getRank(user);
+      if (info === 'none') {
+        info = "";
+      }
+      if (showModInfo) {
+        info = ", " + info + " ";
+        info += "lvl " + (user.gRole === 5
+          ? '∞'
+          : user.level);
+        if (Date.now() - 48 .h < (d = new Date(user.joined))) {
+          info += " - created " + ago(d);
+        }
+      }
+      return user.username + " (" + user.language + info + ")";
+    },
+    formatUserHTML: function(user, showModInfo, fromClass){
+      /*@security no HTML injection should be possible, unless user.rawun or .id is improperly modified*/
+      var rank, info, d;
+      user = getUser(user);
+      if (rank = getRankIcon(user)) {
+        rank += " ";
+      }
+      if (showModInfo) {
+        info = " (lvl " + (user.gRole === 5
+          ? '∞'
+          : user.level);
+        if (Date.now() - 48 .h < (d = new Date(user.joined))) {
+          info += " - created " + ago(d);
+        }
+        info += ")";
+      }
+      if (fromClass) {
+        fromClass = " " + getRank(user);
+      } else {
+        fromClass = "";
+      }
+      return rank + "<span class='un" + fromClass + "' data-uid='" + user.id + "'>" + user.rawun + "</span> " + flag(user.language) + (info || '');
+    },
+    formatUserSimple: function(user){
+      return "<span class=un data-uid='" + user.id + "'>" + user.username + "</span>";
     },
     getTime: function(t){
       t == null && (t = new Date);
@@ -2234,6 +2584,8 @@ window.compareVersions = function(a, b){
       var b, c;
       if (diff < 0) {
         return "-" + humanTime(-diff);
+      } else if (!short && diff < 2000) {
+        return "just now";
       }
       b = [60, 60, 24, 360.25];
       c = 0;
@@ -2242,9 +2594,9 @@ window.compareVersions = function(a, b){
         diff /= b[c++];
       }
       if (short) {
-        return ~~diff + "" + ['s', 'm', 'h', 'd'][c];
+        return ~~diff + "" + ['s', 'm', 'h', 'd', 'y'][c];
       } else {
-        return plural(~~diff, ['second', 'minute', 'hour', 'day'][c]);
+        return ~~diff + " " + ['seconds', 'minutes', 'hours', 'days', 'years'][c];
       }
     },
     mediaTime: function(dur){
@@ -2296,25 +2648,23 @@ window.compareVersions = function(a, b){
         if (that === 5) {
           return 'admin';
         } else {
-          return 'BA';
+          return 'ambassador';
         }
       } else {
         return ['none', 'rdj', 'bouncer', 'manager', 'cohost', 'host'][role || 0];
       }
     },
+    getRankIcon: function(user){
+      var rank;
+      rank = getRank(user);
+      return rank !== 'none' && "<i class='icon icon-chat-" + (rank === 'rdj' ? 'dj' : rank) + " p0ne-icon-small'></i>" || '';
+    },
     parseURL: function(href){
-      var ref$;
-      $dummy[0].href = href;
-      return {
-        hash: (ref$ = $dummy[0]).hash,
-        host: ref$.host,
-        hostname: ref$.hostname,
-        href: ref$.href,
-        pathname: ref$.pathname,
-        port: ref$.port,
-        protocol: ref$.protocol,
-        search: ref$.search
-      };
+      var a;
+      href || (href = "//");
+      a = document.createElement('a');
+      a.href = href;
+      return a;
     },
     getIcon: function(){
       var $icon, fn;
@@ -2325,10 +2675,10 @@ window.compareVersions = function(a, b){
         var res;
         $icon.addClass(className);
         res = {
-          background: $icon.css('background'),
           image: $icon.css('background-image'),
           position: $icon.css('background-position')
         };
+        res.background = res.image + " " + res.position;
         $icon.removeClass(className);
         return res;
       };
@@ -2341,12 +2691,13 @@ window.compareVersions = function(a, b){
       return fn;
     }(),
     disabled: false,
-    userID: typeof API != 'undefined' && API !== null ? API.getUser().id : void 8,
     user: typeof API != 'undefined' && API !== null ? API.getUser() : void 8,
     getRoomSlug: function(){
       return (typeof room != 'undefined' && room !== null ? typeof room.get == 'function' ? room.get('slug') : void 8 : void 8) || decodeURIComponent(location.pathname.substr(1));
     }
   });
+  userID = typeof user != 'undefined' && user !== null ? user.id : void 8;
+  user.isStaff = user && user.role > 1 || user.gRole;
   /*####################################
   #          REQUIRE MODULES           #
   ####################################*/
@@ -2375,8 +2726,8 @@ window.compareVersions = function(a, b){
   if (user_) {
     window.users = user_.collection;
     if (!userID) {
-      user = user_.toJSON();
-      userID = user.id;
+      window.user = user_.toJSON();
+      window.userID = user.id;
     }
   }
   window.Lang = require('lang/Lang');
@@ -2404,7 +2755,7 @@ window.compareVersions = function(a, b){
     return ((ref$ = it.prototype) != null ? ref$.id : void 8) === 'playback';
   });
   requireHelper('PopoutView', (function(it){
-    return '_window' in it;
+    return '$document' in it;
   }));
   requireHelper('MediaPanel', function(it){
     var ref$;
@@ -2454,6 +2805,19 @@ window.compareVersions = function(a, b){
   requireHelper('soundcloud', function(it){
     return it.sc;
   });
+  requireHelper('AlertEvent', function(it){
+    return it._name === 'AlertEvent';
+  });
+  requireHelper('userRollover', function(it){
+    return it.id === 'user-rollover';
+  });
+  requireHelper('currentPlaylistMedia', (function(it){
+    return 'currentFilter' in it;
+  }));
+  requireHelper('RoomHistory', function(it){
+    var ref$;
+    return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'history' && it.prototype.hasOwnProperty('listClass');
+  });
   requireHelper('userList', function(it){
     return it.id === 'user-lists';
   });
@@ -2496,6 +2860,12 @@ window.compareVersions = function(a, b){
       break;
     }
   }
+  for (k in ref1$ = typeof Lang != 'undefined' && Lang !== null ? Lang.languages : void 8) {
+    v = ref1$[k];
+    if (v.has('\'')) {
+      (ref2$ = Lang.languages)[k] = ref2$[k].replace(/\\?'/g, "\\'");
+    }
+  }
   if (app && !(window.chat = app.room.chat)) {
     for (i$ = 0, len$ = (ref1$ = (typeof _$context != 'undefined' && _$context !== null ? _$context._events['chat:receive'] : void 8) || []).length; i$ < len$; ++i$) {
       e = ref1$[i$];
@@ -2505,21 +2875,22 @@ window.compareVersions = function(a, b){
       }
     }
   }
-  if (chat) {
+  if (typeof chat != 'undefined' && chat !== null) {
     importAll$(window, {
       $cm: function(){
-        if (window.saveChat) {
-          return saveChat.$cm;
-        } else {
-          return chat.$chatMessages;
+        var ref$;
+        return (typeof PopoutView != 'undefined' && PopoutView !== null ? (ref$ = PopoutView.chat) != null ? ref$.$chatMessages : void 8 : void 8) || (typeof chat != 'undefined' && chat !== null ? chat.$chatMessages : void 8) || $('#chat-messages');
+      },
+      $cms: function(){
+        var cm, that, ref$;
+        cm = (typeof chat != 'undefined' && chat !== null ? chat.$chatMessages : void 8) || $('#chat-messages');
+        if (that = typeof PopoutView != 'undefined' && PopoutView !== null ? (ref$ = PopoutView.chat) != null ? ref$.$chatMessages : void 8 : void 8) {
+          cm = cm.add(that);
         }
+        return cm;
       },
       playChatSound: function(isMention){
-        if (isMention) {
-          return chat.playSound('mention');
-        } else if ($('.icon-chat-sound-on').length > 0) {
-          return chat.playSound('chat');
-        }
+        return chat.playSound();
       }
     });
   } else {
@@ -2533,17 +2904,35 @@ window.compareVersions = function(a, b){
   }
   importAll$(window, {
     appendChat: function(div, wasAtBottom){
+      var ref$;
       wasAtBottom == null && (wasAtBottom = chatIsAtBottom());
       if (window.saveChat) {
         window.saveChat.$cChunk.append(div);
       } else {
-        $cm().append(div);
+        $cms().append(div);
       }
       if (wasAtBottom) {
         chatScrollDown();
       }
-      chat.lastID = -1;
+      chat.lastType = null;
+      if (typeof PopoutView != 'undefined' && PopoutView !== null) {
+        if ((ref$ = PopoutView.chat) != null) {
+          ref$.lastType = null;
+        }
+      }
       return div;
+    },
+    chatWarn: function(message, title, isHTML){
+      if (!message) {
+        return;
+      }
+      if (typeof title === 'string') {
+        title = $('<span class=un>').text(title);
+      } else {
+        isHTML = title;
+        title = null;
+      }
+      return appendChat($('<div class="cm system"><div class=badge-box><i class="icon icon-chat-system"></i></div></div>').append($('<div class=msg>').append($('<div class=from>').append(title).append(getTimestamp())).append($('<div class=text>')[isHTML ? 'html' : 'text'](message))));
     },
     chatIsAtBottom: function(){
       var cm;
@@ -2562,10 +2951,18 @@ window.compareVersions = function(a, b){
         msg = that + " " + msg;
       }
       return $input.val(msg).trigger('input').focus();
+    },
+    getTimestamp: function(d){
+      d == null && (d = new Date);
+      if (typeof auxiliaries != 'undefined' && auxiliaries !== null) {
+        return "<time class='timestamp' datetime='" + d.toISOString() + "'>" + auxiliaries.getChatTimestamp((typeof database != 'undefined' && database !== null ? database.settings.chatTimestamps : void 8) === 24) + "</time>";
+      } else {
+        return pad(d.getHours()) + ":" + pad(d.getMinutes());
+      }
     }
   });
   /*####################################
-  #           extend jQuery            #
+  #          extend Deferreds          #
   ####################################*/
   replace(jQuery, 'Deferred', function(Deferred_){
     return function(){
@@ -2660,8 +3057,10 @@ window.compareVersions = function(a, b){
     } else if (plugCubed.version) {
       return plugCubed.version;
     } else if (v = $('#p3-settings .version').text()) {} else {
-      v = requireHelper('plugCubedVersion', function(it){
-        return it.major;
+      v = requireHelper('plugCubedVersion', {
+        test: function(it){
+          return it.major;
+        }
       });
       if (v) {
         return v;
@@ -2753,14 +3152,14 @@ window.compareVersions = function(a, b){
   /*@source p0ne.module.ls */
   /**
    * Module script for loading disable-able chunks of code
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   p0ne.moduleSettings = dataLoad('p0ne_moduleSettings', {});
   window.module = function(name, data){
-    var require, optional, callback, setup, update, persistent, disable, module, settings, displayName, disabled, _settings, moderator, ref$, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, len$, k, _settings_, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, moduleSettings, e;
+    var require, optional, setup, update, persistent, disable, disableLate, module, settings, displayName, disabled, _settings, settingsPerCommunity, moderator, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, ref$, len$, k, _settings_, err, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, moduleSettings, key$, roomSlug, wasDisabled, e;
     try {
       if (typeof name !== 'string') {
         data = name;
@@ -2773,10 +3172,7 @@ window.compareVersions = function(a, b){
         };
       }
       data.persistent || (data.persistent = {});
-      name = data.name, require = data.require, optional = data.optional, callback = data.callback, setup = data.setup, update = data.update, persistent = data.persistent, disable = data.disable, module = data.module, settings = data.settings, displayName = data.displayName, disabled = data.disabled, _settings = data._settings, moderator = data.moderator;
-      if (callback) {
-        (ref$ = data.callbacks)[ref$.length] = callback;
-      }
+      name = data.name, require = data.require, optional = data.optional, setup = data.setup, update = data.update, persistent = data.persistent, disable = data.disable, disableLate = data.disableLate, module = data.module, settings = data.settings, displayName = data.displayName, disabled = data.disabled, _settings = data._settings, settingsPerCommunity = data.settingsPerCommunity, moderator = data.moderator;
       if (module) {
         if (typeof module === 'function') {
           fn = module;
@@ -2825,34 +3221,77 @@ window.compareVersions = function(a, b){
       };
       helperFNs = {
         addListener: function(target){
-          var args, early, ref$;
+          var args, ref$, that;
           args = slice$.call(arguments, 1);
           if (target === 'early') {
-            early = true;
             ref$ = args, target = ref$[0], args = slice$.call(ref$, 1);
+            if (target.onEarly) {
+              target.onEarly.apply(target, args);
+            } else {
+              console.warn(getTime() + " [" + name + "] cannot use .onEarly on", target);
+            }
+          } else if (target === 'once' || target === 'one') {
+            ref$ = args, target = ref$[0], args = slice$.call(ref$, 1);
+            if (that = target.once || target.one) {
+              that.apply(target, args);
+            } else {
+              console.warn(getTime() + " [" + name + "] cannot use .once / .one on", target);
+            }
+          } else {
+            target.on.apply(target, args);
           }
           (ref$ = cbs.listeners || (cbs.listeners = []))[ref$.length] = {
             target: target,
             args: args
           };
-          if (!early) {
-            target.on.apply(target, args);
-          } else if (!target.onEarly) {
-            console.warn(getTime() + " [" + name + "] cannot use .onEarly on", target);
-          } else {
-            target.onEarly.apply(target, args);
-          }
           return args[args.length - 1];
         },
         replace: function(target, attr, repl){
-          var ref$, key$;
-          (ref$ = cbs.replacements || (cbs.replacements = []))[ref$.length] = [target, attr, repl];
+          var orig, replacement, ref$;
           if (attr in target) {
-            target[key$ = attr + "_"] == null && (target[key$] = target[attr]);
+            orig = target[attr];
+            if (!(attr + "_" in target)) {
+              target[attr + "_"] = orig;
+            }
           } else {
-            target[attr + "_"] = false;
+            target[attr + "_"] = null;
           }
-          return target[attr] = repl(target[attr + "_"]);
+          target[attr] = replacement = repl(target[attr]);
+          return (ref$ = cbs.replacements || (cbs.replacements = []))[ref$.length] = [target, attr, replacement, orig];
+        },
+        revert: function(target_, attr_){
+          var didReplace, i$, ref$, len$, ref1$, target, attr, replacement, orig;
+          if (!cbs.replacements) {
+            return false;
+          }
+          didReplace = false;
+          if (attr_) {
+            for (i$ = 0, len$ = (ref$ = cbs.replacements).length; i$ < len$; ++i$) {
+              ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1], replacement = ref1$[2], orig = ref1$[3];
+              if (target === target_ && attr_ === attr && target[attr] === replacement) {
+                target[attr] = orig;
+                cbs.replacements;
+                return true;
+              }
+            }
+          } else if (target_) {
+            for (i$ = 0, len$ = (ref$ = cbs.replacements).length; i$ < len$; ++i$) {
+              ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1], replacement = ref1$[2], orig = ref1$[3];
+              if (target === target_ && target[attr] === replacement) {
+                target[attr] = orig;
+                didReplace = true;
+              }
+            }
+          } else {
+            for (i$ = 0, len$ = (ref$ = cbs.replacements).length; i$ < len$; ++i$) {
+              ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1], replacement = ref1$[2], orig = ref1$[3];
+              if (target === target_) {
+                target[attr] = orig;
+                didReplace = true;
+              }
+            }
+          }
+          return didReplace;
         },
         replaceListener: function(emitter, event, ctx, callback){
           var evts, ref$, i$, len$, e;
@@ -2941,7 +3380,7 @@ window.compareVersions = function(a, b){
           return this;
         },
         disable: function(newModule){
-          var i$, ref$, len$, ref1$, target, args, attr, d, style, url, $el, m, err;
+          var i$, ref$, len$, ref1$, target, args, attr, replacement, orig, d, style, url, $el, m, err;
           if (module.disabled) {
             return;
           }
@@ -2955,8 +3394,10 @@ window.compareVersions = function(a, b){
               target.off.apply(target, args);
             }
             for (i$ = 0, len$ = (ref$ = cbs.replacements || []).length; i$ < len$; ++i$) {
-              ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1];
-              target[attr] = target[attr + "_"];
+              ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1], replacement = ref1$[2], orig = ref1$[3];
+              if (target[attr] === replacement) {
+                target[attr] = orig;
+              }
             }
             for (i$ = 0, len$ = (ref$ = cbs.adds || []).length; i$ < len$; ++i$) {
               d = ref$[i$], target = d[0];
@@ -2990,6 +3431,9 @@ window.compareVersions = function(a, b){
               dataUnload("p0ne/" + name);
             }
             delete cbs.listeners, delete cbs.replacements, delete cbs.adds, delete cbs.css, delete cbs.loadedStyles, delete cbs.$elements;
+            if (typeof disableLate === 'function') {
+              disableLate.call(module, helperFNs, newModule, data);
+            }
           } catch (e$) {
             err = e$;
             console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.stack);
@@ -2998,6 +3442,34 @@ window.compareVersions = function(a, b){
           delete p0ne.dependencies[name];
           return this;
         }
+      };
+      module.trigger = function(target){
+        var args, i$, ref$, len$, listener, isMatch, l, j$, ref1$, len1$, i, arg, fn, results$ = [];
+        args = slice$.call(arguments, 1);
+        for (i$ = 0, len$ = (ref$ = cbs.listeners || []).length; i$ < len$; ++i$) {
+          listener = ref$[i$];
+          if (listener.target === target) {
+            isMatch = true;
+            l = listener.args.length - 1;
+            for (j$ = 0, len1$ = (ref1$ = listener.args).length; j$ < len1$; ++j$) {
+              i = j$;
+              arg = ref1$[j$];
+              if (arg !== args[i] && !(typeof arg === 'string' && arg.split(/\s+/).has(args[i]))) {
+                if (i + 1 < args.length && i !== l) {
+                  isMatch = false;
+                }
+                break;
+              }
+            }
+            if (isMatch) {
+              fn = (ref1$ = listener.args)[ref1$.length - 1];
+              if (typeof fn === 'function') {
+                results$.push(fn(args.slice(i)));
+              }
+            }
+          }
+        }
+        return results$;
       };
       module.disable = helperFNs.disable;
       module.enable = helperFNs.enable;
@@ -3010,8 +3482,13 @@ window.compareVersions = function(a, b){
         }
         module._$settings = module_._$settings;
         _settings_ = module_._settings;
-        if (typeof module_.disable == 'function') {
-          module_.disable(module);
+        try {
+          if (typeof module_.disable == 'function') {
+            module_.disable(module);
+          }
+        } catch (e$) {
+          err = e$;
+          console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.stack);
         }
       }
       failedRequirements = [];
@@ -3047,32 +3524,45 @@ window.compareVersions = function(a, b){
         }
         moduleSettings = p0ne.moduleSettings[name];
         if (moduleSettings) {
-          module.disabled = moduleSettings.disabled;
+          if (settingsPerCommunity) {
+            module.disabled = (moduleSettings[key$ = roomSlug = getRoomSlug()] || (moduleSettings[key$] = {})).disabled;
+          } else {
+            module.disabled = moduleSettings.disabled;
+          }
         } else {
           moduleSettings = p0ne.moduleSettings[name] = {
             disabled: !!disabled
           };
         }
         this.moduleSettings = moduleSettings;
-        if (moderator && API.getUser().role < 2 && !module.disabled) {
+        if (moderator && !user.isStaff && !module.disabled) {
           module.modDisabled = true;
           module.disabled = true;
         }
         if (!module.disabled) {
-          if (_settings) {
-            module._settings = _settings_ || dataLoad("p0ne_" + name, _settings);
+          if (_settings_) {
+            module._settings = _settings_;
+          } else if (_settings) {
+            if (settingsPerCommunity) {
+              module._settings = import$(clone$(_settings), dataLoad("p0ne__" + roomSlug + "_" + name, {}));
+            } else {
+              module._settings = import$(clone$(_settings), dataLoad("p0ne_" + name, {}));
+            }
           }
           if (setup != null) {
             setup.call(module, helperFNs, module, data, module_);
           }
+          wasDisabled = "";
+        } else {
+          wasDisabled = ". (note: module still disabled)";
         }
         p0ne.modules[name] = module;
         if (module_) {
           API.trigger('p0neModuleUpdated', module);
-          console.info(getTime() + " [" + name + "] updated");
+          console.info(getTime() + " [" + name + "] updated" + wasDisabled);
         } else {
           API.trigger('p0neModuleLoaded', module);
-          console.info(getTime() + " [" + name + "] initialized");
+          console.info(getTime() + " [" + name + "] initialized" + wasDisabled);
         }
       } catch (e$) {
         e = e$;
@@ -3081,16 +3571,16 @@ window.compareVersions = function(a, b){
       return module;
     } catch (e$) {
       e = e$;
-      return console.error(getTime() + " [module] error initializing '" + name + "':", e.message);
+      return console.error(getTime() + " [module] error initializing '" + name + "':", e.stack);
     }
   };
   /*@source p0ne.auxiliary-modules.ls */
   /**
    * Auxiliary plug_p0ne modules
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   /*####################################
   #            AUXILIARIES             #
@@ -3103,84 +3593,23 @@ window.compareVersions = function(a, b){
       });
     }
   });
-  module('_API_', {
-    optional: [],
-    setup: function(){
-      var k, ref$, v, results$ = [];
-      for (k in ref$ = API) {
-        v = ref$[k];
-        if (!this[k]) {
-          results$.push(this[k] = v);
-        }
-      }
-      return results$;
-    },
-    chatLog: API.chatLog,
-    on: API.on,
-    once: API.once,
-    off: API.off,
-    _events: API._events || (API._events = {}),
-    getAdmins: function(){
-      throw Error('unimplemented');
-    },
-    getAmbassadors: function(){
-      throw Error('unimplemented');
-    },
-    getAudience: function(){
-      throw Error('unimplemented');
-    },
-    getBannedUsers: function(){
-      throw Error('unimplemented');
-    },
-    getDJ: function(){
-      throw Error('unimplemented');
-    },
-    getHistory: function(){
-      return roomHistory;
-    },
-    getHost: function(){
-      throw Error('unimplemented');
-    },
-    getMedia: function(){
-      throw Error('unimplemented');
-    },
-    getNextMedia: function(){
-      throw Error('unimplemented');
-    },
-    getUser: function(){
-      return user_;
-    },
-    getUsers: function(){
-      return users;
-    },
-    getPlaylists: function(){
-      throw Error('unimplemented');
-    },
-    getStaff: function(){
-      throw Error('unimplemented');
-    },
-    getWaitList: function(){
-      throw Error('unimplemented');
-    }
-  });
   module('updateUserData', {
     require: ['user_', 'users', '_$context'],
     setup: function(arg$){
-      var addListener, i$, ref$, len$, user, results$ = [];
+      var addListener, i$, ref$, len$, user;
       addListener = arg$.addListener;
       addListener(window.user_, 'change:username', function(){
         return user.username = window.user_.get('username');
       });
-      addListener(_$context, 'user:join', function(arg$){
+      for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+        user = ref$[i$];
+        user.set('joinedRoom', -1);
+      }
+      return addListener(API, 'userJoin', function(arg$){
         var id;
         id = arg$.id;
         return users.get(id).set('joinedRoom', Date.now());
       });
-      for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
-        user = ref$[i$];
-        results$.push(user.set('joinedRoom', -1));
-      }
-      return results$;
     }
   });
   module('throttleOnFloodAPI', {
@@ -3199,7 +3628,7 @@ window.compareVersions = function(a, b){
   });
   module('PopoutListener', {
     require: ['PopoutView'],
-    optional: ['_$context', 'chat'],
+    optional: ['_$context'],
     setup: function(arg$){
       var replace;
       replace = arg$.replace;
@@ -3212,7 +3641,7 @@ window.compareVersions = function(a, b){
           return API.trigger('popout:open', PopoutView._window, PopoutView);
         };
       });
-      return replace(PopoutView, 'close', function(c_){
+      return replace(PopoutView, 'clear', function(c_){
         return function(){
           c_.apply(this, arguments);
           if (typeof _$context != 'undefined' && _$context !== null) {
@@ -3264,8 +3693,9 @@ window.compareVersions = function(a, b){
     require: ['playlists', 'auxiliaries'],
     optional: ['_$context'],
     module: function(playlistIDOrName, media, appendToEnd){
-      var currentPlaylist, i$, ref$, len$, pl, playlist;
+      var currentPlaylist, def, i$, ref$, len$, pl, playlist;
       currentPlaylist = playlists.get(playlists.getActiveID());
+      def = $.Deferred();
       if (typeof playlistIDOrName === 'string' && !playlistIDOrName.startsWith('http')) {
         for (i$ = 0, len$ = (ref$ = playlists.models).length; i$ < len$; ++i$) {
           pl = ref$[i$];
@@ -3281,7 +3711,8 @@ window.compareVersions = function(a, b){
       }
       if (!playlist) {
         console.error("[grabMedia] could not find playlist", arguments);
-        return;
+        def.reject('playlistNotFound');
+        return def.promise();
       }
       if (!media) {
         addMedia(API.getMedia());
@@ -3291,10 +3722,12 @@ window.compareVersions = function(a, b){
         mediaLookup(media, {
           success: addMedia,
           fail: function(err){
-            return console.error("[grabMedia] couldn't grab", err);
+            console.error("[grabMedia] couldn't grab", err);
+            return def.reject('lookupFailed', err);
           }
         });
       }
+      return def.promise();
       function addMedia(media){
         console.log("[grabMedia] add '" + media.author + " - " + media.title + "' to playlist:", playlist);
         playlist.set('syncing', true);
@@ -3317,9 +3750,11 @@ window.compareVersions = function(a, b){
             }
           }
           playlist.set('syncing', false);
-          return console.info("[grabMedia] successfully added to playlist");
-        }).fail(function(){
-          return console.error("[grabMedia] error adding song to the playlist");
+          console.info("[grabMedia] successfully added to playlist");
+          return def.resolve(playlist.toJSON());
+        }).fail(function(err){
+          console.error("[grabMedia] error adding song to the playlist");
+          return def.reject('ajaxError', err);
         });
       }
       return addMedia;
@@ -3452,10 +3887,10 @@ window.compareVersions = function(a, b){
   /**
    * performance enhancements for plug.dj
    * the perfEmojify module also adds custom emoticons
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('jQueryPerf', {
     setup: function(arg$){
@@ -3546,7 +3981,7 @@ window.compareVersions = function(a, b){
         return e.replace(/([\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:])/g, "\\$1");
       };
       autoEmoteMap = {
-        /*NOTE: the keys (emoticons) HAVE to be uppercase! */
+        /*NOTE: since plug_p0ne v1.6.3, emoticons are case-sensitive */
         '>:(': 'angry',
         '>XD': 'astonished',
         ':DX': 'bowtie',
@@ -3624,23 +4059,32 @@ window.compareVersions = function(a, b){
         }
         for (k in ref$ = this.autoEmoteMap) {
           v = ref$[k];
-          tmp = k.replace("<", "&LT;").replace(">", "&GT;");
+          tmp = k.replace("<", "&lt;").replace(">", "&gt;");
           if (tmp !== k) {
             this.autoEmoteMap[tmp] = v;
             delete this.autoEmoteMap[k];
           }
         }
-        return this.regAutoEmote = RegExp('(^|\\s|&nbsp;)(' + Object.keys(this.autoEmoteMap).map(escapeReg).join("|") + ')(?=\\s|$)', 'gi');
+        return this.regAutoEmote = RegExp('(^|\\s|&nbsp;)(' + Object.keys(this.autoEmoteMap).map(escapeReg).join("|") + ')(?=\\s|$)', 'g');
       };
       emoticons.update();
       replace(emoticons, 'emojify', function(){
         return function(str){
-          var this$ = this;
+          var lastIndex, this$ = this;
+          lastIndex = -1;
           return str.replace(this.regAutoEmote, function(arg$, pre, emote){
-            return pre + ":" + this$.autoEmoteMap[emote.toUpperCase()] + ":";
-          }).replace(/:(.*?):/g, function(_, emote){
-            if (this$.map[emote]) {
-              return "<span class='emoji-glow'><span class='emoji emoji-" + this$.map[emote] + "'></span></span>";
+            return pre + ":" + this$.autoEmoteMap[emote] + ":";
+          }).replace(/:([\w\+\-]*)(.*?)(?=:)|:(.*)$/g, function(_, emote, stuff, stuff2, index){
+            var that;
+            if (index === lastIndex) {
+              if (typeof stuff2 === 'string') {
+                return stuff2;
+              } else {
+                return emote + stuff;
+              }
+            } else if (that = !stuff && this$.map[emote]) {
+              lastIndex = index + emote.length + 1;
+              return "<span class='emoji-glow'><span class='emoji emoji-" + that + "'></span></span>";
             } else {
               return _;
             }
@@ -3676,18 +4120,25 @@ window.compareVersions = function(a, b){
   /*@source p0ne.sjs.ls */
   /**
    * propagate Socket Events to the API Event Emitter for custom event listeners
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('socketListeners', {
     require: ['socketEvents'],
     optional: ['_$context', 'auxiliaries'],
-    setup: function(arg$){
+    logUnmatched: false,
+    lastHandshake: 0,
+    setup: function(arg$, socketListeners){
       var replace, base_url, ref$, onRoomJoinQueue2, i$, ref1$, len$;
       replace = arg$.replace;
-      base_url = "wss://godj.plug.dj/socket";
+      window.Socket || (window.Socket = window.SockJS || window.WebSocket);
+      if (Socket === window.SockJS) {
+        base_url = "https://shalamar.plug.dj:443/socket";
+      } else {
+        base_url = "wss://godj.plug.dj/socket";
+      }
       if (((ref$ = window.socket) != null ? ref$.url : void 8) === base_url) {
         return;
       }
@@ -3733,55 +4184,75 @@ window.compareVersions = function(a, b){
       }
       return forEach;
       function fn$(event){
-        replace(WebSocket.prototype, event, function(e_){
+        console.log("[socketListeners] injecting into Socket::" + event);
+        replace(Socket.prototype, event, function(e_){
           return function(){
-            var this$ = this;
-            e_.apply(this, arguments);
-            console.info("socket stuff", event, this);
-            if (window.socket !== this && this.url === base_url) {
-              replace(window, 'socket', function(){
-                return this$;
-              });
-              replace(this, 'onmessage', function(msg_){
-                return function(t){
-                  var i$, ref$, d, len$, el, type;
-                  if (t.data === 'h') {
-                    return;
+            var url, err, this$ = this;
+            try {
+              e_.apply(this, arguments);
+              url = this._base_url || this.url;
+              if (window.socket !== this && url === base_url) {
+                replace(window, 'socket', function(){
+                  return this$;
+                });
+                replace(this, 'onmessage', function(msg_){
+                  return function(t){
+                    var data, i$, len$, el, type, ref$;
+                    socketListeners.lastHandshake = Date.now();
+                    if (t.data === 'h') {
+                      return;
+                    }
+                    if (typeof t.data === 'string') {
+                      data = JSON.parse(t.data);
+                    } else {
+                      data = t.data || [];
+                    }
+                    for (i$ = 0, len$ = data.length; i$ < len$; ++i$) {
+                      el = data[i$];
+                      _$context.trigger("socket:" + el.a, el);
+                      API.trigger("socket:" + el.a, el);
+                    }
+                    type = (ref$ = data[0]) != null ? ref$.a : void 8;
+                    if (!type) {
+                      console.warn("[SOCKET:WARNING] socket message format changed", t);
+                    }
+                    return msg_.apply(this, arguments);
+                  };
+                });
+                _$context.on('room:joined', function(){
+                  var results$ = [];
+                  while (onRoomJoinQueue2.length) {
+                    results$.push(forEach(onRoomJoinQueue2.shift()));
                   }
-                  for (i$ = 0, len$ = (ref$ = d = JSON.parse(t.data)).length; i$ < len$; ++i$) {
-                    el = ref$[i$];
-                    _$context.trigger("socket:" + el.a, el);
-                    API.trigger("socket:" + el.a, el);
-                  }
-                  type = d != null ? (ref$ = d[0]) != null ? ref$.a : void 8 : void 8;
-                  if (!type) {
-                    console.warn("[SOCKET:WARNING] socket message format changed", t);
-                  }
-                  return msg_.apply(this, arguments);
+                  return results$;
+                });
+                socket.emit = function(e, t, n){
+                  return socket.send(JSON.stringify({
+                    a: e,
+                    p: t,
+                    t: typeof auxiliaries != 'undefined' && auxiliaries !== null ? auxiliaries.getServerEpoch() : void 8,
+                    d: n
+                  }));
                 };
-              });
-              _$context.on('room:joined', function(){
-                var results$ = [];
-                while (onRoomJoinQueue2.length) {
-                  results$.push(forEach(onRoomJoinQueue2.shift()));
-                }
-                return results$;
-              });
-              socket.emit = function(e, t, n){
-                return socket.send(JSON.stringify({
-                  a: e,
-                  p: t,
-                  t: typeof auxiliaries != 'undefined' && auxiliaries !== null ? auxiliaries.getServerEpoch() : void 8,
-                  d: n
-                }));
-              };
-              return console.info("[Socket] socket patched (using ." + event + ")", this);
-            } else if (window.socket !== this) {
-              return console.warn("socket found, but url differs '" + this.url + "'");
+                /*socketListeners.hoofcheck = repeat 1.min, ->
+                    if Date.now! > socketListeners.lastHandshake + 2.min
+                        console.warn "the socket seems to have silently disconnected, trying to reconnect. last message", ago(socketListeners.lastHandshake)
+                        reconnectSocket!*/
+                return console.info("[Socket] socket patched (using ." + event + ")", this);
+              } else if (socketListeners.logUnmatched && window.socket !== this) {
+                return console.warn("socket found, but url differs '" + url + "'", this);
+              }
+            } catch (e$) {
+              err = e$;
+              out$.err = err;
+              return console.error("error when patching socket", this, err.stack);
             }
           };
         });
       }
+    },
+    disable: function(){
+      return clearInterval(this.hoofcheck);
     }
   });
   /*
@@ -3910,10 +4381,10 @@ window.compareVersions = function(a, b){
   /*@source p0ne.fixes.ls */
   /**
    * Fixes for plug.dj bugs
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   /*####################################
   #                FIXES               #
@@ -3922,7 +4393,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var addListener, replace;
       addListener = arg$.addListener, replace = arg$.replace;
-      this.scm = $('#twitter-menu, #facebook-menu').detach();
+      this.scm = $('#twitter-menu, #facebook-menu, .shop-button').detach();
       replace($('#chat-input-field')[0], 'tabIndex', function(){
         return 1;
       });
@@ -3940,25 +4411,17 @@ window.compareVersions = function(a, b){
       return this.scm.insertAfter('#playlist-panel');
     }
   });
-  module('fixChatLT_GT', {
-    require: ['auxiliaries'],
-    setup: function(arg$){
-      var replace, cTS;
-      replace = arg$.replace;
-      cTS = auxiliaries.cleanTypedString;
-      return replace(chatAuxiliaries, 'sendChat', function(sC_){
-        return function(){
-          var res;
-          auxiliaries.cleanTypedString = function(it){
-            return it;
-          };
-          res = sC_.apply(this, arguments);
-          auxiliaries.cleanTypedString = cTS;
-          return res;
-        };
-      });
-    }
-  });
+  /* NOT WORKING
+  module \fixMediaReload, do
+      require: <[ currentMedia ]>
+      setup: ({replace}) ->
+          replace currentMedia, \set, (s_) -> return (a, b) ->
+              if a.historyID and a.historyID == @get \historyID
+                  console.log "avoid force-reloading current song"
+                  return this
+              else
+                  return s_.call this, a, b
+  */
   module('fixMediaThumbnails', {
     require: ['auxiliaries'],
     help: 'Plug.dj changed the Soundcloud thumbnail file location several times, but never updated the paths in their song database, so many songs have broken thumbnail images.\nThis module fixes this issue.',
@@ -3995,7 +4458,7 @@ window.compareVersions = function(a, b){
     },
     help: 'Plug.dj sometimes marks you internally as "not in any room" even though you still are. This is also called "ghosting" because you can chat in a room that technically you are not in anymore. While ghosting you can still chat, but not join the waitlist or moderate. If others want to @mention you, you don\'t show up in the autocomplete.\n\ntl;dr this module automatically rejoins the room when you are ghosting',
     _settings: {
-      warnings: true
+      verbose: true
     },
     setup: function(arg$){
       var replace, addListener, _settings, rejoining, queue, rejoinRoom;
@@ -4007,7 +4470,9 @@ window.compareVersions = function(a, b){
         var p;
         p = arg$.p;
         if (p === userID) {
-          return rejoinRoom('you left the room');
+          return sleep(100, function(){
+            return rejoinRoom('you left the room');
+          });
         }
       });
       replace(PlugAjax.prototype, 'onError', function(oE_){
@@ -4034,13 +4499,13 @@ window.compareVersions = function(a, b){
               var ref$, i$, ref1$, len$, req;
               if (((ref$ = data.responseText) != null ? ref$[0] : void 8) === "<") {
                 if (data.responseText.has("You have been permanently banned from plug.dj")) {
-                  return API.chatLog("your account got permanently banned. RIP", true);
+                  return chatWarn("your account got permanently banned. RIP", "fixGhosting");
                 } else {
-                  return API.chatLog("[fixGhosting] cannot rejoin the room. Plug is acting weird, maybe it is in maintenance mode or you got IP banned?", true);
+                  return chatWarn("cannot rejoin the room. Plug is acting weird, maybe it is in maintenance mode or you got IP banned?", "fixGhosting");
                 }
               } else {
-                if (_settings.warnings) {
-                  API.chatLog("[fixGhosting] reconnected to the room", true);
+                if (_settings.verbose) {
+                  chatWarn("reconnected to the room", "fixGhosting");
                 }
                 for (i$ = 0, len$ = (ref1$ = queue).length; i$ < len$; ++i$) {
                   req = ref1$[i$];
@@ -4059,13 +4524,13 @@ window.compareVersions = function(a, b){
               status = responseJSON != null ? responseJSON.status : void 8;
               switch (status) {
               case 'ban':
-                API.chatLog("you are banned from this community", true);
+                chatWarn("you are banned from this community", "fixGhosting");
                 break;
               case 'roomCapacity':
-                API.chatLog("the room capacity is reached :/", true);
+                chatWarn("the room capacity is reached :/", "fixGhosting");
                 break;
               case 'notAuthorized':
-                API.chatLog("you got logged out", true);
+                chatWarn("you got logged out", "fixGhosting");
                 if (typeof login == 'function') {
                   login();
                 }
@@ -4073,18 +4538,18 @@ window.compareVersions = function(a, b){
               default:
                 switch (statusCode) {
                 case 401:
-                  API.chatLog("[fixGhosting] unexpected permission error while rejoining the room.", true);
+                  chatWarn("unexpected permission error while rejoining the room.", "fixGhosting");
                   break;
                 case 503:
-                  API.chatLog("plug.dj is in mainenance mode. nothing we can do here");
+                  chatWarn("plug.dj is in mainenance mode. nothing we can do here", "fixGhosting");
                   break;
                 case 521:
                 case 522:
                 case 524:
-                  API.chatLog("plug.dj is currently completly down");
+                  chatWarn("plug.dj is currently completly down", "fixGhosting");
                   break;
                 default:
-                  API.chatLog("[fixGhosting] cannot rejoin the room, unexpected error " + statusCode + " (" + datastatus + ")", true);
+                  chatWarn("cannot rejoin the room, unexpected error " + statusCode + " (" + datastatus + ")", "fixGhosting");
                 }
               }
               return sleep(10 .min, function(){
@@ -4105,7 +4570,7 @@ window.compareVersions = function(a, b){
     },
     help: 'Sometimes plug.dj does not properly emit join notifications, so that clients don\'t know another user joined a room. Thus they appear as "ghosts", as if they were not in the room but still can chat\n\nThis module detects "ghost" users and force-adds them to the room.',
     _settings: {
-      warnings: true
+      verbose: true
     },
     setup: function(arg$){
       var addListener, css, this$ = this;
@@ -4121,8 +4586,8 @@ window.compareVersions = function(a, b){
               yet$ = false;
               if (!users.get(u.id)) {
                 socketEvents.userJoin(u);
-                if (this$._settings.warnings) {
-                  results$.push(API.chatLog("[p0ne] force-joined #" + i + " " + d.un + " (" + d.uid + ") to the room", true));
+                if (this$._settings.verbose) {
+                  results$.push(chatWarn("force-joined #" + i + " " + d.un + " (" + d.uid + ") to the room", "p0ne"));
                 }
               }
             } if (yet$) {
@@ -4132,8 +4597,8 @@ window.compareVersions = function(a, b){
             function fn$(data){
               data.role = -1;
               socketEvents.userJoin(data);
-              if (this$._settings.warnings) {
-                return API.chatLog("[p0ne] " + d.un + " (" + d.uid + ") is ghosting", true);
+              if (this$._settings.verbose) {
+                return chatWarn(d.un + " (" + d.uid + ") is ghosting", "p0ne");
               }
             }
           }).fail(function(){
@@ -4154,7 +4619,7 @@ window.compareVersions = function(a, b){
     },
     help: 'Sometimes plug.dj does not automatically start playing the next song. Usually you would have to reload the page to fix this bug.\n\nThis module detects stuck advances and automatically force-loads the next song.',
     _settings: {
-      warnings: true
+      verbose: true
     },
     setup: function(arg$){
       var replace, addListener, _settings, fixStuckDJ, this$ = this;
@@ -4208,8 +4673,8 @@ window.compareVersions = function(a, b){
           } else {
             console.warn("[fixNoAdvance] cannot properly set votes, because optional requirement `votes` is missing");
           }
-          if (this$._settings.warnings && showWarning) {
-            return API.chatLog("[p0ne] fixed DJ not advancing", true);
+          if (this$._settings.verbose && showWarning) {
+            return chatWarn("fixed DJ not advancing", "p0ne");
           }
         }
       });
@@ -4227,7 +4692,7 @@ window.compareVersions = function(a, b){
           This module automatically detects this bug and moves the song to the bottom.
       '''
       _settings:
-          warnings: true
+          verbose: true
       setup: ({addListener}) ->
           addListener API, \socket:reconnected, ->
               _$context.dispatch new LoadEvent(LoadEvent.LOAD)
@@ -4240,7 +4705,7 @@ window.compareVersions = function(a, b){
               if dj?.id == userID and lastPlay.media.id == currentPlaylist.song.id
                   #_$context .trigger \MediaMoveEvent:move
                   ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
-                  API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
+                  chatWarn "fixed playlist not cycling", "p0ne" if @_settings.verbose
           * /
   */
   module('zalgoFix', {
@@ -4251,6 +4716,33 @@ window.compareVersions = function(a, b){
       var css;
       css = arg$.css;
       return css('zalgoFix', '.message {overflow: hidden;}');
+    }
+  });
+  module('fixInHistoryHighlight', {
+    settings: 'fixes',
+    displayName: '☢ Fix InHistory',
+    help: '[WORK IN PROGRESS]\nThis fixes the bug that unless you change to another playlist, some songs don\'t show up as "in history" in your playlist (have red text)',
+    require: ['app'],
+    setup: function(arg$){
+      var addListener;
+      addListener = arg$.addListener;
+      return addListener(API, 'advance', function(d){
+        var list, i$, ref$, len$, row, results$ = [];
+        if (d.media) {
+          list = app.footer.playlist.playlist.media.list;
+          if (list.rowHash[d.media.cid]) {
+            for (i$ = 0, len$ = (ref$ = list.rows).length; i$ < len$; ++i$) {
+              row = ref$[i$];
+              if (row.model.id === d.media.id) {
+                console.log("[fixInHistoryHighlight] fixed", row);
+                row.$el.addClass('in-history');
+                break;
+              }
+            }
+            return results$;
+          }
+        }
+      });
     }
   });
   module('fixWinterThumbnails', {
@@ -4284,7 +4776,7 @@ window.compareVersions = function(a, b){
             window.e = e;
             console.log("[PopoutView:resize] error", e.stack);
             if (!this._window && !warningShown) {
-              API.chatLog("[p0ne] your adblocker is preventing plug.dj from opening the popout chat. You have to make an exception for plug.dj or disable your adblocker. Adblock Plus is known for causing this", true);
+              chatWarn("your adblocker is preventing plug.dj from opening the popout chat. You have to make an exception for plug.dj or disable your adblocker. Adblock Plus is known for causing this", "p0ne");
               warningShown = true;
               return sleep(10000, function(){
                 var warningShown;
@@ -4294,6 +4786,62 @@ window.compareVersions = function(a, b){
           }
         };
       });
+    }
+  });
+  module('chatPolyfixEmoji', {
+    require: ['users'],
+    _settings: {
+      verbose: true
+    },
+    fixedUsernames: {},
+    setup: function(arg$){
+      /*@security no HTML injection should be possible */
+      var addListener, x$, i$, ref$, len$, u, tmp, this$ = this;
+      addListener = arg$.addListener;
+      x$ = document.createElement('canvas').getContext('2d');
+      x$.textBaseline = 'top';
+      x$.font = '32px Arial';
+      x$.fillText('\ud83d\ude03', 0, 0);
+      if (x$.getImageData(16, 16, 1, 1).data[0] !== 0) {
+        console.info("[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied");
+        this.disable();
+      } else {
+        console.info("[chatPolyfixEmoji] emojicons appear to NOT be natively supported. applying fix…");
+        css('chatPolyfixEmoji', '.emoji {position: relative;display: inline-block;}');
+        for (i$ = 0, len$ = (ref$ = (typeof users != 'undefined' && users !== null ? users.models : void 8) || []).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          if ((tmp = emojifyUnicode(u.get('rawun'))) !== u.get('rawun')) {
+            if (this._settings.verbose) {
+              console.log("\t[chatPolyfixEmoji] fixed username from '" + u.get('rawun') + "' to '" + unemojify(tmp) + "'");
+            }
+            u.set('rawun', this.fixedUsernames[u.id] = tmp);
+          }
+        }
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          addListener(_$context, 'user:join', function(u){
+            var tmp;
+            if ((tmp = emojifyUnicode(u.get('rawun'))) !== u.get('rawun')) {
+              if (this$._settings.verbose) {
+                console.info("[chatPolyfixEmoji] fixed username from '" + u.get('rawun') + "' to '" + unemojify(tmp) + "'");
+              }
+              return u.set('rawun', this$.fixedUsernames[u.id] = tmp);
+            }
+          });
+          addListener(_$context, 'chat:plugin', function(msg){
+            var tmp, that;
+            if (msg.uid && msg.message !== (tmp = emojifyUnicode(msg.message))) {
+              if (this$._settings.verbose) {
+                console.log("\t[chatPolyfixEmoji] fixed message '" + msg.message + "' to '" + unemojify(tmp) + "'");
+              }
+              msg.message = tmp;
+            }
+            if (that = this$.fixedUsernames[msg.uid]) {
+              return msg.un = that;
+            }
+          });
+        }
+      }
+      return x$;
     }
   });
   module('disableIntercomTracking', {
@@ -4322,13 +4870,968 @@ window.compareVersions = function(a, b){
       }
     }
   });
+  /*@source p0ne.stream.ls */
+  /**
+   * Modules for Audio-Only stream and stream settings for plug_p0ne
+   *
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @license MIT License
+   * @copyright (c) 2015 J.-T. Brinkmann
+  */
+  /* This modules includes the following things:
+      - audio steam
+      - a stream-settings field in the playback-controls (replacing the HD-button)
+      - a blocked-video-unblocker
+     These are all conbined into this one module to avoid conflicts
+     and due to them sharing a lot of code
+  */
+  module('streamSettings', {
+    settings: 'dev',
+    displayName: 'Stream-Settings',
+    require: ['app', 'currentMedia', 'database', '_$context'],
+    optional: ['database'],
+    audioOnly: false,
+    _settings: {
+      audioOnly: false
+    },
+    setup: function(arg$, streamSettings, arg1$, m_){
+      var addListener, replace, revert, replaceListener, $create, css, $playback, $playbackContainer, $el, playback, $btn, $label, $icons, disabledBtns, Player, audio, unblocker, i$, ref$, youtube, sc, noDJ, syncingPlayer, streamOff, snoozed, player, getPlayer, players, this$ = this;
+      addListener = arg$.addListener, replace = arg$.replace, revert = arg$.revert, replaceListener = arg$.replaceListener, $create = arg$.$create, css = arg$.css;
+      css('streamSettings', ".icon-stream-video {background: " + getIcon('icon-chat-sound-on').background + ";}.icon-stream-audio {background: " + getIcon('icon-chat-room').background + ";}.icon-stream-off {background: " + getIcon('icon-chat-sound-off').background + ";}");
+      $playback = $('#playback');
+      $playbackContainer = $('#playback-container');
+      $el = $create('<div class=p0ne-stream-select>');
+      playback = {};
+      if (m_ != null && m_._settings) {
+        this._settings.audioOnly = m_._settings.audioOnly;
+      }
+      $('#playback-controls').removeClass('no-hd snoozed');
+      replace(Playback.prototype, 'onHDClick', function(){
+        return $.noop;
+      });
+      $btn = $('#playback .hd').addClass('p0ne-stream-select');
+      replace($btn[0], 'innerHTML', function(){
+        return '<div class="box"><span id=p0ne-stream-label>Stream: Video</span><div class="p0ne-stream-buttons"><i class="icon icon-stream-video enabled"></i> <i class="icon icon-stream-audio enabled"></i> <i class="icon icon-stream-off enabled"></i> <div class="p0ne-stream-fancy"></div></div></div>';
+      });
+      this.$label = $label = $btn.find('#p0ne-stream-label');
+      $icons = $btn.find('.icon');
+      disabledBtns = {};
+      function disableBtn(mode){
+        var $icon;
+        disabledBtns[mode] = true;
+        return $icon = $btn.find(".icon-stream-" + mode).removeClass('enabled');
+      }
+      addListener(API, 'advance', function(d){
+        var mode;
+        if (d.media) {
+          for (mode in disabledBtns) {
+            $btn.find(".icon-stream-" + mode).addClass('enabled');
+            delete disabledBtns[mode];
+          }
+          if (d.media.format === 2) {
+            return disableBtn('video');
+          }
+        }
+      });
+      $btn.find('.icon-stream-video').on('click', function(){
+        if (!disabledBtns.video) {
+          database.settings.streamDisabled = false;
+          this$._settings.audioOnly = false;
+          changeStream('video');
+          return refresh();
+        }
+      });
+      $btn.find('.icon-stream-audio').on('click', function(){
+        var ref$;
+        if (!disabledBtns.audio) {
+          database.settings.streamDisabled = false;
+          if (2 !== ((ref$ = currentMedia.get('media')) != null ? ref$.get('format') : void 8)) {
+            this$._settings.audioOnly = true;
+          }
+          changeStream('audio');
+          return refresh();
+        }
+      });
+      $btn.find('.icon-stream-off').on('click', function(){
+        database.settings.streamDisabled = true;
+        changeStream('off');
+        return refresh();
+      });
+      Player = {
+        enable: function(){
+          var media;
+          console.log("[StreamSettings] loading " + this.name + " stream");
+          media = currentMedia.get('media');
+          if (this.media === media && this === player) {
+            return this.start();
+          } else {
+            this.media = media;
+            return this.getURL(media);
+          }
+        },
+        getURL: function(){
+          throw Error('unimplemented');
+        },
+        start: function(){
+          this.seek();
+          this.src = this.media.src;
+          this.load();
+          this.updateVolume(currentMedia.get('volume'));
+          return $playbackContainer.append(this);
+        },
+        disable: function(){
+          this.src = "";
+          return $playbackContainer.empty();
+        },
+        seek: function(){
+          var startTime;
+          startTime = currentMedia.get('elapsed');
+          if (player !== this) {} else if (startTime > 4 && currentMedia.get('remaining') > 4) {
+            this.seekTo(startTime);
+            return console.log("[StreamSettings] " + this.name + " seeking…", mediaTime(startTime));
+          } else {
+            return this.play();
+          }
+        },
+        seekTo: function(t){
+          return this.currentTime = t;
+        },
+        updateVolume: function(vol){
+          return this.volume = vol / 100;
+        }
+      };
+      audio = (m_ != null ? m_.audio : void 8) || new Audio();
+      unblocker = (m_ != null ? m_.audio : void 8) || document.createElement('video');
+      $([unblocker, audio]).addClass('media');
+      for (i$ in ref$ = {
+        audio: audio,
+        unblocker: unblocker
+      }) {
+        (fn$.call(this, i$, ref$[i$]));
+      }
+      audio.name = "Audio-Only";
+      audio.mode = 'audio';
+      audio.getURL = function(media){
+        var this$ = this;
+        return mediaDownload(media, true).then(function(d){
+          console.log("[audioStream] found url. Buffering…", d);
+          audio.media = media;
+          media.src = d.preferredDownload.url;
+          return this$.enable();
+        }).fail(function(err){
+          console.error("[audioStream] couldn't get audio-only stream", err);
+          chatWarn("couldn't load audio-only stream, using video instead", "audioStream", true);
+          media.audioFailed = true;
+          refresh();
+          disableBtn('audio');
+          $playback.addClass('p0ne-stream-audio-failed');
+          return API.once('advance', function(){
+            return $playback.addClass('p0ne-stream-audio-failed');
+          });
+        });
+      };
+      unblocker.name = "Youtube (unblocked)";
+      unblocker.mode = 'video';
+      unblocker.getURL = function(media){
+        var blocked, this$ = this;
+        console.log("[YT Unblocker] receiving video URL", media);
+        blocked = media.get('blocked');
+        return mediaDownload(media).then(function(d){
+          media.src = d.preferredDownload.url;
+          console.log("[YT Unblocker] got video URL", media.src);
+          return this$.start();
+        }).fail(function(){
+          if (blocked === 1) {
+            chatWarn("failed, trying again…", "YT Unblocker");
+          } else {
+            chatWarn("failed to unblock video :(", "YT Unblocker");
+            disableBtn('video');
+          }
+          media.set('blocked', blocked++);
+          return refresh();
+        });
+      };
+      youtube = (ref$ = clone$(Player), ref$.name = "Video", ref$.mode = 'video', ref$.enable = function(media){
+        var startTime;
+        this.media = media;
+        console.log("[StreamSettings] loading Youtube stream");
+        startTime = currentMedia.get('elapsed');
+        playback.buffering = false;
+        playback.yto = {
+          id: media.get('cid'),
+          volume: currentMedia.get('volume'),
+          seek: startTime < 4 ? 0 : startTime,
+          quality: database.hdVideo ? 'hd720' : ""
+        };
+        return $("<iframe id=yt-frame frameborder=0 src='//plgyte.appspot.com/yt5.html'>").load(playback.ytFrameLoadedBind).appendTo(playback.$container);
+      }, ref$.disable = function(){
+        return $playbackContainer.empty();
+      }, ref$.updateVolume = function(vol){
+        return playback.tx("setVolume=" + vol);
+      }, ref$);
+      sc = (ref$ = clone$(Player), ref$.name = "SoundCloud", ref$.mode = 'audio', ref$.enable = function(media){
+        var this$ = this;
+        this.media = media;
+        console.log("[StreamSettings] loading Soundcloud audio stream");
+        if (soundcloud.r) {
+          if (soundcloud.sc) {
+            playback.$container.empty().append("<iframe id=yt-frame frameborder=0 src='" + playback.visualizers.random() + "'></iframe>");
+            return soundcloud.sc.whenStreamingReady(function(){
+              var startTime;
+              if (media === currentMedia.get('media')) {
+                startTime = currentMedia.get('elapsed');
+                return playback.player = soundcloud.sc.stream(media.get('cid'), {
+                  autoPlay: true,
+                  volume: currentMedia.get('volume'),
+                  position: startTime < 4
+                    ? 0
+                    : startTime * 1000,
+                  onload: playback.scOnLoadBind,
+                  whileloading: playback.scLoadingBind,
+                  onfinish: playback.playbackCompleteBind,
+                  ontimeout: playback.scTimeoutBind
+                });
+              }
+            });
+          } else {
+            return playback.$container.append($('<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>').css({
+              position: 'absolute',
+              left: 46
+            }));
+          }
+        } else {
+          _$context.off('sc:ready');
+          return _$context.once('sc:ready', function(){
+            soundcloud.updateVolume(currentMedia.get('volume'));
+            if (media === currentMedia.get('media')) {
+              return playback.onSCReady();
+            } else {
+              return console.warn("[StreamSettings] Soundcloud: a different song already started playing");
+            }
+          });
+        }
+      }, ref$.disable = function(){
+        var ref$;
+        if ((ref$ = playback.player) != null) {
+          ref$.stop().destruct();
+        }
+        playback.buffering = false;
+        return $playbackContainer.empty();
+      }, ref$.updateVolume = function(vol){
+        return playback.player.setVolume(vol);
+      }, ref$);
+      noDJ = (ref$ = clone$(Player), ref$.name = "No DJ", ref$.mode = 'off', ref$.enable = function(){
+        playback.$noDJ.show();
+        return this.$controls.hide();
+      }, ref$.disable = function(){
+        return playback.$noDJ.hide();
+      }, ref$.updateVolume = $.noop, ref$);
+      syncingPlayer = (ref$ = clone$(Player), ref$.name = "waiting…", ref$.mode = 'off', ref$.enable = function(){
+        return $playbackContainer.append("<iframe id=yt-frame frameborder=0 src='" + m.syncing + "'></iframe>");
+      }, ref$.updateVolume = $.noop, ref$);
+      streamOff = {
+        name: "Stream OFF",
+        mode: 'off'
+      };
+      snoozed = {
+        name: "Snoozed",
+        mode: 'off'
+      };
+      player = [youtube, sc][currentMedia.get('media').get('format') - 1];
+      if (snoozed) {
+        changeStream('off', "Snoozed");
+      } else {
+        changeStream(player.mode, player.name);
+      }
+      out$.getPlayer = getPlayer = function(){
+        return player;
+      };
+      out$.players = players = {
+        audio: audio,
+        unblocker: unblocker,
+        youtube: youtube,
+        sc: sc,
+        noDJ: noDJ,
+        syncingPlayer: syncingPlayer
+      };
+      replace(Playback.prototype, 'onVolumeChange', function(){
+        return function(arg$, vol){
+          return player.updateVolume(vol);
+        };
+      });
+      replace(Playback.prototype, 'onMediaChange', function(oMC_){
+        return function(){
+          var media, oldPlayer, this$ = this;
+          this.reset();
+          this.$controls.removeClass('snoozed');
+          media = currentMedia.get('media');
+          if (media) {
+            if (database.settings.streamDisabled) {
+              changeStream('off', "Stream: OFF");
+              return;
+            }
+            this.ignoreComplete = true;
+            sleep(1000, function(){
+              return this$.resetIgnoreComplete();
+            });
+            oldPlayer = player;
+            if (media.get('format') === 1) {
+              /*== AudioOnly Stream (YT) ==*/
+              if (streamSettings._settings.audioOnly && !media.audioFailed) {
+                player = audio;
+              } else if (media.blocked === 3) {
+                player = syncingPlayer;
+              } else if (media.blocked) {
+                player = unblocker;
+              } else {
+                player = youtube;
+              }
+            } else if (media.get('format') === 2) {
+              disableBtn('video');
+              player = sc;
+            }
+          } else {
+            player = noDJ;
+          }
+          changeStream(player.mode);
+          return player.enable(media);
+        };
+      });
+      replace(Playback.prototype, 'stop', function(){
+        return function(){
+          return player.disable();
+        };
+      });
+      replace(Playback.prototype, 'reset', function(r_){
+        return function(){
+          if (database.settings.streamDisabled) {
+            changeStream('off', "Stream: OFF");
+          }
+          player.disable();
+          return r_.apply(this, arguments);
+        };
+      });
+      replace(Playback.prototype, 'onYTPlayerError', function(){
+        return function(e){
+          console.log("[streamSettings] Youtube Playback Error", e);
+          if (!database.settings.streamDisabled && !streamSettings._settings.audioOnly) {
+            return this.unblockYT();
+          }
+        };
+      });
+      replace(Playback.prototype, 'onPlaybackEnter', function(){
+        return function(){
+          return this.$controls.show();
+        };
+      });
+      replace(Playback.prototype, 'onSnoozeClick', function(){
+        return function(){
+          if (!isSnoozed()) {
+            changeStream('off', "Snoozed");
+            return this.reset();
+          }
+        };
+      });
+      /*replace Playback::, \onRefreshClick, -> return ->
+          if currentMedia.get(\media) and restr = currentMedia.get \restricted
+              currentMedia.set do
+                  media: restr
+                  restricted: void
+          else
+              @onMediaChange!*/
+      if (app != null) {
+        playback = app.room.playback;
+        onGotPlayback(playback);
+      } else {
+        replace(Playback.prototype, 'onRemainingChange', function(oMC){
+          return function(){
+            this$.playback = playback = this$;
+            oMC.apply(this$, arguments);
+            return onGotPlayback(playback);
+          };
+        });
+      }
+      if (this._settings.audioOnly) {
+        refresh();
+      }
+      function onGotPlayback(playback){
+        revert(Playback.prototype, 'onRemainingChange');
+        replaceListener(_$context, 'change:streamDisabled', Playback, function(){
+          return bind$(playback, 'onMediaChange');
+        });
+        replaceListener(currentMedia, 'change:media', Playback, function(){
+          return bind$(playback, 'onMediaChange');
+        });
+        replaceListener(currentMedia, 'change:volume', Playback, function(){
+          return bind$(playback, 'onVolumeChange');
+        });
+        $playback.off('mouseenter').on('mouseenter', function(){
+          return playback.onPlaybackEnter();
+        });
+        return $playback.find('.snooze').off('click').on('click', function(){
+          return playback.onSnoozeClick();
+        });
+      }
+      function changeStream(mode, name){
+        console.log("[streamSettings] => stream-" + mode);
+        $label.text(name || player.name);
+        $playback.removeClass().addClass("p0ne-stream-" + mode);
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          _$context.trigger('p0ne:changeMode');
+        }
+        return API.trigger('p0ne:changeMode', mode, name);
+      }
+      return this.unblockYT = function(){
+        var ref$;
+        if ((ref$ = currentMedia.get('media')) != null) {
+          ref$.blocked = true;
+        }
+        return refresh();
+      };
+      function fn$(k, p){
+        importAll$(p, Player);
+        p.addEventListener('canplay', function(){
+          var diff;
+          console.log("[" + k + " stream] finished buffering");
+          if (currentMedia.get('media') === player.media && player === this) {
+            diff = currentMedia.get('elapsed') - player.currentTime;
+            if (diff > 4 && currentMedia.get('remaining') > 4) {
+              return this.seek();
+            } else {
+              player.play();
+              return console.log("[" + k + " stream] playing song (diff " + humanTime(diff, true) + ")");
+            }
+          } else {
+            return console.warn("[" + k + " stream] next song already started");
+          }
+        });
+      }
+    },
+    disable: function(){
+      var $playback, this$ = this;
+      window.removeEventListener('message', this.onRestricted);
+      $playback = $('#playback').removeClass();
+      return sleep(0, function(){
+        if (!isSnoozed()) {
+          refresh();
+        }
+        if (this$.Playback) {
+          return $playback.off('mouseenter').on('mouseenter', bind$(this$.playback, 'onPlaybackEnter'));
+        }
+      });
+    }
+  });
+  /*@source p0ne.chat-commands.ls */
+  /**
+   * plug_p0ne ChatCommands
+   * Basic chat commands are defined here. Trigger them on plug.dj by writing "/commandname" in the chat
+   * e.g. "/move @Brinkie Pie 2" to move the user "Brinkie Pie" to the 2nd position in the waitlist
+   *
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @license MIT License
+   * @copyright (c) 2015 J.-T. Brinkmann
+   */
+  /*####################################
+  #           CHAT COMMANDS            #
+  ####################################*/
+  module('chatCommands', {
+    optional: ['currentMedia'],
+    setup: function(arg$){
+      var addListener, this$ = this;
+      addListener = arg$.addListener;
+      addListener(API, 'chatCommand', function(c){
+        var ref$, key$, ref1$;
+        return typeof (ref$ = this$._commands)[key$ = (ref1$ = /^\/(\w+)/.exec(c)) != null ? ref1$[1] : void 8] == 'function' ? ref$[key$](c) : void 8;
+      });
+      return this.updateCommands();
+    },
+    updateCommands: function(){
+      var k, ref$, v, lresult$, i$, ref1$, len$, results$ = [];
+      this._commands = {};
+      for (k in ref$ = this.commands) {
+        v = ref$[k];
+        lresult$ = [];
+        this._commands[k] = v.callback;
+        for (i$ = 0, len$ = (ref1$ = v.aliases || []).length; i$ < len$; ++i$) {
+          k = ref1$[i$];
+          if (v.moderation) {
+            lresult$.push(this._commands[k] = fn$);
+          } else {
+            lresult$.push(this._commands[k] = v.callback);
+          }
+        }
+        results$.push(lresult$);
+      }
+      return results$;
+      function fn$(c){
+        if (user.isStaff) {
+          return v.callback(c);
+        }
+      }
+    },
+    parseUserArg: function(str){
+      var id, user;
+      if (/[\s\d]+/.test(str)) {
+        return (function(){
+          var i$, ref$, len$, results$ = [];
+          for (i$ = 0, len$ = (ref$ = str.split(/\s+/)).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            if (+id) {
+              results$.push(+id);
+            }
+          }
+          return results$;
+        }());
+      } else {
+        return (function(){
+          var i$, ref$, len$, results$ = [];
+          for (i$ = 0, len$ = (ref$ = getMentions(str)).length; i$ < len$; ++i$) {
+            user = ref$[i$];
+            results$.push(user.id);
+          }
+          return results$;
+        }());
+      }
+    },
+    commands: {
+      help: {
+        aliases: ['commands'],
+        description: "show this list of commands",
+        callback: function(){
+          var res, k, ref$, command, ref1$, aliases;
+          res = "<div class='msg text'>";
+          for (k in ref$ = chatCommands.commands) {
+            command = ref$[k];
+            if ((ref1$ = command.aliases) != null && ref1$.length) {
+              aliases = "aliases: " + humanList(command.aliases);
+            } else {
+              aliases = '';
+            }
+            res += "<div class='p0ne-help-command' alt='" + aliases + "'><b>/" + k + "</b> " + (command.params || '') + " - " + command.description + "</div>";
+          }
+          res += "</div>";
+          return appendChat($("<div class='cm update p0ne-help'>").html(res));
+        }
+      },
+      woot: {
+        aliases: ['+1'],
+        description: "<b>woot</b> the current song",
+        callback: woot
+      },
+      meh: {
+        aliases: ['-1'],
+        description: "<b>meh</b> the current song",
+        callback: meh
+      },
+      grab: {
+        aliases: ['curate'],
+        parameters: " (playlist)",
+        description: "<b>grab</b> the current song into a playlist (default is current playlist)",
+        callback: function(c){
+          var that;
+          if (that = c.replace(/^\/\w+\s+/, '')) {
+            return grabMedia(that);
+          } else {
+            return grabMedia();
+          }
+        }
+      }
+      /*away:
+          aliases: <[ afk ]>
+          description: "change your status to <b>away</b>"
+          callback: ->
+              API.setStatus 1
+      busy:
+          aliases: <[ work working ]>
+          description: "change your status to <b>busy</b>"
+          callback:  ->
+              API.setStatus 2
+      gaming:
+          aliases: <[ game ingame ]>
+          description: "change your status to <b>gaming</b>"
+          callback:  ->
+              API.setStatus 3*/,
+      join: {
+        description: "join the waitlist",
+        callback: join
+      },
+      leave: {
+        description: "leave the waitlist",
+        callback: leave
+      },
+      stream: {
+        parameters: " [on|off]",
+        description: "enable/disable the stream (just '/stream' toggles it)",
+        callback: function(){
+          if (typeof currentMedia != 'undefined' && currentMedia !== null) {
+            return stream(c.has('on' || !(c.has('off') || 'toggle')));
+          } else {
+            return chatWarn("couldn't load required module for enabling/disabling the stream.");
+          }
+        }
+      },
+      snooze: {
+        description: "snoozes the current song",
+        callback: snooze
+      },
+      mute: {
+        description: "mutes the audio",
+        callback: mute
+      },
+      unmute: {
+        description: "unmutes the audio",
+        callback: unmute
+      },
+      muteonce: {
+        aliases: ['muteonce'],
+        description: "mutes the current song",
+        callback: muteonce
+      },
+      automute: {
+        parameters: " [add|remove]",
+        description: "adds/removes this song from the automute list",
+        callback: function(){
+          if (API.getVolume() !== 0) {
+            muteonce();
+          }
+          if (typeof automute != 'undefined' && automute !== null) {
+            return automute(c.hasAny('add' || !c.hasAny('remove' || 'toggle')));
+          } else {
+            return chatWarn("automute is not yet implemented");
+          }
+        }
+      },
+      popout: {
+        aliases: ['popup'],
+        description: "opens/closes the chat in the popout window",
+        callback: function(){
+          if (typeof PopoutView != 'undefined' && PopoutView !== null) {
+            if (PopoutView._window) {
+              return PopoutView.close();
+            } else {
+              return PopoutView.show();
+            }
+          } else {
+            return chatWarn("sorry, the command currently doesn't work");
+          }
+        }
+      },
+      reconnect: {
+        aliases: ['reconnectSocket'],
+        description: "forces the socket to reconnect. This might solve chat issues",
+        callback: function(){
+          if (typeof _$context != 'undefined' && _$context !== null) {
+            _$context.once('sjs:reconnected', function(){
+              return chatWarn("socket reconnected");
+            });
+          }
+          return reconnectSocket();
+        }
+      },
+      rejoin: {
+        aliases: ['rejoinRoom'],
+        description: "forces a rejoin to the room. This might solve some issues, but it might also kick you from the waitlist",
+        callback: function(){
+          if (typeof _$context != 'undefined' && _$context !== null) {
+            _$context.once('room:joined', function(){
+              return chatWarn("room rejoined");
+            });
+          }
+          return rejoinRoom();
+        }
+      },
+      ban: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(user){
+          var i$, ref$, len$, id, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            results$.push(API.modBan(id, 's', 1));
+          }
+          return results$;
+        }
+      },
+      unban: {
+        aliases: ['pardon', 'revive'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(user){
+          var i$, ref$, len$, id, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            results$.push(API.moderateUnbanUser(id));
+          }
+          return results$;
+        }
+      },
+      move: {
+        parameters: " @username position",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var wl, pos, users, id, error;
+          wl = API.getWaitList();
+          c = c.replace(/(\d+)\s*$/, function(arg$, d){
+            pos = +d;
+            return '';
+          });
+          if (0 < pos && pos < 51) {
+            if (users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))) {
+              if (!(id = users[0]) || !getUser(id)) {
+                chatWarn("The user doesn't seem to be in the room");
+              } else {
+                moveDJ(id, pos);
+              }
+              return;
+            } else {
+              error = "requires you to specify a user to be moved";
+            }
+          } else {
+            error = "requires a position to move the user to";
+          }
+          return chatWarn(error + "<br>e.g. /move @" + API.getUsers().random().rawun + " " + (~~(Math.random() * wl.length) + 1), '/move', true);
+        }
+      },
+      moveTop: {
+        aliases: ['push'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var users, i$, i, results$ = [];
+          users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''));
+          for (i$ = users.length - 1; i$ <= 0; ++i$) {
+            i = i$;
+            results$.push(moveDJ(i, 1));
+          }
+          return results$;
+        }
+      }
+      /*moveUp:
+          aliases: <[  ]>
+          parameters: " @username(s) (how much)"
+          description: ""
+          moderation: true
+          callback: (user) ->
+              res = []; djsToAdd = []; l=0
+              wl = API.getWaitList!
+              # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
+              for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                  for u, pos in wl when u.id == id
+                      if pos == 0
+                          skipFirst = true
+                      else
+                          res[pos - 1] = u.id
+                      break
+                  else
+                      djsToAdd[l++] = id
+              console.log "[/move] starting to move…", res, djsToAdd
+              pos = -1; l = res.length
+              do helper = ->
+                  id = res[++pos]
+                  if id
+                      if not skipFirst
+                          console.log "[/move]\tmoving #id to #{pos + 1}/#{wl.length}"
+                          moveDJ id, pos
+                              .then helper
+                              .fail ->
+                                  chatWarn "couldn't /moveup #{if getUser(id) then that.username else id}"
+                                  helper!
+                      else
+                          helper!
+                  else if pos < l
+                      skipFirst := false
+                      helper!
+                  else
+                      for id in djsToAdd
+                          addDJ id
+                      console.log "[/move] done"
+      moveDown:
+          aliases: <[  ]>
+          parameters: " @username(s) (how much)"
+          description: ""
+          moderation: true
+          callback: ->
+              ...
+      */,
+      addDJ: {
+        aliases: ['add'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var users, i, helper;
+          users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''));
+          i = 0;
+          return (helper = function(){
+            if (users[i]) {
+              return addDJ(users[i], helper);
+            }
+          })();
+        }
+      },
+      removeDJ: {
+        aliases: ['remove'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            results$.push(API.moderateRemoveDJ(id));
+          }
+          return results$;
+        }
+      },
+      skip: {
+        aliases: ['forceSkip', 's'],
+        description: "",
+        moderation: true,
+        callback: API.moderateForceSkip
+      },
+      promote: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, that, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            if (that = getUser(id)) {
+              results$.push(API.moderateSetRole(id, that.role + 1));
+            }
+          }
+          return results$;
+        }
+      },
+      demote: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, user.role - 1));
+            }
+          }
+          return results$;
+        }
+      },
+      destaff: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 0));
+            }
+          }
+          return results$;
+        }
+      },
+      rdj: {
+        aliases: ['resident', 'residentDJ', 'dj'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 1));
+            }
+          }
+          return results$;
+        }
+      },
+      bouncer: {
+        aliases: ['helper', 'temp', 'staff'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 2));
+            }
+          }
+          return results$;
+        }
+      },
+      manager: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 3));
+            }
+          }
+          return results$;
+        }
+      },
+      cohost: {
+        aliases: ['co-host', 'co'],
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 4));
+            }
+          }
+          return results$;
+        }
+      },
+      host: {
+        parameters: " @username(s)",
+        description: "",
+        moderation: true,
+        callback: function(c){
+          var i$, ref$, len$, id, user, results$ = [];
+          for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            id = ref$[i$];
+            user = getUser(id);
+            if ((user != null ? user.role : void 8) > 0) {
+              results$.push(API.moderateSetRole(id, 5));
+            }
+          }
+          return results$;
+        }
+      }
+    }
+  });
   /*@source p0ne.base.ls */
   /**
    * Base plug_p0ne modules
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   /*####################################
   #           DISABLE/STATUS           #
@@ -4339,17 +5842,20 @@ window.compareVersions = function(a, b){
       var addListener, this$ = this;
       addListener = arg$.addListener;
       return addListener(API, 'chat', function(data){
-        var enabledModules, i$, ref$, len$, m, response;
+        var enabledModules, disabledModules, i$, ref$, len$, m, module, response;
         if (data.message.has("!disable") && data.message.has("@" + user.username) && API.hasPermission(data.uid, API.ROLE.BOUNCER)) {
           console.warn("[DISABLE] '" + status + "'");
           enabledModules = [];
+          disabledModules = [];
           for (i$ = 0, len$ = (ref$ = this$.modules).length; i$ < len$; ++i$) {
             m = ref$[i$];
-            if (window[m] && !window[m].disabled) {
-              enabledModules[enabledModules.length] = m;
-              window[m].disable();
-            } else {
-              disabledModules[disabledModules.length] = m;
+            if (module = window[m]) {
+              if (module && !module.disabled) {
+                enabledModules[enabledModules.length] = module.displayName || module.name;
+                module.disable();
+              } else {
+                disabledModules[disabledModules.length] = module.displayName || module.name;
+              }
             }
           }
           response = data.un + " - ";
@@ -4357,7 +5863,7 @@ window.compareVersions = function(a, b){
             response += "disabled " + humanList(enabledModules) + ".";
           }
           if (disabledModules.length) {
-            response += " " + humanList(enabledModules) + " were already disabled.";
+            response += " " + humanList(disabledModules) + " " + (disabledModules.length ? 'was' : 'were') + " already disabled.";
           }
           return API.sendChat(response);
         }
@@ -4414,19 +5920,6 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
-  #             YELLOW MOD             #
-  ####################################*/
-  module('yellowMod', {
-    settings: 'chat',
-    displayName: 'Have yellow name as mod',
-    setup: function(arg$){
-      var css, id;
-      css = arg$.css;
-      id = API.getUser().id;
-      return css('yellowMod', "#chat .fromID-" + id + " .un,.user[data-uid='" + id + "'] .name > span {color: #ffdd6f !important;}");
-    }
-  });
-  /*####################################
   #         08/15 PLUG SCRIPTS         #
   ####################################*/
   module('autojoin', {
@@ -4435,11 +5928,21 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var addListener;
       addListener = arg$.addListener;
-      return addListener(API, 'advance', function(){
-        if (join()) {
-          return console.log(getTime() + " [autojoin] joined waitlist");
+      addListener(API, 'advance', function(d){
+        var ref$;
+        if (((ref$ = d.dj) != null ? ref$.id : void 8) === userID) {
+          return addListener('once', API, 'advance', function(){
+            if (join()) {
+              return console.log(getTime() + " [autojoin] joined waitlist");
+            } else {
+              return console.error(getTime() + " [autojoin] failed to join waitlist");
+            }
+          });
         }
-      })();
+      });
+      if (join()) {
+        return console.log(getTime() + " [autojoin] init: joined waitlist");
+      }
     }
   });
   module('friendslistUserPopup', {
@@ -4488,7 +5991,7 @@ window.compareVersions = function(a, b){
       var addListener;
       addListener = arg$.addListener;
       return addListener(API, 'advance', function(d){
-        if (d) {
+        if (d.media) {
           return $('#now-playing-media').prop('title', d.media.author + " - " + d.media.title);
         } else {
           return $('#now-playing-media').prop('title', null);
@@ -4510,8 +6013,9 @@ window.compareVersions = function(a, b){
       settings = this._settings;
       return replace(RoomUserRow.prototype, 'vote', function(){
         return function(){
-          var vote, user, ref$, this$ = this;
-          if (this.model.id === API.getDJ()) {
+          var dj, vote, user, ref$, that, this$ = this;
+          dj = API.getDJ();
+          if (this.model.id === dj) {
             this.$icon.addClass('icon-woot');
           }
           if (this.model.get('grab')) {
@@ -4522,7 +6026,7 @@ window.compareVersions = function(a, b){
               vote = 0;
             }
           }
-          if (this.model.id === API.getDJ().id) {
+          if (dj && this.model.id === dj.id) {
             if (vote) {
               if (!this.$djIcon) {
                 this.$djIcon = $('<i class="icon icon-current-dj" style="right: 35px">').appendTo(this.$el);
@@ -4540,17 +6044,20 @@ window.compareVersions = function(a, b){
             this.$icon || (this.$icon = $('<i>'));
             this.$icon.removeClass().addClass('icon').appendTo(this.$el);
             if (vote === -1 && API.getUser().role > 0 || settings.forceMehIcon) {
-              return this.$icon.addClass('icon-meh');
+              this.$icon.addClass('icon-meh');
             } else if (vote === 'grab') {
-              return this.$icon.addClass('icon-grab');
+              this.$icon.addClass('icon-grab');
             } else if (vote === 'dj') {
-              return this.$icon.addClass('icon-current-dj');
+              this.$icon.addClass('icon-current-dj');
             } else {
-              return this.$icon.addClass('icon-woot');
+              this.$icon.addClass('icon-woot');
             }
           } else if (this.$icon) {
             this.$icon.remove();
-            return ref$ = this.$icon, delete this.$icon, ref$;
+            delete this.$icon;
+          }
+          if (that = typeof chatPolyfixEmoji != 'undefined' && chatPolyfixEmoji !== null ? chatPolyfixEmoji.fixedUsernames[this.model.id] : void 8) {
+            return this.$el.find('.name').html(that);
           }
         };
       });
@@ -4559,6 +6066,7 @@ window.compareVersions = function(a, b){
   /*####################################
   #        DBLCLICK to @MENTION        #
   ####################################*/
+  /*note: this is also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
   module('chatDblclick2Mention', {
     require: ['chat'],
     settings: 'chat',
@@ -4576,18 +6084,18 @@ window.compareVersions = function(a, b){
               try {
                 module.timer = 0;
                 $this = $(this$);
-                if (r = $this.closest('.cm').children('.badge-box').data('uid') || (i = getUserInternal($this.text())).id) {
+                if (r = $this.closest('.cm').children('.badge-box').data('uid') || $this.data('uid') || (i = getUserInternal($this.text())).id) {
                   pos = {
                     x: chat.getPosX(),
                     y: $this.offset().top
                   };
-                  if (i = getUserInternal(r)) {
+                  if (i || (i = getUserInternal(r))) {
                     return chat.onShowChatUser(i, pos);
                   } else {
                     return chat.getExternalUser(r, pos, chat.showChatUserBind);
                   }
                 } else {
-                  return console.warn("[DblCLick username to Mention] couldn't get userID", this$);
+                  return console.warn("[dblclick2Mention] couldn't get userID", this$);
                 }
               } catch (e$) {
                 err = e$;
@@ -4598,7 +6106,7 @@ window.compareVersions = function(a, b){
         } else {
           clearTimeout(module.timer);
           module.timer = 0;
-          chat.onInputMention(e.target.textContent);
+          ((typeof PopoutView != 'undefined' && PopoutView !== null ? PopoutView.chat : void 8) != null || chat).onInputMention(e.target.textContent);
         }
         e.stopPropagation();
         return e.preventDefault();
@@ -4611,7 +6119,8 @@ window.compareVersions = function(a, b){
         return newFromClick;
       });
       $cm().find('.un').off('click', this.fC_).on('click', newFromClick);
-      return addListener(chatDomEvents, 'click', '.un', newFromClick);
+      addListener(chatDomEvents, 'click', '.un', newFromClick);
+      return addListener($('#waitlist'), 'click', '.name', newFromClick);
     },
     disable: function(){
       var cm;
@@ -4623,155 +6132,88 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
-  #           CHAT COMMANDS            #
-  ####################################*/
-  module('chatCommands', {
-    optional: ['currentMedia'],
-    setup: function(arg$){
-      var addListener, this$ = this;
-      addListener = arg$.addListener;
-      addListener(API, 'chatCommand', function(c){
-        var ref$, key$, ref1$;
-        return typeof (ref$ = this$._commands)[key$ = (ref1$ = /^\/(\w+)/.exec(c)) != null ? ref1$[1] : void 8] == 'function' ? ref$[key$](c) : void 8;
-      });
-      return this.updateCommands();
-    },
-    updateCommands: function(){
-      var k, ref$, v, lresult$, i$, ref1$, len$, results$ = [];
-      this._commands = {};
-      for (k in ref$ = this.commands) {
-        v = ref$[k];
-        lresult$ = [];
-        this._commands[k] = v.callback;
-        for (i$ = 0, len$ = (ref1$ = v.aliases || []).length; i$ < len$; ++i$) {
-          k = ref1$[i$];
-          lresult$.push(this._commands[k] = v.callback);
-        }
-        results$.push(lresult$);
-      }
-      return results$;
-    },
-    commands: {
-      help: {
-        aliases: ['commands'],
-        description: "show this list of commands",
-        callback: function(){
-          var res, k, ref$, command, ref1$, aliases;
-          res = "";
-          for (k in ref$ = chatCommands.commands) {
-            command = ref$[k];
-            if ((ref1$ = command.aliases) != null && ref1$.length) {
-              aliases = "aliases: " + humanList(command.aliases);
-            } else {
-              aliases = '';
-            }
-            res += "<div class='p0ne-help-command' alt='" + aliases + "'><b>/" + k + "</b> " + (command.params || '') + " - " + command.description + "</div>";
-          }
-          return appendChat($("<div class=p0ne-help>").html(res));
-        }
-      },
-      available: {
-        aliases: ['avail'],
-        description: "change your status to <b>available</b>",
-        callback: function(){
-          return API.setStatus(0);
-        }
-      },
-      away: {
-        aliases: ['afk'],
-        description: "change your status to <b>away</b>",
-        callback: function(){
-          return API.setStatus(1);
-        }
-      },
-      busy: {
-        aliases: ['work', 'working'],
-        description: "change your status to <b>busy</b>",
-        callback: function(){
-          return API.setStatus(2);
-        }
-      },
-      gaming: {
-        aliases: ['game', 'ingame'],
-        description: "change your status to <b>gaming</b>",
-        callback: function(){
-          return API.setStatus(3);
-        }
-      },
-      join: {
-        description: "join the waitlist",
-        callback: join
-      },
-      leave: {
-        description: "leave the waitlist",
-        callback: leave
-      },
-      stream: {
-        parameters: " [on|off]",
-        description: "enable/disable the stream (just '/stream' toggles it)",
-        callback: function(){
-          if (typeof currentMedia != 'undefined' && currentMedia !== null) {
-            return stream(c.has('on' || !c.has('off' || 'toggle')));
-          } else {
-            return API.chatLog("couldn't load required module for enabling/disabling the stream.", true);
-          }
-        }
-      },
-      snooze: {
-        description: "snoozes the current song",
-        callback: snooze
-      },
-      mute: {
-        description: "mutes the audio",
-        callback: mute
-      },
-      unmute: {
-        description: "unmutes the audio",
-        callback: unmute
-      },
-      muteonce: {
-        aliases: ['muteonce'],
-        description: "mutes the current song",
-        callback: muteonce
-      },
-      automute: {
-        description: "adds/removes this song from the automute list",
-        callback: function(){
-          muteonce();
-          if (typeof automute != 'undefined' && automute !== null) {
-            return automute();
-          } else {
-            return API.chatLog("automute is not yet implemented", true);
-          }
-        }
-      }
-    }
-  });
-  /*####################################
   #              AUTOMUTE              #
   ####################################*/
   module('automute', {
+    optional: ['streamSettings'],
     songlist: dataLoad('p0ne_automute', {}),
-    module: function(media){
-      media || (media = API.getMedia());
-      if (this.songlist[media.id]) {
-        delete this.songlist[media.id];
-        return API.chat("'" + media.author + " - " + media.title + "' removed from the automute list.");
-      } else {
-        this.songlist[media.id] = true;
-        return API.chat("'" + media.author + " - " + media.title + "' added to automute list.");
+    module: function(media, addRemove){
+      var $msg;
+      if (typeof media === 'boolean') {
+        addRemove = media;
+        media = false;
       }
+      media || (media = API.getMedia());
+      if (addRemove == null) {
+        addRemove = !this.songlist[media.cid];
+      }
+      $msg = $("<div class='p0ne-automute-notif'>");
+      if (addRemove) {
+        this.songlist[media.cid] = {
+          title: media.title,
+          author: media.author
+        };
+        $msg.text("+ '" + media.author + " - " + media.title + "' added to automute list.").addClass('p0ne-automute-added');
+      } else {
+        delete this.songlist[media.cid];
+        $msg.text("- '" + media.author + " - " + media.title + "' removed from the automute list.").addClass('p0ne-automute-removed');
+      }
+      $msg.append(getTimestamp());
+      appendChat($msg);
+      return this.updateBtn();
     },
-    setup: function(arg$){
-      var addListener, this$ = this;
+    setup: function(arg$, automute){
+      var addListener, media, $snoozeBtn, $box, streamOff, onModeChange, this$ = this;
       addListener = arg$.addListener;
-      return addListener(API, 'advance', function(arg$){
-        var media;
-        media = arg$.media;
-        if (media && this$.songlist[media.id]) {
+      media = API.getMedia();
+      addListener(API, 'advance', function(d){
+        media = d.media;
+        if (media && this$.songlist[media.cid]) {
           return muteonce();
         }
       });
+      $snoozeBtn = $('#playback .snooze');
+      this.$box_ = $snoozeBtn.children();
+      $box = $("<div class='box'></div>");
+      streamOff = isSnoozed();
+      addListener(API, 'p0ne:changeMode', onModeChange = function(mode){
+        var newStreamOff;
+        newStreamOff = mode === 'off';
+        return requestAnimationFrame(function(){
+          if (newStreamOff) {
+            if (!streamOff) {
+              $snoozeBtn.empty().append($box);
+            }
+            if (!media) {
+              console.warn("[automute] uw0tm8?");
+            } else if (this$.songlist[media.cid]) {
+              console.log("[automute] change automute-btn to REMOVE");
+              $snoozeBtn.addClass('p0ne-automute p0ne-automute-remove');
+              $box.html("remove from<br>automute");
+            } else {
+              console.log("[automute] change automute-btn to ADD");
+              $snoozeBtn.addClass('p0ne-automute p0ne-automute-add');
+              $box.html("add to<br>automute");
+            }
+          } else if (streamOff) {
+            console.log("[automute] change automute-btn to SNOOZE");
+            $snoozeBtn.empty().append(this$.$box_).removeClass('p0ne-automute p0ne-automute-remove p0ne-automute-add');
+          }
+          return streamOff = newStreamOff;
+        });
+      });
+      this.updateBtn = function(mode){
+        return onModeChange(streamOff && 'off');
+      };
+      return addListener($snoozeBtn, 'click', function(e){
+        if (streamOff) {
+          console.info("[automute] snoozy", media.cid, this$.songlist[media.cid], streamOff);
+          return automute();
+        }
+      });
+    },
+    disable: function(){
+      return $('#playback .snooze').empty().append(this.$box_);
     }
   });
   /*####################################
@@ -4783,11 +6225,11 @@ window.compareVersions = function(a, b){
     displayName: 'Join/Leave Notifications',
     help: 'Shows notifications for when users join/leave the room in the chat.',
     setup: function(arg$, arg1$, arg2$, update){
-      var addListener, css, lastMsg, $lastNotif, verbRefreshed, usersInRoom, i$, ref$, d, len$, user, results$ = [];
+      var addListener, css, lastMsg, $lastNotif, verbRefreshed, usersInRoom, i$, ref$, d, len$, u, get$lastNotif;
       addListener = arg$.addListener, css = arg$.css;
       if (update) {
         lastMsg = $cm().children().last();
-        if (lastMsg.hasClass('p0ne-joinLeave-notif')) {
+        if (lastMsg.hasClass('p0ne-notif-joinleave')) {
           $lastNotif = lastMsg;
         }
       }
@@ -4799,60 +6241,243 @@ window.compareVersions = function(a, b){
       }) {
         (fn$.call(this, i$, ref$[i$]));
       }
-      if ((typeof chat != 'undefined' && chat !== null) && (typeof chatDomEvents != 'undefined' && chatDomEvents !== null)) {
-        addListener(chatDomEvents, 'click', '.p0ne-join-notif, .p0ne-leave-notif', function(e){
-          return chat.fromClick(e);
-        });
-      }
+      addListener(API, 'popout:open popout:close', function(arg$, PopoutView){
+        var $lastNotif;
+        return $lastNotif = $cm().find('.p0ne-notif-joinleave:last');
+      });
       if (!update) {
         d = Date.now();
         for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-          user = ref$[i$];
-          results$.push(usersInRoom[user.id] = -1);
+          u = ref$[i$];
+          usersInRoom[u.id] = -1;
         }
-        return results$;
       }
+      return out$.get$lastNotif = get$lastNotif = function(){
+        return $lastNotif;
+      };
       function fn$(event, verb_){
-        addListener(API, event, function(user){
-          var verb, $msg;
+        addListener(API, event, function(u){
+          var verb, $msg, isAtBottom;
           verb = verb_;
           if (event === 'userJoin') {
-            if (usersInRoom[user.id]) {
+            if (usersInRoom[u.id]) {
               verb = verbRefreshed;
             } else {
-              usersInRoom[user.id] = Date.now();
+              usersInRoom[u.id] = Date.now();
             }
           } else {
-            delete usersInRoom[user.id];
+            delete usersInRoom[u.id];
           }
-          $msg = $("<span data-uid=" + user.id + ">" + (event === 'userJoin' ? '+ ' : '- ') + "<span class=un>" + resolveRTL(user.username) + "</span> " + verb + " the room" + (!((typeof auxiliaries != 'undefined' && auxiliaries !== null) && (typeof database != 'undefined' && database !== null))
-            ? ''
-            : '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS === 24) + '</div>') + "</span>");
-          if (false) {
-            return $lastNotif.append($msg);
+          $msg = $("<div class=p0ne-notif-" + (event === 'userJoin' ? 'join' : 'leave') + " data-uid=" + u.id + ">" + (event === 'userJoin' ? '+ ' : '- ') + "" + formatUserHTML(u, user.isStaff, false) + "" + getTimestamp() + "</div>");
+          if ((typeof chat != 'undefined' && chat !== null ? chat.lastType : void 8) === 'p0ne_joinLeave' && $lastNotif) {
+            isAtBottom = chatIsAtBottom();
+            $lastNotif.append($msg);
+            if (isAtBottom) {
+              return chatScrollDown();
+            }
           } else {
-            $lastNotif = $("<div class='cm update p0ne-joinLeave-notif'></div>").append($msg);
+            $lastNotif = $("<div class='cm update p0ne-notif p0ne-notif-joinleave'></div>").append($msg);
             appendChat($lastNotif);
             if (typeof chat != 'undefined' && chat !== null) {
-              $lastNotif = $lastNotif.find('.message');
-              return chat.lastType = 'joinLeave';
+              return chat.lastType = 'p0ne-notif-joinleave';
             }
           }
         });
       }
     }
   });
-  /*@source p0ne.chat.ls */
-  /*@author jtbrinkmann aka. Brinkie Pie */
-  /*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+  module('etaTimer', {
+    displayName: 'ETA Timer',
+    settings: 'base',
+    setup: function(arg$){
+      var css, addListener, $create, sum, lastSongDur, $nextMediaLabel, $eta, $etaText, $etaTime, i$, ref$, hist, len$, m, l, tinyhist, test, this$ = this;
+      css = arg$.css, addListener = arg$.addListener, $create = arg$.$create;
+      css('etaTimer', '#your-next-media>span {width: auto !important;right: 50px;}');
+      sum = lastSongDur = 0;
+      $nextMediaLabel = $('#your-next-media > span');
+      $eta = $create('<div class=p0ne-eta>').append($etaText = $('<span class=p0ne-eta-text>ETA: </span>')).append($etaTime = $('<span class=p0ne-eta-time></span>')).appendTo('#footer');
+      addListener(API, 'waitListUpdate', updateETA);
+      addListener(API, 'advance', function(d){
+        if (d.media) {
+          sum -= lastSongDur;
+          sum += d.media.duration;
+          return lastSongDur = API.getHistory()[l - 1].media.duration;
+        }
+      });
+      for (i$ = 0, len$ = (ref$ = hist = API.getHistory()).length; i$ < len$; ++i$) {
+        m = ref$[i$];
+        sum += m.media.duration;
+      }
+      l = hist.length;
+      if (l < 51) {
+        (tinyhist = function(){
+          return addListener('once', API, 'advance', function(d){
+            if (d.media) {
+              lastSongDur = 0;
+              l++;
+            }
+            if (l < 51) {
+              return tinyhist();
+            }
+          });
+        })();
+      } else {
+        lastSongDur = API.getHistory()[l - 1].media.duration;
+      }
+      updateETA();
+      out$.test = test = function(){
+        var p, avg_, avg;
+        p = API.getWaitListPosition();
+        avg_ = API.getTimeRemaining() + sum * p / l;
+        avg = Math.round(
+        avg_ / 60);
+        return {
+          l: l,
+          avg: avg,
+          avg_: avg_,
+          sum: sum,
+          p: p
+        };
+      };
+      function updateETA(){
+        var p, ref$, avg_, avg;
+        p = API.getWaitListPosition();
+        if (p === 0) {
+          $etaText.text("you are next DJ!");
+          $etaTime.text('');
+          return;
+        } else if (p === -1) {
+          if (((ref$ = API.getDJ()) != null ? ref$.id : void 8) === userID) {
+            $etaText.text("you are DJ!");
+            $etaTime.text('');
+            return;
+          } else {
+            p = API.getWaitList().length;
+          }
+        }
+        avg_ = API.getTimeRemaining() + sum * p / l;
+        avg = Math.round(
+        avg_ / 60);
+        $etaText.text("ETA ca. ");
+        if (avg > 60) {
+          $etaTime.text(~~(avg / 60) + "h" + avg % 60 + "min");
+        } else {
+          $etaTime.text(avg + " min");
+        }
+        $nextMediaLabel.css({
+          right: $eta.width() - 50
+        });
+        clearTimeout(this$.timer);
+        return this$.timer = sleep((avg_ % 60 + 31).s, updateETA);
+      }
+      return updateETA;
+    },
+    disable: function(){
+      return clearTimeout(this.timer);
+    }
+  });
   /*
-   * missing chat inline image plugins:
+  
+          lastSongDur = API.getHistory![*-1].media.duration
+          nextSong = API.getMedia!
+          # calculate average song duration
+          sum = 0
+          hist = API.getHistory!
+          for i from 1 til hist.length
+              sum += hist[i].media.duration
+          l = hist.length - 1
+  
+  
+  
+  
+  
+  
+                  avg_ = API.getMedia!.duration + p * sum / l
+  */
+  module('votelist', {
+    settings: 'base',
+    displayName: 'Votelist',
+    disabled: true,
+    help: 'Moving your mouse above the woot/grab/meh icon shows a list of users who have wooted, grabbed or meh\'d respectively.',
+    setup: function(arg$){
+      var addListener, $create, currentFilter, $vote, $vl;
+      addListener = arg$.addListener, $create = arg$.$create;
+      currentFilter = false;
+      $vote = $('#vote');
+      $vl = $create('<div class=p0ne-votelist>').hide().appendTo($vote);
+      addListener($('#woot'), 'mouseenter', changeFilter('left: 0', function(userlist){
+        var i$, ref$, len$, u;
+        for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          if (u.vote === +1) {
+            userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+          }
+        }
+        return userlist;
+      }));
+      addListener($('#grab'), 'mouseenter', changeFilter('left: 50%; transform: translateX(-50%)', function(userlist){
+        var i$, ref$, len$, u;
+        for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          if (u.grab) {
+            userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+          }
+        }
+        return userlist;
+      }));
+      addListener($('#meh'), 'mouseenter', changeFilter('right: 0', function(userlist){
+        var i$, ref$, len$, u;
+        if (user.isStaff) {
+          for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
+            u = ref$[i$];
+            if (u.vote === -1) {
+              userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+            }
+          }
+          return userlist;
+        }
+      }));
+      addListener($vote, 'mouseleave', function(){
+        currentFilter = false;
+        return $vl.hide();
+      });
+      addListener(API, 'voteUpdate', updateVoteList);
+      function changeFilter(styles, filter){
+        return function(){
+          currentFilter = filter;
+          css('votelist', ".p0ne-votelist { " + styles + " }");
+          return updateVoteList();
+        };
+      }
+      function updateVoteList(){
+        var userlist;
+        if (currentFilter) {
+          userlist = currentFilter('');
+          if (userlist) {
+            $vl.html(userlist).show();
+            return $('#tooltip').hide();
+          } else {
+            return $vl.hide();
+          }
+        }
+      }
+      return updateVoteList;
+    }
+  });
+  /*@source p0ne.chat.ls */
+  /**
+   * chat-related plug_p0ne modules
+   *
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @license MIT License
+   * @copyright (c) 2015 J.-T. Brinkmann
+   */
+  /* ToDo:
+   * add missing chat inline image plugins:
    * Derpibooru
    * imgur.com/a/
    * tumblr
    * deviantart
-   * e621.net
-   * paheal.net
    * gfycat.com
    * cloud-4.steampowered.com … .resizedimage
    */
@@ -4860,153 +6485,67 @@ window.compareVersions = function(a, b){
   MAX_IMAGE_HEIGHT = 300;
   roles = ['none', 'dj', 'bouncer', 'manager', 'cohost', 'host', 'ambassador', 'ambassador', 'ambassador', 'admin'];
   /*####################################
-  #      UNREAD CHAT NOTIFICAITON      #
-  ####################################*/
-  module('unreadChatNotif', {
-    require: ['_$context', 'chatDomEvents'],
-    bottomMsg: $(),
-    settings: 'chat',
-    displayName: 'Mark Unread Chat',
-    setup: function(arg$){
-      var addListener, $chatButton, this$ = this;
-      addListener = arg$.addListener;
-      $chatButton = $('#chat-button');
-      this.bottomMsg = $cm().children().last();
-      addListener('early', _$context, 'chat:receive', function(message){
-        message.wasAtBottom == null && (message.wasAtBottom = chatIsAtBottom());
-        if (!$chatButton.hasClass('selected')) {
-          $chatButton.addClass('has-unread');
-        } else if (message.wasAtBottom) {
-          this.bottomMsg = message.cid;
-          return;
-        }
-        delete this.bottomMsg;
-        $cm().addClass('has-unread');
-        message.unread = true;
-        return message.addClass('unread');
-      });
-      this.throttled = false;
-      addListener(chatDomEvents, 'scroll', updateUnread);
-      addListener($chatButton, 'click', updateUnread);
-      function updateUnread(){
-        if (this$.throttled) {
-          return;
-        }
-        this$.throttled = true;
-        return sleep(200, function(){
-          var cm, cmHeight, lastMsg, msg, $readMsgs, l, unread;
-          try {
-            cm = $cm();
-            cmHeight = cm.height();
-            lastMsg = msg = this$.bottomMsg;
-            $readMsgs = $();
-            l = 0;
-            while ((msg = msg.next()).length) {
-              if (msg.position().top > cmHeight) {
-                this$.bottomMsg = lastMsg;
-                break;
-              } else if (msg.hasClass('unread')) {
-                $readMsgs[l++] = msg[0];
-              }
-              lastMsg = msg;
-            }
-            if (l) {
-              unread = cm.find('.unread');
-              sleep(1500, function(){
-                $readMsgs.removeClass('unread');
-                if ((unread = unread.filter('.unread')).length) {
-                  return this$.bottomMsg = unread.removeClass('unread').last();
-                }
-              });
-            }
-            if (!msg.length) {
-              cm.removeClass('has-unread');
-              $chatButton.removeClass('has-unread');
-            }
-          } catch (e$) {}
-          return this$.throttled = false;
-        });
-      }
-      return updateUnread;
-    },
-    fix: function(){
-      var cm;
-      this.throttled = false;
-      cm = $cm();
-      cm.removeClass('has-unread').find('.unread').removeClass('unread');
-      return this.bottomMsg = cm.children().last();
-    },
-    disable: function(){
-      return $cm().removeClass('has-unread').find('.unread').removeClass('unread');
-    }
-  });
-  /*####################################
   #         BETTER CHAT INPUT          #
   ####################################*/
-  module('p0neChatInput', {
+  module('betterChatInput', {
     require: ['chat', 'user'],
     optional: ['user_', '_$context', 'PopoutListener', 'Lang'],
     displayName: "Better Chat Input",
     settings: 'chat',
     help: 'Replaces the default chat input field with a multiline textfield.\nThis allows you to more accurately see how your message will actually look when send',
     setup: function(arg$){
-      var addListener, css, $create, $name, $autoresize_helper, chat, val, oldHeight, chatHidden, this$ = this;
-      addListener = arg$.addListener, css = arg$.css, $create = arg$.$create;
-      css('p0ne_chat_input', '#chat-input {bottom: 7px;height: auto;background: transparent !important;min-height: 30px;}#chat-input-field {position: static;resize: none;height: 16px;overflow: hidden;margin-left: 8px;color: #eee;background: rgba(0, 24, 33, .7);box-shadow: inset 0 0 0 1px transparent;transition: box-shadow .2s ease-out;}#chat-input-field:focus {box-shadow: inset 0 0 0 1px #009cdd !important;}.muted .chat-input-name {display: none;}.autoresize_helper {display: none;white-space: pre-wrap;word-wrap: break-word;}#chat-input-field, .autoresize_helper {width: 295px;padding: 8px 10px 5px 10px;min-height: 16px;font-weight: 400;font-size: 12px;font-family: Roboto,sans-serif;}.chat-input-name {position: absolute;top: 8px;left: 18px;font-weight: 700;font-size: 12px;font-family: Roboto,sans-serif;color: #666;transition: color .2s ease-out;pointer-events:none;}#chat-input-field:focus + .chat-input-name {color: #ffdd6f !important;}/*fix chat-messages size*/#chat-messages {height: auto !important;bottom: 45px;}');
+      var addListener, replace, revert, css, $create, $autoresize_helper, oldHeight, chat, focused, init, $onpage_autoresize_helper, chatHidden, wasEmote, this$ = this;
+      addListener = arg$.addListener, replace = arg$.replace, revert = arg$.revert, css = arg$.css, $create = arg$.$create;
+      css('p0ne_chat_input', '#chat-input {bottom: 7px;height: auto;background: transparent !important;min-height: 30px;}#chat-input-field {position: static;resize: none;height: 16px;overflow: hidden;margin-left: 8px;color: #eee;background: rgba(0, 24, 33, .7);box-shadow: inset 0 0 0 1px transparent;transition: box-shadow .2s ease-out;}.popout #chat-input-field {box-sizing: content-box;}#chat-input-field:focus {box-shadow: inset 0 0 0 1px #009cdd !important;}.autoresize-helper {display: none;white-space: pre-wrap;word-wrap: break-word;}#chat-input-field, .autoresize-helper {width: 295px;padding: 8px 10px 5px 10px;min-height: 16px;font-weight: 400;font-size: 12px;font-family: Roboto,sans-serif;}/* emote */.p0ne-better-chat-emote {font-style: italic;}/*fix chat-messages size*/#chat-messages {height: auto !important;bottom: 45px;}');
       chat = PopoutView.chat || window.chat;
       this.cIF_ = chat.$chatInputField[0];
+      focused = chat.$chatInputField.hasClass('focused');
       chat.$chatInput.removeClass('focused');
-      val = chat.$chatInputField.val();
-      this.fixIndent = function(){
-        return requestAnimationFrame(function(){
-          var indent;
-          indent = 6 + $name.width();
-          chat.$chatInputField.css({
-            textIndent: indent
-          });
-          return $autoresize_helper.css({
-            textIndent: indent
-          });
-        });
-      };
-      oldHeight = 0;
-      addListener(API, 'popout:open', function(){
-        chat = PopoutView.chat || window.chat;
+      init = addListener(API, 'popout:open', function(arg$, PopoutView){
+        var val, focused;
+        chat = PopoutView.chat;
         this$.$form = chat.$chatInputField.parent();
+        val = window.chat.$chatInputField.val();
+        focused = window.chat.$chatInputField.is(':focus');
         chat.$chatInputField.detach();
-        oldHeight = chat.$chatInputField.height();
-        chat.$chatInputField[0] = chat.chatInput = $create("<textarea id='chat-input-field' maxlength=256>").attr('tabIndex', 1).val(val).attr('placeholder', typeof Lang != 'undefined' && Lang !== null ? Lang.chat.placeholder : void 8).on('keydown', function(e){
+        return chat.$chatInputField[0] = chat.chatInput = $create("<textarea id='chat-input-field' maxlength=256>").attr('tabIndex', 1).val(val).focus().attr('placeholder', (typeof Lang != 'undefined' && Lang !== null ? Lang.chat.placeholder : void 8) || "Chat").on('keydown', function(e){
           return chat.onKeyDown(e);
         }).on('keyup', function(e){
           return chat.onKeyUp(e);
-        }).on('input', onInput).appendTo(this$.$form).after($autoresize_helper = $create('<div>').addClass('autoresize_helper'))[0];
-        $name = $create('<span>').addClass('chat-input-name').text(user.username + " ").insertAfter(chat.$chatInputField);
-        return this$.fixIndent();
-      })();
-      sleep(2000, this.fixIndent);
+        }).on('input', onInput).on('keydown', checkForMsgSend).appendTo(this$.$form).after($autoresize_helper = $create('<div>').addClass('autoresize-helper'))[0];
+      });
+      init(null, {
+        chat: window.chat
+      });
+      $onpage_autoresize_helper = $autoresize_helper;
+      if (PopoutView._window) {
+        init(null, PopoutView);
+      }
+      addListener(API, 'popout:close', function(){
+        window.chat.$chatInputField.val(chat.$chatInputField.val());
+        chat = window.chat;
+        return $autoresize_helper = $onpage_autoresize_helper;
+      });
       chatHidden = $cm().parent().css('display') === 'none';
-      if (_$context) {
-        addListener(_$context, 'chat:send', function(){
-          return requestAnimationFrame(function(){
-            return chat.$chatInputField.trigger('input');
-          });
-        });
-        if (chatHidden) {
-          _$context.once('show:chat', this.fixIndent);
-        }
-      } else if (chatHidden) {
-        $('#chat-button').one('click', this.fixIndent);
-      }
-      if (typeof user_ != 'undefined' && user_ !== null) {
-        addListener(user_, 'change:username', this.fixIndent);
-      }
+      wasEmote = false;
       function onInput(){
-        var content, content2, newHeight, scrollTop;
+        var content, newHeight, scrollTop;
         content = chat.$chatInputField.val();
-        if ((content2 = content.replace(/\n/g, "")) !== content) {
-          chat.$chatInputField.val(content = content2);
+        if (content !== (content = content.replace(/\n/g, ""))) {
+          chat.$chatInputField.val(content);
         }
-        $autoresize_helper.text(content + "");
+        if (content[0] === '/' && content[1] === 'm' && content[2] === 'e') {
+          if (!wasEmote) {
+            wasEmote = true;
+            chat.$chatInputField.addClass('p0ne-better-chat-emote');
+            $autoresize_helper.addClass('p0ne-better-chat-emote');
+          }
+        } else if (wasEmote) {
+          wasEmote = false;
+          chat.$chatInputField.removeClass('p0ne-better-chat-emote');
+          $autoresize_helper.removeClass('p0ne-better-chat-emote');
+        }
+        $autoresize_helper.text(content);
         newHeight = $autoresize_helper.height();
         if (oldHeight === newHeight) {
           return;
@@ -5021,7 +6560,12 @@ window.compareVersions = function(a, b){
         }).scrollTop(scrollTop + newHeight - oldHeight);
         return oldHeight = newHeight;
       }
-      return onInput;
+      function checkForMsgSend(e){
+        if ((e && (e.which || e.keyCode)) === 13) {
+          return requestAnimationFrame(onInput);
+        }
+      }
+      return checkForMsgSend;
     },
     disable: function(){
       if (this.cIF_) {
@@ -5029,12 +6573,16 @@ window.compareVersions = function(a, b){
       }
     }
   });
+  /*####################################
+  #            CHAT PLUGIN             #
+  ####################################*/
   module('chatPlugin', {
     require: ['_$context'],
     setup: function(arg$){
-      var addListener;
+      var addListener, onerror;
       addListener = arg$.addListener;
       p0ne.chatLinkPlugins || (p0ne.chatLinkPlugins = []);
+      onerror = 'onerror="chatPlugin.imgError(this)"';
       addListener('early', _$context, 'chat:receive', function(msg){
         var onload;
         msg.wasAtBottom == null && (msg.wasAtBottom = chatIsAtBottom());
@@ -5066,6 +6614,7 @@ window.compareVersions = function(a, b){
                     url: url,
                     offset: offset,
                     onload: onload,
+                    onerror: onerror,
                     msg: msg
                   })) {
                     return that;
@@ -5081,7 +6630,7 @@ window.compareVersions = function(a, b){
         });
       });
       addListener(_$context, 'chat:receive', function(e){
-        return getChat(e.cid).addClass(Object.keys(e.classes).join(' '));
+        return getChat(e).addClass(Object.keys(e.classes || {}).join(' '));
       });
       function addClass(classes){
         var i$, ref$, len$, className, results$ = [];
@@ -5112,7 +6661,7 @@ window.compareVersions = function(a, b){
       console.warn("[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML);
       x$ = $(elem).parent();
       x$.text(x$.attr('href'));
-      x$.addClass('p0ne_img_failed');
+      x$.addClass('p0ne-img-failed');
       return x$;
     }
   });
@@ -5136,9 +6685,9 @@ window.compareVersions = function(a, b){
             $this = $(this);
             if (fromUser = users.get(uid)) {
               role = getRank(fromUser);
-              if (role !== -1) {
-                fromRole = "from-" + roles[role];
-                if (role === 0) {
+              if (role !== 'ghost') {
+                fromRole = "from-" + role;
+                if (role === 'none') {
                   fromRole += " from";
                 } else {
                   fromRole += " from-staff";
@@ -5178,6 +6727,99 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
+  #      UNREAD CHAT NOTIFICAITON      #
+  ####################################*/
+  module('unreadChatNotif', {
+    require: ['_$context', 'chatDomEvents', 'chatPlugin'],
+    bottomMsg: $(),
+    settings: 'chat',
+    displayName: 'Mark Unread Chat',
+    setup: function(arg$){
+      var addListener, unreadCount, $chatButton, $unreadCount, this$ = this;
+      addListener = arg$.addListener;
+      unreadCount = 0;
+      $chatButton = $('#chat-button').append($unreadCount = $('<div class=p0ne-toolbar-count>'));
+      this.bottomMsg = $cm().children().last();
+      addListener(_$context, 'chat:plugin', function(message){
+        message.wasAtBottom == null && (message.wasAtBottom = chatIsAtBottom());
+        if (!$chatButton.hasClass('selected') && (typeof PopoutView != 'undefined' && PopoutView !== null ? PopoutView.chat : void 8) == null) {
+          $chatButton.addClass('p0ne-toolbar-highlight');
+          $unreadCount.text(unreadCount + 1);
+        } else if (message.wasAtBottom) {
+          this.bottomMsg = message.cid;
+          return;
+        }
+        delete this.bottomMsg;
+        $cm().addClass('has-unread');
+        message.unread = true;
+        message.addClass('unread');
+        return unreadCount++;
+      });
+      this.throttled = false;
+      addListener(chatDomEvents, 'scroll', updateUnread);
+      addListener($chatButton, 'click', updateUnread);
+      addListener('early', _$context, 'chat:delete', function(cid){
+        var $msg;
+        $msg = getChat(cid);
+        if ($msg.length && $msg.hasClass('unread')) {
+          $msg.removeClass('unread');
+          return unreadCount--;
+        }
+      });
+      function updateUnread(){
+        if (this$.throttled) {
+          return;
+        }
+        this$.throttled = true;
+        return sleep(200, function(){
+          var cm, cmHeight, lastMsg, msg, $readMsgs, l, unread;
+          try {
+            cm = $cm();
+            cmHeight = cm.height();
+            lastMsg = msg = this$.bottomMsg;
+            $readMsgs = $();
+            l = 0;
+            while ((msg = msg.next()).length) {
+              if (msg.position().top > cmHeight) {
+                this$.bottomMsg = lastMsg;
+                break;
+              } else if (msg.hasClass('unread')) {
+                $readMsgs[l++] = msg[0];
+              }
+              lastMsg = msg;
+            }
+            if (l) {
+              unread = cm.find('.unread');
+              sleep(1500, function(){
+                $readMsgs.removeClass('unread');
+                if ((unread = unread.filter('.unread')).length) {
+                  return this$.bottomMsg = unread.removeClass('unread').last();
+                }
+              });
+            }
+            if (!msg.length) {
+              cm.removeClass('has-unread');
+              $chatButton.removeClass('p0ne-toolbar-highlight');
+              unreadCount = 0;
+            }
+          } catch (e$) {}
+          return this$.throttled = false;
+        });
+      }
+      return updateUnread;
+    },
+    fix: function(){
+      var cm;
+      this.throttled = false;
+      cm = $cm();
+      cm.removeClass('has-unread').find('.unread').removeClass('unread');
+      return this.bottomMsg = cm.children().last();
+    },
+    disable: function(){
+      return $cm().removeClass('has-unread').find('.unread').removeClass('unread');
+    }
+  });
+  /*####################################
   #          OTHERS' @MENTIONS         #
   ####################################*/
   module('chatOthersMentions', {
@@ -5186,11 +6828,10 @@ window.compareVersions = function(a, b){
     settings: 'chat',
     displayName: 'Highlight @mentions for others',
     setup: function(arg$){
+      /*sleep 0, ->
+          $cm! .children! .each ->*/
       var addListener;
       addListener = arg$.addListener;
-      sleep(0, function(){
-        return $cm().children().each(function(){});
-      });
       return addListener(_$context, 'chat:plugin', function(message){
         var type, uid, res, lastI, i$, ref$, len$, yet$, mention;
         type = message.type, uid = message.uid;
@@ -5226,9 +6867,9 @@ window.compareVersions = function(a, b){
       var addListener, this$ = this;
       addListener = arg$.addListener;
       return addListener(API, 'chat:image', function(arg$){
-        var all, pre, completeURL, protocol, domain, url, onload, msg, offset, that, rgx, repl, forceProtocol, img;
-        all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, msg = arg$.msg, offset = arg$.offset;
-        if (msg.message.hasAny(['nsfw', 'no-inline', 'noinline']) || msg.message[offset + all.length] === ";") {
+        var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, that, rgx, repl, forceProtocol, img;
+        all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, onerror = arg$.onerror, msg = arg$.msg, offset = arg$.offset;
+        if (msg.message.toLowerCase().hasAny(['nsfw', 'suggestive', 'gore', 'spoiler', 'no-inline', 'noinline']) || msg.message[offset + all.length] === ";" || domain === 'plug.dj') {
           return;
         }
         if (that = this$.plugins[domain] || this$.plugins[domain = domain.substr(1 + domain.indexOf('.'))]) {
@@ -5236,29 +6877,29 @@ window.compareVersions = function(a, b){
           img = url.replace(rgx, repl);
           if (img !== url) {
             console.log("[inline-img]", completeURL + " ==> " + protocol + img);
-            return "<a " + pre + "><img src='" + (forceProtocol || protocol) + img + "' class=p0ne_img " + onload + " onerror='chatInlineImages.imgError(this)'></a>";
+            return "<a " + pre + "><img src='" + (forceProtocol || protocol) + img + "' class=p0ne-img " + onload + " " + onerror + "></a>";
           }
         }
         if (/^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i.test(url)) {
           if (in$(domain, this$.forceHTTPSDomains)) {
-            completeURL = completeURL.replace(/^.+\/\//, 'https://');
+            completeURL = completeURL.replace('http://', 'https://');
           }
           console.log("[inline-img]", "[direct] " + completeURL);
-          return "<a " + pre + "><img src='" + completeURL + "' class=p0ne_img " + onload + " onerror='chatInlineImages.imgError(this)'></a>";
+          return "<a " + pre + "><img src='" + completeURL + "' class=p0ne-img " + onload + " onerror='chatInlineImages.imgError(this)'></a>";
         }
         console.log("[inline-img]", "NO MATCH FOR " + completeURL + " (probably isn't an image)");
         return false;
       });
     },
-    forceHTTPSDomains: ['i.imgur.com'],
+    forceHTTPSDomains: ['i.imgur.com', 'deviantart.com'],
     plugins: {
-      'imgur.com': [/^imgur.com\/(?:r\/\w+\/)?(\w\w\w+)/g, "i.imgur.com/$1.gif"],
-      'prntscrn.com': [/^(prntscr.com\/\w+)(?:\/direct\/)?/g, "$1/direct"],
-      'gyazo.com': [/^gyazo.com\/\w+/g, "i.$&/direct"],
-      'dropbox.com': [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/g, "dl.dropboxusercontent.com$1"],
-      'pbs.twitter.com': [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/g, "$1:small"],
+      'imgur.com': [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,7}(?:[&,][\w]{5,7})*)(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif"],
+      'prntscrn.com': [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"],
+      'gyazo.com': [/^gyazo.com\/\w+/, "$&/raw"],
+      'dropbox.com': [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"],
+      'pbs.twitter.com': [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/, "$1:small"],
       'googleimg.com': [
-        /^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/g, function(arg$, src){
+        /^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, function(arg$, src){
           return decodeURIComponent(url);
         }
       ],
@@ -5310,12 +6951,12 @@ window.compareVersions = function(a, b){
       PADDING = 20;
       $app = $('#app');
       $container = $('#dialog-container');
-      this.$el = $el = $createPersistent('<img class=p0ne_img_large>').appendTo($body).css({
+      this.$el = $el = $createPersistent('<img class=p0ne-img-large>').appendTo($body).css({
         position: 'absolute',
         zIndex: 6,
         cursor: 'pointer'
       }).hide();
-      addListener($container, 'click', '.p0ne_img_large', function(){
+      addListener($container, 'click', '.p0ne-img-large', function(){
         dialog.close();
         return false;
       });
@@ -5387,7 +7028,7 @@ window.compareVersions = function(a, b){
         }
       };
       dialog.closeBind = bind$(dialog, 'close');
-      return addListener(chatDomEvents, 'click', '.p0ne_img', function(e){
+      return addListener(chatDomEvents, 'click', '.p0ne-img', function(e){
         var $img_;
         console.info("[lightbox] showing", this, this.src);
         $img_ = $(this);
@@ -5442,7 +7083,7 @@ window.compareVersions = function(a, b){
           When hovering the thumbnail, it will animate, alternating between three frames of the video.
       '''
       setup: ({add, addListener}) ->
-          addListener chatDomEvents, \mouseenter, \.p0ne_yt_img, (e) ~>
+          addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) ~>
               clearInterval @interval
               img = this
               id = this.parentElement
@@ -5458,7 +7099,7 @@ window.compareVersions = function(a, b){
               console.log "[p0ne_yt_preview]", "started", e, id, @interval
               #ToDo show YT-options (grab, open, preview, [automute])
   
-          addListener chatDomEvents, \mouseleave, \.p0ne_yt_img, (e) ~>
+          addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) ~>
               clearInterval @interval
               img = this
               id = this.parentElement.dataset.ytCid
@@ -5471,9 +7112,9 @@ window.compareVersions = function(a, b){
           if yt and (yt = yt.1)
               console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
               return "
-                  <a class=p0ne_yt data-yt-cid='#yt' #pre>
-                      <div class=p0ne_yt_icon></div>
-                      <div class=p0ne_yt_img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
+                  <a class=p0ne-yt data-yt-cid='#yt' #pre>
+                      <div class=p0ne-yt-icon></div>
+                      <div class=p0ne-yt-img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
                       #url
                   </a>
               " # no `onerror` on purpose # when updating the HTML, check if it breaks the animation callback
@@ -5487,16 +7128,16 @@ window.compareVersions = function(a, b){
   /**
    * plug_p0ne modules to add styles.
    * This needs to be kept in sync with plug_pony.css
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('p0neStylesheet', {
     setup: function(arg$){
       var loadStyle;
       loadStyle = arg$.loadStyle;
-      return loadStyle(p0ne.host + "/css/plug_p0ne.css?r=35");
+      return loadStyle(p0ne.host + "/css/plug_p0ne.css?r=38");
     }
   });
   /*
@@ -5526,7 +7167,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var loadStyle;
       loadStyle = arg$.loadStyle;
-      return loadStyle(p0ne.host + "/css/fimplug.css?r=20");
+      return loadStyle(p0ne.host + "/css/fimplug.css?r=23");
     }
   });
   /*####################################
@@ -5559,6 +7200,19 @@ window.compareVersions = function(a, b){
           return this;
         };
       });
+    }
+  });
+  /*####################################
+  #        FIX HIGH RESOLUTIONS        #
+  ####################################*/
+  module('fixHiRes', {
+    displayName: "Fix high resolutions",
+    help: 'This will fix some odd looking things on larger screens',
+    setup: function(){
+      return $body.addClass('p0ne-fix-hires');
+    },
+    disable: function(){
+      return $body.removeClass('p0ne-fix-hires');
     }
   });
   /*####################################
@@ -5696,6 +7350,35 @@ window.compareVersions = function(a, b){
       return $body.removeClass('legacy-chat');
     }
   });
+  module('legacyFooter', {
+    displayName: "Info Footer",
+    settings: 'look&feel',
+    help: 'Restore the old look of the footer (the thing below the chat) and transform it into a more useful information panel.\nTo get to the settings etc, click anywhere on the panel.',
+    disabled: true,
+    setup: function(){
+      var foo, info, x$;
+      $body.addClass('legacy-footer');
+      foo = $('#footer-user');
+      info = foo.find('.info');
+      info.on('click', function(){});
+      info.on('click', function(){
+        foo.addClass('menu');
+        return requestAnimationFrame(function(){
+          return $body.one('click', function(){
+            return foo.removeClass('menu');
+          });
+        });
+      });
+      x$ = foo.find('.back span');
+      if (!/\S/.test(x$.text())) {
+        x$.text((typeof Lang != 'undefined' && Lang !== null ? Lang.userMeta.backToCommunity : void 8) || "Back To Community");
+      }
+      return x$;
+    },
+    disable: function(){
+      return $body.removeClass('legacy-footer');
+    }
+  });
   module('djIconChat', {
     require: ['chatPlugin'],
     settings: 'look&feel',
@@ -5704,7 +7387,7 @@ window.compareVersions = function(a, b){
       var addListener, css, icon;
       addListener = arg$.addListener, css = arg$.css;
       icon = getIcon('icon-current-dj');
-      css('djIconChat', "#chat .from-current-dj .un::before {background-image: " + icon.image + ";background-position: " + icon.position + ";}");
+      css('djIconChat', "#chat .from-current-dj .timestamp::before { background: " + icon.background + "; }");
       return addListener(_$context, 'chat:plugin', function(message){
         var ref$;
         if (message.uid && message.uid === ((ref$ = API.getDJ()) != null ? ref$.id : void 8)) {
@@ -5734,9 +7417,12 @@ window.compareVersions = function(a, b){
    * made to be compatible with plugCubes Room Settings
    * so room hosts don't have to bother with mutliple formats
    * that also means, that a lot of inspiration came from and credits go to the PlugCubed team ♥
+   *
+   * for more information, see https://issue.plugcubed.net/wiki/Plug3%3ARS
+   *
    * @author jtbrinkmann aka. Brinkie Pie
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
   */
   module('roomSettings', {
     require: ['room'],
@@ -5768,7 +7454,7 @@ window.compareVersions = function(a, b){
           this$._room = roomslug;
           return this$._trigger();
         }).fail(function(){
-          return API.chatLog("[p0ne] cannot load Room Settings", true);
+          return chatWarn("cannot load Room Settings", "p0ne");
         });
       }
     },
@@ -5829,7 +7515,7 @@ window.compareVersions = function(a, b){
           for (role in ref$ = d.colors.chat) {
             color = ref$[role];
             if (isColor(color)) {
-              styles += "/* " + role + " => " + color + " */\n#user-panel:not(.is-none) .user > .icon-chat-" + role + " + .name, #user-lists .user > .icon-chat-" + role + " + .name, .cm.from-" + role + " .from\n#waitlist .icon-chat-" + role + " + span, #user-rollover .icon-chat-cohost + span {\n        color: " + color + " !important;\n}\n";
+              styles += "/* " + role + " => " + color + " */\n#user-panel:not(.is-none) .user > .icon-chat-" + role + " + .name, #user-lists .user > .icon-chat-" + role + " + .name,\n.cm.from-" + role + " .from, #waitlist .icon-chat-" + role + " + span,\n#user-rollover .icon-chat-cohost + span, ." + role + " {\n        color: " + color + " !important;\n}\n";
             }
           }
           colorMap = {
@@ -5961,236 +7647,241 @@ window.compareVersions = function(a, b){
   /**
    * BetterPonymotes - a script add ponymotes to the chat on plug.dj
    * based on BetterPonymotes https://ponymotes.net/bpm/
-   * for a ponymote tutorial see: http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
+   * for a ponymote tutorial see:
+   * http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
-  (function(){
-    var ref$, host, ref1$, _FLAG_NSFW, _FLAG_REDIRECT, emote_regexp, sanitize_emote, lookup_core_emote, convert_emote_element, ref2$, ref3$;
-    if ((ref$ = window.bpm) != null) {
-      ref$.disable();
-    }
-    window.emote_map || (window.emote_map = {});
-    host = ((ref1$ = window.p0ne) != null ? ref1$.host : void 8) || "https://cdn.p0ne.com";
-    /*== external sources ==*/
-    $.getScript(host + "/script/bpm-resources.js").then(function(){
-      return API.trigger('p0ne_emotes_map');
-    });
-    $('body').append("<div id='bpm-resources'><link rel='stylesheet' href='" + host + "/css/bpmotes.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/emote-classes.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/combiners-nsfw.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/gif-animotes.css' type='text/css'>" + ('webkitAnimation' in document.body.style
-      ? "<link rel='stylesheet' href='" + host + "/css/extracss-webkit.css' type='text/css'>"
-      : "<link rel='stylesheet' href='" + host + "/css/extracss-pure.css' type='text/css'>") + "</div>");
-    /*
-            <style>
-            \#chat-suggestion-items .bpm-emote {
-                max-width: 27px;
-                max-height: 27px
-            }
-            </style>
-    */
-    /*== constants ==*/
-    _FLAG_NSFW = 1;
-    _FLAG_REDIRECT = 2;
-    /*
-     * As a note, this regexp is a little forgiving in some respects and strict in
-     * others. It will not permit text in the [] portion, but alt-text quotes don't
-     * have to match each other.
-     */
-    /*                 [](/  <   emote   >   <     alt-text    >  )*/
-    emote_regexp = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g;
-    /*== auxiliaries ==*/
-    /*
-     * Escapes an emote name (or similar) to match the CSS classes.
-     *
-     * Must be kept in sync with other copies, and the Python code.
-     */
-    sanitize_emote = function(s){
-      return s.toLowerCase().replace("!", "_excl_").replace(":", "_colon_").replace("#", "_hash_").replace("/", "_slash_");
-    };
-    lookup_core_emote = function(name, altText){
-      var data, nameWithSlash, parts, flag_data, tag_data, flags, source_id, is_nsfw, is_redirect;
-      data = emote_map["/" + name];
-      if (!data) {
-        return null;
+  module('bpm', {
+    require: ['chatPlugin'],
+    displayName: 'Better Ponymotes',
+    settings: 'pony',
+    module: function(str){
+      if (!str) {
+        console.error("bpm(null)");
       }
-      nameWithSlash = name;
-      parts = data.split(',');
-      flag_data = parts[0];
-      tag_data = parts[1];
-      flags = parseInt(flag_data.slice(0, 1), 16);
-      source_id = parseInt(flag_data.slice(1, 3), 16);
-      is_nsfw = flags & _FLAG_NSFW;
-      is_redirect = flags & _FLAG_REDIRECT;
-      /*tags = []
-      start = 0
-      while (str = tag_data.slice(start, start+2)) != ""
-          tags.push(parseInt(str, 16)) # Hexadecimal
-          start += 2
-      
-      if is_redirect
-          base = parts.2
-      else
-          base = name*/
-      return {
-        name: nameWithSlash,
-        is_nsfw: !!is_nsfw,
-        source_id: source_id,
-        source_name: sr_id2name[source_id],
-        css_class: "bpmote-" + sanitize_emote(name),
-        altText: altText
-      };
-    };
-    convert_emote_element = function(info, parts){
-      var title, flags, i$, len$, i, flag;
-      title = (info.name + " from " + info.source_name).replace(/"/g, '');
-      flags = "";
-      for (i$ = 0, len$ = parts.length; i$ < len$; ++i$) {
-        i = i$;
-        flag = parts[i$];
-        if (i > 0) {
-          /* Normalize case, and forbid things that don't look exactly as we expect */
-          flag = sanitize_emote(flag.toLowerCase());
-          if (!/\W/.test(flag)) {
-            flags += " bpflag-" + flag;
-          }
-        }
-      }
-      if (info.is_nsfw) {
-        title = "[NSFW] " + title;
-        flags += " bpm-nsfw";
-      }
-      return "<span class='bpflag-in bpm-emote " + info.css_class + " " + flags + "' title='" + title + "'>" + (info.altText || '') + "</span>";
-    };
-    window.bpm = function(str){
-      return str.replace(emote_regexp, function(_, parts, altText){
-        var name, info;
-        parts = parts.split('-');
-        name = parts[0];
-        info = lookup_core_emote(name, altText);
-        if (!info) {
-          return _;
-        } else {
-          return convert_emote_element(info, parts);
-        }
-      });
-    };
-    window.bpm.disable = function(revertPonimotes){
-      var i$, ref$, len$, i, e, results$ = [];
-      $('#bpm-resources').remove();
-      if (revertPonimotes) {
-        $('.bpm-emote').replaceAll(function(){
-          return document.createTextNode(this.className.replace(/bpflag-in|bpm-emote|^\s+|\s+$/g, '').replace(/\s+/g, '-'));
+      return this.bpm(str);
+    },
+    setup: function(arg$){
+      var addListener, $create, host, ref$, _FLAG_NSFW, _FLAG_REDIRECT, EMOTE_REGEXP, sanitize_map;
+      addListener = arg$.addListener, $create = arg$.$create;
+      host = ((ref$ = window.p0ne) != null ? ref$.host : void 8) || "https://cdn.p0ne.com";
+      /*== external sources ==*/
+      if (!window.emote_map) {
+        window.emote_map = {};
+        $.getScript(host + "/script/bpm-resources.js").then(function(){
+          return API.trigger('p0ne_emotes_map');
         });
-        if (window.bpm.callback) {
-          for (i$ = 0, len$ = (ref$ = window._$context._events['chat:receive']).length; i$ < len$; ++i$) {
-            i = i$;
-            e = ref$[i$];
-            if (e === window.bpm.callback) {
-              window._$context._events['chat:receive'].splice(i, 1);
-              break;
-            }
-          }
-          return results$;
-        }
-      }
-    };
-    if ((ref2$ = window.p0ne) != null && ref2$.chatMessagePlugins) {
-      /* add BPM as a p0ne chat plugin */
-      (ref3$ = window.p0ne.chatMessagePlugins)[ref3$.length] = window.bpm;
-    } else {
-      (function(){
-        /* add BPM as a standalone script */
-        var module, ref$, id, ref1$, ref2$;
-        if (!window._$context) {
-          module = window.require.s.contexts._.defined['b1b5f/b8d75/c3237'];
-          if (module && ((ref$ = module._events) != null && ref$['chat:receive'])) {
-            window._$context = module;
-          } else {
-            for (id in ref1$ = require.s.contexts._.defined) {
-              module = ref1$[id];
-              if (module && ((ref2$ = module._events) != null && ref2$['chat:receive'])) {
-                window._$context = module;
-                break;
-              }
-            }
-          }
-        }
-        return window._$context._events['chat:receive'].unshift(window.bpm.callback = {
-          callback: function(d){
-            d.message = bpm(d.message);
-          }
-        });
-      })();
-    }
-    return API.once('p0ne_emotes_map', function(){
-      var cb;
-      console.info("[bpm] loaded");
-      /* ponify old messages */
-      $('#chat .text').html(function(){
-        return window.bpm(this.innerHTML);
-      });
-      /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
-      cb = function(){
-        return typeof addAutocompletion == 'function' ? addAutocompletion({
-          name: "Ponymotes",
-          data: Object.keys(emote_map),
-          pre: "[]",
-          check: function(str, pos){
-            var temp;
-            if (!str[pos + 2] || str[pos + 2] === "(" && (!str[pos + 3] || str[pos + 3] === "(/")) {
-              temp = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/.exec(str.substr(pos));
-              if (temp) {
-                this.data = temp[2] || '';
-                return true;
-              }
-            }
-            return false;
-          },
-          display: function(items){
-            var emote;
-            return (function(){
-              var i$, ref$, len$, results$ = [];
-              for (i$ = 0, len$ = (ref$ = items).length; i$ < len$; ++i$) {
-                emote = ref$[i$];
-                results$.push({
-                  value: "[](/" + emote + ")",
-                  image: bpm("[](/" + emote + ")")
-                });
-              }
-              return results$;
-            }());
-          },
-          insert: function(suggestion){
-            return suggestion.substr(0, suggestion.length - 1) + "" + this.data + ")";
-          }
-        }) : void 8;
-      };
-      if (window.addAutocompletion) {
-        return cb();
       } else {
-        return $(window).one('p0ne_autocomplete', cb);
+        requestAnimationFrame(function(){
+          return API.trigger('p0ne_emotes_map');
+        });
       }
-    });
-  })();
+      $create("<div id='bpm-resources'><link rel='stylesheet' href='" + host + "/css/bpmotes.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/emote-classes.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/combiners-nsfw.css' type='text/css'><link rel='stylesheet' href='" + host + "/css/gif-animotes.css' type='text/css'>" + ('webkitAnimation' in document.body.style
+        ? "<link rel='stylesheet' href='" + host + "/css/extracss-webkit.css' type='text/css'>"
+        : "<link rel='stylesheet' href='" + host + "/css/extracss-pure.css' type='text/css'>") + "</div>").appendTo($body);
+      /*
+              <style>
+              \#chat-suggestion-items .bpm-emote {
+                  max-width: 27px;
+                  max-height: 27px
+              }
+              </style>
+      */
+      /*== constants ==*/
+      _FLAG_NSFW = 1;
+      _FLAG_REDIRECT = 2;
+      /*
+       * As a note, this regexp is a little forgiving in some respects and strict in
+       * others. It will not permit text in the [] portion, but alt-text quotes don't
+       * have to match each other.
+       */
+      /*                 [](/  <   emote   >   <     alt-text    >  )*/
+      EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g;
+      /*== auxiliaries ==*/
+      /*
+       * Escapes an emote name (or similar) to match the CSS classes.
+       *
+       * Must be kept in sync with other copies, and the Python code.
+       */
+      sanitize_map = {
+        '!': '_excl_',
+        ':': '_colon_',
+        '#': '_hash_',
+        '/': '_slash_'
+      };
+      function sanitize_emote(s){
+        return s.toLowerCase().replace(/[!:#\/]/g, function(c){
+          return sanitize_map[c];
+        });
+      }
+      function lookup_core_emote(name, altText){
+        var data, nameWithSlash, parts, flag_data, tag_data, flags, source_id, is_nsfw, is_redirect;
+        data = emote_map["/" + name];
+        if (!data) {
+          return null;
+        }
+        nameWithSlash = name;
+        parts = data.split(',');
+        flag_data = parts[0];
+        tag_data = parts[1];
+        flags = parseInt(flag_data.slice(0, 1), 16);
+        source_id = parseInt(flag_data.slice(1, 3), 16);
+        is_nsfw = flags & _FLAG_NSFW;
+        is_redirect = flags & _FLAG_REDIRECT;
+        /*tags = []
+        start = 0
+        while (str = tag_data.slice(start, start+2)) != ""
+            tags.push(parseInt(str, 16)) # Hexadecimal
+            start += 2
+        
+        if is_redirect
+            base = parts.2
+        else
+            base = name*/
+        return {
+          name: nameWithSlash,
+          is_nsfw: !!is_nsfw,
+          source_id: source_id,
+          source_name: sr_id2name[source_id],
+          css_class: "bpmote-" + sanitize_emote(name),
+          altText: altText
+        };
+      }
+      function convert_emote_element(info, parts){
+        var title, flags, i$, len$, i, flag;
+        title = (info.name + " from " + info.source_name).replace(/"/g, '');
+        flags = "";
+        for (i$ = 0, len$ = parts.length; i$ < len$; ++i$) {
+          i = i$;
+          flag = parts[i$];
+          if (i > 0) {
+            /* Normalize case, and forbid things that don't look exactly as we expect */
+            flag = sanitize_emote(flag.toLowerCase());
+            if (!/\W/.test(flag)) {
+              flags += " bpflag-" + flag;
+            }
+          }
+        }
+        if (info.is_nsfw) {
+          title = "[NSFW] " + title;
+          flags += " bpm-nsfw";
+        }
+        return "<span class='bpflag-in bpm-emote " + info.css_class + " " + flags + "' title='" + title + "'>" + (info.altText || '') + "</span>";
+      }
+      this.bpm = function(str){
+        if (!str) {
+          console.error("bpm(null) [2]");
+        }
+        return str.replace(EMOTE_REGEXP, function(_, parts, altText){
+          var name, info;
+          parts = parts.split('-');
+          name = parts[0];
+          info = lookup_core_emote(name, altText);
+          if (!info) {
+            return _;
+          } else {
+            return convert_emote_element(info, parts);
+          }
+        });
+      };
+      addListener(window._$context || API, 'chat:plugin', function(msg){
+        return msg.message = bpm(msg.message);
+      });
+      return addListener('once', API, 'p0ne_emotes_map', function(){
+        var cb;
+        console.info("[bpm] loaded");
+        $cms().find('.text').html(function(){
+          return bpm(this.innerHTML);
+        });
+        /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
+        cb = function(){
+          var AUTOCOMPLETE_REGEX;
+          AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/;
+          return typeof addAutocompletion == 'function' ? addAutocompletion({
+            name: "Ponymotes",
+            data: Object.keys(emote_map),
+            pre: "[]",
+            check: function(str, pos){
+              var temp;
+              if (!str[pos + 2] || str[pos + 2] === "(" && (!str[pos + 3] || str[pos + 3] === "(/")) {
+                temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos));
+                if (temp) {
+                  this.data = temp[2] || '';
+                  return true;
+                }
+              }
+              return false;
+            },
+            display: function(items){
+              var emote;
+              return (function(){
+                var i$, ref$, len$, results$ = [];
+                for (i$ = 0, len$ = (ref$ = items).length; i$ < len$; ++i$) {
+                  emote = ref$[i$];
+                  results$.push({
+                    value: "[](/" + emote + ")",
+                    image: bpm("[](/" + emote + ")")
+                  });
+                }
+                return results$;
+              }());
+            },
+            insert: function(suggestion){
+              return suggestion.substr(0, suggestion.length - 1) + "" + this.data + ")";
+            }
+          }) : void 8;
+        };
+        if (window.addAutocompletion) {
+          return cb();
+        } else {
+          return addListener('once', API, 'p0ne:autocomplete', cb);
+        }
+      });
+    },
+    disable: function(revertPonimotes){
+      if (revertPonimotes) {
+        return $cms().find('.bpm-emote').replaceWith(function(){
+          var flags, i$, ref$, len$, class_, emote;
+          flags = "";
+          for (i$ = 0, len$ = (ref$ = this.classList || this.className.split(/s+/)).length; i$ < len$; ++i$) {
+            class_ = ref$[i$];
+            if (class_.startsWith('bpmote-')) {
+              emote = class_.substr(7);
+            } else if (class_.startsWith('bpflag-') && class_ !== 'bpflag-in') {
+              flags += class_.substr(6);
+            }
+          }
+          if (emote) {
+            return document.createTextNode("[](/" + emote + flags + ")");
+          } else {
+            return console.warn("[bpm] cannot convert back", this);
+          }
+        });
+      }
+    }
+  });
   /*@source p0ne.song-notif.ls */
   /**
    * get fancy song notifications in the chat (with preview thumbnail, description, buttons, …)
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('songNotif', {
     require: ['chatDomEvents'],
-    optional: ['_$context', 'database', 'auxiliaries', 'app', 'popMenu'],
+    optional: ['_$context', 'chat', 'database', 'auxiliaries', 'app', 'popMenu'],
     settings: 'base',
+    displayName: 'Song Notifications',
     help: 'Shows notifications for playing songs in the chat.\nBesides the songs\' name, it also features a thumbnail and some extra buttons.\n\nBy clicking on the song\'s or author\'s name, a search on plug.dj for that name will be started, to easily find similar tracks.\n\nBy hovering the notification and clicking "description" the songs description will be loaded.\nYou can click anywhere on it to close it again.',
     setup: function(arg$, arg1$, arg2$, module_){
       var addListener, $create, $createPersistent, css, lastMedia, that, $description, this$ = this;
       addListener = arg$.addListener, $create = arg$.$create, $createPersistent = arg$.$createPersistent, css = arg$.css;
       this.callback = function(d){
-        var skipped, skipper, reason, media, $div, html, time, mediaURL, duration, timestamp, e;
+        var skipped, skipper, reason, media, $div, html, time, mediaURL, duration, e;
         try {
           skipped = false;
           skipper = reason = "";
@@ -6199,7 +7890,10 @@ window.compareVersions = function(a, b){
             return;
           }
           lastMedia = media.id;
-          $div = $createPersistent("<div class='update song-notif' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
+          if (typeof chat != 'undefined' && chat !== null) {
+            chat.lastType = 'p0ne-song-notif';
+          }
+          $div = $createPersistent("<div class='update p0ne-song-notif' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
           html = "";
           time = getTime();
           if (media.format === 1) {
@@ -6209,18 +7903,13 @@ window.compareVersions = function(a, b){
           }
           duration = mediaTime(media.duration);
           console.logImg(media.image.replace(/^\/\//, 'https://')).then(function(){
-            return console.log(time + " [DV_ADVANCE] " + d.dj.username + " is playing '" + media.author + " - " + media.title + "' (" + duration + ")", d);
+            return console.log(time + " [DJ_ADVANCE] " + d.dj.username + " is playing '" + media.author + " - " + media.title + "' (" + duration + ")", d);
           });
-          if (window.auxiliaries && window.database) {
-            timestamp = "<div class='timestamp'>" + auxiliaries.getChatTimestamp(database.settings.chatTS === 24) + "</div>";
-          } else {
-            timestamp = "";
-          }
-          html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + media.image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> --><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + timestamp + "<div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
+          html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + media.image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> --><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + getTimestamp() + "<div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
           $div.html(html);
-          $div.find('.song-dj').text(d.dj.username);
           $div.find('.song-title').text(d.media.title).prop('title', d.media.title);
           $div.find('.song-author').text(d.media.author);
+          $div.find('.song-dj').text(d.dj.username).data('uid', d.dj.id);
           if (media.format === 2 && p0ne.SOUNDCLOUD_KEY) {
             $div.addClass('loading');
             mediaLookup(media, {
@@ -6248,8 +7937,9 @@ window.compareVersions = function(a, b){
           });
         });
       }
-      loadStyle(p0ne.host + "/css/p0ne.notif.css?r=14");
+      loadStyle(p0ne.host + "/css/p0ne.notif.css?r=16");
       if (that = !module_ && API.getMedia()) {
+        that.image = httpsify(that.image);
         this.callback({
           media: that,
           dj: API.getDJ()
@@ -6262,7 +7952,7 @@ window.compareVersions = function(a, b){
         addListener(chatDomEvents, 'click', '.song-add', function(){
           var $el, $notif, id, format, msgOffset, obj;
           $el = $(this);
-          $notif = $el.closest('.song-notif');
+          $notif = $el.closest('.p0ne-song-notif');
           id = $notif.data('id');
           format = $notif.data('format');
           console.log("[add from notif]", $notif, id, format);
@@ -6288,11 +7978,12 @@ window.compareVersions = function(a, b){
         css('songNotificationsAdd', '.song-add {display:none}');
       }
       addListener(chatDomEvents, 'click', '.song-add', function(){
-        return showDescription($(this).closest(".song-notif"), "<span class='ruleskip'>!ruleskip 1 - nonpony</span>\n<span class='ruleskip'>!ruleskip 2 - </span>\n<span class='ruleskip'>!ruleskip 3 - </span>\n<span class='ruleskip'>!ruleskip 4 - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>");
+        return showDescription($(this).closest('.p0ne-song-notif'), "<span class='ruleskip'>!ruleskip 1 - nonpony</span>\n<span class='ruleskip'>!ruleskip 2 - </span>\n<span class='ruleskip'>!ruleskip 3 - </span>\n<span class='ruleskip'>!ruleskip 4 - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>");
       });
       addListener(chatDomEvents, 'click', '.song-author', function(){
         return mediaSearch(this.textContent);
       });
+      $description = $();
       addListener(chatDomEvents, 'click', '.song-description-btn', function(e){
         var $notif, cid, format, that;
         try {
@@ -6300,7 +7991,7 @@ window.compareVersions = function(a, b){
             hideDescription();
           }
           $description = $(this);
-          $notif = $description.closest('.song-notif');
+          $notif = $description.closest('.p0ne-song-notif');
           cid = $notif.data('cid');
           format = $notif.data('format');
           console.log("[song-notif] showing description", cid, $notif);
@@ -6359,7 +8050,7 @@ window.compareVersions = function(a, b){
         offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
         ch = cm.height();
         if (offsetTop + h > ch) {
-          return $cm.animate({
+          return cm.animate({
             scrollTop: cm.scrollTop() + Math.min(offsetTop + h - ch + 100, offsetTop)
           });
         }
@@ -6370,13 +8061,13 @@ window.compareVersions = function(a, b){
           return;
         }
         console.log("[song-notif] closing description", $description);
-        $notif = $description.closest('.song-notif');
+        $notif = $description.closest('.p0ne-song-notif');
         $description.animate({
           opacity: 0,
           height: 0
         }, function(){
           return $(this).css({
-            opacity: 1,
+            opacity: '',
             height: 'auto'
           }).removeClass('song-description text').addClass('song-description-btn').text("Description").appendTo($notif.find('.song-notif-next'));
         });
@@ -6400,10 +8091,10 @@ window.compareVersions = function(a, b){
   /**
    * plug_p0ne songInfo
    * adds a dropdown with the currently playing song's description when clicking on the now-playing-bar (in the top-center of the page)
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('songInfo', {
     optional: ['_$context'],
@@ -6491,6 +8182,11 @@ window.compareVersions = function(a, b){
       this.$el.html("");
       $meta = this.$create('<div>').addClass('p0ne-song-info-meta').appendTo(this.$el);
       $parts = {};
+      if (media.format === 1) {
+        $meta.addClass('youtube');
+      } else {
+        $meta.addClass('soundcloud');
+      }
       $('<span>').addClass('p0ne-song-info-author').appendTo($meta).click(function(){
         return mediaSearch(media.author);
       }).attr('title', "search for '" + media.author + "'").text(media.author);
@@ -6498,11 +8194,11 @@ window.compareVersions = function(a, b){
         return mediaSearch(media.title);
       }).attr('title', "search for '" + media.title + "'").text(media.title);
       $('<br>').appendTo($meta);
-      $('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', "https://www.youtube.com/channel/" + d.uploader.id).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
-      $('<a>').addClass('p0ne-song-info-ytTitle').appendTo($meta).attr('href', "http://youtube.com/watch?v=" + media.cid).attr('target', '_blank').attr('title', "open video on Youtube").text(d.title);
+      $('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', d.uploader.url).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
+      $('<a>').addClass('p0ne-song-info-upload-title').appendTo($meta).attr('href', d.url).attr('target', '_blank').attr('title', (media.format === 1 ? 'open video on YouTube' : 'open Song on SoundCloud') + "").text(d.title);
       $('<br>').appendTo($meta);
       $('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getISOTime(new Date(d.uploadDate)));
-      $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text(mediaTime(+d.duration));
+      $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text("duration: " + mediaTime(+d.duration));
       if (media.format === 1) {
         for (i$ = 0, len$ = (ref$ = d.data.entry.media$group.media$restriction || []).length; i$ < len$; ++i$) {
           r = ref$[i$];
@@ -6521,9 +8217,8 @@ window.compareVersions = function(a, b){
    * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
    *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    *
    * Developer's note: if you create your own custom avatar script or use a modified version of this,
    * you are hereby granted permission connect to this one's default avatar server.
@@ -6551,794 +8246,622 @@ window.compareVersions = function(a, b){
       - do not access p0ne._avatars directly, do avoid conflicts and bugs!
       - if you however STILL manually change something, you might need to do updateAvatarStore() to update it
   */
-  requireHelper('users', function(it){
-    var ref$, ref1$;
-    return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
-  });
-  window.userID || (window.userID = API.getUser().id);
-  if (typeof users != 'undefined' && users !== null) {
-    window.user_ || (window.user_ = users.get(userID));
+  if (typeof SockJS == 'undefined' || SockJS === null) {
+    window.Socket = window.WebSocket;
+    require.config({
+      paths: {
+        sockjs: p0ne.host + "/script/sockjs"
+      }
+    });
   }
-  window.sleep || (window.sleep = function(delay, fn){
-    return setTimeout(fn, delay);
-  });
-  requireHelper('avatarAuxiliaries', function(it){
-    return it.getAvatarUrl;
-  });
-  requireHelper('Avatar', function(it){
-    return it.AUDIENCE;
-  });
-  requireHelper('AvatarList', function(it){
-    var ref$;
-    return (ref$ = it._byId) != null ? ref$.admin01 : void 8;
-  });
-  requireHelper('myAvatars', function(it){
-    return it.comparator === 'id';
-  });
-  requireHelper('InventoryDropdown', function(it){
-    return it.selected;
-  });
-  window.Lang = require('lang/Lang');
-  window.Cells = requireAll(function(m){
-    var ref$;
-    return ((ref$ = m.prototype) != null ? ref$.className : void 8) === 'cell' && m.prototype.getBlinkFrame;
-  });
-  module('customAvatars', {
-    require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars'],
-    displayName: 'Custom Avatars',
-    settings: 'base',
-    help: 'This adds a few custom avatars to plug.dj\n\nYou can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".\nClick on the Dropdown field in the top-left to select another category.\n\nEveryone who uses plug_p0ne sees you with your custom avatar.',
-    persistent: ['socket'],
-    setup: function(arg$){
-      var addListener, replace, css, user, hasNewAvatar, getAvatarUrl_, _internal_addAvatar, i$, ref$, len$, ref1$, avatarID, category, Cell, that, urlParser, this$ = this;
-      addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
-      this.replace = replace;
-      console.info("[p0ne avatars] initializing");
-      p0ne._avatars = {};
-      user = API.getUser();
-      hasNewAvatar = localStorage.vanillaAvatarID && localStorage.vanillaAvatarID === user.avatarID;
-      localStorage.vanillaAvatarID = user.avatarID;
-      replace(avatarAuxiliaries, 'getAvatarUrl', function(gAU_){
-        return function(avatarID, type){
-          var ref$;
-          return ((ref$ = p0ne._avatars[avatarID]) != null ? ref$[type] : void 8) || gAU_(avatarID, type);
-        };
-      });
-      getAvatarUrl_ = avatarAuxiliaries.getAvatarUrl_;
-      _internal_addAvatar = function(d){
-        var avatarID, avatar, base_url;
-        avatarID = d.avatarID;
-        if (p0ne._avatars[avatarID]) {
-          console.info("[p0ne avatars] updating '" + avatarID + "'", d);
-        } else if (!d.isVanilla) {
-          console.info("[p0ne avatars] adding '" + avatarID + "'", d);
-        }
-        avatar = {
-          inInventory: false,
-          category: d.category || 'p0ne',
-          thumbOffsetTop: d.thumbOffsetTop,
-          thumbOffsetLeft: d.thumbOffsetLeft,
-          isVanilla: !!d.isVanilla,
-          permissions: d.permissions || 0
-        };
-        if (d.isVanilla) {
-          avatar[""] = getAvatarUrl_(avatarID, "");
-          avatar.dj = getAvatarUrl_(avatarID, 'dj');
-          avatar.b = getAvatarUrl_(avatarID, 'b');
-        } else {
-          base_url = d.base_url || "";
-          avatar[""] = base_url + (d.anim || avatarID + '.png');
-          avatar.dj = base_url + (d.dj || avatarID + 'dj.png');
-          avatar.b = base_url + (d.b || avatarID + 'b.png');
-        }
-        p0ne._avatars[avatarID] = avatar;
-        if (!(avatar.category in Lang.userAvatars)) {
-          Lang.userAvatars[avatar.category] = avatar.category;
-        }
-        delete Avatar.IMAGES[avatarID + ""];
-        delete Avatar.IMAGES[avatarID + "dj"];
-        delete Avatar.IMAGES[avatarID + "b"];
-        if (!updateAvatarStore.loading) {
-          updateAvatarStore.loading = true;
-          return requestAnimationFrame(function(){
-            updateAvatarStore();
-            return updateAvatarStore.loading = false;
-          });
-        }
-      };
-      out$.addAvatar = this.addAvatar = function(avatarID, d){
-        var avatar;
-        if (typeof d === 'object') {
-          avatar = d;
-          d.avatarID = avatarID;
-        } else if (typeof avatarID === 'object') {
-          avatar = avatarID;
-        } else {
-          throw new TypeError("invalid avatar data passed to addAvatar(avatarID*, data)");
-        }
-        d.isVanilla = false;
-        return _internal_addAvatar(d);
-      };
-      out$.removeAvatar = this.removeAvatar = function(avatarID, replace){
-        var i$, ref$, len$, u, ref1$;
-        for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
-          u = ref$[i$];
-          if (u.get('avatarID') === avatarID) {
-            u.set('avatarID', u.get('avatarID_'));
+  require(['sockjs'], function(SockJS){
+    requireHelper('users', function(it){
+      var ref$, ref1$;
+      return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
+    });
+    window.userID || (window.userID = API.getUser().id);
+    if (typeof users != 'undefined' && users !== null) {
+      window.user_ || (window.user_ = users.get(userID));
+    }
+    window.sleep || (window.sleep = function(delay, fn){
+      return setTimeout(fn, delay);
+    });
+    requireHelper('avatarAuxiliaries', function(it){
+      return it.getAvatarUrl;
+    });
+    requireHelper('Avatar', function(it){
+      return it.AUDIENCE;
+    });
+    requireHelper('myAvatars', function(it){
+      return it.comparator === 'id';
+    });
+    requireHelper('InventoryDropdown', function(it){
+      return it.selected;
+    });
+    window.Lang = require('lang/Lang');
+    window.Cells = requireAll(function(m){
+      var ref$;
+      return ((ref$ = m.prototype) != null ? ref$.className : void 8) === 'cell' && m.prototype.getBlinkFrame;
+    });
+    return module('customAvatars', {
+      require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars'],
+      optional: ['user_', '_$context'],
+      displayName: 'Custom Avatars',
+      settings: 'base',
+      disabled: true,
+      help: 'This adds a few custom avatars to plug.dj\n\nYou can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".\nClick on the Dropdown field in the top-left to select another category.\n\nEveryone who uses plug_p0ne sees you with your custom avatar.',
+      persistent: ['socket'],
+      setup: function(arg$, customAvatars){
+        var addListener, revert, css, avatarID, hasNewAvatar, getAvatarUrl_, _internal_addAvatar, i$, ref$, len$, Cell, that, urlParser, this$ = this;
+        addListener = arg$.addListener, this.replace = arg$.replace, revert = arg$.revert, css = arg$.css;
+        console.info("[p0ne avatars] initializing");
+        p0ne._avatars = {};
+        avatarID = API.getUser().avatarID;
+        hasNewAvatar = localStorage.vanillaAvatarID && localStorage.vanillaAvatarID === avatarID;
+        localStorage.vanillaAvatarID = avatarID;
+        replace(avatarAuxiliaries, 'getAvatarUrl', function(gAU_){
+          return function(avatarID, type){
+            var ref$;
+            return ((ref$ = p0ne._avatars[avatarID]) != null ? ref$[type] : void 8) || gAU_(avatarID, type);
+          };
+        });
+        getAvatarUrl_ = avatarAuxiliaries.getAvatarUrl_;
+        _internal_addAvatar = function(d){
+          var avatarID, avatar, base_url;
+          avatarID = d.avatarID;
+          if (p0ne._avatars[avatarID]) {
+            console.info("[p0ne avatars] updating '" + avatarID + "'", d);
+          } else if (!d.isVanilla) {
+            console.info("[p0ne avatars] adding '" + avatarID + "'", d);
           }
-        }
-        return ref1$ = (ref$ = p0ne._avatars)[avatarID], delete ref$[avatarID], ref1$;
-      };
-      out$.changeAvatar = this.changeAvatar = function(userID, avatarID){
-        var avatar, user, ref$;
-        avatar = p0ne._avatars[avatarID];
-        if (!avatar) {
-          console.warn("[p0ne avatars] can't load avatar: '" + avatarID + "'");
-          return;
-        }
-        if (!(user = users.get(userID))) {
-          return;
-        }
-        if (!avatar.permissions || API.hasPermissions(userID, avatar.permissions)) {
-          (ref$ = user.attributes).avatarID_ || (ref$.avatarID_ = user.get('avatarID'));
-          user.set('avatarID', avatarID);
-        } else {
-          console.warn("user with ID " + userID + " doesn't have permissions for avatar '" + avatarID + "'");
-        }
-        if (userID === user_.id) {
-          if ((ref$ = customAvatars.socket) != null) {
-            ref$.emit('changeAvatarID', avatarID);
+          avatar = {
+            inInventory: false,
+            category: d.category || 'p0ne',
+            thumbOffsetTop: d.thumbOffsetTop,
+            thumbOffsetLeft: d.thumbOffsetLeft,
+            isVanilla: !!d.isVanilla,
+            permissions: d.permissions || 0
+          };
+          if (d.isVanilla) {
+            avatar[""] = getAvatarUrl_(avatarID, "");
+            avatar.dj = getAvatarUrl_(avatarID, 'dj');
+            avatar.b = getAvatarUrl_(avatarID, 'b');
+          } else {
+            base_url = d.base_url || "";
+            avatar[""] = base_url + (d.anim || avatarID + '.png');
+            avatar.dj = base_url + (d.dj || avatarID + 'dj.png');
+            avatar.b = base_url + (d.b || avatarID + 'b.png');
           }
-          return localStorage.avatarID = avatarID;
-        }
-      };
-      out$.updateAvatarStore = this.updateAvatarStore = function(){
-        var styles, avatarIDs, l, avatarID, ref$, avi, vanilla, categories, ref1$, key$, category, avis, i$, len$;
-        styles = "";
-        avatarIDs = [];
-        l = 0;
-        for (avatarID in ref$ = p0ne._avatars) {
-          avi = ref$[avatarID];
-          if (!avi.isVanilla) {
-            avatarIDs[l++] = avatarID;
-            styles += ".avi-" + avatarID + " {background-image: url('" + avi[''] + "');background-position: " + (avi.thumbOffsetLeft || 0) + "px " + (avi.thumbOffsetTop || 0) + "px";
-            styles += "}\n";
+          p0ne._avatars[avatarID] = avatar;
+          if (!(avatar.category in Lang.userAvatars)) {
+            Lang.userAvatars[avatar.category] = avatar.category;
           }
-        }
-        if (l) {
-          css('p0ne_avatars', ".avi {background-repeat: no-repeat;}\n.thumb.small .avi-" + avatarIDs.join(', .thumb.small .avi-') + " {background-size: 1393px; /* = 836/15*24 thumbsWidth / thumbsCount * animCount*/}\n.thumb.medium .avi-" + avatarIDs.join(', .thumb.medium .avi-') + " {background-size: 1784px; /* = 1115/15*24 thumbsWidth / thumbsCount * animCount*/}\n" + styles + "");
-        }
-        vanilla = [];
-        l = 0;
-        categories = {};
-        for (avatarID in ref$ = p0ne._avatars) {
-          avi = ref$[avatarID];
-          if (avi.inInventory || !avi.isVanilla) {
-            if (avi.isVanilla) {
-              vanilla[l++] = new Avatar({
-                id: avatarID,
-                category: avi.category,
-                type: 'avatar'
-              });
-            } else {
-              (ref1$ = categories[key$ = avi.category] || (categories[key$] = []))[ref1$.length] = avatarID;
-            }
-          }
-        }
-        myAvatars.models = [];
-        l = 0;
-        for (category in categories) {
-          avis = categories[category];
-          for (i$ = 0, len$ = avis.length; i$ < len$; ++i$) {
-            avatarID = avis[i$];
-            myAvatars.models[l++] = new Avatar({
-              id: avatarID,
-              category: category,
-              type: 'avatar'
+          delete Avatar.IMAGES[avatarID + ""];
+          delete Avatar.IMAGES[avatarID + "dj"];
+          delete Avatar.IMAGES[avatarID + "b"];
+          if (!updateAvatarStore.loading) {
+            updateAvatarStore.loading = true;
+            return requestAnimationFrame(function(){
+              updateAvatarStore();
+              return updateAvatarStore.loading = false;
             });
           }
-        }
-        myAvatars.models = myAvatars.models.concat(vanilla);
-        myAvatars.length = myAvatars.models.length;
-        myAvatars.trigger('reset', false);
-        console.log("[p0ne avatars] avatar inventory updated");
-        return true;
-      };
-      addListener(myAvatars, 'reset', function(vanillaTrigger){
-        if (vanillaTrigger) {
-          return updateAvatarStore();
-        }
-      });
-      replace(InventoryDropdown.prototype, 'draw', function(d_){
-        return function(){
-          var html, categories, i$, ref$, len$, avi, category, this$ = this;
-          html = "";
-          categories = {};
-          for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
-            avi = ref$[i$];
-            categories[avi.get('category')] = true;
-          }
-          for (category in categories) {
-            html += "<div class=\"row\" data-value=\"" + category + "\"><span>" + Lang.userAvatars[category] + "</span></div>";
-          }
-          this.$el.html("<dl class=\"dropdown\">\n    <dt><span></span><i class=\"icon icon-arrow-down-grey\"></i><i class=\"icon icon-arrow-up-grey\"></i></dt>\n    <dd>" + html + "</dd>\n</dl>");
-          $('dt').on('click', function(e){
-            return this$.onBaseClick(e);
-          });
-          $('.row').on('click', function(e){
-            return this$.onRowClick(e);
-          });
-          this.select(InventoryDropdown.selected);
-          return this.$el.show();
         };
-      });
-      Lang.userAvatars.p0ne = "Custom Avatars";
-      for (i$ = 0, len$ = (ref$ = AvatarList.models).length; i$ < len$; ++i$) {
-        ref1$ = ref$[i$], avatarID = ref1$.id, category = ref1$.attributes.category;
-        _internal_addAvatar({
-          avatarID: avatarID,
-          isVanilla: true,
-          category: category
-        });
-      }
-      console.log("[p0ne avatars] added internal avatars", p0ne._avatars);
-      for (i$ = 0, len$ = (ref$ = window.Cells).length; i$ < len$; ++i$) {
-        Cell = ref$[i$];
-        replace(Cell.prototype, 'onClick', fn$);
-      }
-      $.ajax({
-        url: '/_/store/inventory/avatars',
-        success: function(d){
-          var avatarIDs, l, i$, ref$, len$, avatar;
+        out$.addAvatar = this.addAvatar = function(avatarID, d){
+          var avatar;
+          if (typeof d === 'object') {
+            avatar = d;
+            d.avatarID = avatarID;
+          } else if (typeof avatarID === 'object') {
+            avatar = avatarID;
+          } else {
+            throw new TypeError("invalid avatar data passed to addAvatar(avatarID*, data)");
+          }
+          d.isVanilla = false;
+          return _internal_addAvatar(d);
+        };
+        out$.removeAvatar = this.removeAvatar = function(avatarID, replace){
+          var i$, ref$, len$, u, ref1$;
+          for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+            u = ref$[i$];
+            if (u.get('avatarID') === avatarID) {
+              u.set('avatarID', u.get('avatarID_'));
+            }
+          }
+          return ref1$ = (ref$ = p0ne._avatars)[avatarID], delete ref$[avatarID], ref1$;
+        };
+        out$.changeAvatar = this.changeAvatar = function(userID, avatarID){
+          var avatar, user, ref$;
+          avatar = p0ne._avatars[avatarID];
+          if (!avatar) {
+            console.warn("[p0ne avatars] can't load avatar: '" + avatarID + "'");
+            return;
+          }
+          if (!(user = users.get(userID))) {
+            return;
+          }
+          if (!avatar.permissions || API.hasPermissions(userID, avatar.permissions)) {
+            (ref$ = user.attributes).avatarID_ || (ref$.avatarID_ = user.get('avatarID'));
+            user.set('avatarID', avatarID);
+          } else {
+            console.warn("user with ID " + userID + " doesn't have permissions for avatar '" + avatarID + "'");
+          }
+          if (userID === user_.id) {
+            return localStorage.avatarID = avatarID;
+          }
+        };
+        out$.updateAvatarStore = this.updateAvatarStore = function(){
+          var styles, avatarIDs, l, avatarID, ref$, avi, vanilla, categories, ref1$, key$, category, avis, i$, len$;
+          styles = "";
           avatarIDs = [];
           l = 0;
-          for (i$ = 0, len$ = (ref$ = d.data).length; i$ < len$; ++i$) {
-            avatar = ref$[i$];
-            avatarIDs[l++] = avatar.id;
-            if (!p0ne._avatars[avatar.id]) {
-              _internal_addAvatar({
-                avatarID: avatar.id,
-                isVanilla: true,
-                category: avatar.category
+          for (avatarID in ref$ = p0ne._avatars) {
+            avi = ref$[avatarID];
+            if (!avi.isVanilla) {
+              avatarIDs[l++] = avatarID;
+              styles += ".avi-" + avatarID + " {background-image: url('" + avi[''] + "');background-position: " + (avi.thumbOffsetLeft || 0) + "px " + (avi.thumbOffsetTop || 0) + "px";
+              styles += "}\n";
+            }
+          }
+          if (l) {
+            css('p0ne_avatars', ".avi {background-repeat: no-repeat;}\n.thumb.small .avi-" + avatarIDs.join(', .thumb.small .avi-') + " {background-size: 1393px; /* = 836/15*24 thumbsWidth / thumbsCount * animCount*/}\n.thumb.medium .avi-" + avatarIDs.join(', .thumb.medium .avi-') + " {background-size: 1784px; /* = 1115/15*24 thumbsWidth / thumbsCount * animCount*/}\n" + styles + "");
+          }
+          vanilla = [];
+          l = 0;
+          categories = {};
+          for (avatarID in ref$ = p0ne._avatars) {
+            avi = ref$[avatarID];
+            if (avi.inInventory || !avi.isVanilla) {
+              if (avi.isVanilla) {
+                vanilla[l++] = new Avatar({
+                  id: avatarID,
+                  category: avi.category,
+                  type: 'avatar'
+                });
+              } else {
+                (ref1$ = categories[key$ = avi.category] || (categories[key$] = []))[ref1$.length] = avatarID;
+              }
+            }
+          }
+          myAvatars.models = [];
+          l = 0;
+          for (category in categories) {
+            avis = categories[category];
+            for (i$ = 0, len$ = avis.length; i$ < len$; ++i$) {
+              avatarID = avis[i$];
+              myAvatars.models[l++] = new Avatar({
+                id: avatarID,
+                category: category,
+                type: 'avatar'
               });
             }
-            p0ne._avatars[avatar.id].inInventory = true;
           }
-          return updateAvatarStore();
+          myAvatars.models = myAvatars.models.concat(vanilla);
+          myAvatars.length = myAvatars.models.length;
+          myAvatars.trigger('reset', false);
+          console.log("[p0ne avatars] avatar inventory updated");
+          return true;
+        };
+        addListener(myAvatars, 'reset', function(vanillaTrigger){
+          if (vanillaTrigger) {
+            return updateAvatarStore();
+          }
+        });
+        replace(InventoryDropdown.prototype, 'draw', function(d_){
+          return function(){
+            var html, categories, i$, ref$, len$, avi, category, this$ = this;
+            html = "";
+            categories = {};
+            for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
+              avi = ref$[i$];
+              categories[avi.get('category')] = true;
+            }
+            for (category in categories) {
+              html += "<div class=\"row\" data-value=\"" + category + "\"><span>" + Lang.userAvatars[category] + "</span></div>";
+            }
+            this.$el.html("<dl class=\"dropdown\">\n    <dt><span></span><i class=\"icon icon-arrow-down-grey\"></i><i class=\"icon icon-arrow-up-grey\"></i></dt>\n    <dd>" + html + "</dd>\n</dl>");
+            $('dt').on('click', function(e){
+              return this$.onBaseClick(e);
+            });
+            $('.row').on('click', function(e){
+              return this$.onRowClick(e);
+            });
+            this.select(InventoryDropdown.selected);
+            return this.$el.show();
+          };
+        });
+        Lang.userAvatars.p0ne = "Custom Avatars";
+        /*for {id:avatarID, attributes:{category}} in AvatarList.models
+            _internal_addAvatar do
+                avatarID: avatarID
+                isVanilla: true
+                category: category
+                #category: avatarID.replace /\d+$/, ''
+                #category: avatarID.substr(0,avatarID.length-2) damn you "tastycat"
+        */
+        console.log("[p0ne avatars] added internal avatars", p0ne._avatars);
+        for (i$ = 0, len$ = (ref$ = window.Cells).length; i$ < len$; ++i$) {
+          Cell = ref$[i$];
+          replace(Cell.prototype, 'onClick', fn$);
         }
-      });
-      if (that = !hasNewAvatar && localStorage.avatarID) {
-        changeAvatar(userID, that);
-      }
-      /*####################################
-      #         ppCAS Integration          #
-      ####################################*/
-      this.oldBlurb = API.getUser().blurb;
-      this.blurbIsChanged = false;
-      urlParser = document.createElement('a');
-      addListener(API, 'chatCommand', function(str){
-        var server, base_url, helper;
-        if (0 === str.toLowerCase().indexOf("/ppcas")) {
-          server = $.trim(str.substr(6));
-          if (server === "<url>") {
-            API.chatLog("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", true);
-          } else if (server === ".") {
-            base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/";
-            helper = function(fn){
-              var i$, ref$, len$, avatarID, results$ = [];
-              fn = window[fn];
-              for (i$ = 0, len$ = (ref$ = ['su01', 'su02', 'space03', 'space04', 'space05', 'space06']).length; i$ < len$; ++i$) {
-                avatarID = ref$[i$];
-                fn(avatarID, {
-                  category: "Veteran",
-                  base_url: base_url,
-                  thumbOffsetTop: -5
+        $.ajax({
+          url: '/_/store/inventory/avatars',
+          success: function(d){
+            var avatarIDs, l, i$, ref$, len$, avatar;
+            avatarIDs = [];
+            l = 0;
+            for (i$ = 0, len$ = (ref$ = d.data).length; i$ < len$; ++i$) {
+              avatar = ref$[i$];
+              avatarIDs[l++] = avatar.id;
+              if (!p0ne._avatars[avatar.id]) {
+                _internal_addAvatar({
+                  avatarID: avatar.id,
+                  isVanilla: true,
+                  category: avatar.category
                 });
               }
-              fn('animal12', {
-                category: "Veteran",
-                base_url: base_url,
-                thumbOffsetTop: -19,
-                thumbOffsetLeft: -16
-              });
-              for (i$ = 0, len$ = (ref$ = ['animal01', 'animal02', 'animal03', 'animal04', 'animal05', 'animal06', 'animal07', 'animal08', 'animal09', 'animal10', 'animal11', 'animal12', 'animal13', 'animal14', 'lucha01', 'lucha02', 'lucha03', 'lucha04', 'lucha05', 'lucha06', 'lucha07', 'lucha08', 'monster01', 'monster02', 'monster03', 'monster04', 'monster05', '_tastycat', '_tastycat02', 'warrior01', 'warrior02', 'warrior03', 'warrior04']).length; i$ < len$; ++i$) {
-                avatarID = ref$[i$];
-                results$.push(fn(avatarID, {
-                  category: "Veteran",
-                  base_url: base_url,
-                  thumbOffsetTop: -10
-                }));
-              }
-              return results$;
-            };
-            this$.socket = {
-              close: function(){
-                var ref$;
-                helper('removeAvatar');
-                return ref$ = this.socket, delete this.socket, ref$;
-              }
-            };
-            helper('addAvatar');
+              p0ne._avatars[avatar.id].inInventory = true;
+            }
+            return updateAvatarStore();
           }
-          urlParser.href = server;
-          if (urlParser.host !== location.host) {
-            console.log("[p0ne avatars] connecting to", server);
-            return this$.connect(server);
-          } else {
-            return console.warn("[p0ne avatars] invalid ppCAS server");
-          }
-        }
-      });
-      return this.connect('https://p0ne.com/_');
-      function fn$(oC_){
-        return function(){
-          var avatarID;
-          console.log("[p0ne avatars] Avatar Cell click", this);
-          avatarID = this.model.get("id");
-          if (p0ne._avatars[avatarID].isVanilla && p0ne._avatars[avatarID].inInventory) {
-            return oC_.apply(this, arguments);
-          } else {
-            changeAvatar(userID, avatarID);
-            return this.onSelected();
-          }
-        };
-      }
-    },
-    connectAttemps: 1,
-    connect: function(url, reconnecting, reconnectWarning){
-      var reconnect, this$ = this;
-      if (!reconnecting && this.socket) {
-        if (url === this.socket.url && this.socket.readyState === 1) {
-          return;
-        }
-        this.socket.close();
-      }
-      console.log("[p0ne avatars] using socket as ppCAS avatar server");
-      reconnect = true;
-      if (reconnectWarning) {
-        setTimeout(function(){
-          if (this$.connectAttemps === 0) {
-            return API.chatLog("[p0ne avatars] lost connection to avatar server \xa0 =(");
-          }
-        }, 10000);
-      }
-      this.socket = new SockJS(url);
-      this.socket.url = url;
-      this.socket.on = this.socket.addEventListener;
-      this.socket.off = this.socket.removeEventListener;
-      this.socket.once = function(type, callback){
-        return this.on(type, function(){
-          this.off(type, callback);
-          return callback.apply(this, arguments);
         });
-      };
-      this.socket.emit = function(type){
-        var data;
-        data = slice$.call(arguments, 1);
-        console.log("[ppCAS] > [" + type + "]", data);
-        return this.send(JSON.stringify({
-          type: type,
-          data: data
-        }));
-      };
-      this.socket.trigger = function(type, args){
-        var listeners, i$, len$, fn, results$ = [];
-        if (typeof args !== 'object' || !(args != null && args.length)) {
-          args = [args];
+        if (that = !hasNewAvatar && localStorage.avatarID) {
+          changeAvatar(userID, that);
         }
-        listeners = this._listeners[type];
-        if (listeners) {
-          for (i$ = 0, len$ = listeners.length; i$ < len$; ++i$) {
-            fn = listeners[i$];
-            results$.push(fn.apply(this, args));
+        if ((typeof _$context != 'undefined' && _$context !== null) && (typeof user_ != 'undefined' && user_ !== null)) {
+          addListener(_$context, 'ack', function(){
+            return replace(user_, 'set', function(s_){
+              return function(obj, val){
+                if (obj.avatarID && obj.avatarID === this.get('avatarID_')) {
+                  delete obj.avatarID;
+                }
+                return s_.call(this, obj, val);
+              };
+            });
+          });
+          addListener(_$context, 'UserEvent:friends', function(){
+            return revert(user_, 'set');
+          });
+        }
+        /*####################################
+        #         ppCAS Integration          #
+        ####################################*/
+        this.oldBlurb = API.getUser().blurb;
+        this.blurbIsChanged = false;
+        urlParser = document.createElement('a');
+        addListener(API, 'chatCommand', function(str){
+          var server, base_url, helper;
+          if (0 === str.toLowerCase().indexOf("/ppcas")) {
+            server = $.trim(str.substr(6));
+            if (server === "<url>") {
+              chatWarn("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars");
+            } else if (server === ".") {
+              base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/";
+              helper = function(fn){
+                var i$, ref$, len$, avatarID, results$ = [];
+                fn = window[fn];
+                for (i$ = 0, len$ = (ref$ = ['su01', 'su02', 'space03', 'space04', 'space05', 'space06']).length; i$ < len$; ++i$) {
+                  avatarID = ref$[i$];
+                  fn(avatarID, {
+                    category: 'Veteran',
+                    base_url: base_url,
+                    thumbOffsetTop: -5
+                  });
+                }
+                fn('animal12', {
+                  category: 'Veteran',
+                  base_url: base_url,
+                  thumbOffsetTop: -19,
+                  thumbOffsetLeft: -16
+                });
+                for (i$ = 0, len$ = (ref$ = ['animal01', 'animal02', 'animal03', 'animal04', 'animal05', 'animal06', 'animal07', 'animal08', 'animal09', 'animal10', 'animal11', 'animal12', 'animal13', 'animal14', 'lucha01', 'lucha02', 'lucha03', 'lucha04', 'lucha05', 'lucha06', 'lucha07', 'lucha08', 'monster01', 'monster02', 'monster03', 'monster04', 'monster05', '_tastycat', '_tastycat02', 'warrior01', 'warrior02', 'warrior03', 'warrior04']).length; i$ < len$; ++i$) {
+                  avatarID = ref$[i$];
+                  results$.push(fn(avatarID, {
+                    category: 'Veteran',
+                    base_url: base_url,
+                    thumbOffsetTop: -10
+                  }));
+                }
+                return results$;
+              };
+              this$.socket = {
+                close: function(){
+                  var ref$;
+                  helper('removeAvatar');
+                  return ref$ = this.socket, delete this.socket, ref$;
+                }
+              };
+              helper('addAvatar');
+            }
+            urlParser.href = server;
+            if (urlParser.host !== location.host) {
+              console.log("[p0ne avatars] connecting to", server);
+              return this$.connect(server);
+            } else {
+              return console.warn("[p0ne avatars] invalid ppCAS server");
+            }
           }
-          return results$;
-        } else {
-          return console.error("[ppCAS] unknown event '" + type + "'");
+        });
+        return this.connect('https://p0ne.com/_');
+        function fn$(oC_){
+          return function(){
+            var avatarID, ref$, ref1$;
+            console.log("[p0ne avatars] Avatar Cell click", this);
+            avatarID = this.model.get("id");
+            if (!p0ne._avatars[avatarID] || p0ne._avatars[avatarID].inInventory) {
+              oC_.apply(this, arguments);
+              return (ref$ = customAvatars.socket) != null ? ref$.emit('changeAvatarID', null) : void 8;
+            } else {
+              if ((ref1$ = customAvatars.socket) != null) {
+                ref1$.emit('changeAvatarID', avatarID);
+              }
+              changeAvatar(userID, avatarID);
+              return this.onSelected();
+            }
+          };
         }
-      };
-      this.socket.onmessage = function(arg$){
-        var message, ref$, type, data, e;
-        message = arg$.data;
-        try {
-          ref$ = JSON.parse(message), type = ref$.type, data = ref$.data;
-          console.log("[ppCAS] < [" + type + "]", data);
-        } catch (e$) {
-          e = e$;
-          console.warn("[ppCAS] invalid message received", message, e);
-          return;
+      },
+      connectAttemps: 1,
+      connect: function(url, reconnecting, reconnectWarning){
+        var reconnect, user, oldBlurb, newBlurb, this$ = this;
+        if (!reconnecting && this.socket) {
+          if (url === this.socket.url && this.socket.readyState === 1) {
+            return;
+          }
+          this.socket.close();
         }
-        return this$.socket.trigger(type, data);
-      };
-      this.replace(this.socket, close, function(close_){
-        return function(){
-          this.trigger(close);
-          return close_.apply(this, arguments);
+        console.log("[p0ne avatars] using socket as ppCAS avatar server");
+        reconnect = true;
+        if (reconnectWarning) {
+          setTimeout(function(){
+            if (this$.connectAttemps === 0) {
+              return chatWarn("lost connection to avatar server \xa0 =(", "p0ne avatars");
+            }
+          }, 10000);
+        }
+        this.socket = new SockJS(url);
+        this.socket.url = url;
+        this.socket.on = this.socket.addEventListener;
+        this.socket.off = this.socket.removeEventListener;
+        this.socket.once = function(type, callback){
+          return this.on(type, function(){
+            this.off(type, callback);
+            return callback.apply(this, arguments);
+          });
         };
-      });
-      (function(){
-        var user, oldBlurb, newBlurb, this$ = this;
+        this.socket.emit = function(type){
+          var data;
+          data = slice$.call(arguments, 1);
+          console.log("[ppCAS] > [" + type + "]", data);
+          return this.send(JSON.stringify({
+            type: type,
+            data: data
+          }));
+        };
+        this.socket.trigger = function(type, args){
+          var listeners, i$, len$, fn, results$ = [];
+          if (typeof args !== 'object' || !(args != null && args.length)) {
+            args = [args];
+          }
+          listeners = this._listeners[type];
+          if (listeners) {
+            for (i$ = 0, len$ = listeners.length; i$ < len$; ++i$) {
+              fn = listeners[i$];
+              results$.push(fn.apply(this, args));
+            }
+            return results$;
+          } else {
+            return console.error("[ppCAS] unknown event '" + type + "'");
+          }
+        };
+        this.socket.onmessage = function(arg$){
+          var message, ref$, type, data, e;
+          message = arg$.data;
+          try {
+            ref$ = JSON.parse(message), type = ref$.type, data = ref$.data;
+            console.log("[ppCAS] < [" + type + "]", data);
+          } catch (e$) {
+            e = e$;
+            console.warn("[ppCAS] invalid message received", message, e);
+            return;
+          }
+          return this$.socket.trigger(type, data);
+        };
+        this.replace(this.socket, close, function(close_){
+          return function(){
+            this.trigger(close);
+            return close_.apply(this, arguments);
+          };
+        });
         user = API.getUser();
         oldBlurb = user.blurb || "";
         newBlurb = oldBlurb.replace(/🐎\w{4}/g, '');
         if (oldBlurb !== newBlurb) {
-          return this.changeBlurb(newBlurb, {
+          this.changeBlurb(newBlurb, {
             success: function(){
               return console.info("[ppCAS] removed old authToken from user blurb");
             }
           });
         }
-      })();
-      this.socket.on('authToken', function(authToken){
-        var user, newBlurb;
-        user = API.getUser();
-        this$.oldBlurb = user.blurb || "";
-        if (!user.blurb) {
-          newBlurb = authToken;
-        } else if (user.blurb.length >= 72) {
-          newBlurb = user.blurb.substr(0, 71) + "… 🐎" + authToken;
-        } else {
-          newBlurb = user.blurb + " " + authToken;
-        }
-        this$.blurbIsChanged = true;
-        return this$.changeBlurb(newBlurb, {
-          success: function(){
-            this$.blurbIsChanged = false;
-            return this$.socket.emit('auth', userID);
-          },
-          error: function(){
-            console.error("[ppCAS] failed to authenticate by changing the blurb.");
-            return this$.changeBlurb(this$.oldBlurb, {
-              success: function(){
-                return console.info("[ppCAS] blurb reset.");
-              }
-            });
+        this.socket.on('authToken', function(authToken){
+          var user, newBlurb;
+          user = API.getUser();
+          this$.oldBlurb = user.blurb || "";
+          if (!user.blurb) {
+            newBlurb = authToken;
+          } else if (user.blurb.length >= 72) {
+            newBlurb = user.blurb.substr(0, 71) + "… 🐎" + authToken;
+          } else {
+            newBlurb = user.blurb + " " + authToken;
           }
-        });
-      });
-      this.socket.on('authAccepted', function(){
-        this$.connectAttemps = 0;
-        reconnecting = false;
-        return this$.changeBlurb(this$.oldBlurb, {
-          success: function(){
-            return this$.blurbIsChanged = false;
-          },
-          error: function(){
-            API.chatLog("[p0ne avatars] failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?");
-            return this$.changeBlurb(this$.oldBlurb, {
-              error: function(){
-                return console.error("[ppCAS] failed to reset the blurb.");
-              }
-            });
-          }
-        });
-      });
-      this.socket.on('authDenied', function(){
-        console.warn("[ppCAS] authDenied");
-        API.chatLog("[p0ne avatars] authentification failed");
-        this$.changeBlurb(this$.oldBlurb, {
-          success: function(){
-            return this$.blurbIsChanged = false;
-          },
-          error: function(){
-            return this$.changeBlurb(this$.oldBlurb, {
-              error: function(){
-                return console.error("[ppCAS] failed to reset the blurb.");
-              }
-            });
-          }
-        });
-        return API.chatLog("[p0ne avatars] Failed to authenticate with user id '" + userID + "'", true);
-      });
-      this.socket.on('avatars', function(avatars){
-        var user, avatarID, avatar;
-        user = API.getUser();
-        this$.socket.avatars = avatars;
-        if (this$.socket.users) {
-          requestAnimationFrame(initUsers);
-        }
-        for (avatarID in avatars) {
-          avatar = avatars[avatarID];
-          addAvatar(avatarID, avatar);
-        }
-        if (localStorage.avatarID in avatars) {
-          return changeAvatar(userID, localStorage.avatarID);
-        } else if (user.avatarID in avatars) {
-          return this$.socket.emit('changeAvatarID', user.avatarID);
-        }
-      });
-      this.socket.on('users', function(users){
-        this$.socket.users = users;
-        if (this$.socket.avatars) {
-          return requestAnimationFrame(initUsers);
-        }
-      });
-      function initUsers(avatarID){
-        var userID, ref$, ref1$;
-        for (userID in ref$ = this$.socket.users) {
-          avatarID = ref$[userID];
-          console.log("[ppCAS] change other's avatar", userID, "(" + ((ref1$ = users.get(userID)) != null ? ref1$.get('username') : void 8) + ")", avatarID);
-          this$.changeAvatar(userID, avatarID);
-        }
-        if (reconnecting) {
-          API.chatLog("[p0ne avatars] reconnected");
-        }
-        _$context.trigger('ppCAS:connected');
-        return API.trigger('ppCAS:connected');
-      }
-      this.socket.on('changeAvatarID', function(userID, avatarID){
-        var ref$;
-        console.log("[ppCAS] change other's avatar:", userID, avatarID);
-        return (ref$ = users.get(userID)) != null ? ref$.set('avatarID', avatarID) : void 8;
-      });
-      this.socket.on('disconnect', function(userID){
-        console.log("[ppCAS] user disconnected:", userID);
-        return this$.changeAvatarID(userID, avatarID);
-      });
-      this.socket.on('disconnected', function(reason){
-        return this$.socket.trigger('close', reason);
-      });
-      this.socket.on('close', function(reason){
-        console.warn("[ppCAS] connection closed", reason);
-        return reconnect = false;
-      });
-      this.socket.onclose = function(e){
-        var timeout;
-        console.warn("[ppCAS] DISCONNECTED", e);
-        _$context.trigger('ppCAS:disconnected');
-        API.trigger('ppCAS:disconnected');
-        if (e.wasClean) {
-          return reconnect = false;
-        } else if (reconnect && !this$.disabled) {
-          timeout = ~~((5000 + Math.random() * 5000) * this$.connectAttemps);
-          console.info("[ppCAS] reconnecting in " + humanTime(timeout) + " (" + xth(this$.connectAttemps) + " attempt)");
-          return this$.reconnectTimer = sleep(timeout, function(){
-            console.log("[ppCAS] reconnecting…");
-            this$.connectAttemps++;
-            this$.connect(url, true, this$.connectAttemps === 1);
-            _$context.trigger('ppCAS:connecting');
-            return API.trigger('ppCAS:connecting');
+          this$.blurbIsChanged = true;
+          return this$.changeBlurb(newBlurb, {
+            success: function(){
+              this$.blurbIsChanged = false;
+              return this$.socket.emit('auth', userID);
+            },
+            error: function(){
+              console.error("[ppCAS] failed to authenticate by changing the blurb.");
+              return this$.changeBlurb(this$.oldBlurb, {
+                success: function(){
+                  return console.info("[ppCAS] blurb reset.");
+                }
+              });
+            }
           });
-        }
-      };
-      _$context.trigger('ppCAS:connecting');
-      return API.trigger('ppCAS:connecting');
-    },
-    changeBlurb: function(newBlurb, options){
-      options == null && (options = {});
-      return $.ajax({
-        method: 'PUT',
-        url: '/_/profile/blurb',
-        contentType: 'application/json',
-        data: JSON.stringify({
-          blurb: newBlurb
-        }),
-        success: options.success,
-        error: options.error
-      });
-    },
-    disable: function(){
-      var ref$, avatarID, ref1$, avi, i$, user, that, results$ = [];
-      if (this.blurbIsChanged) {
-        this.changeBlurb(this.oldBlurb);
-      }
-      if ((ref$ = this.socket) != null) {
-        ref$.close();
-      }
-      clearTimeout(this.reconnectTimer);
-      for (avatarID in ref1$ = p0ne._avatars) {
-        avi = ref1$[avatarID];
-        avi.inInventory = false;
-      }
-      this.updateAvatarStore();
-      for (i$ in ref1$ = users.models) {
-        user = ref1$[i$];
-        if (that = user.attributes.avatarID_) {
-          results$.push(user.set('avatarID', that));
-        }
-      }
-      return results$;
-    }
-  });
-  /*@source p0ne.stream.ls */
-  /**
-   * Modules for Audio-Only stream and stream settings for plug_p0ne
-   * @author jtbrinkmann aka. Brinkie Pie
-   * @license MIT License
-   * @copyright (c) 2015 J.-T. Brinkmann
-  */
-  module('streamSettings', {
-    settings: 'dev',
-    displayName: 'Audio-Only Stream',
-    require: ['app', 'currentMedia', '_$context'],
-    optional: ['database'],
-    audioOnly: false,
-    setup: function(arg$, streamSettings, arg1$, m_){
-      var addListener, replace, replaceListener, $create, css, $playback, $el, $btn, audio, HDsettings, this$ = this;
-      addListener = arg$.addListener, replace = arg$.replace, replaceListener = arg$.replaceListener, $create = arg$.$create, css = arg$.css;
-      $playback = $('#playback');
-      $el = $create('<div class=p0ne-stream-select>');
-      if (m_) {
-        this.audioOnly = m_.audioOnly;
-      }
-      css('streamSettings', ".icon-stream-video {background: " + getIcon('icon-chat-sound-on').background + ";}.icon-stream-audio {background: " + getIcon('icon-chat-room').background + ";}.icon-stream-off {background: " + getIcon('icon-chat-sound-off').background + ";}");
-      replace(Playback.prototype, 'onHDClick', function(){
-        return $.noop;
-      });
-      $btn = $('#playback .hd').addClass('p0ne-stream-select').html('<div class="box"><span id=p0ne-stream-label>Stream: Video</span><div class="p0ne-stream-buttons"><i class="icon icon-stream-video"></i> <i class="icon icon-stream-audio"></i> <i class="icon icon-stream-off"></i> <div class="p0ne-stream-fancy"></div></div></div>');
-      this.$label = $btn.find('#p0ne-stream-label');
-      addListener($btn.find('.icon-stream-video'), 'click', function(){
-        return this$.changeStream('video');
-      });
-      addListener($btn.find('.icon-stream-audio'), 'click', function(){
-        return this$.changeStream('audio');
-      });
-      addListener($btn.find('.icon-stream-off'), 'click', function(){
-        return this$.changeStream('off');
-      });
-      this.changeStream();
-      this.audio = audio = new Audio();
-      out$.audio = audio;
-      audio.volume = currentMedia.get('volume') / 100;
-      HDsettings = (typeof database != 'undefined' && database !== null ? database.settings : void 8) || {
-        hd720: true
-      };
-      audio.addEventListener('canplay', function(){
-        var diff;
-        console.log("[audioStream] finished buffering");
-        if (currentMedia.get('media') === audio.media) {
-          diff = currentMedia.get('elapsed') - audio.currentTime;
-          if (diff > 4) {
-            audio.init = false;
-            seek();
-            return sleep(2000, function(){
-              if (audio.paused) {
-                console.warn("[audioStream] still not playing. forcing audio.play()");
-                return audio.play();
-              }
-            });
-          } else {
-            audio.play();
-            return console.log("[audioStream] playing song (diff " + humanTime(diff, true) + ")");
+        });
+        this.socket.on('authAccepted', function(){
+          this$.connectAttemps = 0;
+          reconnecting = false;
+          return this$.changeBlurb(this$.oldBlurb, {
+            success: function(){
+              return this$.blurbIsChanged = false;
+            },
+            error: function(){
+              chatWarn("failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?", "p0ne avatars");
+              return this$.changeBlurb(this$.oldBlurb, {
+                error: function(){
+                  return console.error("[ppCAS] failed to reset the blurb.");
+                }
+              });
+            }
+          });
+        });
+        this.socket.on('authDenied', function(){
+          console.warn("[ppCAS] authDenied");
+          chatWarn("authentification failed", "p0ne avatars");
+          this$.changeBlurb(this$.oldBlurb, {
+            success: function(){
+              return this$.blurbIsChanged = false;
+            },
+            error: function(){
+              return this$.changeBlurb(this$.oldBlurb, {
+                error: function(){
+                  return console.error("[ppCAS] failed to reset the blurb.");
+                }
+              });
+            }
+          });
+          return chatWarn("Failed to authenticate with user id '" + userID + "'", "p0ne avatars");
+        });
+        this.socket.on('avatars', function(avatars){
+          var user, avatarID, avatar;
+          user = API.getUser();
+          this$.socket.avatars = avatars;
+          if (this$.socket.users) {
+            requestAnimationFrame(initUsers);
           }
-        } else {
-          return console.warn("[audioStream] next song already started");
+          for (avatarID in avatars) {
+            avatar = avatars[avatarID];
+            addAvatar(avatarID, avatar);
+          }
+          if (localStorage.avatarID in avatars) {
+            return changeAvatar(userID, localStorage.avatarID);
+          } else if (user.avatarID in avatars) {
+            return this$.socket.emit('changeAvatarID', user.avatarID);
+          }
+        });
+        this.socket.on('users', function(users){
+          this$.socket.users = users;
+          if (this$.socket.avatars) {
+            return requestAnimationFrame(initUsers);
+          }
+        });
+        function initUsers(avatarID){
+          var userID, ref$, ref1$;
+          for (userID in ref$ = this$.socket.users) {
+            avatarID = ref$[userID];
+            console.log("[ppCAS] change other's avatar", userID, "(" + ((ref1$ = users.get(userID)) != null ? ref1$.get('username') : void 8) + ")", avatarID);
+            this$.changeAvatar(userID, avatarID);
+          }
+          if (reconnecting) {
+            chatWarn("reconnected", "p0ne avatars");
+          }
+          _$context.trigger('ppCAS:connected');
+          return API.trigger('ppCAS:connected');
         }
-      });
-      replace(Playback.prototype, 'onVolumeChange', function(oVC_){
-        return function(){
-          audio.volume = currentMedia.get('volume') / 100;
-          return oVC_.apply(this, arguments);
-        };
-      });
-      replace(Playback.prototype, 'onMediaChange', function(oMC_){
-        return function(){
-          var media, startTime, a, this$ = this;
-          this.reset();
-          this.$controls.removeClass('snoozed');
-          media = currentMedia.get('media');
-          audio.src = null;
-          audio.media = {};
-          if (media) {
-            this.$noDJ.hide();
-            if (currentMedia.get('streamDisabled')) {
-              return;
-            }
-            this.ignoreComplete = true;
-            sleep(1000, function(){
-              return this$.resetIgnoreComplete();
+        this.socket.on('changeAvatarID', function(userID, avatarID){
+          var ref$;
+          console.log("[ppCAS] change other's avatar:", userID, avatarID);
+          return (ref$ = users.get(userID)) != null ? ref$.set('avatarID', avatarID) : void 8;
+        });
+        this.socket.on('disconnect', function(userID){
+          console.log("[ppCAS] user disconnected:", userID);
+          return this$.changeAvatarID(userID, avatarID);
+        });
+        this.socket.on('disconnected', function(reason){
+          return this$.socket.trigger('close', reason);
+        });
+        this.socket.on('close', function(reason){
+          console.warn("[ppCAS] connection closed", reason);
+          return reconnect = false;
+        });
+        this.socket.onclose = function(e){
+          var timeout;
+          console.warn("[ppCAS] DISCONNECTED", e);
+          _$context.trigger('ppCAS:disconnected');
+          API.trigger('ppCAS:disconnected');
+          if (e.wasClean) {
+            return reconnect = false;
+          } else if (reconnect && !this$.disabled) {
+            timeout = ~~((5000 + Math.random() * 5000) * this$.connectAttemps);
+            console.info("[ppCAS] reconnecting in " + humanTime(timeout) + " (" + xth(this$.connectAttemps) + " attempt)");
+            return this$.reconnectTimer = sleep(timeout, function(){
+              console.log("[ppCAS] reconnecting…");
+              this$.connectAttemps++;
+              this$.connect(url, true, this$.connectAttemps === 1);
+              _$context.trigger('ppCAS:connecting');
+              return API.trigger('ppCAS:connecting');
             });
-            if (media.get('format') === 1) {
-              if (streamSettings.audioOnly && !audio.failed) {
-                /*== audio only streaming ==*/
-                console.log("[audioStream] looking for URL");
-                if (media.id === audio.media.id) {
-                  return seek();
-                } else {
-                  audio.init = true;
-                  return mediaDownload(media, true).then(function(d){
-                    console.log("[audioStream] found url. Buffering…", d);
-                    media.src = d.preferredDownload.url;
-                    audio.media = media;
-                    audio.src = media.src;
-                    seek();
-                    return audio.load();
-                  }).fail(function(err){
-                    console.error("[audioStream] couldn't get audio stream", err);
-                    API.chatLog("[audioStream] couldn't load audio-only stream, using video instead", true);
-                    audio.failed = true;
-                    refresh();
-                    return API.once('advance', function(){
-                      return audio.failed = false;
-                    });
-                  });
-                }
-              } else {
-                console.log("[audioStream] loading video stream");
-                startTime = currentMedia.get('elapsed');
-                this.buffering = false;
-                this.yto = {
-                  id: media.get('cid'),
-                  volume: currentMedia.get('volume'),
-                  seek: startTime < 4 ? 0 : startTime,
-                  quality: HDsettings.hdVideo ? 'hd720' : ""
-                };
-                a = 'yt5';
-                if (window.location.host !== 'plug.dj') {
-                  a += window.location.host === 'localhost' ? 'local' : 'staging';
-                }
-                return this.$container.append($("<iframe id=yt-frame frameborder=0 src='" + window.location.protocol + "//plgyte.appspot.com/" + a + ".html'>").load(this.ytFrameLoadedBind));
-              }
-            } else if (media.get('format') === 2) {
-              return oMC_.apply(this, arguments);
-            } else {
-              return console.log("[audioStream] wut", media.get('format'), typeof media.get('format'));
-            }
-          } else {
-            this.$noDJ.show();
-            return this.$controls.hide();
           }
         };
-      });
-      replace(Playback.prototype, 'stop', function(s_){
-        return function(){
-          audio.pause();
-          return s_.apply(this, arguments);
-        };
-      });
-      replaceListener(currentMedia, 'change:media', Playback, function(){
-        return bind$(app.room.playback, 'onMediaChange');
-      });
-      replaceListener(currentMedia, 'change:streamDisabled', Playback, function(){
-        return bind$(app.room.playback, 'onMediaChange');
-      });
-      replaceListener(currentMedia, 'change:volume', Playback, function(){
-        return bind$(app.room.playback, 'onVolumeChange');
-      });
-      if (streamSettings.audioOnly) {
-        refresh();
-      }
-      function seek(){
-        var startTime;
-        startTime = currentMedia.get('elapsed');
-        startTime = startTime < 4 ? 0 : startTime;
-        audio.currentTime = startTime;
-        return console.log("[audioStream] seeking…", mediaTime(startTime));
-      }
-      return seek;
-    },
-    changeStream: function(mode){
-      var prevMode;
-      prevMode = currentMedia.get('streamDisabled')
-        ? 'off'
-        : streamSettings.audioOnly ? 'audio' : 'video';
-      if (mode !== prevMode) {
-        mode || (mode = prevMode);
-        console.log("[streamSettings] stream-" + mode);
-        this.$label.text("Stream: " + mode);
-        streamSettings.audioOnly = mode === 'audio';
-        stream(mode !== 'off');
-        $body.removeClass("p0ne-stream-" + prevMode).addClass("p0ne-stream-" + mode);
-        return refresh();
-      }
-    },
-    disable: function(){
-      this.audio.src = null;
-      sleep(0, function(){
-        if (streamSettings.audioOnly) {
-          return refresh();
+        _$context.trigger('ppCAS:connecting');
+        return API.trigger('ppCAS:connecting');
+      },
+      changeBlurb: function(newBlurb, options){
+        options == null && (options = {});
+        return $.ajax({
+          method: 'PUT',
+          url: '/_/profile/blurb',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            blurb: newBlurb
+          }),
+          success: options.success,
+          error: options.error
+        });
+      },
+      disable: function(){
+        var ref$, avatarID, ref1$, avi, i$, user, that, results$ = [];
+        if (this.blurbIsChanged) {
+          this.changeBlurb(this.oldBlurb);
         }
-      });
-      return $body.removeClass('p0ne-stream-video').removeClass('p0ne-stream-audio').removeClass('p0ne-stream-off');
-    }
+        if ((ref$ = this.socket) != null) {
+          ref$.close();
+        }
+        clearTimeout(this.reconnectTimer);
+        for (avatarID in ref1$ = p0ne._avatars) {
+          avi = ref1$[avatarID];
+          avi.inInventory = false;
+        }
+        this.updateAvatarStore();
+        for (i$ in ref1$ = users.models) {
+          user = ref1$[i$];
+          if (that = user.attributes.avatarID_) {
+            results$.push(user.set('avatarID', that));
+          }
+        }
+        return results$;
+      }
+    });
   });
   /*@source p0ne.settings.ls */
   /**
    * Settings pane for plug_p0ne
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   module('p0neSettings', {
     _settings: {
@@ -7348,14 +8871,17 @@ window.compareVersions = function(a, b){
       }
     },
     setup: function(arg$, arg1$, arg2$, oldModule){
-      var $create, addListener, groupToggles, $ppM, $ppI, $ppS, $ppP, i$, ref$, module, this$ = this;
+      var $create, addListener, groupToggles, ref$, $ppM, $ppI, $ppS, $ppP, i$, module, this$ = this;
       $create = arg$.$create, addListener = arg$.addListener;
       this.$create = $create;
-      groupToggles = this.groupToggles = this._settings.groupToggles;
-      $ppM = $create("<div id=p0ne_menu>").insertAfter('#app-menu');
-      $ppI = $create("<div class=p0ne_icon>p<div class=p0ne_icon_sub>0</div></div>").appendTo($ppM);
-      $ppS = this.$ppS = $create("<div class=p0ne_settings>").appendTo($("<div class=p0ne_settings_wrapper>").appendTo($ppM));
-      $ppP = $create("<div class=p0ne_settings_popup>").appendTo($ppM).fadeOut(0);
+      groupToggles = this.groupToggles = (ref$ = this._settings).groupToggles || (ref$.groupToggles = {
+        p0neSettings: true,
+        base: true
+      });
+      $ppM = $create("<div id=p0ne-menu>").insertAfter('#app-menu');
+      $ppI = $create("<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>").appendTo($ppM);
+      $ppS = this.$ppS = $create("<div class=p0ne-settings>").appendTo($("<div class=p0ne-settings-wrapper>").appendTo($ppM));
+      $ppP = $create("<div class=p0ne-settings-popup>").appendTo($ppM).fadeOut(0);
       this.toggleMenu(groupToggles.p0neSettings);
       for (i$ in ref$ = p0ne.modules) {
         module = ref$[i$];
@@ -7364,7 +8890,7 @@ window.compareVersions = function(a, b){
       $ppI.click(function(){
         return this$.toggleMenu();
       });
-      addListener($body, 'click', '.p0ne_settings_summary', function(e){
+      addListener($body, 'click', '.p0ne-settings-summary', function(e){
         var $s;
         $s = $(this).parent();
         if ($s.data('open')) {
@@ -7384,7 +8910,7 @@ window.compareVersions = function(a, b){
         var $this, enable, $el, module;
         $this = $(this);
         enable = this.checked;
-        $el = $this.closest('.p0ne_settings_item');
+        $el = $this.closest('.p0ne-settings-item');
         module = $el.data('module');
         console.log("[p0neSettings] toggle", module.displayName, "=>", enable);
         if (enable) {
@@ -7393,11 +8919,11 @@ window.compareVersions = function(a, b){
           return module.disable();
         }
       });
-      addListener($ppS, 'mouseover', '.p0ne_settings_has_more', function(){
+      addListener($ppS, 'mouseover', '.p0ne-settings-has-more', function(){
         var $this, module, l, maxT, h, t, tt, ref$, diff;
         $this = $(this);
         module = $this.data('module');
-        $ppP.html("<div class=p0ne_settings_popup_triangle></div><h3>" + module.displayName + "</h3>" + (!module.screenshot
+        $ppP.html("<div class=p0ne-settings-popup-triangle></div><h3>" + module.displayName + "</h3>" + (!module.screenshot
           ? ''
           : '<img src=' + module.screenshot + '>') + "" + module.help + "");
         l = $ppS.width();
@@ -7416,11 +8942,11 @@ window.compareVersions = function(a, b){
           top: tt,
           left: l
         }).stop().fadeIn();
-        return $ppP.find('.p0ne_settings_popup_triangle').css({
+        return $ppP.find('.p0ne-settings-popup-triangle').css({
           top: t
         });
       });
-      addListener($ppS, 'mouseout', '.p0ne_settings_has_more', function(){
+      addListener($ppS, 'mouseout', '.p0ne-settings-has-more', function(){
         return $ppP.stop().fadeOut();
       });
       addListener($ppP, 'mouseover', function(){
@@ -7442,7 +8968,6 @@ window.compareVersions = function(a, b){
       });
       addListener(API, 'p0neModuleUpdated', function(module){
         if (module._$settings) {
-          module._$settings.find('.checkbox')[0].checked = true;
           module._$settings.addClass('updated');
           return sleep(2000, function(){
             return module._$settings.removeClass('updated');
@@ -7450,6 +8975,9 @@ window.compareVersions = function(a, b){
         } else if (module.settings) {
           return this$.addModule(module);
         }
+      });
+      addListener($body, 'click', '#app-menu', function(){
+        return this$.toggleMenu(false);
       });
       if (typeof _$context != 'undefined' && _$context !== null) {
         addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
@@ -7471,26 +8999,30 @@ window.compareVersions = function(a, b){
       return this.groupToggles.p0neSettings = state;
     },
     groups: {},
+    moderationGroup: $(),
     addModule: function(module){
       var itemClasses, icons, i$, ref$, len$, k, $s;
       if (module.settings) {
         module.more = typeof module.settings === 'function';
-        itemClasses = 'p0ne_settings_item';
+        itemClasses = 'p0ne-settings-item';
         icons = "";
         for (i$ = 0, len$ = (ref$ = ['more', 'help', 'screenshot']).length; i$ < len$; ++i$) {
           k = ref$[i$];
           if (module[k]) {
-            icons += "<div class=p0ne_settings_" + k + "></div>";
+            icons += "<div class=p0ne-settings-" + k + "></div>";
           }
         }
         if (icons.length) {
-          icons = "<div class=p0ne_settings_icons>" + icons + "</div>";
-          itemClasses += ' p0ne_settings_has_more';
+          icons = "<div class=p0ne-settings-icons>" + icons + "</div>";
+          itemClasses += ' p0ne-settings-has-more';
         }
         if (!($s = this.groups[module.settings])) {
-          $s = this.groups[module.settings] = $('<div class=p0ne_settings_group>').data('group', module.settings).append($('<div class=p0ne_settings_summary>').text(module.settings.toUpperCase())).appendTo(this.$ppS);
+          $s = this.groups[module.settings] = $('<div class=p0ne-settings-group>').data('group', module.settings).append($('<div class=p0ne-settings-summary>').text(module.settings.toUpperCase())).appendTo(this.$ppS);
           if (this._settings.groupToggles[module.settings]) {
             $s.data('open', true).addClass('open');
+          }
+          if (module.settings === 'moderation') {
+            $s.addClass('p0ne-settings-group-moderation');
           }
         }
         $s.append(module._$settings = $("<label class='" + itemClasses + "'><input type=checkbox class=checkbox " + (module.disabled ? '' : 'checked') + " /><div class=togglebox><div class=knob></div></div>" + module.displayName + "" + icons + "</label>").data('module', module));
@@ -7510,93 +9042,121 @@ window.compareVersions = function(a, b){
       }
       return results$;
     }
-    /*
-    updateSettingsThrottled: (m) ->
-        return if throttled or not m.settings
-        @throttled = true
-        requestAnimationFrame ~>
-            @updateSettings!
-            @throttled = false
-    */
   });
+  /*
+      updateSettingsThrottled: (m) ->
+          return if throttled or not m.settings
+          @throttled = true
+          requestAnimationFrame ~>
+              @updateSettings!
+              @throttled = false
+  */
   /*@source p0ne.moderate.ls */
   /**
    * plug_p0ne modules to help moderators do their job
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
+  /*####################################
+  #       BASE MODERATION MODULE       #
+  ####################################*/
   module('enableModeratorModules', {
     require: ['user_'],
     setup: function(arg$){
       var addListener, prevRole;
       addListener = arg$.addListener;
       prevRole = user_.attributes.role;
+      if (user.isStaff) {
+        $body.addClass('user-is-staff');
+      }
       return addListener(user_, 'change:role', function(user, newRole){
-        var i$, ref$, len$, m, results$ = [];
+        var i$, ref$, len$, m;
         if (newRole > 1 && prevRole < 2) {
           for (i$ = 0, len$ = (ref$ = p0ne.modules).length; i$ < len$; ++i$) {
             m = ref$[i$];
             if (m.modDisabled) {
               m.enable();
-              results$.push(m.modDisabled = false);
+              m.modDisabled = false;
             }
           }
-          return results$;
+          $body.addClass('user-is-staff');
+          return user.isStaff = true;
         } else {
           for (i$ = 0, len$ = (ref$ = p0ne.modules).length; i$ < len$; ++i$) {
             m = ref$[i$];
             if (m.moderator && !m.modDisabled) {
               m.modDisabled = true;
-              results$.push(m.disable());
+              m.disable();
             }
           }
-          return results$;
+          $body.removeClass('user-is-staff');
+          return user.isStaff = true;
         }
       });
+    },
+    disable: function(){
+      return $body.removeClass('user-is-staff');
     }
   });
-  module('warnOnHistory', {
+  /*####################################
+  #             YELLOW MOD             #
+  ####################################*/
+  module('yellowMod', {
+    displayName: 'Have yellow name as mod',
     moderator: true,
+    settings: 'moderation',
+    setup: function(arg$){
+      var css, id;
+      css = arg$.css;
+      id = API.getUser().id;
+      return css('yellowMod', "#chat .fromID-" + id + " .un,.user[data-uid='" + id + "'] .name > span {color: #ffdd6f !important;}");
+    }
+  });
+  /*####################################
+  #       WARN ON HISTORY PLAYS        #
+  ####################################*/
+  module('warnOnHistory', {
+    displayName: 'Warn on History',
+    moderator: true,
+    settings: 'moderation',
     setup: function(arg$){
       var addListener, this$ = this;
       addListener = arg$.addListener;
       return addListener(API, 'advance', function(d){
-        var hist, inHistory, skipped, lastTime, i$, len$, i, m, lastPlay, msg;
-        if (!d.media) {
-          return;
-        }
-        hist = API.getHistory();
-        inHistory = 0;
-        skipped = 0;
-        lastTime = 0;
-        for (i$ = 0, len$ = hist.length; i$ < len$; ++i$) {
-          i = i$;
-          m = hist[i$];
-          if (m.id === d.id && d.historyID !== m.historyID) {
-            inHistory++;
-            m.i = i;
-            lastPlay || (lastPlay = m);
-            if (m.skipped) {
-              skipped++;
+        var hist, inHistory, skipped, i$, len$, i, m, lastPlayI, lastPlay, msg;
+        if (d.media) {
+          hist = API.getHistory();
+          inHistory = 0;
+          skipped = 0;
+          for (i$ = 0, len$ = hist.length; i$ < len$; ++i$) {
+            i = i$;
+            m = hist[i$];
+            if (m.media.cid === d.media.cid && i !== 0) {
+              lastPlayI || (lastPlayI = i);
+              lastPlay || (lastPlay = m);
+              inHistory++;
+              if (m.skipped) {
+                skipped++;
+              }
             }
           }
-        }
-        if (inHistory) {
-          msg = "Song is in history";
-          if (inHistory > 1) {
-            msg += " (" + inHistory + " times) one:";
+          if (inHistory) {
+            msg = "";
+            if (inHistory > 1) {
+              msg += inHistory + "x ";
+            }
+            msg += "(" + (lastPlayI + 1) + "/" + (hist.length - 1) + ") ";
+            if (skipped === inHistory) {
+              msg += "but was skipped last time ";
+            }
+            if (skipped > 1) {
+              msg += "it was skipped " + skipped + "/" + inHistory + " times ";
+            }
+            chatWarn(msg, 'Song is in History');
+            return API.trigger('p0ne:songInHistory');
           }
-          msg += " " + ago(PARSESOMEHOW(lastPlay.datetime)) + " (" + (i + 1) + "/" + hist.length + ")";
-          if (skipped === inHistory) {
-            msg = " but was skipped last time";
-          }
-          if (skipped > 1) {
-            msg = " it was skipped " + skipped + "/" + inHistory + " times";
-          }
-          API.chatLog(msg, true);
-          return API.trigger('p0ne_songInHistory');
         }
       });
     }
@@ -7607,63 +9167,78 @@ window.compareVersions = function(a, b){
   module('disableChatDelete', {
     require: ['_$context', 'user_'],
     optional: ['socketListeners'],
-    settings: 'chat',
-    displayName: 'Show deleted messages',
     moderator: true,
+    displayName: 'Show deleted messages',
+    settings: 'moderation',
     setup: function(arg$){
-      var replace_$Listener, addListener, $createPersistent, css;
+      var replace_$Listener, addListener, $createPersistent, css, lastDeletedCid;
       replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $createPersistent = arg$.$createPersistent, css = arg$.css;
-      css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne_showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
-      $body.addClass('p0ne_showDeletedMessages');
+      css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne-showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
+      $body.addClass('p0ne-showDeletedMessages');
+      lastDeletedCid = null;
       addListener(_$context, 'socket:chatDelete', function(arg$){
         var p, c, mi, ref$;
         p = arg$.p, c = p.c, mi = p.mi;
-        return markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
+        markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
+        return lastDeletedCid = c;
       });
       replace_$Listener('chat:delete', function(){
         return function(cid){
-          if (!socketListeners) {
+          if (cid !== lastDeletedCid) {
             return markAsDeleted(cid);
           }
         };
       });
       function markAsDeleted(cid, moderator){
-        var $msg, t, d, cm;
-        $msg = getChat(cid);
+        var ref$, $msg, isLast, t, ref1$, d, cm;
+        if ((typeof chat != 'undefined' && chat !== null) && ((ref$ = chat.lastText) != null && ref$.hasClass("cid-" + cid))) {
+          $msg = chat.lastText.parent().parent();
+          isLast = true;
+        } else {
+          $msg = getChat(cid);
+        }
         console.log("[Chat Delete]", cid, $msg.text());
         t = getISOTime();
-        if (moderator) {
-          t += " by " + moderator;
-        }
         try {
-          $msg.removeClass('deletable').addClass('deleted');
-          d = $createPersistent('<time>').addClass('deleted-message').attr('datetime', t).text(t).appendTo($msg);
+          if (((ref1$ = getUser(cid.split('-')[0])) != null ? ref1$.gRole : void 8) === 0) {
+            $msg.addClass('deleted');
+          }
+          d = $createPersistent(getTimestamp()).addClass('delete-timestamp').appendTo($msg);
+          d.text("deleted " + (moderator ? 'by ' + moderator : '') + " " + d.text());
           cm = $cm();
-          return cm.scrollTop(cm.scrollTop() + d.height());
+          cm.scrollTop(cm.scrollTop() + d.height());
+          if (isLast) {
+            return chat.lastType = 'p0ne-deleted';
+          }
         } catch (e$) {}
       }
       return markAsDeleted;
     },
     disable: function(){
-      return $body.removeClass('p0ne_showDeletedMessages');
+      return $body.removeClass('p0ne-showDeletedMessages');
     }
   });
   /*####################################
-  #           MESSAGE CLASSES          #
+  #         DELETE OWN MESSAGES        #
   ####################################*/
   module('chatDeleteOwnMessages', {
     moderator: true,
     setup: function(arg$){
       var addListener;
       addListener = arg$.addListener;
-      $cm().find("fromID-" + userID).addClass('deletable').append('<div class="delete-button">Delete</div>');
-      return addListener(API, 'chat', function(message){
+      $cm().find("fromID-" + userID).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
+      addListener(API, 'chat', function(message){
         var cid, uid;
         cid = message.cid, uid = message.uid;
         if (uid === userID) {
-          return getChat(cid).addClass('deletable').append('<div class="delete-button">Delete</div>');
+          return getChat(cid).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
         }
       });
+      function delCb(){
+        return API.moderateDeleteChat(
+        $(this).closest('.cm').data('cid'));
+      }
+      return delCb;
     }
   });
   /*####################################
@@ -7672,6 +9247,8 @@ window.compareVersions = function(a, b){
   module('warnOnMehers', {
     users: {},
     moderator: true,
+    displayName: 'Warn on Mehers',
+    settings: 'moderation',
     _settings: {
       instantWarn: false,
       maxMehs: 3
@@ -7686,20 +9263,23 @@ window.compareVersions = function(a, b){
       current = {};
       addListener(API, 'voteUpdate', function(d){
         current[d.user.id] = d.vote;
-        if (this$._settings.instantWarn && d.vote === -1) {
-          return API.chatLog(d.user.username + " (lvl " + d.user.level + ") meh'd this song", true);
+        if (d.vote === -1 && d.user.uid !== userID) {
+          console.error(formatUser(d.user, true) + " meh'd this song");
+          if (this$._settings.instantWarn) {
+            return appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll, true) + " meh'd the past " + plural(users[k], 'song') + "!</div></div>"));
+          }
         }
       });
       lastAdvance = 0;
       return addListener(API, 'advance', function(d){
-        var k, ref$, v, ref1$;
+        var k, ref$, v, troll, ref1$;
         d = Date.now();
         for (k in ref$ = current) {
           v = ref$[k];
           if (v === -1) {
             users[k] || (users[k] = 0);
-            if (++users[k] > this$._settings.maxMehs) {
-              API.chatLog(d.dj.username + " (lvl " + d.dj.level + ") meh'd the past " + users[k] + " songs!", true);
+            if (++users[k] > this$._settings.maxMehs && (troll = getUser(k))) {
+              appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll) + " meh'd the past " + plural(users[k], 'song') + "!</div></div>"));
             }
           } else if (d > lastAdvance + 10000 && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== k) {
             delete users[k];
@@ -7714,24 +9294,27 @@ window.compareVersions = function(a, b){
     require: ['RoomUserRow', 'WaitlistRow'],
     optional: ['socketListeners', 'app', 'userList', '_$context'],
     moderator: true,
+    settings: 'moderation',
+    displayName: "Show Idle Time",
+    help: 'This module shows how long users have been inactive in the User- and Waitlist-Panel.\n"Being active"',
     lastActivity: {},
     _settings: {
-      highlightOver: 45 .min
+      highlightOver: 43 .min
     },
     setup: function(arg$, arg1$, arg2$, m_){
-      var addListener, settings, start, i$, ref$, len$, user, lastActivity, timer, d, noActivityYet, fn, Constr;
-      addListener = arg$.addListener;
+      var addListener, $create, settings, start, i$, ref$, len$, user, ref1$, key$, lastActivity, $waitlistBtn, $afkCount, chatHidden, lastAfkCount, d, noActivityYet, fn, Constr;
+      addListener = arg$.addListener, $create = arg$.$create;
       settings = this._settings;
-      this.start = start = (m_ != null ? m_.start : void 8) || Date.now();
+      this.start = start = Date.now();
       if (m_) {
-        this.lastActivity = m_.lastActivity;
-      } else {
-        for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-          user = ref$[i$];
-          this.lastActivity[user.id] = start;
-        }
+        this.lastActivity = m_.lastActivity || {};
+      }
+      for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
+        user = ref$[i$];
+        (ref1$ = this.lastActivity)[key$ = user.id] || (ref1$[key$] = start);
       }
       lastActivity = this.lastActivity;
+      $waitlistBtn = $('#waitlist-button').append($afkCount = $create('<div class=p0ne-toolbar-count>'));
       addListener(API, 'socket:skip socket:grab', function(id){
         return updateUser(id);
       });
@@ -7745,20 +9328,49 @@ window.compareVersions = function(a, b){
         return updateUser(e.s);
       });
       addListener(API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', function(u){
-        return updateUser(u.mid);
+        return updateUser(u.mi);
       });
       addListener(API, 'userLeave', function(u){
         var key$, ref$;
         return ref$ = lastActivity[key$ = u.id], delete lastActivity[key$], ref$;
       });
+      chatHidden = $cm().parent().css('display') === 'none';
       if ((typeof _$context != 'undefined' && _$context !== null) && (app != null || (typeof userList != 'undefined' && userList !== null))) {
         addListener(_$context, 'show:users show:waitlist', function(){
-          return timer = repeat(60000, forceRerender);
+          return chatHidden = true;
         });
         addListener(_$context, 'show:chat', function(){
-          return clearInterval(timer);
+          return chatHidden = false;
         });
       }
+      lastAfkCount = 0;
+      this.timer = repeat(60000, function(){
+        var afkCount, d, usersToCheck, that, i$, len$, u;
+        if (chatHidden) {
+          return forceRerender();
+        } else {
+          afkCount = 0;
+          d = Date.now();
+          usersToCheck = API.getWaitList();
+          if (that = API.getDJ()) {
+            usersToCheck[usersToCheck.length] = that;
+          }
+          for (i$ = 0, len$ = usersToCheck.length; i$ < len$; ++i$) {
+            u = usersToCheck[i$];
+            if (d - lastActivity[u.id] > settings.highlightOver) {
+              afkCount++;
+            }
+          }
+          if (afkCount !== lastAfkCount) {
+            if (afkCount) {
+              $afkCount.text(afkCount);
+            } else {
+              $afkCount.clear();
+            }
+            return lastAfkCount = afkCount;
+          }
+        }
+      });
       d = 0;
       for (i$ = 0, len$ = (ref$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
         fn = i$;
@@ -7771,7 +9383,6 @@ window.compareVersions = function(a, b){
         for (i$ = 0, len$ = (ref$ = (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || (app != null ? app.room.waitlist.rows : void 8)).length; i$ < len$; ++i$) {
           r = ref$[i$];
           if (r.model.id === uid) {
-            console.log("updated " + r.model.username + "'s row", r);
             results$.push(r.render(true));
           }
         }
@@ -7781,8 +9392,7 @@ window.compareVersions = function(a, b){
         var i$, ref$, ref1$, len$, r, results$ = [];
         for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
           r = ref$[i$];
-          console.log("rerendering " + r.model.username + "'s row", r);
-          results$.push(r.render());
+          results$.push(r.render(false));
         }
         return results$;
       }
@@ -7799,7 +9409,7 @@ window.compareVersions = function(a, b){
             });
           }
           ago = d - lastActivity[this.model.id];
-          if (lastActivity[this.model.id] === start) {
+          if (lastActivity[this.model.id] <= start) {
             time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
           } else if (ago < 60000) {
             time = "<1m";
@@ -7823,6 +9433,18 @@ window.compareVersions = function(a, b){
           }
         };
       }
+    },
+    disable: function(){
+      clearInterval(this.timer);
+      return $('#waitlist-button').removeClass('p0ne-toolbar-highlight');
+    },
+    disableLate: function(){
+      var i$, ref$, ref1$, len$, r, results$ = [];
+      for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+        r = ref$[i$];
+        results$.push(r.render());
+      }
+      return results$;
     }
   });
   /*@source p0ne.dev.ls */
@@ -7830,11 +9452,34 @@ window.compareVersions = function(a, b){
    * plug_p0ne dev
    * a set of plug_p0ne modules for usage in the console
    * They are not used by any other module
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
+  /*####################################
+  #        FIX CONSOLE SPAMMING        #
+  ####################################*/
+  module('fixConsoleSpamming', {
+    setup: function(arg$){
+      /* this fixes a bug in plug.dj. Version 1.2.6.6390 (2015-02-15)
+       * which spams the console with console.info(undefined)
+       * everytime the socket receives a message.
+       * On WebKit browsers it's ignored, on others (e.g. Firefox)
+       * it will create many empty messages in the console
+       * (https://i.imgur.com/VBzw2ek.png screenshot from Firefox' Web Console)
+      */
+      var replace;
+      replace = arg$.replace;
+      return replace(console, 'info', function(info_){
+        return function(){
+          if (arguments.length) {
+            return info_.apply(this, arguments);
+          }
+        };
+      });
+    }
+  });
   /*####################################
   #           LOG EVERYTHING           #
   ####################################*/
@@ -7855,7 +9500,8 @@ window.compareVersions = function(a, b){
         if (data.un) {
           name = collapseWhitespace(
           data.un.replace(/\u202e/g, '\\u202e'));
-          name = repeatString$(" ", 24 - name.length) + name;
+          name = stripHTML(
+          repeatString$(" ", 24 - name.length) + name);
           if (data.type === 'emote') {
             return console.log(getTime() + " [CHAT] " + name + ": %c" + message, "font-style: italic;");
           } else {
@@ -7867,15 +9513,13 @@ window.compareVersions = function(a, b){
           return console.log(getTime() + " [CHAT] %c" + message, 'color: #36F');
         }
       });
-      addListener(API, 'userJoin', function(data){
-        var name;
-        name = htmlUnescape(data.username).replace(/\u202e/g, '\\u202e');
-        return console.log(getTime() + " + [JOIN]", data.id, name, "(" + getRank(data) + ")", data);
+      addListener(API, 'userJoin', function(user){
+        return console.log(getTime() + " + [JOIN]", user.id, formatUser(user, true), user);
       });
-      addListener(API, 'userLeave', function(data){
+      addListener(API, 'userLeave', function(user){
         var name;
-        name = htmlUnescape(data.username).replace(/\u202e/g, '\\u202e');
-        return console.log(getTime() + " - [LEAVE]", data.id, name, "(" + getRank(data) + ")", data);
+        name = htmlUnescape(user.username).replace(/\u202e/g, '\\u202e');
+        return console.log(getTime() + " - [LEAVE]", user.id, formatUser(user, true), user);
       });
       if (!window._$context) {
         return;
@@ -7919,12 +9563,84 @@ window.compareVersions = function(a, b){
   /*####################################
   #             DEV TOOLS              #
   ####################################*/
+  module('InternalAPI', {
+    optional: [],
+    setup: function(){
+      var k, ref$, v;
+      for (k in ref$ = API) {
+        v = ref$[k];
+        if (!this[k]) {
+          this[k] = v;
+        } else if (this[k] === 'user') {
+          (fn$.call(this, k));
+        }
+      }
+      return importAll$(this, Backbone.Events);
+      function fn$(k){
+        this[k] = function(){
+          var ref$;
+          return getUserInternal((ref$ = API[k]()) != null ? ref$.id : void 8);
+        };
+      }
+    },
+    chatLog: API.chatLog,
+    getAdmins: function(){
+      return typeof users != 'undefined' && users !== null ? users.filter(function(it){
+        return it.get('gRole') === 5;
+      }) : void 8;
+    },
+    getAmbassadors: function(){
+      return typeof users != 'undefined' && users !== null ? users.filter(function(u){
+        var ref$;
+        return 0 < (ref$ = u.get('gRole')) && ref$ < 5;
+      }) : void 8;
+    },
+    getAudience: typeof users != 'undefined' && users !== null ? users.getAudience : void 8,
+    getBannedUsers: function(){
+      throw Error('unimplemented');
+    },
+    getDJ: function(){
+      var ref$;
+      return getUserInternal((ref$ = API.getDJ()) != null ? ref$.id : void 8);
+    },
+    getHistory: function(){
+      return roomHistory;
+    },
+    getHost: function(){
+      var ref$;
+      return getUserInternal((ref$ = API.getHost()) != null ? ref$.id : void 8);
+    },
+    getMedia: function(){
+      return typeof currentMedia != 'undefined' && currentMedia !== null ? currentMedia.get('media') : void 8;
+    },
+    getNextMedia: function(){
+      return typeof playlists != 'undefined' && playlists !== null ? playlists.activeMedia[0] : void 8;
+    },
+    getUser: function(){
+      return user_;
+    },
+    getUsers: function(){
+      return users;
+    },
+    getPlaylist: window.getActivePlaylist,
+    getPlaylists: function(){
+      return playlists;
+    },
+    getStaff: function(){
+      return typeof users != 'undefined' && users !== null ? users.filter(function(u){
+        return u.get('role');
+      }) : void 8;
+    },
+    getWaitList: function(){
+      return app != null ? app.room.waitlist : void 8;
+    }
+  });
   module('downloadLink', {
     setup: function(arg$){
       var css, icon;
       css = arg$.css;
       icon = getIcon('icon-arrow-down');
-      return css('downloadLink', ".p0ne_downloadlink::before {content: ' ';position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: " + icon.position + ";background-image: " + icon.image + ";}");
+      return css('downloadLink', ".p0ne-downloadlink::before {content: ' ';position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: " + icon.position + ";background-image: " + icon.image + ";}");
     },
     module: function(name, filename, dataOrURL){
       if (!dataOrURL) {
@@ -7940,7 +9656,7 @@ window.compareVersions = function(a, b){
         }));
       }
       filename = filename.replace(/[\/\\\?%\*\:\|\"\<\>\.]/g, '');
-      return appendChat("<div class='message p0ne_downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
+      return appendChat("<div class='message p0ne-downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
     }
   });
   importAll$(window, {
@@ -7980,13 +9696,13 @@ window.compareVersions = function(a, b){
     listUsersByAge: function(){
       var a, i$, len$, u, results$ = [];
       a = API.getUsers().sort(function(a, b){
-        a = +a.dateJoined.replace(/\D/g, '');
-        b = +b.dateJoined.replace(/\D/g, '');
+        a = +a.joined.replace(/\D/g, '');
+        b = +b.joined.replace(/\D/g, '');
         return (a > b && 1) || (a === b && 0) || -1;
       });
       for (i$ = 0, len$ = a.length; i$ < len$; ++i$) {
         u = a[i$];
-        results$.push(console.log(u.dateJoined.replace(/T|\..+/g, ' '), u.username));
+        results$.push(console.log(u.joined.replace(/T|\..+/g, ' '), u.username));
       }
       return results$;
     },
@@ -8073,9 +9789,9 @@ window.compareVersions = function(a, b){
         };
       }
       if (!ignoreWarnings) {
-        if (length < 2) {
+        if (username.length < 2) {
           cb(false, "too short");
-        } else if (length >= 25) {
+        } else if (username.length >= 25) {
           cb(false, "too long");
         } else if (username.has("/")) {
           cb(false, "forward slashes are not allowed");
@@ -8158,8 +9874,63 @@ window.compareVersions = function(a, b){
           return API.trigger('p0ne:avatarsloaded', JSON.parse(that[0].substr(11, that[0].length - 12)));
         }
       });
+    },
+    parseYTGetVideoInfo: function(d, onlyStripHTML){
+      var k, v, ref$, res, i$, ref1$, len$, a, ref2$;
+      if (typeof d === 'object') {
+        for (k in d) {
+          v = d[k];
+          d[k] = parseYTGetVideoInfo(v);
+        }
+        return d;
+      } else if (typeof d !== 'string' || d.startsWith("http")) {
+        return d;
+      } else if (d.startsWith("<!DOCTYPE html>")) {
+        d = JSON.parse(((ref$ = d.match(/ytplayer\.config = (\{[\s\S]*?\});/)) != null ? ref$[1] : void 8) || null);
+        if (onlyStripHTML) {
+          return d;
+        } else {
+          return parseYTGetVideoInfo(d);
+        }
+      } else if (d.has(",")) {
+        return d.split(",").map(parseYTGetVideoInfo);
+      } else if (d.has("&")) {
+        res = {};
+        for (i$ = 0, len$ = (ref1$ = d.split("&")).length; i$ < len$; ++i$) {
+          a = ref1$[i$];
+          a = a.split("=");
+          if (res[a[0]]) {
+            if (!$.isArray(res[a[0]])) {
+              res[a[0]] = [res[a[0]]];
+            }
+            (ref2$ = res[a[0]])[ref2$.length] = parseYTGetVideoInfo(unescape(a[1]));
+          } else {
+            res[a[0]] = parseYTGetVideoInfo(unescape(a[1]));
+          }
+        }
+        return res;
+      } else if (!isNaN(d)) {
+        return +d;
+      } else if (d === 'True' || d === 'False') {
+        return d === 'True';
+      } else {
+        return d;
+      }
     }
   });
+  if (!window.chrome) {
+    $.getScript("https://cdn.p0ne.com/script/zclip/jquery.zclip.min.js").then(function(){
+      window.copy = function(str, title){
+        return appendChat($("<button class='cm p0ne-notif'> copy " + (title || '') + "</button>")).zclip({
+          path: "https://cdn.p0ne.com/script/zclip/ZeroClipboard.swf",
+          copy: str
+        });
+      };
+      return console.info("[copy polyfill] loaded polyfill for copy() with zclip");
+    }).fail(function(){
+      return console.warn("[copy polyfill] failed to load zclip!");
+    });
+  }
   module('renameUser', {
     require: ['users'],
     module: function(idOrName, newName){
@@ -8231,7 +10002,7 @@ window.compareVersions = function(a, b){
     var host, res;
     $('#chat-messages img').fixSize();
     host = p0ne.host;
-    res = "<head>\n<title>plug.dj Chatlog " + getTime() + " - " + getRoomSlug() + " (" + API.getUser().username + ")</title>\n<!-- basic chat styling -->\n" + $("head link[href^='https://cdn.plug.dj/_/static/css/app']")[0].outerHTML + "\n<link href='https://dl.dropboxusercontent.com/u/4217628/css/fimplugChatlog.css' rel='stylesheet' type='text/css'>";
+    res = "<!DOCTYPE HTML>\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>plug.dj Chatlog " + getTime() + " - " + getRoomSlug() + " (" + API.getUser().rawun + ")</title>\n<!-- basic chat styling -->\n" + $("head link[href^='https://cdn.plug.dj/_/static/css/app']")[0].outerHTML + "\n<link href='https://dl.dropboxusercontent.com/u/4217628/css/fimplugChatlog.css' rel='stylesheet' type='text/css'>";
     res += getCustomCSS(true);
     /*
     res += """\n
@@ -8258,21 +10029,16 @@ window.compareVersions = function(a, b){
     return copy(res);
   };
   /*@source p0ne.userHistory.ls */
-  requireHelper('userRollover', function(it){
-    return it.id === 'user-rollover';
-  });
-  requireHelper('RoomHistory', function(it){
-    var ref$;
-    return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'history' && it.prototype.hasOwnProperty('listClass');
-  });
-  ObjWrap = function(obj){
-    obj.get = function(name){
-      return this[name];
-    };
-    return obj;
-  };
+  /**
+   * small module to show a user's song history on plug.dj
+   * fetches the song history from the user's /@/profile page
+   *
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @license MIT License
+   * @copyright (c) 2015 J.-T. Brinkmann
+  */
   module('userHistory', {
-    require: ['userRollover', 'RoomHistory'],
+    require: ['userRollover', 'RoomHistory', 'backbone'],
     help: 'Shows another user\'s song history when clicking on their username in the user-rollover.\n\nDue to technical restrictions, only Youtube songs can be shown.',
     setup: function(arg$){
       var addListener, replace, css;
@@ -8312,7 +10078,7 @@ window.compareVersions = function(a, b){
             if (cid = /\/vi\/(.{11})\//.exec(img)) {
               cid = cid[1];
               ref$ = author.split(" - "), title = ref$[0], author = ref$[1];
-              return songs.add(new ObjWrap({
+              return songs.add(new backbone.Model({
                 user: {
                   id: user.id,
                   username: "in " + roomName
@@ -8327,7 +10093,7 @@ window.compareVersions = function(a, b){
                   listeners: listeners,
                   skipped: 0
                 },
-                media: new ObjWrap({
+                media: new backbone.Model({
                   format: 1,
                   cid: cid,
                   author: author,
@@ -8344,7 +10110,7 @@ window.compareVersions = function(a, b){
             return songs;
           });
           _$context.trigger('show:history');
-          return _.defer(function(){
+          return requestAnimationFrame(function(){
             RoomHistory.prototype.collection = RoomHistory.prototype.collection_;
             return console.log(getTime() + " [userHistory] restoring room's proper history");
           });
@@ -8357,10 +10123,10 @@ window.compareVersions = function(a, b){
   /**
    * ponify chat - a script to ponify some words in the chat on plug.dj
    * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   /*####################################
   #            PONIFY CHAT             #
@@ -8369,7 +10135,8 @@ window.compareVersions = function(a, b){
     optional: ['emoticons'],
     displayName: 'Ponify Chat',
     settings: 'pony',
-    help: 'Ponify the chat! (replace words like "anyone" with "anypony")\nReplaced words will be underlined. Move your cursor over the word to see it\'s original.\n\nIt also replaces some of the emoticons with pony emoticons.'
+    help: 'Ponify the chat! (replace words like "anyone" with "anypony")\nReplaced words will be underlined. Move your cursor over the word to see it\'s original.\n\nIt also replaces some of the emoticons with pony emoticons.',
+    disabled: true
     /*== TEXT ==*/,
     map: {
       "anybody": "anypony",
@@ -8467,7 +10234,7 @@ window.compareVersions = function(a, b){
     },
     ponifyMsg: function(msg){
       var this$ = this;
-      msg.message = msg.message.replace(this.regexp, function(_, pre, s, post, i){
+      msg.message = msg.message.replace(this.regexp, function(_, prepre, pre, s, post, i){
         var w, r, lastUpperCaseLetters, l, ref$, ref1$, i$, o;
         w = this$.map[s.toLowerCase()];
         r = "";
@@ -8498,14 +10265,14 @@ window.compareVersions = function(a, b){
           }
         }
         if (post) {
-          if ("szxß".has(w[w.length - 1])) {
+          if ("szx".has(w[w.length - 1])) {
             r += "' ";
           } else {
             r += "'s ";
           }
         }
         console.log("replaced '" + s + "' with '" + r + "'", msg.cid);
-        return r;
+        return prepre + r;
       });
     }
     /*== EMOTICONS ==*/
@@ -8617,7 +10384,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var addListener, replace, css, aEM, emote, ref$, ref1$, name, url, m, ponyCSS, reversedMap, this$ = this;
       addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
-      this.regexp = RegExp('/(?:^|https?:)(\\b|an?\\s+)(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
+      this.regexp = RegExp('((?:^|<.+?>.+?</.+?>).*?)(\\b|an?\\s+)(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
       addListener(_$context, 'chat:plugin', function(msg){
         return this$.ponifyMsg(msg);
       });
@@ -8658,63 +10425,94 @@ window.compareVersions = function(a, b){
   /*@source p0ne.fimplug.ls */
   /**
    * fimplug related modules
+   *
    * @author jtbrinkmann aka. Brinkie Pie
-   * @version 1.0
    * @license MIT License
-   * @copyright (c) 2014 J.-T. Brinkmann
+   * @copyright (c) 2015 J.-T. Brinkmann
    */
   /*not really implemented yet*/
-  module('songNotifRuleskip', {
-    require: ['songNotif'],
-    setup: function(arg$){
-      var replace, addListener;
-      replace = arg$.replace, addListener = arg$.addListener;
-      replace(songNotif, 'skip', function(){
-        return function($notif){
-          return songNotif.showDescription($notif, "<span class=\"ruleskip-btn ruleskip-1\" data-rule=1>!ruleskip 1 MLP-related only</span>\n<span class=\"ruleskip-btn\" data-rule=2>!ruleskip 2 Loops / Pictures</span>\n<span class=\"ruleskip-btn\" data-rule=3>!ruleskip 3 low-efford mixes</span>\n<span class=\"ruleskip-btn\" data-rule=4>!ruleskip 4 history</span>\n<span class=\"ruleskip-btn\" data-rule=6>!ruleskip 6 &gt;10min</span>\n<span class=\"ruleskip-btn\" data-rule=13>!ruleskip 13 clop/porn/gote</span>\n<span class=\"ruleskip-btn\" data-rule=14>!ruleskip 14 episode / not music</span>\n<span class=\"ruleskip-btn\" data-rule=23>!ruleskip 23 WD-only</span>");
-        };
-      });
-      return addListener(chatDomEvents, 'click', '.ruleskip-btn', function(btn){
-        var num;
-        songNotif.hideDescription();
-        if (num = $(btn).data('rule')) {
-          return API.sendChat("!ruleskip " + num);
-        }
-      });
-    }
-  });
+  /*
+  module \songNotifRuleskip, do
+      require: <[ songNotif ]>
+      setup: ({replace, addListener}) ->
+          replace songNotif, \skip, -> return ($notif) ->
+              songNotif.showDescription $notif, """
+                  <span class="ruleskip-btn ruleskip-1" data-rule=1>!ruleskip 1 MLP-related only</span>
+                  <span class="ruleskip-btn" data-rule=2>!ruleskip 2 Loops / Pictures</span>
+                  <span class="ruleskip-btn" data-rule=3>!ruleskip 3 low-efford mixes</span>
+                  <span class="ruleskip-btn" data-rule=4>!ruleskip 4 history</span>
+                  <span class="ruleskip-btn" data-rule=6>!ruleskip 6 &gt;10min</span>
+                  <span class="ruleskip-btn" data-rule=13>!ruleskip 13 clop/porn/gote</span>
+                  <span class="ruleskip-btn" data-rule=14>!ruleskip 14 episode / not music</span>
+                  <span class="ruleskip-btn" data-rule=23>!ruleskip 23 WD-only</span>
+              """
+          addListener chatDomEvents, \click, \.ruleskip-btn, (btn) ->
+              songNotif.hideDescription!
+              if num = $ btn .data \rule
+                  API.sendChat "!ruleskip #num"
+  */
   return module('fimstats', {
     settings: 'pony',
-    setup: function(arg$){
+    optional: ['_$context'],
+    disabled: true,
+    setup: function(arg$, lookup){
       var addListener, $create, $el;
       addListener = arg$.addListener, $create = arg$.$create;
+      css('fimstats', '.p0ne-last-played {position: absolute;right: 140px;top: 30px;font-size: .9em;color: #ddd;transition: opacity .2s ease-out;}#volume:hover ~ .p0ne-last-played {opacity: 0;}#dialog-preview .p0ne-last-played {right: 0;top: 23px;left: 0;}/*@media (min-width: 0px) {*/.p0ne-fimstats-last { display: none; }.p0ne-fimstats-first { display: none; }.p0ne-fimstats-plays::before { content: " ("; }.p0ne-fimstats-plays::after { content: "x) "; }.p0ne-fimstats-first-notyet::before { content: "first play!"; }.p0ne-fimstats-once::before { content: "once "; }/*}*/@media (min-width: 1600px) {.p0ne-fimstats-last { display: inline; }.p0ne-fimstats-first { display: inline; }.p0ne-fimstats-plays::before { content: " …("; }.p0ne-fimstats-plays::after { content: "x)… "; }.p0ne-fimstats-first-notyet::before { content: "first played just now!"; }.p0ne-fimstats-once::before { content: "once played by "; }}@media (min-width: 1700px) {.p0ne-fimstats-last::before { content: "last: "; }.p0ne-fimstats-plays::before { content: " - (played "; }.p0ne-fimstats-plays::after { content: "x)"; }.p0ne-fimstats-first::before { content: " - first: "; }}@media (min-width: 1800px) {.p0ne-fimstats-last::before { content: "last played by "; }.p0ne-fimstats-plays::before { content: " \xa0 - (played "; }.p0ne-fimstats-plays::after { content: "x)"; }.p0ne-fimstats-first::before { content: " - \xa0 first played by "; }}');
       $el = $create('<span class=p0ne-last-played>').appendTo('#now-playing-bar');
       addListener(API, 'advance', this.updateStats = function(d){
         d || (d = {
           media: API.getMedia()
         });
         if (d.media) {
-          return $.getJSON("https://fimstats.anjanms.com/_/media/" + d.media.format + "/" + d.media.cid).then(function(d){
-            var first, last;
-            first = d.data[0].firstPlay.user + " " + ago(d.data[0].firstPlay.time * 1000);
-            last = d.data[0].lastPlay.user + " " + ago(d.data[0].lastPlay.time * 1000);
-            if (first !== last) {
-              return $el.text("last played by " + last + " \xa0 - \xa0 first played by " + first);
-            } else {
-              return $el.text("first&last played by " + first);
-            }
-          }).fail(function(arg$, arg1$, status){
-            if (status === "Not Found") {
-              return $el.text("first played just now!");
-            } else {
-              return $el.text("");
-            }
+          return lookup(d.media).then(function(d){
+            return $el.html(d.html).prop('title', d.text);
+          }).fail(function(err){
+            return $el.html(err.html).prop('title', err.text);
           });
         } else {
-          return $el.text("");
+          return $el.html("");
         }
       });
+      if (typeof _$context != 'undefined' && _$context !== null) {
+        addListener(_$context, 'ShowDialogEvent:show', function(d){
+          var ref$;
+          if ((ref$ = d.dialog.options) != null && ref$.media) {
+            console.log("[fimstats]", d.media);
+            return lookup(d.dialog.options.media.toJSON()).then(function(d){
+              console.log("[fimstats] ->", d.media, d, $('#dialog-preview .message'));
+              return $('#dialog-preview .message').after($('<div class=p0ne-last-played>').html(d.html));
+            });
+          }
+        });
+      }
       return this.updateStats();
+    },
+    module: function(media){
+      return $.getJSON("https://fimstats.anjanms.com/_/media/" + media.format + "/" + media.cid).then(function(d){
+        var first, last;
+        d.firstPlay = d.data[0].firstPlay;
+        d.lastPlay = d.data[0].lastPlay;
+        d.plays = d.data[0].plays;
+        first = d.firstPlay.user + " " + ago(d.firstPlay.time * 1000);
+        last = d.lastPlay.user + " " + ago(d.lastPlay.time * 1000);
+        if (first !== last) {
+          d.text = "last played by " + last + " \xa0 - (" + d.plays + "x) - \xa0 first played by " + first;
+          d.html = "<span class=p0ne-fimstats-last>" + last + "</span><span class=p0ne-fimstats-plays>" + d.plays + "</span><span class=p0ne-fimstats-first>" + first + "</span>";
+        } else {
+          d.text = "once played by " + first;
+          d.html = "<span class=p0ne-fimstats-once>" + first + "</span>";
+        }
+        return d;
+      }).fail(function(d, arg$, status){
+        if (status === "Not Found") {
+          d.text = "first played just now!";
+          d.html = "<span class=p0ne-fimstats-first-notyet></span>";
+        } else {
+          d.text = d.html = "";
+        }
+        return d;
+      });
     }
   });
   function fn$(needle){
@@ -8739,13 +10537,18 @@ function clone$(it){
   function fun(){} fun.prototype = it;
   return new fun;
 }
+function import$(obj, src){
+  var own = {}.hasOwnProperty;
+  for (var key in src) if (own.call(src, key)) obj[key] = src[key];
+  return obj;
+}
+function bind$(obj, key, target){
+  return function(){ return (target || obj)[key].apply(obj, arguments) };
+}
 function in$(x, xs){
   var i = -1, l = xs.length >>> 0;
   while (++i < l) if (x === xs[i]) return true;
   return false;
-}
-function bind$(obj, key, target){
-  return function(){ return (target || obj)[key].apply(obj, arguments) };
 }
 function deepEq$(x, y, type){
   var toString = {}.toString, hasOwnProperty = {}.hasOwnProperty,
