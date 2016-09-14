@@ -15,11 +15,8 @@
     background: url("https://i.imgur.com/b8M0n1c.png") fixed center center / cover !important;
 }
 /* blurred background */
-.popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions,
-#user-rollover, #footer-user .back, .communities, .history, .pop-menu, .p0ne-song-info
-/*#user-inventory div.avatars, #user-inventory div.badges, #inventory-view div.history
-#user-store div.avatars, #user-store div.badges, #user-store div.misc,
-#user-view>div>.section*/ {
+#history-panel, .popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions, #user-rollover, #footer-user .back,
+#dashboard, .pop-menu, .p0ne-song-info {
     background: url(https://i.imgur.com/cWuL5f4.png) fixed center center / cover !important;
 }
 
@@ -44,7 +41,8 @@
 #user-settings .container button, .dropdown, #volume .slider,
 .input-background, .search, #user-friends .list .row, .app-right .group,
 .pop-menu li:hover, .user-content .grid .cell:hover>.top,
-#user-inventory, #user-store, #user-friends, #user-settings {
+#user-inventory, #user-store, #user-friends, #user-settings,
+#history-panel .history {
     background: rgba(0,0,0,0.2) !important;
 }
 
@@ -55,13 +53,13 @@
 #footer-user.open-user .info, #dj-button, #vote .crowd-response, #search-suggestion li:hover,
 #search-suggestion li.selected, #footer-user .back span, #app-menu .item:hover,
 #user-friends .list .row .buttons button, #friends-button .request-count,
-.pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio {
+.pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio, #video-only-dj {
     background: rgba(0,0,0,0.4) !important;
 }
 
 /* dark background (when overlaying other text) */
 #footer-user .menu, #room-info, #search-suggestion, #app-menu.open, .dialog,
-.dialog-input-background, .swap, #history-panel {
+.dialog-input-background, .swap {
     background: rgba(20,20,20,0.85) !important;
 }
 
@@ -230,14 +228,16 @@
 }
 
 /*= toolbar icons =*/
-.app-right .header {
+.app-right .header, #media-panel .header {
     border-bottom: none;
     margin-bottom: 0;
     text-align: center;
     background: rgba(31,12,44, .8) !important;
     z-index: 3;
-    right: 12px;
-    width: auto;
+    margin-right: 12px;
+    right: 0;
+    width: auto !important;
+    left: 0;
 }
 #media-panel .header, #chat-header, .app-right .list-header /*, .popout .header*/ {
     background: linear-gradient(to bottom, rgba(31,12,44, .8) 0, rgba(57,27,78, .8) 50%, rgba(57,27,78, .5) 100%) !important;
@@ -266,7 +266,7 @@
 #chat-header, .popout .header {
     text-align: justify;
     left: 0;
-    right: 17px;
+    right: 0;
 }
 .popout .button, .app-right .button {
     padding-right: 0;
@@ -285,7 +285,7 @@
     margin-right: 0 !important;
 }
 #user-lists .button {
-    width: 66px !important; /* magic number at which it doesn't break into two lines (when being staff) */
+    width: 63px !important; /* magic number at which it doesn't break into two lines (when being staff) */
 }
 #user-lists .header .button.bans, #user-lists .header .button.mutes {
     cursor: not-allowed !important;
@@ -513,14 +513,14 @@
 #user-view .header {
     box-shadow: none;
     margin-top: 15px;
-    float: none !important;
+    /* float: none !important; */
     /* position: static; */
 }
 #user-store .misc .grid .cell .title-bar {
     background: transparent;
 }
 #user-settings .left {
-    float: none;
+    /* float: none; */
 }
 
 /*== Chat ==*/
@@ -662,9 +662,10 @@
 
 /*== playback controls ==*/
 
-#playback-controls .refresh { background: linear-gradient(to bottom, rgba(  0, 181, 230, .7) 0, rgba(  0, 181, 230, .1) 100%) !important; }
-#playback-controls .hd {      background: linear-gradient(to bottom, rgba(  0, 230,  99, .7) 0, rgba(  0, 230,  99, .1) 100%) !important; }
-#playback-controls .snooze {  background: linear-gradient(to bottom, rgba(172, 118, 255, .7) 0, rgba(172, 118, 255, .1) 100%) !important; }
+#playback-controls .refresh {        background: linear-gradient(to bottom, rgba(  0, 181, 230, .7) 0, rgba(  0, 181, 230, .1) 100%) !important; }
+#playback-controls .hd {             background: linear-gradient(to bottom, rgba(  0, 230,  99, .7) 0, rgba(  0, 230,  99, .1) 100%) !important; }
+#playback-controls .snooze {         background: linear-gradient(to bottom, rgba(172, 118, 255, .7) 0, rgba(172, 118, 255, .1) 100%) !important; }
+#playback-controls .p3-fullscreen {  background: linear-gradient(to bottom, rgba( 28,  31,  37, .7) 0, rgba( 28,  31,  37, .1) 100%) !important; }
 
 /* transparent Chat Header */
 /*#chat-messages { // was bugging out the chat scroll
@@ -698,4 +699,26 @@
 #user-rollover.chat {
     left: auto !important;
     right: 352px;
+}
+
+/*== fix FiMplug room theme mentions ==*/
+#chat .mention.from-none, .mention.from-none:nth-child(2n+1) {
+    background: rgba(88, 90, 28, 0.7) !important;
+    border-left: #FFDD6F 3px solid;
+}
+
+/*== song-info ==*/
+.p0ne-song-info {
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+
+
+/*== fix Unnoen ==*/
+#chat .fromID-3463504 .un {
+    color: #04C9B2 !important;
+}
+#chat .fromID-3463504 .icon {
+    background: url(https://plug.unnoen.com/images/ranks/Host.png) !important;
 }

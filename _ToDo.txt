@@ -20,6 +20,7 @@
 	- throttle avatarID changes
 	- room specific avatars
 - /mod-commands
+- warn on userJoin of <1 day old accounts (humanTime user.joinDate)
 
 == 2.5 ==
 - AFK number (a little icon above the waitlist showing how many people are > AFK-limit)
@@ -38,6 +39,7 @@
 - OAuth
 - Chatlog manager
 - add songs by drag'n'dropping links
+- #user-rollover flag icon & join TIME
 
 == SUGGESTION QUEUE ==
 - Think of shorter names for you features, like

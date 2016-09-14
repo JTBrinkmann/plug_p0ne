@@ -818,6 +818,14 @@ window <<<<
             return "#num\xa0#singular" # \xa0 is NBSP
         else
             return "#num\xa0#plural"
+    xth: (i) ->
+        ld = i % 10 # last digit
+        switch true
+        | (i%100 - ld == 10) => "#{i}th" # 11th, 12th, 13th, 2311th, …
+        | (ld==1) => return "#{i}st"
+        | (ld==2) => return "#{i}nd"
+        | (ld==3) => return "#{i}rd"
+        return "#{i}th"
 
 
     # formatting
@@ -952,6 +960,7 @@ requireHelper \DialogAlert, (.::?.id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
 requireHelper \ActivateEvent, (.ACTIVATE)
 requireHelper \votes, (.attributes?.grabbers)
+requireHelper \chatAuxiliaries, (.sendChat)
 requireHelper \tracker, (.identify)
 requireHelper \currentMedia, (.updateElapsedBind)
 requireHelper \settings, (.settings)

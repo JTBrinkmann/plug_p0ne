@@ -10,8 +10,9 @@
 */
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
+p0ne_ = window.p0ne
 window.p0ne =
-    version: \1.5.2
+    version: \1.5.7
     lastCompatibleVersion: \1.5.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -23,6 +24,8 @@ window.p0ne =
     lsBound_num: {}
     modules: p0ne?.modules || {}
     dependencies: {}
+    reload: ->
+        return $.getScript "#{@host}/script/plug_p0ne.beta.js"
     close: ->
         for m in @modules
             m.disable?!
@@ -45,6 +48,13 @@ window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to
 
 
 <-      (fn_) ->
+    if window.P0NE_UPDATE
+        window.P0NE_UPDATE = false
+        if p0ne_?.version == window.p0ne.version
+            return
+        else
+            API.chatLog? "plug_p0ne automatically updated to v#{p0ne.version}", true
+
     if console and typeof (console.group || console.groupCollapsed) == \function
         fn = ->
             if console.groupCollapsed
@@ -85,3 +95,15 @@ window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to
 
 p0ne = window.p0ne # so that modules always refer to their initial `p0ne` object, unless explicitly referring to `window.p0ne`
 localStorage.p0neVersion = p0ne.version
+
+#== Auto-Update ==
+# check for a new version every 30min
+/*setInterval do
+    ->
+        window.P0NE_UPDATE = true
+        p0ne.reload!
+            .then ->
+                setTimeout do
+                    -> window.P0NE_UPDATE = false
+                    10_000ms
+    30 * 60_000ms*/
