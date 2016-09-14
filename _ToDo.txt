@@ -1,11 +1,18 @@
 ==== To Do ====
-== SUMMARY ==
 
 == TEMP ==
+- fix new YT Player
+- make YT_EXPERIMENT default # NONONONO nothing but treble, tue URLs seem to be IP bound?
+- fix :undefined:
 
 == 1.5 ==
-- fix reconnect reloading media & resetting avatar
 - settings sub-menus
+- auto reconnectSocket
+- increase initial seek by average audioOnly Stream loading time
+- prevent new messages from merging with deleted messages
+	something something
+	if message2delete .find ".cid-#{chat.lastID}" .length
+		chat.lastID = null
 
 == 2.0 ==
 - website
@@ -19,8 +26,13 @@
 	- emit changed:room events
 	- throttle avatarID changes
 	- room specific avatars
+- fix changing rooms
 - /mod-commands
-- warn on userJoin of <1 day old accounts (humanTime user.joinDate)
+- make join/leave less spammy
+	- collapse many join/leave notifications
+	- merge join/leave notifs of the same user, if nothing in between
+- fix song-info's links for Soundcloud songs
+- fix song-notif open-link for SoundCloud
 
 == 2.5 ==
 - AFK number (a little icon above the waitlist showing how many people are > AFK-limit)
@@ -29,6 +41,9 @@
 - hax mutelist
 - BPM search function
 - make BPM always uptodate?
+- hide specific inline images
+- YT unblocker for previews
+- show placeholder in chat on Image Preview
 
 == 3.0 ==
 - Playlist Manager
@@ -56,7 +71,7 @@
 	/skip, /ban [time], /lock and /unlock, /lockskip (skips and moves to a set position, traditionally used to lock waitlist if it's full), /mute [time], /move [position], can't remember what else
 
 
-== COMPLETE ==
+== COMPLETE LIST ==
 - p0ne.close()
 - standard plug.dj script features
 	- ETA

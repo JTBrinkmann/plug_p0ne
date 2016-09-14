@@ -1,9 +1,9 @@
 /**
  * Fixes for plug.dj bugs
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 
@@ -13,7 +13,7 @@
 module \simpleFixes, do
     setup: ({addListener, replace}) ->
         # hide social-menu (because personally, i only accidentally click on it. it's just badly positioned)
-        @scm = $ '#twitter-menu, #facebook-menu' .detach! # not using .social-menu in case other scripts use this class to easily add buttons
+        @scm = $ '#twitter-menu, #facebook-menu, .shop-button' .detach! # not using .social-menu in case other scripts use this class to easily add buttons
 
         # add tab-index to chat-input
         replace $(\#chat-input-field).0, \tabIndex, -> return 1
@@ -29,15 +29,18 @@ module \simpleFixes, do
     disable: ->
         @scm .insertAfter \#playlist-panel
 
-module \fixChatLT_GT, do
-    require: <[ auxiliaries ]>
+# This fixes the current media reloading on socket reconnects, even if the song didn't change
+/* NOT WORKING
+module \fixMediaReload, do
+    require: <[ currentMedia ]>
     setup: ({replace}) ->
-        cTS = auxiliaries.cleanTypedString
-        replace chatAuxiliaries, \sendChat, (sC_) -> return ->
-            auxiliaries.cleanTypedString = (it) -> it
-            res = sC_ ...
-            auxiliaries.cleanTypedString = cTS
-            return res
+        replace currentMedia, \set, (s_) -> return (a, b) ->
+            if a.historyID and a.historyID == @get \historyID
+                console.log "avoid force-reloading current song"
+                return this
+            else
+                return s_.call this, a, b
+*/
 
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
@@ -74,14 +77,16 @@ module \fixGhosting, do
         tl;dr this module automatically rejoins the room when you are ghosting
     '''
     _settings:
-        warnings: true
+        verbose: true
     setup: ({replace, addListener}) ->
         _settings = @_settings
         rejoining = false
         queue = []
 
         addListener API, \socket:userLeave, ({p}) -> if p == userID
-            rejoinRoom 'you left the room'
+            sleep 100ms, ->
+                # to avoid problems, like auto-rejoining when closing the tab
+                rejoinRoom 'you left the room'
 
         replace PlugAjax::, \onError, (oE_) -> return (status, data) ->
             if status == \notInRoom
@@ -102,11 +107,11 @@ module \fixGhosting, do
                             if data.responseText?.0 == "<" # indicator for IP/user ban
                                 if data.responseText .has "You have been permanently banned from plug.dj"
                                     # for whatever reason this responds with a status code 200
-                                    API.chatLog "your account got permanently banned. RIP", true
+                                    chatWarn "your account got permanently banned. RIP", "fixGhosting"
                                 else
-                                    API.chatLog "[fixGhosting] cannot rejoin the room. Plug is acting weird, maybe it is in maintenance mode or you got IP banned?", true
+                                    chatWarn "cannot rejoin the room. Plug is acting weird, maybe it is in maintenance mode or you got IP banned?", "fixGhosting"
                             else
-                                API.chatLog "[fixGhosting] reconnected to the room", true if _settings.warnings
+                                chatWarn "reconnected to the room", "fixGhosting" if _settings.verbose
                                 for req in queue
                                     req.execute! # re-attempt whatever ajax requests just failed
                                 rejoining := false
@@ -116,23 +121,23 @@ module \fixGhosting, do
                             status = responseJSON?.status
                             switch status
                             | \ban =>
-                                API.chatLog "you are banned from this community", true
+                                chatWarn "you are banned from this community", "fixGhosting"
                             | \roomCapacity =>
-                                API.chatLog "the room capacity is reached :/", true
+                                chatWarn "the room capacity is reached :/", "fixGhosting"
                             | \notAuthorized =>
-                                API.chatLog "you got logged out", true
+                                chatWarn "you got logged out", "fixGhosting"
                                 login?!
                             | otherwise =>
                                 switch statusCode
                                 | 401 =>
-                                    API.chatLog "[fixGhosting] unexpected permission error while rejoining the room.", true
+                                    chatWarn "unexpected permission error while rejoining the room.", "fixGhosting"
                                     #ToDo is an IP ban responding with status 401?
                                 | 503 =>
-                                    API.chatLog "plug.dj is in mainenance mode. nothing we can do here"
+                                    chatWarn "plug.dj is in mainenance mode. nothing we can do here", "fixGhosting"
                                 | 521, 522, 524 =>
-                                    API.chatLog "plug.dj is currently completly down"
+                                    chatWarn "plug.dj is currently completly down", "fixGhosting"
                                 | otherwise =>
-                                    API.chatLog "[fixGhosting] cannot rejoin the room, unexpected error #{statusCode} (#{datastatus})", true
+                                    chatWarn "cannot rejoin the room, unexpected error #{statusCode} (#{datastatus})", "fixGhosting"
                             # don't try again for the next 10min
                             sleep 10.min, ->
                                 rejoining := false
@@ -148,7 +153,7 @@ module \fixOthersGhosting, do
         This module detects "ghost" users and force-adds them to the room.
     '''
     _settings:
-        warnings: true
+        verbose: true
     setup: ({addListener, css}) ->
         addListener API, \chat, (d) ~> if d.uid and not users.get(d.uid)
             console.info "[fixOthersGhosting] seems like '#{d.un}' (#{d.uid}) is ghosting"
@@ -159,12 +164,12 @@ module \fixOthersGhosting, do
                     # "manually" trigger socket event for DJ advance
                     for u, i in data.0.users when not users.get(u.id)
                         socketEvents.userJoin u
-                        API.chatLog "[p0ne] force-joined ##i #{d.un} (#{d.uid}) to the room", true if @_settings.warnings
+                        chatWarn "force-joined ##i #{d.un} (#{d.uid}) to the room", "p0ne" if @_settings.verbose
                     else
                         ajax \GET "users/#{d.uid}", (data) ~>
                             data.role = -1
                             socketEvents.userJoin data
-                            API.chatLog "[p0ne] #{d.un} (#{d.uid}) is ghosting", true if @_settings.warnings
+                            chatWarn "#{d.un} (#{d.uid}) is ghosting", "p0ne" if @_settings.verbose
                 .fail ->
                     console.error "[fixOthersGhosting] cannot load room data:", status, data
                     console.error "[fixOthersGhosting] cannot load user data:", status, data
@@ -181,7 +186,7 @@ module \fixStuckDJ, do
         This module detects stuck advances and automatically force-loads the next song.
     '''
     _settings:
-        warnings: true
+        verbose: true
     setup: ({replace, addListener}) ->
         _settings = @_settings
         fixStuckDJ = this
@@ -219,7 +224,7 @@ module \fixStuckDJ, do
                         votes.vote {i,v}
                 else
                     console.warn "[fixNoAdvance] cannot properly set votes, because optional requirement `votes` is missing"
-                API.chatLog "[p0ne] fixed DJ not advancing", true if @_settings.warnings and showWarning
+                chatWarn "fixed DJ not advancing", "p0ne" if @_settings.verbose and showWarning
 
 /*
 module \fixNoPlaylistCycle, do
@@ -233,7 +238,7 @@ module \fixNoPlaylistCycle, do
         This module automatically detects this bug and moves the song to the bottom.
     '''
     _settings:
-        warnings: true
+        verbose: true
     setup: ({addListener}) ->
         addListener API, \socket:reconnected, ->
             _$context.dispatch new LoadEvent(LoadEvent.LOAD)
@@ -246,7 +251,7 @@ module \fixNoPlaylistCycle, do
             if dj?.id == userID and lastPlay.media.id == currentPlaylist.song.id
                 #_$context .trigger \MediaMoveEvent:move
                 ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
-                API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
+                chatWarn "fixed playlist not cycling", "p0ne" if @_settings.verbose
         * /
 */
 
@@ -266,11 +271,29 @@ module \zalgoFix, do
             }
         '
 
+
+module \fixInHistoryHighlight, do
+    settings: \fixes
+    displayName: '☢ Fix InHistory'
+    help: '''
+        [WORK IN PROGRESS]
+        This fixes the bug that unless you change to another playlist, some songs don't show up as "in history" in your playlist (have red text)
+    '''
+    require: <[ app ]>
+    setup: ({addListener}) ->
+        addListener API, \advance, (d) -> if d.media
+            list = app.footer.playlist.playlist.media.list
+            if list.rowHash[d.media.cid]
+                for row in list.rows when row.model.id == d.media.id
+                    console.log "[fixInHistoryHighlight] fixed", row
+                    row.$el .addClass \in-history
+                    break
+
 module \fixWinterThumbnails, do
     setup: ({css}) ->
         avis = [".thumb .avi-2014winter#{pad i}" for i from 1 to 10].join(', ')
         css \fixWinterThumbnails, "
-            #{avis} {
+            #avis {
                 background-position-y: 0 !important;
             }
         "
@@ -286,10 +309,65 @@ module \warnOnAdblockPopoutBlock, do
                 window.e = e
                 console.log "[PopoutView:resize] error", e.stack
                 if not this._window and not warningShown
-                    API.chatLog "[p0ne] your adblocker is preventing plug.dj from opening the popout chat. You have to make an exception for plug.dj or disable your adblocker. Adblock Plus is known for causing this", true
+                    chatWarn "your adblocker is preventing plug.dj from opening the popout chat. You have to make an exception for plug.dj or disable your adblocker. Adblock Plus is known for causing this", "p0ne"
                     warningShown = true
                     sleep 10_000ms, ->
                         warningShown = false
+
+module \chatPolyfixEmoji, do
+    require: <[ users ]>
+    #optional: <[ chatPlugin ]> defined later
+    _settings:
+        verbose: true
+    fixedUsernames: {}
+    setup: ({addListener}) ->
+        /*@security no HTML injection should be possible */
+        document.createElement \canvas
+            .getContext \2d
+                ..textBaseline = 'top'
+                ..font = '32px Arial'
+                ..fillText('\ud83d\ude03', 0, 0)
+                if ..getImageData(16, 16, 1, 1).data[0] != 0
+                    console.info "[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied"
+                    @disable!
+                else
+                    console.info "[chatPolyfixEmoji] emojicons appear to NOT be natively supported. applying fix…"
+                    css \chatPolyfixEmoji, '
+                        .emoji {
+                            position: relative;
+                            display: inline-block;
+                        }
+                    '
+                    # cache usernames that require fixing
+                    # note: .rawun is used, because it's already HTML escaped
+                    for u in users?.models ||[] when (tmp=emojifyUnicode(u.get \rawun)) != u.get \rawun
+                        console.log "\t[chatPolyfixEmoji] fixed username from '#{u.get \rawun}' to '#{unemojify tmp}'" if @_settings.verbose
+                        u.set \rawun, @fixedUsernames[u.id] = tmp
+                        # ooooh dangerous dangerous :0
+                        # (not with regard to security, but breaking other scripts)
+                        # (though .rawun should only be used for inserting HTML)
+                        # i really hope this doesn't break anything :I
+                        #                                   --Brinkie 2015
+
+
+                    # fix incoming messages
+                    if _$context?
+                        addListener _$context, \user:join, (u) ~>
+                            if  (tmp=emojifyUnicode(u.get \rawun)) != u.get \rawun
+                                console.info "[chatPolyfixEmoji] fixed username from '#{u.get \rawun}' to '#{unemojify tmp}'" if @_settings.verbose
+                                u.set \rawun, @fixedUsernames[u.id] = tmp
+                        addListener _$context, \chat:plugin, (msg) ~>
+                            # fix the message body
+                            if msg.uid and msg.message != (tmp = emojifyUnicode(msg.message))
+                                console.log "\t[chatPolyfixEmoji] fixed message '#{msg.message}' to '#{unemojify tmp}'" if @_settings.verbose
+                                msg.message = tmp
+
+                            # fix the username
+                            if @fixedUsernames[msg.uid]
+                                # usernames may not contain HTML, also .rawun is HTML escaped.
+                                # The HTML that's added by the emoji fix is considered safe
+                                msg.un = that
+
 
 module \disableIntercomTracking, do
     require: <[ tracker ]>

@@ -2,11 +2,27 @@
  * plug_p0ne dev
  * a set of plug_p0ne modules for usage in the console
  * They are not used by any other module
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
+
+/*####################################
+#        FIX CONSOLE SPAMMING        #
+####################################*/
+module \fixConsoleSpamming, do
+    setup: ({replace}) ->
+        /* this fixes a bug in plug.dj. Version 1.2.6.6390 (2015-02-15)
+         * which spams the console with console.info(undefined)
+         * everytime the socket receives a message.
+         * On WebKit browsers it's ignored, on others (e.g. Firefox)
+         * it will create many empty messages in the console
+         * (https://i.imgur.com/VBzw2ek.png screenshot from Firefox' Web Console)
+        */
+        replace console, \info, (info_) -> return ->
+            info_ ... if arguments.length
+
 /*####################################
 #           LOG EVERYTHING           #
 ####################################*/
@@ -29,7 +45,7 @@ module \logEventsToConsole, do
             message = cleanMessage data.message
             if data.un
                 name = data.un .replace(/\u202e/g, '\\u202e') |> collapseWhitespace
-                name = " " * (24 - name.length) + name
+                name = " " * (24 - name.length) + name |> stripHTML
                 if data.type == \emote
                     console.log "#{getTime!} [CHAT] #name: %c#message", "font-style: italic;"
                 else
@@ -39,12 +55,11 @@ module \logEventsToConsole, do
             else
                 console.log "#{getTime!} [CHAT] %c#message", 'color: #36F'
 
-        addListener API, \userJoin, (data) ->
-            name = htmlUnescape(data.username) .replace(/\u202e/g, '\\u202e')
-            console.log "#{getTime!} + [JOIN]", data.id, name, "(#{getRank data})", data
-        addListener API, \userLeave, (data) ->
-            name = htmlUnescape(data.username) .replace(/\u202e/g, '\\u202e')
-            console.log "#{getTime!} - [LEAVE]", data.id, name, "(#{getRank data})", data
+        addListener API, \userJoin, (user) ->
+            console.log "#{getTime!} + [JOIN]", user.id, formatUser(user, true), user
+        addListener API, \userLeave, (user) ->
+            name = htmlUnescape(user.username) .replace(/\u202e/g, '\\u202e')
+            console.log "#{getTime!} - [LEAVE]", user.id, formatUser(user, true), user
 
         return if not window._$context
         addListener _$context, \PlayMediaEvent:play, (data) ->
@@ -78,11 +93,39 @@ module \logEventsToConsole, do
 /*####################################
 #             DEV TOOLS              #
 ####################################*/
+module \InternalAPI, do
+    optional: <[]>
+    setup: ->
+        for k,v of API
+            if not @[k]
+                @[k] = v
+            else if @[k] == \user
+                let k=k
+                    @[k] = -> getUserInternal(API[k]!?.id)
+        this <<<< Backbone.Events
+    chatLog: API.chatLog
+    getAdmins: -> return users?.filter (.get(\gRole) == 5)
+    getAmbassadors: -> return users?.filter (u) -> 0 < u.get(\gRole) < 5
+    getAudience: users?.getAudience
+    getBannedUsers: -> ...
+    getDJ: -> return getUserInternal(API.getDJ!?.id)
+    getHistory: -> return roomHistory
+    getHost: -> return getUserInternal(API.getHost!?.id)
+    getMedia: -> return currentMedia?.get \media
+    getNextMedia: -> return playlists?.activeMedia.0
+    getUser: -> return user_
+    getUsers: -> return users
+    getPlaylist: window.getActivePlaylist
+    getPlaylists: -> return playlists
+    getStaff: -> return users?.filter (u) -> return u.get(\role) # > 1 or u.get(\gRole)
+    getWaitList: -> return app?.room.waitlist
+
+
 module \downloadLink, do
     setup: ({css}) ->
         icon = getIcon \icon-arrow-down
         css \downloadLink, "
-            .p0ne_downloadlink::before {
+            .p0ne-downloadlink::before {
                 content: ' ';
                 position: absolute;
                 margin-top: -6px;
@@ -101,7 +144,7 @@ module \downloadLink, do
             dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
         filename .= replace /[\/\\\?%\*\:\|\"\<\>\.]/g, '' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
         return appendChat "
-                <div class='message p0ne_downloadlink'>
+                <div class='message p0ne-downloadlink'>
                     <i class='icon'></i>
                     <span class='text'>
                         <a href='#{dataOrURL}' download='#{filename}'>#{name}</a>
@@ -126,12 +169,12 @@ window <<<<
         console.log res
     listUsersByAge: ->
         a = API.getUsers! .sort (a,b) ->
-            a = +a.dateJoined.replace(/\D/g,'')
-            b = +b.dateJoined.replace(/\D/g,'')
+            a = +a.joined.replace(/\D/g,'')
+            b = +b.joined.replace(/\D/g,'')
             return (a > b && 1) || (a == b && 0) || -1
 
         for u in a
-            console.log u.dateJoined.replace(/T|\..+/g, ' '), u.username
+            console.log u.joined.replace(/T|\..+/g, ' '), u.username
     joinRoom: (slug) ->
         ajax \POST, \rooms/join, {slug}
 
@@ -186,9 +229,9 @@ window <<<<
             cb = (slug, err) -> console[err && \error || \log] "username '#username': ", err || slug
 
         if not ignoreWarnings
-            if length < 2
+            if username.length < 2
                 cb(false, "too short")
-            else if length >= 25
+            else if username.length >= 25
                 cb(false, "too long")
             else if username.has("/")
                 cb(false, "forward slashes are not allowed")
@@ -257,6 +300,53 @@ window <<<<
           if d.match /manifest.*/
             API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
 
+    parseYTGetVideoInfo: (d, onlyStripHTML) ->
+        #== Parser ==
+        # useful for debugging mediaDownload()
+        if typeof d == \object
+            for k,v of d
+                d[k] = parseYTGetVideoInfo(v)
+            return d
+        else if typeof d != \string or d.startsWith "http"
+            return d
+        else if d.startsWith "<!DOCTYPE html>"
+            d = JSON.parse(d.match(/ytplayer\.config = (\{[\s\S]*?\});/)?.1 ||null)
+            if onlyStripHTML
+                return d
+            else
+                return parseYTGetVideoInfo d
+        else if d.has(",")
+            return d.split(",").map(parseYTGetVideoInfo)
+        else if d.has "&"
+            res = {}
+            for a in d.split "&"
+                a .= split "="
+                if res[a.0]
+                    res[a.0] = [res[a.0]] if not $.isArray res[a.0]
+                    res[a.0][*] = parseYTGetVideoInfo unescape(a.1)
+                else
+                    res[a.0] = parseYTGetVideoInfo unescape(a.1)
+            return res
+        else if not isNaN(d)
+            return +d
+        else if d in <[ True False ]>
+            return d == \True
+        else
+            return d
+
+if not window.chrome # little fix for non-WebKit browsers to allow copying data to the clipboard
+    $.getScript "https://cdn.p0ne.com/script/zclip/jquery.zclip.min.js"
+        .then ->
+            window.copy = (str, title) ->
+                appendChat $ "<button class='cm p0ne-notif'> copy #{title ||''}</button>"
+                    .zclip do
+                        path: "https://cdn.p0ne.com/script/zclip/ZeroClipboard.swf"
+                        copy: str
+                    #$ '<div class="cm p0ne-notif">'
+                    #.append do
+            console.info "[copy polyfill] loaded polyfill for copy() with zclip"
+        .fail ->
+            console.warn "[copy polyfill] failed to load zclip!"
 
 module \renameUser, do
     require: <[ users ]>
@@ -289,12 +379,12 @@ do ->
 module \export_, do
     require: <[ downloadLink ]>
     exportRCS: ->
-        # $ '.p0ne_downloadlink' .remove!
+        # $ '.p0ne-downloadlink' .remove!
         for k,v of localStorage
             downloadLink "plugDjChat '#k'", k.replace(/plugDjChat-(.*?)T(\d+):(\d+):(\d+)\.\d+Z/, "$1 $2.$3.$4.html"), v
 
     exportPlaylists: ->
-        # $ '.p0ne_downloadlink' .remove!
+        # $ '.p0ne-downloadlink' .remove!
         for let pl in playlists
             $.get "/_/playlists/#{pl.id}/media" .then (data) ->
                 downloadLink "playlist '#{pl.name}'",  "#{pl.name}.txt", data
@@ -305,8 +395,10 @@ window.copyChat = (copy) ->
     $ '#chat-messages img' .fixSize!
     host = p0ne.host
     res = """
+        <!DOCTYPE HTML>
         <head>
-        <title>plug.dj Chatlog #{getTime!} - #{getRoomSlug!} (#{API.getUser!.username})</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <title>plug.dj Chatlog #{getTime!} - #{getRoomSlug!} (#{API.getUser!.rawun})</title>
         <!-- basic chat styling -->
         #{ $ "head link[href^='https://cdn.plug.dj/_/static/css/app']" .0 .outerHTML }
         <link href='https://dl.dropboxusercontent.com/u/4217628/css/fimplugChatlog.css' rel='stylesheet' type='text/css'>

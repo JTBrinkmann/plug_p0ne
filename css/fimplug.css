@@ -28,7 +28,7 @@
 #user-view .cell, #waitlist .list .user, #room-info .button,
 .dialog-body, #search-suggestion ul, #search-suggestion li, #app-menu .list,
 .app-right .friends, .pop-menu ul, #history-button,
-.popout #vote #woot, .popout #vote #grab, .popout #vote #meh,
+/*.popout #vote #woot, .popout #vote #grab, .popout #vote #meh,*/
 #user-rollover .meta, #footer-user,
 #dialog-ban-user .duration .toggle, #dialog-mute-user .duration .toggle {
     background: transparent !important;
@@ -161,7 +161,7 @@
     top: 0 !important;
     height: 35px;
     padding-top: 5px;
-    background: linear-gradient(to bottom,rgba(27, 27, 27, 0.8) 0, rgba(27, 27, 27, .95) 20%, rgba(27, 27, 27, 1) 100%);
+    background: linear-gradient(to bottom,rgba(27, 27, 27, 0.8) 0, rgba(27, 27, 27, .95) 30%, rgba(27, 27, 27, 1) 100%);
 }
 .youtube .dialog-frame:first-child {
     background: rgba(27, 27, 27, 0.8);
@@ -188,6 +188,7 @@
     transition: border-left-width 100ms linear, padding-left 100ms linear;
     border-left: #FFF 0 solid;
     padding-left: 3px;
+    box-sizing: border-box;
 }
 
 /*= avatar list (store & inventory) + friend list =*/
@@ -341,16 +342,27 @@
        );
     z-index: 0;
     background-size: 50px 50px;
+    -webkit-animation: move 4s linear infinite;
+    -moz-animation: move 4s linear infinite;
+    -o-animation: move 4s linear infinite;
     animation: move 4s linear infinite;
 }
 
 @-webkit-keyframes move {
-    0% {
-       background-position: 0 0;
-    }
-    100% {
-       background-position: 50px 50px;
-    }
+    0% {   background-position:  0    0;   }
+    100% { background-position: 50px 50px; }
+}
+@-moz-keyframes move {
+    0% {   background-position:  0    0;   }
+    100% { background-position: 50px 50px; }
+}
+@-o-keyframes move {
+    0% {   background-position:  0    0;   }
+    100% { background-position: 50px 50px; }
+}
+@keyframes move {
+    0% {   background-position:  0    0;   }
+    100% { background-position: 50px 50px; }
 }
 .experience .level {
     opacity: .5;
@@ -494,6 +506,9 @@
     width: 100% !important;
     top: 0;
 }
+#user-view .levels .box {
+    width: 20% !important;
+}
 #user-view .header {
     width: 100% !important;
 }
@@ -529,13 +544,15 @@
     box-shadow: 0 0 3px #800;
     border-radius: 4px;
     opacity: 0;
-    transition: opacity .5s ease-out;
-    transition-delay: 1s;
+    transition: opacity .5s ease-out, visibility 0.1s linear;
     display: block !important;
+    visibility: hidden;
 }
 
 #chat .cm:hover .delete-button {
-    opacity: 1
+    opacity: 1;
+    transition-delay: 1s, 1s;
+    visibility: visible;
 }
 
 
@@ -701,24 +718,34 @@
     right: 352px;
 }
 
-/*== fix FiMplug room theme mentions ==*/
+/*== song-info ==*/
+.song-thumb-wrapper {
+    border-bottom-left-radius: 10px;
+    border-top-left-radius: 10px;
+}
+
+/*== fix FiMplug room theme ==*/
+.icon-chat-bouncer {
+    background-position: 0 -2px;
+}
+#playback .background img {
+    background-position: top left, bottom right;
+}
+
+/*= mentions =*/
 #chat .mention.from-none, .mention.from-none:nth-child(2n+1) {
     background: rgba(88, 90, 28, 0.7) !important;
     border-left: #FFDD6F 3px solid;
 }
 
-/*== song-info ==*/
-.p0ne-song-info {
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
-}
-
-
-
-/*== fix Unnoen ==*/
+/*= fix Unnoen =*/
 #chat .fromID-3463504 .un {
     color: #04C9B2 !important;
 }
 #chat .fromID-3463504 .icon {
     background: url(https://plug.unnoen.com/images/ranks/Host.png) !important;
+}
+#chat .fromID-3463504.mention {
+    background: rgba(47, 115, 107, 0.7) !important;
+    border-left: #04C9B2 3px solid !important;
 }

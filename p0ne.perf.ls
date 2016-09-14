@@ -1,10 +1,10 @@
 /**
  * performance enhancements for plug.dj
  * the perfEmojify module also adds custom emoticons
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 module \jQueryPerf, do
     setup: ({replace}) ->
@@ -64,7 +64,7 @@ module \perfEmojify, do
             return e .replace /([\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:])/g, "\\$1"
 
         autoEmoteMap =
-            /*NOTE: the keys (emoticons) HAVE to be uppercase! */
+            /*NOTE: since plug_p0ne v1.6.3, emoticons are case-sensitive */
             \>:( : \angry
             \>XD : \astonished
             \:DX : \bowtie
@@ -130,21 +130,29 @@ module \perfEmojify, do
 
             # fix autoEmote
             for k,v of @autoEmoteMap
-                tmp = k .replace "<", "&LT;" .replace ">", "&GT;"
+                tmp = k .replace "<", "&lt;" .replace ">", "&gt;"
                 if tmp != k
                     @autoEmoteMap[tmp] = v
                     delete @autoEmoteMap[k]
 
             # create regexp for autoEmote
-            @regAutoEmote = //(^|\s|&nbsp;)(#{Object.keys(@autoEmoteMap) .map escapeReg .join "|"})(?=\s|$)//gi
+            @regAutoEmote = //(^|\s|&nbsp;)(#{Object.keys(@autoEmoteMap) .map escapeReg .join "|"})(?=\s|$)//g
 
         emoticons.update!
+
         replace emoticons, \emojify, -> return (str) ->
+            lastIndex = -1
             return str
-                .replace @regAutoEmote, (,pre,emote) ~> return "#pre:#{@autoEmoteMap[emote .toUpperCase!]}:"
-                .replace /:(.*?):/g, (_, emote) ~>
-                    if @map[emote]
-                        return "<span class='emoji-glow'><span class='emoji emoji-#{@map[emote]}'></span></span>"
+                .replace @regAutoEmote, (,pre,emote) ~> return "#pre:#{@autoEmoteMap[emote]}:"
+                .replace /:([\w\+\-]*)(.*?)(?=:)|:(.*)$/g, (_, emote, stuff, stuff2, index) ~>
+                    if index == lastIndex
+                        if typeof stuff2 == \string
+                            return stuff2
+                        else
+                            return emote+stuff
+                    else if not stuff and @map[emote]
+                        lastIndex := index + emote.length + 1
+                        return "<span class='emoji-glow'><span class='emoji emoji-#that'></span></span>"
                     else
                         return _
         replace emoticons, \lookup, -> return (str) ->

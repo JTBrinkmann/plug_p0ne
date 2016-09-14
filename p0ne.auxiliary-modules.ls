@@ -1,9 +1,9 @@
 /**
  * Auxiliary plug_p0ne modules
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 
@@ -14,39 +14,17 @@ module \getActivePlaylist, do
     require: <[ playlists ]>
     module: ->
         return playlists.findWhere active: true
-module \_API_, do
-    optional: <[]>
-    setup: ->
-        for k,v of API when not @[k]
-            @[k] = v
-    chatLog: API.chatLog
-    on: API.on
-    once: API.once
-    off: API.off
-    _events: API.{}_events
-    getAdmins: -> ...
-    getAmbassadors: -> ...
-    getAudience: -> ...
-    getBannedUsers: -> ...
-    getDJ: -> ...
-    getHistory: -> return roomHistory
-    getHost: -> ...
-    getMedia: -> ...
-    getNextMedia: -> ...
-    getUser: -> return user_
-    getUsers: -> return users
-    getPlaylists: -> ...
-    getStaff: -> ...
-    getWaitList: -> ...
+
 module \updateUserData, do
     require: <[ user_ users _$context ]>
     setup: ({addListener}) ->
         addListener window.user_, \change:username, ->
             user.username = window.user_.get \username
-        addListener _$context, \user:join, ({id}) ->
-            users.get(id).set \joinedRoom, Date.now!
         for user in users.models
             user.set \joinedRoom, -1
+        addListener API, \userJoin, ({id}) ->
+            users.get(id).set \joinedRoom, Date.now!
+
 module \throttleOnFloodAPI, do
     setup: ({addListener}) ->
         addListener API, \socket:floodAPI, ->
@@ -58,7 +36,7 @@ module \throttleOnFloodAPI, do
 
 module \PopoutListener, do
     require: <[ PopoutView ]>
-    optional: <[ _$context chat ]>
+    optional: <[ _$context ]>
     setup: ({replace}) ->
         # also works with chatDomEvents.on \click, \.un, -> example!
         # even thought cb.callback becomes \.un and cb.context becomes -> example!
@@ -66,7 +44,7 @@ module \PopoutListener, do
             r_ ...
             _$context?.trigger \popout:open, PopoutView._window, PopoutView
             API.trigger \popout:open, PopoutView._window, PopoutView
-        replace PopoutView, \close, (c_) -> return ->
+        replace PopoutView, \clear, (c_) -> return ->
             c_ ...
             _$context?.trigger \popout:close, PopoutView._window, PopoutView
             API.trigger \popout:close, PopoutView._window, PopoutView
@@ -99,6 +77,7 @@ module \grabMedia, do
     optional: <[ _$context ]>
     module: (playlistIDOrName, media, appendToEnd) ->
         currentPlaylist = playlists.get(playlists.getActiveID!)
+        def = $.Deferred!
         # get playlist
         if typeof playlistIDOrName == \string and not playlistIDOrName .startsWith \http
             for pl in playlists.models when playlistIDOrName == pl.get \name
@@ -109,7 +88,8 @@ module \grabMedia, do
 
         if not playlist
             console.error "[grabMedia] could not find playlist", arguments
-            return
+            def.reject \playlistNotFound
+            return def .promise!
 
         # get media
         if not media # default to current song
@@ -121,6 +101,8 @@ module \grabMedia, do
                 success: addMedia
                 fail: (err) ->
                     console.error "[grabMedia] couldn't grab", err
+                    def.reject \lookupFailed, err
+        return def .promise!
 
         # add media to playlist
         function addMedia media
@@ -140,8 +122,10 @@ module \grabMedia, do
                     # update local playlist
                     playlist.set \syncing, false
                     console.info "[grabMedia] successfully added to playlist"
-                .fail ->
+                    def.resolve playlist.toJSON!
+                .fail (err) ->
                     console.error "[grabMedia] error adding song to the playlist"
+                    def.reject \ajaxError, err
 
 
 

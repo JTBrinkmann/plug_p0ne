@@ -1,9 +1,9 @@
 /**
  * get fancy song notifications in the chat (with preview thumbnail, description, buttons, …)
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 
 #ToDo add proper SoundCloud Support
@@ -12,8 +12,9 @@
 
 module \songNotif, do
     require: <[ chatDomEvents ]>
-    optional: <[ _$context database auxiliaries app popMenu ]>
+    optional: <[ _$context chat  database auxiliaries app popMenu ]>
     settings: \base
+    displayName: 'Song Notifications'
     help: '''
         Shows notifications for playing songs in the chat.
         Besides the songs' name, it also features a thumbnail and some extra buttons.
@@ -34,8 +35,9 @@ module \songNotif, do
                 if not media or media.id == lastMedia
                     return
                 lastMedia := media.id
+                chat?.lastType = \p0ne-song-notif
 
-                $div = $createPersistent "<div class='update song-notif' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
+                $div = $createPersistent "<div class='update p0ne-song-notif' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
                 html = ""
                 time = getTime!
                 if media.format == 1  # YouTube
@@ -46,12 +48,8 @@ module \songNotif, do
 
                 duration = mediaTime media.duration
                 console.logImg media.image.replace(/^\/\//, 'https://') .then ->
-                    console.log "#time [DV_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#duration)", d
+                    console.log "#time [DJ_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#duration)", d
 
-                if window.auxiliaries and window.database
-                    timestamp = "<div class='timestamp'>#{auxiliaries.getChatTimestamp(database.settings.chatTS == 24)}</div>"
-                else
-                    timestamp = ""
                 html += "
                     <div class='song-thumb-wrapper'>
                         <img class='song-thumb' src='#{media.image}' />
@@ -61,16 +59,18 @@ module \songNotif, do
                         <!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> -->
                         <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
                     </div>
-                    #timestamp
+                    #{getTimestamp!}
                     <div class='song-dj un'></div>
                     <b class='song-title'></b>
                     <span class='song-author'></span>
                     <div class='song-description-btn'>Description</div>
                 "
                 $div.html html
-                $div .find \.song-dj .text d.dj.username
                 $div .find \.song-title .text d.media.title .prop \title, d.media.title
                 $div .find \.song-author .text d.media.author
+                $div .find \.song-dj
+                    .text d.dj.username
+                    .data \uid, d.dj.id
 
                 if media.format == 2sc and p0ne.SOUNDCLOUD_KEY # SoundCloud
                     $div .addClass \loading
@@ -102,11 +102,12 @@ module \songNotif, do
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=14"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=16"
 
 
         #== show current song ==
         if not module_ and API.getMedia!
+            that.image = httpsify that.image
             @callback media: that, dj: API.getDJ!
 
         # hide non-playable videos
@@ -117,7 +118,7 @@ module \songNotif, do
         if popMenu?
             addListener chatDomEvents, \click, \.song-add, ->
                 $el = $ this
-                $notif = $el.closest \.song-notif
+                $notif = $el.closest \.p0ne-song-notif
                 id = $notif.data \id
                 format = $notif.data \format
                 console.log "[add from notif]", $notif, id, format
@@ -138,7 +139,7 @@ module \songNotif, do
 
         #== fimplug ruleskip ==
         addListener chatDomEvents, \click, \.song-add, ->
-            showDescription $(this).closest(".song-notif"), """
+            showDescription $(this).closest(\.p0ne-song-notif), """
                 <span class='ruleskip'>!ruleskip 1 - nonpony</span>
                 <span class='ruleskip'>!ruleskip 2 - </span>
                 <span class='ruleskip'>!ruleskip 3 - </span>
@@ -157,7 +158,7 @@ module \songNotif, do
         # disable previous listeners (for debugging)
         #$ \#chat-messages .off \click, \.song-description-btn
         #$ \#chat-messages .off \click, \.song-description
-        var $description
+        $description = $()
         addListener chatDomEvents, \click, \.song-description-btn, (e) ->
             try
                 if $description
@@ -165,7 +166,7 @@ module \songNotif, do
 
                 #== Show Description ==
                 $description := $ this
-                $notif = $description .closest \.song-notif
+                $notif = $description .closest \.p0ne-song-notif
                 cid    = $notif .data \cid
                 format = $notif .data \format
                 console.log "[song-notif] showing description", cid, $notif
@@ -219,7 +220,7 @@ module \songNotif, do
                 offsetTop = $notif.offset!?.top - 100px
                 ch = cm .height!
                 if offsetTop + h > ch
-                    $cm.animate do
+                    cm.animate do
                         scrollTop: cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
                         # 100px is height of .song-notif without .song-description
 
@@ -227,13 +228,13 @@ module \songNotif, do
             #== Hide Description ==
             return if not $description
             console.log "[song-notif] closing description", $description
-            $notif = $description .closest \.song-notif
+            $notif = $description .closest \.p0ne-song-notif
             $description.animate do
                 opacity: 0
                 height: 0px
                 ->
                     $ this
-                        .css opacity: 1, height: \auto
+                        .css opacity: '', height: \auto
                         .removeClass 'song-description text'
                         .addClass 'song-description-btn'
                         .text "Description"

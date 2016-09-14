@@ -1,9 +1,9 @@
 /**
  * Auxiliary-functions for plug_p0ne
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
 */
 
 export $window = $ window
@@ -44,7 +44,7 @@ String::define \startsWith, (str) ->
         return false if char != this[i++]
     return true
 String::define \endsWith, (str) ->
-    return this.lastIndexOf == @length - str.length
+    return this.substr(@length - str.length) == str
 for Constr in [String, Array]
     Constr::define \has, (needle) -> return -1 != @indexOf needle
     Constr::define \hasAny, (needles) ->
@@ -52,8 +52,9 @@ for Constr in [String, Array]
             return true
         return false
 
+Number::defineGetter \s, ->     return this * 1_000s_to_ms
 Number::defineGetter \min, ->   return this * 60_000min_to_ms
-Number::defineGetter \s, ->     return this * 1_000min_to_ms
+Number::defineGetter \h, ->   return this * 3_600_000h_to_ms
 
 
 jQuery.fn <<<<
@@ -79,6 +80,11 @@ jQuery.fn <<<<
             el.style .width = "#{el.width}px"
             el.style .height = "#{el.height}px"
         return this
+$.easing <<<<
+    easeInQuad: (p) ->
+        return p * p
+    easeOutQuad: (p) ->
+        return 1-(1-p)*(1-p)
 
 /*####################################
 #            DATA MANAGER            #
@@ -298,9 +304,27 @@ window <<<<
     modUnmute: (userID, cb) -> ajax \DELETE, "mutes/#userID", cb
     chatDelete: (chatID, cb) -> ajax \DELETE, "chat/#chatID", cb
     kick: (userID, cb) ->
-        <- ban userID
-        <- sleep 1_000ms
-        unban userID, cb
+        def = $.Deferred!
+        ban userID
+            .then ->
+                unban userID, cb
+                    .then def.resolve, def.reject
+            .fail def.reject
+    addDJ: (userID, cb) ->
+        for u in API.getWaitlist! when u.id == userID
+            # specified user is in the waitlist
+            cb \alreadyInWaitlist
+            return $.Deferred! .resolve \alreadyInWaitlist
+        else
+            return ajax \POST, "booth/add", id: userID, cb
+    moveDJ: (userID, position, cb) ->
+        def = $.Deferred
+        addDJ userID
+            .then ->
+                ajax \POST, "booth/move", userID: userID, position: position, cb
+                    .then def.resolve, def.reject
+            .fail def.reject
+        return def .promise!
 
     getUserData: (user, cb) !->
         if typeof user != \number
@@ -324,13 +348,14 @@ window <<<<
         return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click! .length
     snooze: ->
         return $ '#playback .snooze' .click! .length
+    isSnoozed: -> $ \#playback-container .children! .length == 0
     refresh: ->
         return $ '#playback .refresh' .click! .length
     stream: (val) ->
         if not currentMedia
             console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
         else
-            currentMedia?.set \streamDisabled, (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
     join: ->
         # for this, performance might be essential
         # return $ '#dj-button.is-wait' .click! .length != 0
@@ -358,25 +383,55 @@ window <<<<
             #* ext: \webm, minRes: 144p, itags:  <[ 278 ]>, type: \video
             #* ext: \webm, minRes: 128kbps, itags:  <[ 171 ]>, type: \audio
             * ext: \ts, minRes: 240p, itags:  <[ 151 132,92 93 94 95 96 ]> # used for live streaming
-        res = {}
+        ytItags = {}
         for format in list
-            for itags, i in format.itags when itag != \_
+            for itags, i in format.itags when itags != \_
                 # formats with type: \audio not taken into account ignored here
                 startI = resolutions.indexOf format.minRes
                 for itag in itags.split ","
-                    res[itag] =
+                    ytItags[itag] =
+                        itag: itag
                         ext: format.ext
+                        type: format.type || \video
                         resolution: resolutions[startI + i]
-        return res
+        return ytItags
 
     mediaSearch: (query) ->
+        # open playlist drawer
         $ '#playlist-button .icon-playlist'
-            .click! # will silently fail if playlist is already open
+            .click! # will silently fail if playlist is already open, which is desired
+
         $ \#search-input-field
-            .val query
-            .trigger do
+            .val query # enter search string
+            .trigger do # start search
                 type: \keyup
                 which: 13 # Enter
+
+    mediaParse: (media, cb) !->
+        /* work in progress */
+        cb ||= logger \
+        if typeof media == \string
+            if +media # assume SoundCloud CID
+                cb {format: 2, cid: media}
+            else if media.length == 11 # assume youtube CID
+                cb {format: 1, cid: media}
+            else if cid = YT_REGEX .exec(media)?.1
+                cb {format: 1, cid}
+            else if parseURL media .hostname in <[ soundcloud.com  i1.sndcdn.com ]>
+                $.getJSON "https://api.soundcloud.com/resolve/", do
+                    url: url
+                    client_id: p0ne.SOUNDCLOUD_KEY
+                    .then (d) ->
+                        cb {format: 2, cid: d.id, data: d}
+        else if typeof media == \object and media
+            if media.toJSON
+                cb media.toJSON!
+            else if media.format
+                cb media
+        else if not media
+            cb API.getMedia!
+        cb!
+
     mediaLookup: ({format, id, cid}:url, cb) ->
         if typeof cb == \function
             success = cb
@@ -412,6 +467,7 @@ window <<<<
                             uploader:
                                 name:     d.entry.author.0.name.$t
                                 id:       d.entry.media$group.yt$uploaderId.$t
+                                url:      "https://www.youtube.com/channel/#{d.entry.media$group.yt$uploaderId.$t}"
                             image:        "https://i.ytimg.com/vi/#cid/0.jpg"
                             title:        d.entry.title.$t
                             uploadDate:   d.entry.published.$t
@@ -438,6 +494,7 @@ window <<<<
                                 id:         d.user.id
                                 name:       d.user.username
                                 image:      d.user.avatar_url
+                                url:        d.user.permalink_url
                             image:          d.artwork_url
                             title:          d.title
                             uploadDate:     d.created_at
@@ -452,189 +509,327 @@ window <<<<
             return $.Deferred()
                 .fail fail
                 .reject "unsupported format"
+    # https://www.youtube.com/annotations_invideo?video_id=gkp9ohUPIuo
+    # AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,SS,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW
+    mediaDownload: do ->
+        regexNormal = {}; regexUnblocked = {}
+        for key in <[ title url_encoded_fmt_stream_map fmt_list dashmpd errorcode reason ]>
+            regexNormal[key] = //#key=(.*?)(?:&|$)//
+            regexUnblocked[key] = //"#key":"(.*?)"//
+        for key in <[ url itag type fallback_host ]>
+            regexNormal[key] = //#key=(.*?)(?:&|$)//
+            regexUnblocked[key] = //#key=(.*?)(?:\\u0026|$)//
+        return (media, audioOnly, cb) ->
+            /* status codes:
+                = success = (resolved)
+                0 - downloads found
 
-    mediaDownload: (media, audioOnly, cb) ->
-        # arguments parsing
-        if not media or typeof media == \boolean or typeof media == \function or media.success or media.error # if `media` is left out
-            [media, audioOnly, cb] = [false, media, cb]
-        else if typeof audioOnly != \boolean # if audioOnly is left out
-            cb = audioOnly; audioOnly = false
+                = error = (rejected)
+                1 - failed to receive video info
+                2 - video info loaded, but no downloads found (video likely blocked)
+                3 - (for audioOnly) dash.mpd found, but no downloads (basically like 2)
 
-        # parsing cb
-        if typeof cb == \function
-            success = cb
-        else if cb
-            {success, error} = cb
+                note: itags are Youtube's code describing the data format
+                    your browser may or may not be able to play them. resolution unknown
+                    https://en.wikipedia.org/wiki/YouTube#Quality_and_formats
+                    (click [show] in "Comparison of YouTube media encoding options" to see the whole table)
+             */
+            # arguments parsing
+            if not media or typeof media == \boolean or typeof media == \function or media.success or media.error # if `media` is left out
+                [media, audioOnly, cb] = [false, media, cb]
+            else if typeof audioOnly != \boolean # if audioOnly is left out
+                cb = audioOnly; audioOnly = false
 
-        # defaulting arguments
-        if media?.attributes
-            {format, cid, id} = media.attributes
-        else
-            media ||= API.getMedia!
+            # parsing cb
+            if typeof cb == \function
+                success = cb
+            else if cb
+                {success, error} = cb
+
+            # defaulting arguments
+            if media?.attributes
+                blocked = media.blocked
+                media .= attributes
+            else if not media
+                media = API.getMedia!
+                blocked = 0
+            else
+                blocked = media.blocked
             {format, cid, id} = media
+            media.blocked = blocked = +blocked || 0
 
 
-        res =  $.Deferred()
-        res
-            .then success || logger \mediaDownload
-            .fail error || logger \mediaDownloadError
-            .fail (err) ->
-                if audioOnly or format == 2
-                    media.downloadAudioError = err
+            if format == 2
+                audioOnly = true
+
+
+            res =  $.Deferred()
+            res
+                .then (data) ->
+                    data.blocked = blocked
+                    if audioOnly
+                        return media.downloadAudio = data
+                    else
+                        return media.download = data
+                .fail (err, status) ->
+                    if status
+                        err =
+                            status: 1
+                            message: "network error or request rejected"
+                    err.blocked = blocked
+                    if audioOnly
+                        return media.downloadAudioError = err
+                    else
+                        return media.downloadError = err
+                .then success || logger \mediaDownload
+                .fail error || logger \mediaDownloadError
+
+            if audioOnly
+                return res.resolve media.downloadAudio if media.downloadAudio?.blocked == blocked
+                return res.reject media.downloadAudioError if media.downloadAudioError
+            else
+                return res.resolve media.download if media.download
+                return res.reject media.downloadError if media.downloadError?.blocked == blocked
+
+            cid ||= id
+            if format == 1 # youtube
+                if blocked == 2
+                    url = p0ne.proxy "http://vimow.com/watch?v=#cid"
+                else if blocked
+                    url = p0ne.proxy "https://www.youtube.com/watch?v=#cid"
                 else
-                    media.downloadError = err
+                    url = p0ne.proxy "https://www.youtube.com/get_video_info?video_id=#cid"
+                console.info "[mediaDownload] YT lookup", url
+                $.ajax do
+                    url: url
+                    error: res.reject
+                    success: (d) -> /* see parseYTGetVideoInfo in p0ne.dev for a proper parser of the data */
+                        export d
+                        file = d # for get()
+                        files = {}
+                        bestVideo = null
+                        bestVideoSize = 0
 
-        if audioOnly or format == 2
-            return res.resolve media.downloadAudio if media.downloadAudio
-            return res.reject media.downloadAudioError if media.downloadAudioError
-        else
-            return res.resolve media.download if media.download
-            return res.reject media.downloadError if media.downloadError
-
-        cid ||= id
-        if format == 1 # youtube
-            url = p0ne.proxy "https://www.youtube.com/get_video_info?video_id=#cid"
-            console.info "[mediaDownload] YT lookup", url
-            $.ajax do
-                url: url
-                error: res.reject
-                success: (d) ->
-                    /*== Parser ==
-                    # useful for debugging
-                    parse = (d) ->
-                      if d.startsWith "http"
-                        return d
-                      else if d.has(",")
-                        return d.split(",").map(parse)
-                      else if d.has "&"
-                        res = {}
-                        for a in d.split "&"
-                          a .= split "="
-                          if res[a.0]
-                            res[a.0] = [res[a.0]] if not $.isArray res[a.0]
-                            res[a.0][*] = parse unescape(a.1)
-                          else
-                            res[a.0] = parse unescape(a.1)
-                        return res
-                      else if not isNaN(d)
-                        return +d
-                      else if d in <[ True False ]>
-                        return d == \True
-                      else
-                        return d
-                    parse(d)
-                    */
-                    basename = d.match(/title=(.*?)(?:&|$)/)?.1 || cid
-                    basename = unescape(basename).replace /\++/g, ' '
-                    files = {}
-                    bestVideo = null
-                    bestVideoSize = 0
-                    if not audioOnly
-                        if d.match(/adaptive_fmts=(.*?)(?:&|$)/)
-                            for file in unescape(that.1) .split ","
-                                url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
-                                if file.match(/type=(.*?)%3B/)
-                                    mimeType = unescape that.1
-                                    filename = "#basename.#{mimeType.substr 6}"
-                                    if file.match(/size=(.*?)(?:&|$)/)
-                                        resolution = unescape(that.1)
-                                        size = resolution.split \x
-                                        size = size.0 * size.1
-                                        (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
-                                        if size > bestVideoSize
-                                            bestVideo = video
-                                            bestVideoSize = size
-                        else if d.match(/url_encoded_fmt_stream_map=(.*?)(?:&|$)/)
-                            console.warn "[mediaDownload] only a low quality stream could be found for", cid
-                            for file in unescape(that.1) .split ","
-                                url = that.1 if d.match(/url=(.*?)(?:&|$)/)
-                                if ytItags[d.match(/itag=(.*?);/)?.1]
-                                    (files[that.ext] ||= [])[*] = video =
-                                        file: "#basename.#{that.ext}"
-                                        url: httpsify $baseurl.text!
-                                        mimeType: "#{that.type}/#{that.ext}"
-                                        resolution: that.resolution
-                                    if that.resolution > bestVideoSize
+                        if blocked == 2
+                            # getting video proxy URL using vimow.com
+                            if d.match /<title>(.*?) - vimow<\/title>/
+                                title = htmlUnescape that.1
+                            else
+                                title = cid
+                            files = {}
+                            for file in d.match(/<source .*?>/g) ||[]
+                                src = /src='(.*?)'/.match(file)
+                                resolution = /src='(.*?)'/.match(file)
+                                mimeType = /src='(\w+\/(\w+))'/.match(file)
+                                if src and resolution and mimeType
+                                    (files[that.5] ||= [])[*] = video =
+                                        url: src.1
+                                        resolution: resolution.1
+                                        mimeType: mimeType.1
+                                        file: "basename.#{mimeType.2}"
+                                    if that.2 > bestVideoSize
                                         bestVideo = video
-                                        bestVideoSize = that.resolution
+                                        bestVideoSize = video.resolution
 
-                        files.preferredDownload = bestVideo
-                        console.log "[mediaDownload] resolving", files
-                        res.resolve media.download = files
-
-                    # audioOnly
-                    else if d.match(/dashmpd=(http.+?)(?:&|$)/)
-                        url = p0ne.proxy(unescape that.1 /*parse(d).dashmpd*/)
-                        console.info "[mediaDownload] DASHMPD lookup", url
-                        $.get url
-                            .then (dashmpd) ->
-                                $dash = $ $.parseXML dashmpd
-                                bestVideo = size: 0
-                                $dash .find \AdaptationSet .each ->
-                                    $set = $ this
-                                    mimeType = $set .attr \mimeType
-                                    type = mimeType.substr(0,5) # => \audio or \video
-                                    return if type != \audio #and audioOnly
-                                    files[mimeType] = []; l=0
-                                    $set .find \BaseURL .each ->
-                                        $baseurl = $ this
-                                        $representation = $baseurl .parent!
-                                        #height = $representation .attr \height
-                                        files[mimeType][l++] = m =
-                                            file: "#basename.#{mimeType.substr 6}"
-                                            url: httpsify $baseurl.text!
-                                            mimeType: mimeType
-                                            size: $baseurl.attr(\yt:contentLength) / 1_000_000B_to_MB
-                                            samplingRate: "#{$representation .attr \audioSamplingRate}Hz"
-                                            #height: height
-                                            #width: height && $representation .attr \width
-                                            #resolution: height && "#{height}p"
-                                        if audioOnly and ~~m.size > ~~bestVideo.size and (window.chrome or mimeType != \audio/webm)
-                                                bestVideo := m
+                            if bestVideo
                                 files.preferredDownload = bestVideo
+                                files.status = 0
                                 console.log "[mediaDownload] resolving", files
-                                res.resolve media.downloadAudio = files
+                                res.resolve files
+                            else
+                                console.warn "[mediaDownload] vimow.com loaded, but no downloads found"
+                                res.reject do
+                                    status: 2
+                                    message: 'no downloads found'
+                            return
 
-                                /*
-                                html = ""
-                                for mimeType, files of res
-                                    html += "<h3 class=AdaptationSet>#mimeType</h3>"
-                                    for f in files
-                                        html += "<a href='#{$baseurl.text!}' download='#file' class='download"
-                                        html += " preferred-download" if f.preferredDownload
-                                        html += "'>#file</a> (#size; #{f.samplingRate || f.resolution})<br>"
-                                */
-                            .fail res.reject
-                    else
-                        console.error "[mediaDownload] no download found"
-                        res.reject "no download found"
-                        #window.open(htmlUnescape(/.+>(http.+?)<\/BaseURL>/i.exec(d)[1]))
-        else if format == 2 # soundcloud
-            audioOnly = true
-            mediaLookup media
-                .then (d) ->
-                    if d.download
-                        d =
-                            "#{d.downloadFormat}":
-                                url: d.download
-                                size: d.downloadSize
-                        res.resolve media.downloadAudio = d
-                    else
-                        res.reject "download disabled"
-                .fail res.reject
-        else
-            console.error "[mediaDownload] unknown format", media
-            res.reject "unknown format"
 
-        return res.promise!
+                        else if blocked
+                            get = (key) !->
+                                val = (file || d).match regexUnblocked[key]
+                                if key in <[ url itag type fallback_host ]>
+                                    return decodeURIComponent val.1
+                                return val.1 if val
+                            basename = get(\title) || cid
+                        else
+                            get = (key, unescape) !->
+                                val = file.match regexNormal[key]
+                                # "+" are not unescaped by default, as they only appear in the title and verticals
+                                if val
+                                    val = val.1 .replace(/\++/g, ' ') if unescape
+                                    return decodeURIComponent val.1
+                            basename = get(\title, true) || cid
+
+                            if error = get \errorcode
+                                reason = get(\reason, true)
+                                switch +error
+                                | 150 =>
+                                    console.error "[mediaDownload] video_info error 150! Embedding not allowed on some websites"
+                                | otherwise =>
+                                    console.error "[mediaDownload] video_info error #error! unkown error code", reason
+
+                        if not audioOnly
+                            /*if get \adaptive_fmts
+                                for file in unescape(that.1) .split ","
+                                    url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
+                                    if file.match(/type=(.*?)%3B/)
+                                        mimeType = unescape that.1
+                                        filename = "#basename.#{mimeType.substr 6}"
+                                        if file.match(/size=(.*?)(?:&|$)/)
+                                            resolution = unescape(that.1)
+                                            size = resolution.split \x
+                                            size = size.0 * size.1
+                                            (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
+                                            if size > bestVideoSize
+                                                bestVideo = video
+                                                bestVideoSize = size*/
+                            fmt_list_ = get \fmt_list
+                            if get \url_encoded_fmt_stream_map
+                                for file in that .split ","
+                                    #file = unescape(file).replace(/\\u0026/g, '&')
+                                    url = get \url
+                                    fallback_host = unescape(that.1) if file.match(/fallback_host=(.*?)(?:\\u0026|$)/)
+                                    itag = get \itag
+                                    if ytItags[itag]
+                                        format = that
+                                    else
+                                        if not fmt_list
+                                            fmt_list = {}
+                                            if fmt_list_
+                                                for e in fmt_list_.split ','
+                                                    e .= split '/'
+                                                    fmt_list[e.0] = e.1 .split 'x' .1
+                                            else
+                                                console.warn "[mediaDownload] no fmt_list found"
+                                        if fmt_list[itag] and get \type
+                                            format =
+                                                itag: itag
+                                                type: that.1
+                                                ext: that.2
+                                                resolution: fmt_list[itag]
+                                            console.warn "[mediaDownload] unknown itag found, found in fmt_list", itag
+                                    if format
+                                        original_url = url
+                                        url = url
+                                            .replace /^.*?googlevideo.com/, do
+                                                "https://#fallback_host" # hack to bypass restrictions
+                                                    #.replace 'googlevideo.com', 'c.docs.google.com' # hack to allow HTTPS
+                                        #url .= replace('googlevideo.com', 'c.docs.google.com') # supposedly unblocks some videos
+                                        (files[format.ext] ||= [])[*] = video =
+                                            file: "#basename.#{format.ext}"
+                                            url: url
+                                            original_url: original_url
+                                            fallback_host: fallback_host
+                                            #fallback_url: original_url.replace('googlevideo.com', fallback_host)
+                                            mimeType: "#{format.type}/#{format.ext}"
+                                            resolution: format.resolution
+                                            itag: format.itag
+                                        if format.resolution > bestVideoSize
+                                            bestVideo = video
+                                            bestVideoSize = video.resolution
+                                    else
+                                        console.warn "[mediaDownload] unknown itag found, not in fmt_list", itag
+
+                            if bestVideo
+                                files.preferredDownload = bestVideo
+                                files.status = 0
+                                console.log "[mediaDownload] resolving", files
+                                res.resolve files
+                            else
+                                console.warn "[mediaDownload] no downloads found"
+                                res.reject do
+                                    status: 2
+                                    message: 'no downloads found'
+
+                        # audioOnly
+                        else
+                            if blocked and d.match(/"dashmpd":"(.*?)"/)
+                                url = p0ne.proxy(that.1 .replace(/\\\//g, '/'))
+                            else if d.match(/dashmpd=(http.+?)(?:&|$)/)
+                                url = p0ne.proxy(unescape that.1 /*parse(d).dashmpd*/)
+
+                            if url
+                                console.info "[mediaDownload] DASHMPD lookup", url
+                                $.get url
+                                    .then (dashmpd) ->
+                                        export dashmpd
+                                        $dash = dashmpd |> $.parseXML |> jQuery
+                                        bestVideo = size: 0
+                                        $dash .find \AdaptationSet .each ->
+                                            $set = $ this
+                                            mimeType = $set .attr \mimeType
+                                            type = mimeType.substr(0,5) # => \audio or \video
+                                            return if type != \audio #and audioOnly
+                                            if mimeType == \audio/mp4
+                                                ext = \m4a # audio-only .mp4 files are commonly saved as .m4a
+                                            else
+                                                ext = mimeType.substr 6
+                                            files[mimeType] = []; l=0
+                                            $set .find \BaseURL .each ->
+                                                $baseurl = $ this
+                                                $representation = $baseurl .parent!
+                                                #height = $representation .attr \height
+                                                files[mimeType][l++] = m =
+                                                    file: "#basename.#ext"
+                                                    url: httpsify $baseurl.text!
+                                                    mimeType: mimeType
+                                                    size: $baseurl.attr(\yt:contentLength) / 1_000_000B_to_MB
+                                                    samplingRate: "#{$representation .attr \audioSamplingRate}Hz"
+                                                    #height: height
+                                                    #width: height && $representation .attr \width
+                                                    #resolution: height && "#{height}p"
+                                                if audioOnly and ~~m.size > ~~bestVideo.size and (window.chrome or mimeType != \audio/webm)
+                                                        bestVideo := m
+                                        if bestVideo
+                                            files.preferredDownload = bestVideo
+                                            files.status = 0
+                                            console.log "[mediaDownload] resolving", files
+                                            res.resolve files
+                                        else
+                                            console.warn "[mediaDownload] dash.mpd found, but no downloads"
+                                            res.reject do
+                                                status: 3
+                                                message: 'dash.mpd found, but no downloads'
+
+                                        /*
+                                        html = ""
+                                        for mimeType, files of res
+                                            html += "<h3 class=AdaptationSet>#mimeType</h3>"
+                                            for f in files
+                                                html += "<a href='#{$baseurl.text!}' download='#file' class='download"
+                                                html += " preferred-download" if f.preferredDownload
+                                                html += "'>#file</a> (#size; #{f.samplingRate || f.resolution})<br>"
+                                        */
+                                    .fail res.reject
+                            else
+                                console.error "[mediaDownload] no download found"
+                                res.reject "no download found"
+                            #window.open(htmlUnescape(/.+>(http.+?)<\/BaseURL>/i.exec(d)[1]))
+            else if format == 2 # soundcloud
+                audioOnly = true
+                mediaLookup media
+                    .then (d) ->
+                        if d.download
+                            res.resolve media.downloadAudio =
+                                (d.downloadFormat):
+                                    url: d.download
+                                    size: d.downloadSize
+                        else
+                            res.reject "download disabled"
+                    .fail res.reject
+            else
+                console.error "[mediaDownload] unknown format", media
+                res.reject "unknown format"
+
+            return res.promise!
 
     proxify: (url) ->
-        if url.startsWith("http:")
+        if url.startsWith?("http:")
             return p0ne.proxy url
         else
             return url
     httpsify: (url) ->
-        if url.startsWith("http:")
+        if url.startsWith?("http:")
             return "https://#{url.substr 7}"
         else
             return url
@@ -643,12 +838,13 @@ window <<<<
         if not cid
             return $!
         else
-            res = $cm! .find ".cid-#cid" .last!
-            if not res.hasClass \.text
-                res .= find \.text .last!
+            res = $cms! .find ".text.cid-#cid"
             return res
     getChat: (cid) ->
-        return getChatText cid .parent! .parent!
+        if typeof cid == \object
+            return cid.$el ||= getChat(cid.cid)
+        else
+            return getChatText cid .parent! .parent!
     #ToDo test this
     getMentions: (data, safeOffsets) ->
         if safeOffsets
@@ -708,10 +904,10 @@ window <<<<
             return String.fromCharCode(+b or htmlEscapeMap[a] or parseInt(c, 16)) or _
     stripHTML: (msg) ->
         return msg .replace(/<.*?>/g, '')
-    unemotify: (str) ->
+    unemojify: (str) ->
         map = window.emoticons?.map
         return str if not map
-        str .replace /<span class="emoji-glow"><span class="emoji emoji-(\w+)"><\/span><\/span>/g, (_, emoteID) ->
+        str .replace /(?:<span class="emoji-glow">)?<span class="emoji emoji-(\w+)"><\/span>(?:<\/span>)?/g, (_, emoteID) ->
             if emoticons.reversedMap[emoteID]
                 return ":#that:"
             else
@@ -737,11 +933,11 @@ window <<<<
 
     collapseWhitespace: (str) ->
         return str.replace /\s+/g, ' '
-    cleanMessage: (str) -> return str |> unemotify |> stripHTML |> htmlUnescape |> resolveRTL |> collapseWhitespace
+    cleanMessage: (str) -> return str |> unemojify |> stripHTML |> htmlUnescape |> resolveRTL |> collapseWhitespace
 
     formatPlainText: (text) -> # used for song-notif and song-info
         lvl = 0
-        text .= replace /([\s\S]*?)($|https?:(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, (,pre,url,post) ->
+        text .= replace /([\s\S]*?)($|(?:https?:|www\.)(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, (,pre,url,post) ->
             pre = pre
                 .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
                 .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
@@ -809,7 +1005,7 @@ window <<<<
             arr[*-2] += " and\xa0#{arr.pop!}" # \xa0 is NBSP
         return arr.join ", "
 
-    plural: (num, singular, plural=singular+'s') ->
+    plural: (num, singular, plural="#{singular}s") ->
         # for further functionality, see
         # * http://unicode.org/repos/cldr-tmp/trunk/diff/supplemental/language_plural_rules.html
         # * http://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
@@ -827,6 +1023,82 @@ window <<<<
         | (ld==3) => return "#{i}rd"
         return "#{i}th"
 
+    /*fromCodePoints: (str) ->
+        res = ""
+        for codePoint in str.split \-
+            res += String.fromCodePoints(parseInt(codePoint, 16))
+        return res
+    */
+    emojifyUnicode: (str) ->
+        if typeof str != \string
+            return str
+        else
+            return str.replace do
+                # U+1F300 to  U+1F3FF | U+1F400 to  U+1F64F | U+1F680 to  U+1F6FF
+                /\ud83c[\udf00-\udfff]|\ud83d[\udc00-\ude4f]|\ud83d[\ude80-\udeff]/g
+                (emoji, all) ->
+                    emoji = emoji.codePointAt(0).toString(16)
+                    if emoticons.reversedMap[emoji]
+                        # emoji is converted to a hexadecimal number, so no undesired HTML injection here
+                        return emojifyUnicodeOne(emoji, true)
+                    else
+                        return all
+    emojifyUnicodeOne: (key /*, isCodePoint*/) ->
+        #if not isCodePoint
+        #    key = emoticons.map[language]
+        return "<span class=\"emoji emoji-#key\"></span>"
+    flag: (language, unicode) ->
+        /*@security HTML injection possible, if Lang.languages[language] is maliciously crafted*/
+        if language.0 == \' or language.1 == \' # avoid HTML injection
+            return ""
+        else
+            return "<span class='flag flag-#language' title='#{Lang?.languages[language]}'></span>"
+        /*
+        if window.emoticons
+            language .= language if typeof language == \object
+            language = \gb if language == \en
+            if key = emoticons.map[language]
+                if unicode
+                    return key
+                else
+                    return emojifyOne(key)
+        return language*/
+    formatUser: (user, showModInfo) ->
+        user .= toJSON! if user.toJSON
+        info = getRank(user)
+        if info == \none
+            info = ""
+
+        if showModInfo
+            info = ", #info "
+            info += "lvl #{if user.gRole == 5 then '∞' else user.level}"
+            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+                info += " - created #{ago d}"
+
+        return "#{user.username} (#{user.language}#info)"
+
+    formatUserHTML: (user, showModInfo, fromClass) ->
+        /*@security no HTML injection should be possible, unless user.rawun or .id is improperly modified*/
+        user = getUser(user)
+        if rank = getRankIcon(user)
+            rank += " "
+
+        if showModInfo
+            info = " (lvl #{if user.gRole == 5 then '∞' else user.level}"
+            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+                info += " - created #{ago d}"
+            info += ")"
+        if fromClass
+            fromClass = " #{getRank(user)}"
+        else
+            fromClass = ""
+
+        # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
+        return "#rank<span class='un#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
+
+    formatUserSimple: (user) ->
+        return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
+
 
     # formatting
     getTime: (t = new Date) ->
@@ -835,14 +1107,17 @@ window <<<<
         return t.toISOString! .replace(/T|\..+/g, " ")
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff, short) ->
-        return "-#{humanTime -diff}" if diff < 0
+        if diff < 0
+            return "-#{humanTime -diff}"
+        else if not short and diff < 2_000ms
+            return "just now"
         b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
         diff /= 1000to_s
         while diff > 2*b[c] then diff /= b[c++]
         if short
-            return "#{~~diff}#{<[ s m h d ]>[c]}"
+            return "#{~~diff}#{<[ s m h d y ]>[c]}"
         else
-            return plural ~~diff, <[ second minute hour day ]>[c]
+            return "#{~~diff} #{<[ seconds minutes hours days years ]>[c]}"
     # show a timespan (in s) in a format like "mm:ss" or "hh:mm:ss" etc
     mediaTime: (~~dur) ->
         return "-#{mediaTime -dur}" if dur < 0
@@ -877,13 +1152,19 @@ window <<<<
             if that == 5
                 return \admin
             else
-                return \BA
+                return \ambassador
         else
             return <[ none rdj bouncer manager cohost host ]>[role || 0]
+    getRankIcon: (user) ->
+        rank = getRank(user)
+        return rank != \none && "<i class='icon icon-chat-#{if rank == \rdj then \dj else rank} p0ne-icon-small'></i>" ||''
 
     parseURL: (href) ->
-        $dummy.0.href = href
-        return $dummy.0{hash, host, hostname, href, pathname, port, protocol, search}
+        href ||= "//"
+        a = document.createElement \a
+        a.href = href
+        return a
+        #$dummy.0{hash, host, hostname, href, pathname, port, protocol, search}
 
     getIcon: do ->
         # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
@@ -894,9 +1175,9 @@ window <<<<
         fn = (className) ->
             $icon.addClass className
             res =
-                background: $icon .css \background
                 image:      $icon .css \background-image
                 position:   $icon .css \background-position
+            res.background = "#{res.image} #{res.position}"
             $icon.removeClass className
             return res
         fn.enableCaching = -> res = _.memoize(fn); res.enableCaching = $.noop; window.getIcon = res
@@ -907,11 +1188,12 @@ window <<<<
 
     # variables
     disabled: false
-    userID: API?.getUser!.id # API.getUser! will fail when used on the Dashboard if no room has been visited before
-    user: API?.getUser! # for usage with things that should not change, like userID, joindate, …
+    user: API?.getUser! # preverably for usage with things that should not change, like userID, joindate, …
+        # is kept uptodate in updateUserData in p0ne.auxiliary-modules
     getRoomSlug: ->
         return room?.get?(\slug) || decodeURIComponent location.pathname.substr(1)
-
+userID = user?.id # API.getUser! will fail when used on the Dashboard if no room has been visited before
+user.isStaff = user and user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
 
 
 
@@ -938,8 +1220,8 @@ requireHelper \user_, (.canModChat) #(._events?.'change:username')
 if user_
     window.users = user_.collection
     if not userID
-        user = user_.toJSON!
-        userID = user.id
+        window.user = user_.toJSON!
+        window.userID = user.id
 
 
 window.Lang = require \lang/Lang
@@ -950,7 +1232,7 @@ requireHelper \database, (.settings)
 requireHelper \socketEvents, (.ack)
 requireHelper \permissions, (.canModChat)
 requireHelper \Playback, (.::?.id == \playback)
-requireHelper \PopoutView, (\_window of)
+requireHelper \PopoutView, (\$document of)
 requireHelper \MediaPanel, (.::?.onPlaylistVisible)
 requireHelper \PlugAjax, (.::?.hasOwnProperty \permissionAlert)
 requireHelper \backbone, (.Events), id: \backbone
@@ -965,6 +1247,10 @@ requireHelper \tracker, (.identify)
 requireHelper \currentMedia, (.updateElapsedBind)
 requireHelper \settings, (.settings)
 requireHelper \soundcloud, (.sc)
+requireHelper \AlertEvent, (._name == \AlertEvent)
+requireHelper \userRollover, (.id == \user-rollover)
+requireHelper \currentPlaylistMedia, (\currentFilter of)
+requireHelper \RoomHistory, ((it) -> it::?listClass == \history and it::hasOwnProperty \listClass)
 requireHelper \userList, (.id == \user-lists)
 requireHelper \FriendsList, (.::?.className == \friends)
 requireHelper \RoomUserRow, (.::?.vote)
@@ -984,6 +1270,10 @@ for cb in (room._events[\change:name] || _$context?._events[\show:room] || Layou
 
 
 
+# security fix to avoid HTML injection
+for k,v of Lang?.languages when v.has \'
+    Lang.languages[k] .= replace /\\?'/g, "\\'"
+
 
 # chat
 if app and not window.chat = app.room.chat
@@ -991,19 +1281,22 @@ if app and not window.chat = app.room.chat
         window.chat = e.context
         break
 
-if chat
+if chat?
     window <<<<
         $cm: ->
-            if window.saveChat
-                return saveChat.$cm
-            else
-                return chat.$chatMessages
+            return PopoutView?.chat?.$chatMessages || chat?.$chatMessages || $ \#chat-messages
+        $cms: ->
+            cm = chat?.$chatMessages || $ \#chat-messages
+            cm .= add that if PopoutView?.chat?.$chatMessages
+            return cm
 
         playChatSound: (isMention) ->
-            if isMention
+            chat.playSound!
+            /*if isMention
                 chat.playSound \mention
             else if $ \.icon-chat-sound-on .length > 0
                 chat.playSound \chat
+            */
 else
     cm = $ \#chat-messages
     window <<<<
@@ -1017,12 +1310,31 @@ window <<<<
         if window.saveChat
             window.saveChat.$cChunk.append div
         else
-            $cm!.append div
+            $cms!.append div
         chatScrollDown! if wasAtBottom
-        chat.lastID = -1 # avoid message merging above the appended div
+        chat.lastType = null # avoid message merging above the appended div
+        PopoutView?.chat?.lastType = null
         return div
 
         #playChatSound isMention
+    chatWarn: (message, /*optional*/ title, isHTML) ->
+        return if not message
+        if typeof title == \string
+            title = $ '<span class=un>' .text title
+        else
+            isHTML = title
+            title = null
+
+        return appendChat do
+            $ '<div class="cm system"><div class=badge-box><i class="icon icon-chat-system"></i></div></div>'
+                .append do
+                    $ '<div class=msg>'
+                        .append do
+                            $ '<div class=from>'
+                                .append title
+                                .append getTimestamp!
+                        .append do
+                            $('<div class=text>')[if isHTML then \html else \text] message
 
     chatIsAtBottom: ->
         cm = $cm!
@@ -1039,11 +1351,26 @@ window <<<<
             .val msg
             .trigger \input
             .focus!
+    getTimestamp: (d=new Date) ->
+        if auxiliaries?
+            return "<time class='timestamp' datetime='#{d.toISOString!}'>#{auxiliaries.getChatTimestamp(database?.settings.chatTimestamps == 24h)}</time>"
+        else
+            return "#{pad d.getHours!}:#{pad d.getMinutes!}"
+            /* # or we just default to 24h clock because it makes more sense* and keeps the code cleaner
+            # *(is more easily understood. 12h clock is messed up at noon and midnight)
+            use12Clock = database?.settings.chatTimestamps == 24h
+            h = d.getHours!
+            if suffix
+                suffix = \am
+                if h >= 12
+                    suffix = \pm
+                    h %= 13 # 13 because otherwise 12:34 (noon) would appear as "0:34pm" instead of "12:34pm"
+            return "#{pad h}:#{pad d.getMinutes!}#{suffix |''}"*/
 
 
 
 /*####################################
-#           extend jQuery            #
+#          extend Deferreds          #
 ####################################*/
 # add .timeout(time, fn) to Deferreds and Promises
 replace jQuery, \Deferred, (Deferred_) -> return ->
@@ -1125,7 +1452,7 @@ window.getPlugCubedVersion = ->
     else if v = $ '#p3-settings .version' .text!
         void
     else # plug³ alpha
-        v = requireHelper \plugCubedVersion, (.major)
+        v = requireHelper \plugCubedVersion, test: (.major)
         return v if v
 
         # alternative methode (40x slower)

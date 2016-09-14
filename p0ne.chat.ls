@@ -1,14 +1,17 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+/**
+ * chat-related plug_p0ne modules
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+ */
 
-/*
- * missing chat inline image plugins:
+/* ToDo:
+ * add missing chat inline image plugins:
  * Derpibooru
  * imgur.com/a/
  * tumblr
  * deviantart
- * e621.net
- * paheal.net
  * gfycat.com
  * cloud-4.steampowered.com … .resizedimage
  */
@@ -20,21 +23,280 @@ roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador 
 
 
 
+
+
+/*####################################
+#         BETTER CHAT INPUT          #
+####################################*/
+module \betterChatInput, do
+    require: <[ chat user ]>
+    optional: <[ user_ _$context PopoutListener Lang ]>
+    displayName: "Better Chat Input"
+    settings: \chat
+    help: '''
+        Replaces the default chat input field with a multiline textfield.
+        This allows you to more accurately see how your message will actually look when send
+    '''
+    setup: ({addListener, replace, revert, css, $create}) ->
+        # apply styles
+        css \p0ne_chat_input, '
+            #chat-input {
+                bottom: 7px;
+                height: auto;
+                background: transparent !important;
+                min-height: 30px;
+            }
+            #chat-input-field {
+                position: static;
+                resize: none;
+                height: 16px;
+                overflow: hidden;
+                margin-left: 8px;
+                color: #eee;
+                background: rgba(0, 24, 33, .7);
+                box-shadow: inset 0 0 0 1px transparent;
+                transition: box-shadow .2s ease-out;
+            }
+            .popout #chat-input-field {
+                box-sizing: content-box;
+            }
+            #chat-input-field:focus {
+                box-shadow: inset 0 0 0 1px #009cdd !important;
+            }
+
+            .autoresize-helper {
+                display: none;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+
+            #chat-input-field, .autoresize-helper {
+                width: 295px;
+                padding: 8px 10px 5px 10px;
+                min-height: 16px;
+                font-weight: 400;
+                font-size: 12px;
+                font-family: Roboto,sans-serif;
+            }
+
+            /* emote */
+            .p0ne-better-chat-emote {
+                font-style: italic;
+            }
+
+            /*fix chat-messages size*/
+            #chat-messages {
+                height: auto !important;
+                bottom: 45px;
+            }
+        '
+
+        var $autoresize_helper, oldHeight
+        chat = PopoutView.chat || window.chat
+
+        # back up elements that are to be removed
+        @cIF_ = chat.$chatInputField.0
+
+
+        focused = chat.$chatInputField .hasClass \focused
+        #val = chat.$chatInputField .val!
+        chat.$chatInput .removeClass \focused # fix permanent focus class
+
+
+        # add new input text-area
+        init = addListener API, \popout:open, (,PopoutView) ~>
+            chat := PopoutView.chat
+            @$form = chat.$chatInputField.parent!
+            val = window.chat.$chatInputField .val!
+            focused = window.chat.$chatInputField .is \:focus
+            #oldHeight := chat.$chatInputField .height!
+            chat.$chatInputField .detach!
+            chat.$chatInputField.0 = chat.chatInput = $create "<textarea id='chat-input-field' maxlength=256>"
+                .attr \tabIndex, 1
+                .val val
+                .focus! # who doesn't want to have the chat focused?
+                .attr \placeholder, Lang?.chat.placeholder || "Chat"
+                # add DOM event Listeners from original input field (not using .bind to allow custom chat.onKey* functions)
+                .on \keydown, (e) ->
+                    chat.onKeyDown e
+                .on \keyup, (e) ->
+                    chat.onKeyUp e
+                #.on \focus, _.bind(chat.onFocus, chat)
+                #.on \blur, _.bind(chat.onBlur, chat)
+
+                # add event listeners for autoresizing
+                .on \input, onInput
+                .on \keydown, checkForMsgSend
+                .appendTo @$form
+                .after do
+                    $autoresize_helper := $create \<div> .addClass \autoresize-helper
+                .0
+
+
+        # init for onpage chat
+        init(null, {chat: window.chat})
+        $onpage_autoresize_helper = $autoresize_helper
+
+        # init for current popout, if any
+        init(null, PopoutView) if PopoutView._window
+
+        addListener API, \popout:close, ~>
+            window.chat.$chatInputField .val(chat.$chatInputField .val!)
+            chat := window.chat
+            $autoresize_helper := $onpage_autoresize_helper
+
+
+        chatHidden = $cm!.parent!.css(\display) == \none
+
+
+        wasEmote = false
+        function onInput
+            content = chat.$chatInputField .val!
+            if content != (content = content.replace(/\n/g, "")) #.replace(/\s+/g, " "))
+                chat.$chatInputField .val content
+            if content.0 == \/ and content.1 == \m and content.2 == \e
+                if not wasEmote
+                    wasEmote := true
+                    chat.$chatInputField .addClass \p0ne-better-chat-emote
+                    $autoresize_helper   .addClass \p0ne-better-chat-emote
+            else if wasEmote
+                wasEmote := false
+                chat.$chatInputField .removeClass \p0ne-better-chat-emote
+                $autoresize_helper   .removeClass \p0ne-better-chat-emote
+
+            $autoresize_helper.text(content)
+            newHeight = $autoresize_helper .height!
+            return if oldHeight == newHeight
+            console.log "[chat input] adjusting height"
+            scrollTop = chat.$chatMessages.scrollTop!
+            chat.$chatInputField
+                .css height: newHeight
+            chat.$chatMessages
+                .css bottom: newHeight + 30px
+                .scrollTop scrollTop + newHeight - oldHeight
+            oldHeight := newHeight
+
+        function checkForMsgSend e
+            if (e and (e.which || e.keyCode)) == 13 # ENTER
+                requestAnimationFrame(onInput)
+
+
+    disable: ->
+        if @cIF_
+            chat.$chatInputField = $ (chat.chatInput = @cIF_)
+                .val chat.$chatInputField.val!
+                .appendTo @$form
+
+
+
+
+/*####################################
+#            CHAT PLUGIN             #
+####################################*/
+module \chatPlugin, do
+    require: <[ _$context ]>
+    setup: ({addListener}) ->
+        p0ne.chatLinkPlugins ||= []
+        onerror = 'onerror="chatPlugin.imgError(this)"'
+        addListener \early, _$context, \chat:receive, (msg) -> # run plugins that modify chat msgs
+            msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
+            msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
+
+            _$context .trigger \chat:plugin, msg
+            API .trigger \chat:plugin, msg
+
+
+            # p0ne.chatLinkPlugins
+            if msg.wasAtBottom
+                onload = 'onload="chatScrollDown()"'
+            else
+                onload = ''
+            msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,url, domain, offset)->
+                domain .= toLowerCase!
+                for ctx in [_$context, API] when ctx._events[\chat:image]
+                    for plugin in ctx._events[\chat:image]
+                        try
+                            return that if plugin.callback.call plugin.ctx, {all,pre,completeURL,protocol,domain,url, offset,  onload,onerror,msg}
+                        catch err
+                            console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
+                return all
+
+        addListener _$context, \chat:receive, (e) ->
+            getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
+
+        function addClass classes
+            if typeof classes == \string
+                for className in classes.split /\s+/g when className
+                    @classes[className] = true
+        function removeClass classes
+            if typeof classes == \string
+                for className in classes.split /\s+/g
+                    delete @classes[className]
+    imgError: (elem) ->
+        console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
+        $ elem .parent!
+            ..text ..attr \href
+            ..addClass \p0ne-img-failed
+
+
+/*####################################
+#           MESSAGE CLASSES          #
+####################################*/
+module \chatMessageClasses, do
+    optional: <[ users ]>
+    require: <[ chatPlugin ]>
+    setup: ({addListener}) ->
+        try
+            $cm! .children! .each ->
+                if uid = this.dataset.cid
+                    uid .= substr(0, 7)
+                    return if not uid
+                    $this = $ this
+                    if fromUser = users.get uid
+                        role = getRank(fromUser)
+                        if role != \ghost
+                            fromRole = "from-#{role}"
+                            if role == \none
+                                fromRole += " from"
+                                # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                            else
+                                fromRole += " from-staff"
+                    if not fromRole
+                        for r in ($this .find \.icon .prop(\className) ||"").split " " when r.startsWith \icon-chat-
+                            fromRole = "from-#{r.substr 10}"
+                        else
+                            fromRole = \from-none
+                    $this .addClass "fromID-#{uid} #fromRole"
+        catch err
+            console.error "[chatMessageClasses] couldn't convert old messages", err.stack
+
+        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) -> if uid
+            message.user = user = getUser(uid)
+            message.addClass "fromID-#{uid}"
+            message.addClass "from-#{getRank user}"
+            message.addClass \from-staff if user?.role > 1
+
+
+
+
 /*####################################
 #      UNREAD CHAT NOTIFICAITON      #
 ####################################*/
 module \unreadChatNotif, do
-    require: <[ _$context chatDomEvents ]>
+    require: <[ _$context chatDomEvents chatPlugin ]>
     bottomMsg: $!
     settings: \chat
     displayName: 'Mark Unread Chat'
     setup: ({addListener}) ->
+        unreadCount = 0
         $chatButton = $ \#chat-button
+            .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
         @bottomMsg = $cm! .children! .last!
-        addListener \early, _$context, \chat:receive, (message) ->
+        addListener _$context, \chat:plugin, (message) ->
             message.wasAtBottom ?= chatIsAtBottom!
-            if not $chatButton.hasClass \selected
-                $chatButton.addClass \has-unread
+            if not $chatButton.hasClass \selected and not PopoutView?.chat?
+                $chatButton.addClass \p0ne-toolbar-highlight
+                $unreadCount .text (unreadCount + 1)
             else if message.wasAtBottom
                 @bottomMsg = message.cid
                 return
@@ -43,9 +305,18 @@ module \unreadChatNotif, do
             $cm! .addClass \has-unread
             message.unread = true
             message.addClass \unread
+            unreadCount++
         @throttled = false
         addListener chatDomEvents, \scroll, updateUnread
         addListener $chatButton, \click, updateUnread
+
+        # reduce deleted messages from unreadCount
+        addListener \early _$context, \chat:delete, (cid) ->
+            $msg = getChat(cid)
+            if $msg.length and $msg.hasClass(\unread)
+                $msg.removeClass \unread # this is to avoid problems with disableChatDelete
+                unreadCount--
+
         ~function updateUnread
             return if @throttled
             @throttled := true
@@ -70,7 +341,8 @@ module \unreadChatNotif, do
                                 @bottomMsg = unread .removeClass \unread .last!
                     if not msg.length
                         cm .removeClass \has-unread
-                        $chatButton .removeClass \has-unread
+                        $chatButton .removeClass \p0ne-toolbar-highlight
+                        unreadCount := 0
                 @throttled := false
     fix: ->
         @throttled = false
@@ -84,258 +356,6 @@ module \unreadChatNotif, do
             .removeClass \has-unread
             .find \.unread .removeClass \unread
 
-
-
-
-
-/*####################################
-#         BETTER CHAT INPUT          #
-####################################*/
-module \p0neChatInput, do
-    require: <[ chat user ]>
-    optional: <[ user_ _$context PopoutListener Lang ]>
-    displayName: "Better Chat Input"
-    settings: \chat
-    help: '''
-        Replaces the default chat input field with a multiline textfield.
-        This allows you to more accurately see how your message will actually look when send
-    '''
-    setup: ({addListener, css, $create}) ->
-        # apply styles
-        css \p0ne_chat_input, '
-            #chat-input {
-                bottom: 7px;
-                height: auto;
-                background: transparent !important;
-                min-height: 30px;
-            }
-            #chat-input-field {
-                position: static;
-                resize: none;
-                height: 16px;
-                overflow: hidden;
-                margin-left: 8px;
-                color: #eee;
-                background: rgba(0, 24, 33, .7);
-                box-shadow: inset 0 0 0 1px transparent;
-                transition: box-shadow .2s ease-out;
-            }
-            #chat-input-field:focus {
-                box-shadow: inset 0 0 0 1px #009cdd !important;
-            }
-            .muted .chat-input-name {
-                display: none;
-            }
-
-            .autoresize_helper {
-                display: none;
-                white-space: pre-wrap;
-                word-wrap: break-word;
-            }
-
-            #chat-input-field, .autoresize_helper {
-                width: 295px;
-                padding: 8px 10px 5px 10px;
-                min-height: 16px;
-                font-weight: 400;
-                font-size: 12px;
-                font-family: Roboto,sans-serif;
-            }
-            .chat-input-name {
-                position: absolute;
-                top: 8px;
-                left: 18px;
-                font-weight: 700;
-                font-size: 12px;
-                font-family: Roboto,sans-serif;
-                color: #666;
-                transition: color .2s ease-out;
-                pointer-events:none;
-            }
-            #chat-input-field:focus + .chat-input-name {
-                color: #ffdd6f !important;
-            }
-            /*fix chat-messages size*/
-            #chat-messages {
-                height: auto !important;
-                bottom: 45px;
-            }
-        '
-
-        var $name, $autoresize_helper, chat
-        chat = PopoutView.chat || window.chat
-
-        # back up elements that are to be removed
-        @cIF_ = chat.$chatInputField.0
-
-
-        # fix permanent focus class
-        chat.$chatInput .removeClass \focused
-        val = chat.$chatInputField .val!
-
-        # use $name's width to add proper indent to the input field
-        @fixIndent = -> requestAnimationFrame -> # wait an animation frame so $name is properly added to the DOM
-            indent = 6px + $name.width!
-            chat.$chatInputField .css textIndent: indent
-            $autoresize_helper   .css textIndent: indent
-
-        # add new input text-area
-        oldHeight = 0
-        do addListener API, \popout:open, ~>
-            chat := PopoutView.chat || window.chat
-            @$form = chat.$chatInputField.parent!
-
-            chat.$chatInputField .detach!
-            oldHeight := chat.$chatInputField .height!
-            chat.$chatInputField.0 = chat.chatInput = $create "<textarea id='chat-input-field' maxlength=256>"
-                .attr \tabIndex, 1
-                .val val
-                .attr \placeholder, Lang?.chat.placeholder
-                # add DOM event Listeners from original input field (not using .bind to allow custom chat.onKey* functions)
-                .on \keydown, (e) ->
-                    chat.onKeyDown e
-                .on \keyup, (e) ->
-                    chat.onKeyUp e
-                #.on \focus, _.bind(chat.onFocus, chat)
-                #.on \blur, _.bind(chat.onBlur, chat)
-
-                # add event listeners for autoresizing
-                .on 'input', onInput
-                .appendTo @$form
-                .after do
-                    $autoresize_helper := $create \<div> .addClass \autoresize_helper
-                .0
-
-            # username field
-            $name := $create \<span>
-                .addClass \chat-input-name
-                .text "#{user.username} "
-                .insertAfter chat.$chatInputField
-
-            @fixIndent!
-
-        sleep 2_000ms, @fixIndent
-
-        chatHidden = $cm!.parent!.css(\display) == \none
-        if _$context
-            addListener _$context, \chat:send, -> requestAnimationFrame ->
-                chat.$chatInputField .trigger \input
-            if chatHidden
-                _$context.once \show:chat, @fixIndent
-        else if chatHidden
-            $ \#chat-button .one \click, @fixIndent
-
-        if user_?
-            addListener user_, \change:username, @fixIndent
-
-
-        function onInput
-            content = chat.$chatInputField .val!
-            if (content2 = content.replace(/\n/g, "")) != content
-                chat.$chatInputField .val (content=content2)
-            $autoresize_helper.text("#content")
-            newHeight = $autoresize_helper .height!
-            return if oldHeight == newHeight
-            console.log "[chat input] adjusting height"
-            scrollTop = chat.$chatMessages.scrollTop!
-            chat.$chatInputField
-                .css height: newHeight
-            chat.$chatMessages
-                .css bottom: newHeight + 30px
-                .scrollTop scrollTop + newHeight - oldHeight
-            oldHeight := newHeight
-
-
-    disable: ->
-        if @cIF_
-            chat.$chatInputField = $ (chat.chatInput = @cIF_)
-                .val chat.$chatInputField.val!
-                .appendTo @$form
-
-
-
-module \chatPlugin, do
-    require: <[ _$context ]>
-    setup: ({addListener}) ->
-        p0ne.chatLinkPlugins ||= []
-        addListener \early, _$context, \chat:receive, (msg) -> # run plugins that modify chat msgs
-            msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
-            msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
-
-            _$context .trigger \chat:plugin, msg
-            API .trigger \chat:plugin, msg
-
-
-            # p0ne.chatLinkPlugins
-            if msg.wasAtBottom
-                onload = 'onload="chatScrollDown()"'
-            else
-                onload = ''
-            msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,url, domain, offset)->
-                domain .= toLowerCase!
-                for ctx in [_$context, API] when ctx._events[\chat:image]
-                    for plugin in ctx._events[\chat:image]
-                        try
-                            return that if plugin.callback.call plugin.ctx, {all,pre,completeURL,protocol,domain,url, offset,  onload,msg}
-                        catch err
-                            console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
-                return all
-
-        addListener _$context, \chat:receive, (e) ->
-            getChat(e.cid) .addClass Object.keys(e.classes).join(' ')
-
-        function addClass classes
-            if typeof classes == \string
-                for className in classes.split /\s+/g when className
-                    @classes[className] = true
-        function removeClass classes
-            if typeof classes == \string
-                for className in classes.split /\s+/g
-                    delete @classes[className]
-    imgError: (elem) ->
-        console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
-        $ elem .parent!
-            ..text ..attr \href
-            ..addClass \p0ne_img_failed
-
-
-/*####################################
-#           MESSAGE CLASSES          #
-####################################*/
-module \chatMessageClasses, do
-    optional: <[ users ]>
-    require: <[ chatPlugin ]>
-    setup: ({addListener}) ->
-        try
-            $cm! .children! .each ->
-                if uid = this.dataset.cid
-                    uid .= substr(0, 7)
-                    return if not uid
-                    $this = $ this
-                    if fromUser = users.get uid
-                        role = getRank(fromUser)
-                        if role != -1
-                            fromRole = "from-#{roles[role]}"
-                            if role == 0
-                                fromRole += " from"
-                                # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
-                            else
-                                fromRole += " from-staff"
-                    if not fromRole
-                        for r in ($this .find \.icon .prop(\className) ||"").split " " when r.startsWith \icon-chat-
-                            fromRole = "from-#{r.substr 10}"
-                        else
-                            fromRole = \from-none
-                    $this .addClass "fromID-#{uid} #fromRole"
-        catch err
-            console.error "[chatMessageClasses] couldn't convert old messages", err.stack
-
-        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) -> if uid
-            message.user = user = getUser(uid)
-            message.addClass "fromID-#{uid}"
-            message.addClass "from-#{getRank user}"
-            message.addClass \from-staff if user?.role > 1
-
 /*####################################
 #          OTHERS' @MENTIONS         #
 ####################################*/
@@ -345,8 +365,8 @@ module \chatOthersMentions, do
     settings: \chat
     displayName: 'Highlight @mentions for others'
     setup: ({addListener}) ->
-        sleep 0, ->
-            $cm! .children! .each ->
+        /*sleep 0, ->
+            $cm! .children! .each ->*/
 
         addListener _$context, \chat:plugin, ({type, uid}:message) -> if uid
             res = ""; lastI = 0
@@ -376,35 +396,36 @@ module \chatInlineImages, do
         Converts image links to images in the chat, so you can see a preview
     '''
     setup: ({addListener}) ->
-        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, msg, offset}) ~>
-            return if msg.message.hasAny <[ nsfw no-inline noinline ]> or msg.message[offset + all.length] == ";"
+        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ~>
+            # note: converting images with the domain plug.dj might allow some kind of exploit in the future
+            return if msg.message.toLowerCase!.hasAny <[ nsfw suggestive gore spoiler no-inline noinline ]> or msg.message[offset + all.length] == ";" or domain == \plug.dj
             # images
             if @plugins[domain] || @plugins[domain .= substr(1 + domain.indexOf(\.))]
                 [rgx, repl, forceProtocol] = that
                 img = url.replace(rgx, repl)
                 if img != url
                     console.log "[inline-img]", "#completeURL ==> #protocol#img"
-                    return "<a #pre><img src='#{forceProtocol||protocol}#img' class=p0ne_img #onload onerror='chatInlineImages.imgError(this)'></a>"
+                    return "<a #pre><img src='#{forceProtocol||protocol}#img' class=p0ne-img #onload #onerror></a>"
 
             # direct images (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest?cb=20131206071408)
             #   <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
             if /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i .test url
                 if domain in @forceHTTPSDomains
-                    completeURL .= replace /^.+\/\//, 'https://'
+                    completeURL .= replace 'http://', 'https://'
                 console.log "[inline-img]", "[direct] #completeURL"
-                return "<a #pre><img src='#completeURL' class=p0ne_img #onload onerror='chatInlineImages.imgError(this)'></a>"
+                return "<a #pre><img src='#completeURL' class=p0ne-img #onload onerror='chatInlineImages.imgError(this)'></a>"
 
             console.log "[inline-img]", "NO MATCH FOR #completeURL (probably isn't an image)"
             return false
 
-    forceHTTPSDomains: <[ i.imgur.com ]>
+    forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
-        \imgur.com :       [/^imgur.com\/(?:r\/\w+\/)?(\w\w\w+)/g, "i.imgur.com/$1.gif"]
-        \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/g, "$1/direct"]
-        \gyazo.com :       [/^gyazo.com\/\w+/g, "i.$&/direct"]
-        \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/g, "dl.dropboxusercontent.com$1"]
-        \pbs.twitter.com : [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/g, "$1:small"]
-        \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/g, (,src) -> return decodeURIComponent url]
+        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,7}(?:[&,][\w]{5,7})*)(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif"] # from RedditEnhancementSuite
+        \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"]
+        \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
+        \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
+        \pbs.twitter.com : [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/, "$1:small"]
+        \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, (,src) -> return decodeURIComponent url]
         \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
         \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
 
@@ -440,13 +461,13 @@ module \imageLightbox, do
         $app = $ \#app #TEMP
         $container = $ \#dialog-container
         var lastSrc
-        @$el = $el = $createPersistent '<img class=p0ne_img_large>' .appendTo $body
+        @$el = $el = $createPersistent '<img class=p0ne-img-large>' .appendTo $body
             .css do #TEMP
                 position: \absolute
                 zIndex: 6
                 cursor: \pointer
             .hide!
-        addListener $container, \click, \.p0ne_img_large, ->
+        addListener $container, \click, \.p0ne-img-large, ->
             dialog.close!
             return false
 
@@ -504,7 +525,7 @@ module \imageLightbox, do
                         cb?!
         dialog.closeBind = dialog~close
 
-        addListener chatDomEvents, \click, \.p0ne_img, (e) ->
+        addListener chatDomEvents, \click, \.p0ne-img, (e) ->
             console.info "[lightbox] showing", this, this.src
             $img_ = $ this
             e.preventDefault!
@@ -553,7 +574,7 @@ module \chatYoutubeThumbnails, do
         When hovering the thumbnail, it will animate, alternating between three frames of the video.
     '''
     setup: ({add, addListener}) ->
-        addListener chatDomEvents, \mouseenter, \.p0ne_yt_img, (e) ~>
+        addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) ~>
             clearInterval @interval
             img = this
             id = this.parentElement
@@ -569,7 +590,7 @@ module \chatYoutubeThumbnails, do
             console.log "[p0ne_yt_preview]", "started", e, id, @interval
             #ToDo show YT-options (grab, open, preview, [automute])
 
-        addListener chatDomEvents, \mouseleave, \.p0ne_yt_img, (e) ~>
+        addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) ~>
             clearInterval @interval
             img = this
             id = this.parentElement.dataset.ytCid
@@ -582,9 +603,9 @@ module \chatYoutubeThumbnails, do
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
             return "
-                <a class=p0ne_yt data-yt-cid='#yt' #pre>
-                    <div class=p0ne_yt_icon></div>
-                    <div class=p0ne_yt_img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
+                <a class=p0ne-yt data-yt-cid='#yt' #pre>
+                    <div class=p0ne-yt-icon></div>
+                    <div class=p0ne-yt-img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
                     #url
                 </a>
             " # no `onerror` on purpose # when updating the HTML, check if it breaks the animation callback

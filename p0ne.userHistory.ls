@@ -1,14 +1,15 @@
-
-requireHelper \userRollover, (.id == \user-rollover)
-requireHelper \RoomHistory, ((it) -> it::?listClass == \history and it::hasOwnProperty \listClass) #((it) -> it.onPointsChange && it._events?.reset)
+/**
+ * small module to show a user's song history on plug.dj
+ * fetches the song history from the user's /@/profile page
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+*/
 #HistoryItem = RoomHistory::collection.model if RoomHistory
 
-ObjWrap = (obj) ->
-    obj.get = (name) -> return this[name]
-    return obj
-
 module \userHistory, do
-    require: <[ userRollover RoomHistory ]>
+    require: <[ userRollover RoomHistory backbone ]>
     help: '''
         Shows another user's song history when clicking on their username in the user-rollover.
 
@@ -16,6 +17,7 @@ module \userHistory, do
     '''
     setup: ({addListener, replace, css}) ->
         css \userHistory, '#user-rollover .username { cursor: pointer }'
+
         addListener $(\body), \click, '#user-rollover .username', ->
             $ '#history-button.selected' .click! # hide history if already open
             user = userRollover.user
@@ -45,7 +47,7 @@ module \userHistory, do
                         if cid = /\/vi\/(.{11})\//.exec(img)
                             cid = cid.1
                             [title, author] = author.split " - "
-                            songs.add new ObjWrap do
+                            songs.add new backbone.Model do
                                 user: {id: user.id, username: "in #roomName"}
                                 room: {name: roomName}
                                 score:
@@ -54,7 +56,7 @@ module \userHistory, do
                                     negative: negative
                                     listeners: listeners
                                     skipped: 0
-                                media: new ObjWrap do
+                                media: new backbone.Model do
                                     format: 1
                                     cid: cid
                                     author: author
@@ -64,6 +66,6 @@ module \userHistory, do
                     export songs, d
                     replace RoomHistory::, \collection, -> return songs
                     _$context.trigger \show:history
-                    _.defer ->
+                    requestAnimationFrame ->
                         RoomHistory::.collection = RoomHistory::.collection_
                         console.log "#{getTime!} [userHistory] restoring room's proper history"

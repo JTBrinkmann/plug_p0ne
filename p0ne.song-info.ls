@@ -1,10 +1,10 @@
 /**
  * plug_p0ne songInfo
  * adds a dropdown with the currently playing song's description when clicking on the now-playing-bar (in the top-center of the page)
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 # maybe add "other videos by artist", which loads a list of other uploads by the uploader?
 # http://gdata.youtube.com/feeds/api/users/#{channel}/uploads?alt=json&max-results=10
@@ -74,6 +74,11 @@ module \songInfo, do
         $meta = @$create \<div>  .addClass \p0ne-song-info-meta        .appendTo @$el
         $parts = {}
 
+        if media.format == 1
+            $meta.addClass \youtube
+        else
+            $meta.addClass \soundcloud
+
         $ \<span> .addClass \p0ne-song-info-author      .appendTo $meta
             .click -> mediaSearch media.author
             .attr \title, "search for '#{media.author}'"
@@ -84,20 +89,20 @@ module \songInfo, do
             .text media.title
         $ \<br>                                         .appendTo $meta
         $ \<a> .addClass \p0ne-song-info-uploader       .appendTo $meta
-            .attr \href, "https://www.youtube.com/channel/#{d.uploader.id}"
+            .attr \href, d.uploader.url
             .attr \target, \_blank
             .attr \title, "open channel of '#{d.uploader.name}'"
             .text d.uploader.name
-        $ \<a> .addClass \p0ne-song-info-ytTitle        .appendTo $meta
-            .attr \href, "http://youtube.com/watch?v=#{media.cid}"
+        $ \<a> .addClass \p0ne-song-info-upload-title   .appendTo $meta
+            .attr \href, d.url
             .attr \target, \_blank
-            .attr \title, "open video on Youtube"
+            .attr \title, "#{if media.format == 1 then 'open video on YouTube' else 'open Song on SoundCloud'}"
             .text d.title
         $ \<br>                                         .appendTo $meta
         $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
             .text getISOTime new Date(d.uploadDate)
         $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
-            .text mediaTime +d.duration
+            .text "duration: #{mediaTime +d.duration}"
         if media.format == 1
             for r in d.data.entry.media$group.media$restriction ||[]
                 $ \<span> .addClass \p0ne-song-info-blocked     .appendTo @$el

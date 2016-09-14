@@ -1,9 +1,9 @@
 /**
  * Module script for loading disable-able chunks of code
+ *
  * @author jtbrinkmann aka. Brinkie Pie
- * @version 1.0
  * @license MIT License
- * @copyright (c) 2014 J.-T. Brinkmann
+ * @copyright (c) 2015 J.-T. Brinkmann
  */
 p0ne.moduleSettings = dataLoad \p0ne_moduleSettings, {}
 window.module = (name, data) ->
@@ -19,8 +19,9 @@ window.module = (name, data) ->
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.persistent ||= {}
-        {name, require, optional, callback,  setup, update, persistent, disable, module, settings, displayName, disabled, _settings, moderator} = data
-        data.callbacks[*] = callback if callback
+
+        {name, require, optional, setup, update, persistent, disable, disableLate, module, settings, displayName, disabled, _settings, settingsPerCommunity, moderator} = data
+
         if module
             if typeof module == \function
                 fn = module
@@ -61,24 +62,52 @@ window.module = (name, data) ->
         helperFNs =
             addListener: (target, ...args) ->
                 if target == \early
-                    early = true
                     [target, ...args] = args
-                cbs.[]listeners[*] = {target, args}
-                if not early
-                    target.on .apply target, args
-                else if not target.onEarly
-                    console.warn "#{getTime!} [#name] cannot use .onEarly on", target
+                    if target.onEarly
+                        target.onEarly .apply target, args
+                    else
+                        console.warn "#{getTime!} [#name] cannot use .onEarly on", target
+                else if target in <[ once one ]>
+                    [target, ...args] = args
+                    if target.once or target.one
+                        that .apply target, args
+                    else
+                        console.warn "#{getTime!} [#name] cannot use .once / .one on", target
                 else
-                    target.onEarly .apply target, args
+                    target.on .apply target, args
+                cbs.[]listeners[*] = {target, args}
                 return args[*-1] # return callback so one can do `do addListener(…)` to initially trigger the callback
 
             replace: (target, attr, repl) ->
-                cbs.[]replacements[*] = [target, attr, repl]
                 if attr of target
-                    target["#{attr}_"] ?= target[attr]
+                    orig = target[attr]
+                    # for debugging, not really required
+                    target["#{attr}_"] = orig if "#{attr}_" not of target
                 else
-                    target["#{attr}_"] = false
-                target[attr] = repl(target["#{attr}_"])
+                    target["#{attr}_"] = null
+                target[attr] = replacement = repl(target[attr])
+                cbs.[]replacements[*] = [target, attr, replacement, orig]
+            revert: (target_, attr_) ->
+                return false if not cbs.replacements
+                didReplace = false
+                if attr_
+                    # replace ONE
+                    for [target, attr , replacement, orig] in cbs.replacements
+                        if target == target_ and attr_ == attr and target[attr] == replacement
+                            target[attr] = orig #target["#{attr}_"]
+                            cbs.replacements
+                            return true
+                else if target_
+                    # replace ALL for target
+                    for [target, attr, replacement, orig] in cbs.replacements when target == target_ and target[attr] == replacement
+                            target[attr] = orig #target["#{attr}_"]
+                            didReplace = true
+                else
+                    # replace ALL
+                    for [target, attr , replacement, orig] in cbs.replacements when target == target_
+                            target[attr] = orig #target["#{attr}_"]
+                            didReplace = true
+                return didReplace
 
             replaceListener: (emitter, event, ctx, callback) ->
                 if not evts = emitter?._events?[event]
@@ -144,8 +173,9 @@ window.module = (name, data) ->
                     disable.call module, helperFNs, newModule, data if typeof disable == \function
                     for {target, args} in cbs.listeners ||[]
                         target.off .apply target, args
-                    for [target, attr /*, repl*/] in cbs.replacements ||[]
-                        target[attr] = target["#{attr}_"]
+                    for [target, attr , replacement, orig] in cbs.replacements ||[]
+                        if target[attr] == replacement
+                            target[attr] = orig #target["#{attr}_"]
                     for [target /*, callback, options*/]:d in cbs.adds ||[]
                         target .remove d.index
                         d.index = -1
@@ -165,21 +195,44 @@ window.module = (name, data) ->
                         console.info "#{getTime!} [#name] disabled"
                         dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
+                    disableLate.call module, helperFNs, newModule, data if typeof disableLate == \function
                 catch err
                     console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
                     delete window[name]
                 delete p0ne.dependencies[name]
                 return this
+        module.trigger = (target, ...args) -> # FOR DEBUGGING
+            for listener in cbs.listeners ||[] when listener.target == target
+                #console.log "\thas same target"
+                isMatch = true
+                l = listener.args.length - 1
+                for arg, i in listener.args
+                    #console.log "\t\ti = #i", if typeof arg != \function then arg else '[function]'
+                    if arg != args[i] and not (typeof arg == \string and arg.split(/\s+/).has(args[i]))
+                        if i + 1 < args.length and i != l
+                            #console.log "\t\tfound different argument", arg, args[i]
+                            isMatch = false
+                        break
+                if isMatch
+                    fn = listener.args[*-1]
+                    #console.log "\t\tfound match", (typeof fn == \function), i, args.slice i
+                    if typeof fn == \function
+                        fn args.slice i
 
         module.disable = helperFNs.disable
         module.enable = helperFNs.enable
+
+        # if there's an old instance of the module
         if module_ = window[name]
             if persistent
                 for k in persistent ||[]
                     module[k] = module_[k]
             module._$settings = module_._$settings
             _settings_ = module_._settings
-            module_.disable? module
+            try
+                module_.disable? module
+            catch err
+                console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
 
 
 
@@ -205,30 +258,43 @@ window.module = (name, data) ->
 
             moduleSettings = p0ne.moduleSettings[name]
             if moduleSettings
-                module.disabled = moduleSettings.disabled
+                if settingsPerCommunity
+                    module.disabled = moduleSettings{}[roomSlug = getRoomSlug!].disabled
+                else
+                    module.disabled = moduleSettings.disabled
             else
                 moduleSettings = p0ne.moduleSettings[name] = {disabled: !!disabled}
             @moduleSettings = moduleSettings
 
-            if moderator and API.getUser!.role < 2 and not module.disabled
+            if moderator and not user.isStaff and not module.disabled
                 module.modDisabled = true
                 module.disabled = true
 
             # initialize module
             if not module.disabled
-                module._settings = _settings_ || dataLoad "p0ne_#name", _settings if _settings
+                if _settings_
+                    module._settings = _settings_
+                else if _settings
+                    if settingsPerCommunity
+                        module._settings = _settings with dataLoad("p0ne__#{roomSlug}_#name", {})
+                    else
+                        module._settings = _settings with dataLoad("p0ne_#name", {})
                 setup?.call module, helperFNs, module, data, module_
+                wasDisabled = ""
+            else
+                wasDisabled = ". (note: module still disabled)"
 
             p0ne.modules[name] = module
             if module_
                 API.trigger \p0neModuleUpdated, module
-                console.info "#{getTime!} [#name] updated"
+                console.info "#{getTime!} [#name] updated#wasDisabled"
             else
                 API.trigger \p0neModuleLoaded, module
-                console.info "#{getTime!} [#name] initialized"
+                console.info "#{getTime!} [#name] initialized#wasDisabled"
         catch e
             console.error "#{getTime!} [#name] error initializing", e.stack
-
+            try
+                module.disable
         return module
     catch e
-        console.error "#{getTime!} [module] error initializing '#name':", e.message
+        console.error "#{getTime!} [module] error initializing '#name':", e.stack
