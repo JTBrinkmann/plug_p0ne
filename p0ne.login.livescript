@@ -1,0 +1,120 @@
+module \login, do
+    settings: false
+    persistent: <[ showLogin ]>
+    module: ->
+        @showLogin!
+    showLogin: ({css}) ->
+        css '
+            .login, .login a {
+                color: #eee;
+            }
+            .login-overlay {
+                position: fixed;
+                left: 0; top: 0; right: 0; bottom: 0;
+                z-index: 1000;
+                background: rgba(17,19,23,.5);
+            }
+            .login-overlay:before {
+                content: ' ';
+                display: inline-block;
+                height: 100%;
+                vertical-align: middle;
+            }
+            .login {
+                display: inline-block;
+                background: #1c1f25;
+                vertical-align: middle;
+                white-space: normal;
+                padding: 20px 40px 25px;
+            }
+            .login .icon-container 
+                margin-bottom: 3px;
+                width: 100%;
+                height: 45px;
+            }
+            .login .email {
+                margin-bottom: 8px;
+                font-size: 16px;
+            }
+            .login .error {
+                display: none;
+                margin-bottom: 10px;
+                padding: 10px;
+                width: 250px;
+                background: #db182e;
+                font-weight: bold;
+            }
+            .login input, .login .submit {
+                display: block;
+                margin-bottom: 5px;
+                width: 250px;
+                font-family: "Open Sans",sans-serif;
+            }
+            .login input {
+                border: 1px solid #323742;
+                padding: 1em .75em;
+                background: #0a0a0a;
+                font-size: 14px;
+            }
+            .login .submit {
+                width: 100%;
+                height: 46px;
+                margin-bottom: 5px;
+                margin-top: 10px;
+                background: #009cdd;
+                color: #eee;
+                font-weight: 400;
+                font-size: 18px;
+                cursor: pointer;
+            }
+        '
+        $el = $ '
+            <div class=login-overlay>
+                <div class="login box">
+                    <div class=icon-container><i class="icon icon-site-logo"></i></div>
+                    <div class=email>Login with Email</div>
+                    <div class=error></div>
+                    <input type=email placeholder="Email">
+                    <input type=password placeholder="Password">
+                    <button id=submit>Login</button>
+                    <a class=forgot-password href="/forgot-password">Forgot your password?</a>
+                </div>
+            </div>
+        '
+            .on \click, \.submit, ->
+                @disabled = true
+                $.get '/'
+                    .then (d) ~>
+                        @disabled = false
+                        if csrf = /_csrf = "(.*?)"/ .exec(d)?.0
+                            ajax \POST, 'auth/login', csrf: csrf, email: $email.val!, password: $pw.val!, do
+                                success: ->
+                                    API.chatLog "connect to plug.dj", true
+                                    $el .fadeOut -> $el .remove!
+                                fail: (data) ->
+                                    switch data.responseJSON?.status
+                                    | \csrfTokenExpired =>
+                                        if not retry
+                                            retry := true
+                                            $el .find \.submit .click!
+                                        else
+                                            fail!
+                                    | \badLogin =>
+                                        fail "Sorry, but your email + password combination is invalid."
+                                    | otherwise =>
+                                        fail!
+                        else
+                            fail "failed to connect"
+                    .fail fail
+            .on \click, ->
+                $el .fadeOut -> $el .remove!
+            .hide!
+            .appendTo $body
+            .fadeIn!
+        $email = $el .find 'input[type=email]'
+        $pw = $el .find 'input[type=password]'
+        $error = $el .find '.error'
+
+        function fail msg
+            $el.0.disabled = false
+            $error .text msg||"Unexpected error while connecting to plug.dj. Try to manually reload the page and log in."

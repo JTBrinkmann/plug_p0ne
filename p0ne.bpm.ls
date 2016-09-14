@@ -13,8 +13,8 @@ do ->
     host = window.p0ne?.host or "https://dl.dropboxusercontent.com/u/4217628/plug_p0ne"
 
     /*== external sources ==*/
-    $.getScript "#host/bpm-resources.js" .then ->
-        $ window .trigger \p0ne_emotes_map
+    $.getScript "#host/script/bpm-resources.js" .then ->
+        API .trigger \p0ne_emotes_map
 
     $ \body .append "
         <div id='bpm-resources'>
@@ -70,7 +70,7 @@ do ->
 
         flags = parseInt(flag_data.slice(0, 1), 16)     # Hexadecimal
         source_id = parseInt(flag_data.slice(1, 3), 16) # Hexadecimal
-        #size = parseInt(flag_data.slice(3, 7), 16)      # Hexadecimal
+        #size = parseInt(flag_data.slice(3, 7), 16)     # Hexadecimal
         is_nsfw = (flags .&. _FLAG_NSFW)
         is_redirect = (flags .&. _FLAG_REDIRECT)
 
@@ -141,7 +141,7 @@ do ->
         /*
         # in case it is required to avoid replacing in HTML tags
         # usually though, there shouldn't be ponymotes in links / inline images / converted ponymotes
-        if str .indexOf("[](/") != -1
+        if str .has("[](/")
             # avoid replacing emotes in HTML tags
             return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) ->
                 nonHTML .= replace emote_regexp, (_, parts, altText) ->
@@ -157,9 +157,9 @@ do ->
             return str
         */
 
-    if window.p0ne?.chatPlugins
+    if window.p0ne?.chatMessagePlugins
         /* add BPM as a p0ne chat plugin */
-        window.p0ne.chatPlugins[*] = window.bpm
+        window.p0ne.chatMessagePlugins[*] = window.bpm
     else do ->
         /* add BPM as a standalone script */
         if not window._$context
@@ -175,7 +175,7 @@ do ->
             window.bpm.callback = callback: (d) !->
                 d.message = bpm(d.message)
 
-    $(window) .one \p0ne_emotes_map, ->
+    API .once \p0ne_emotes_map, ->
         console.info "[bpm] loaded"
         /* ponify old messages */
         $ '#chat .text' .html ->

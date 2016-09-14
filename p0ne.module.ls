@@ -5,7 +5,7 @@
  * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
  */
-window.module = (name, data) -> # data = {name, require, optional, callback, callbacks, setup, update, persistent, enable, disable, module}
+window.module = (name, data) ->
     try
         # setup(helperFNs, module, args)
         # update(helperFNs, module, args, oldModule)
@@ -17,9 +17,8 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
         data = {setup: data} if typeof data == \function
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
-        data.callbacks ||= []
         data.persistent ||= {}
-        {name, require, optional, callback, callbacks, setup, update, persistent, enable, disable, module, settings, displayName} = data
+        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -57,30 +56,25 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
             for k of a
                 return false if a[k] != b[k]
             return true
-        apply_ = Function::apply
-        toggle = (fn, d) ->
-            if d.length
-                [target, event, ...args, callback] = d
-            else
-                {target, event, args, callback} = d
-            if args
-                apply_.apply target[fn], d
-            else
-                target[fn] event, callback
-            return callback
 
         helperFNs =
-            addListener: (/*target, event, ...args, callback*/) ->
-                return toggle \on, (cbs.[]listeners[*] = [] <<<< arguments)
+            addListener: (target, ...args) ->
+                if target == \early
+                    early = true
+                    [target, ...args] = args
+                cbs.[]listeners[*] = {target, args}
+                if not early
+                    return target.on .apply target, args
+                else if not target.onEarly
+                    console.warn "[#name] cannot use .onEarly on", target
+                else
+                    return target.onEarly .apply target, args
 
             replace: (target, attr, repl) ->
                 cbs.[]replacements[*] = [target, attr, repl]
                 target["#{attr}_"] ||= target[attr]
-                repl = module[repl] if typeof repl == \string and module[repl]
-                if typeof repl == \function
-                    target[attr] = repl(target["#{attr}_"])
-                else
-                    target[attr] = repl
+                target[attr] = repl(target["#{attr}_"])
+
             replace_$Listener: (type, callback) ->
                 if not window._$context
                     console.error "[ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
@@ -101,32 +95,69 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
                 target[d.index] = callback
                 cbs.[]adds[*] = d
 
-            $create: (str) ->
-                return cbs.[]$elements[*] = $ str
+            $create: (html) ->
+                return cbs.[]$elements[*] = $ html
+            $createPersistent: (html) ->
+                return cbs.[]$elementsPersistent[*] = $ html
+            css: (name, str) ->
+                p0neCSS.css name, str
+                cbs.{}css[name] = str
+            loadStyle: (url) ->
+                return if p0neCSS.$el.filter "[href='#url']" .length
+                p0neCSS.loadStyle url
+                cbs.{}loadedStyles[url] = true
 
-            disable: ->
+            toggle: ->
+                if @disabled
+                    @enable!
+                    return true
+                else
+                    @disable!
+                    return false
+            enable: ->
+                return if not @disabled
+                @disabled = false
+                setup?.call module, helperFNs, module, data, module_
+                API.trigger \p0neModuleEnabled, module
+                console.info "[#name] enabled"
+            disable: (newModule) ->
                 return if module.disabled
-                module.disabled = true
-                disable?.call module, helperFNs, module, data
-                for d in cbs.listeners ||[]
-                    toggle \off, d
-                for [target, attr /*, repl*/] in cbs.replacements ||[]
-                    target[attr] = target["#{attr}_"]
-                for [target /*, callback, options*/]:d in cbs.adds ||[]
-                    target .remove d.index
-                    d.index = -1
-                for $el in cbs.$elements ||[]
-                    $el .remove!
-                for m in p0ne.dependencies[name] ||[]
-                    m.disable!
-                delete! p0ne.dependencies[name]
+                try
+                    module.disabled = true
+                    disable?.call module, helperFNs, newModule, data
+                    for {target, args} in cbs.listeners ||[]
+                        target.off .apply target, args
+                    for [target, attr /*, repl*/] in cbs.replacements ||[]
+                        target[attr] = target["#{attr}_"]
+                    for [target /*, callback, options*/]:d in cbs.adds ||[]
+                        target .remove d.index
+                        d.index = -1
+                    for style of cbs.css
+                        p0neCSS.css style, "/* disabled */"
+                    for url of cbs.loadedStyles
+                        p0neCSS.unloadStyle url
+                    for m in p0ne.dependencies[name] ||[]
+                        m.disable!
+                    for $el in cbs.$elements ||[]
+                        $el .remove!
+                    if not newModule
+                        for $el in cbs.$elementsPersistent ||[]
+                            $el .remove!
+                        API.trigger \p0neModuleDisabled, module
+                        console.info "[#name] disabled"
+                    delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
+                catch err
+                    console.error "[module] failed to disable '#name' cleanly", err.stack
+                    delete window[name]
+                delete p0ne.dependencies[name]
 
         module.disable = helperFNs.disable
+        module.enable = helperFNs.enable
         if module_ = window[name]
             if persistent
                 for k in persistent ||[]
                     module[k] = module_[k]
-            module_.disable!
+            module_.disable? module
         failedRequirements = []; l=0
         for r in require ||[]
             if !r
@@ -143,15 +174,20 @@ window.module = (name, data) -> # data = {name, require, optional, callback, cal
 
         try
             window[name] = module
-            for cbName, d of callbacks
-                d.isModuleCallback = true
-                helperFNs.addListener d
-            setup?.call module, helperFNs, module, data, module_
 
-            API.trigger \p0neModuleLoaded, module
+            # set up Help and Settings
+            module.help? .= replace /\n/g, "<br>\n"
+
+            # initialize module
+            if not module.disabled
+                setup?.call module, helperFNs, module, data, module_
+
+            p0ne.modules[*] = module
             if module_
+                API.trigger \p0neModuleUpdated, module
                 console.info "[#name] updated"
             else
+                API.trigger \p0neModuleLoaded, module
                 console.info "[#name] initialized"
         catch e
             console.error "[#name] error initializing", e.stack

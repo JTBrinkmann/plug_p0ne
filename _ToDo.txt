@@ -2,11 +2,38 @@
 == SUMMARY ==
 - Chatlog manager
 - options menu
-- fix module updating (it's VERY broken)
 - Playlist Manager
 
+== TEMP ==
+
 == COMPLETE ==
+- p0ne.close()
+- standard plug.dj script features
+	- ETA
+	- PM
+	- booth alert
+	~~ moderators ~~
+	- song in history
+	- song >10min
+	- user info (when joined, how often meh'd)
 - separate fimplug.css and p0ne.css
+- FIXES
+	- remember video stream on/off
+	- spinning wheel of death when editing playlists
+- P0ne Bugfixes
+	- make plug_p0ne work with Popout Chat (legacyChat & ChatInput)
+	- add-icon derps in .history in icon-view
+- Options Menu
+	- save settings
+	- module options
+		- replace <toggle> with "<label><input type=checkbox class=checkbox val=...><div class=togglebox><div class=knob></div></div>#{$el .text!}</label>"
+			- add listener to save settings
+	- advanced options (hide tech-savy options by default)
+- Fixes
+	- fix no-playlist-update
+		- test if works
+	- improve no-leave
+		- in the require with .execute, the .onError sends you to "/" on auth-error
 - Chat
 	- fix emoticons like :<3
 	// - instead of rendering messages by the user twice (once when pending, once when received) only move (animated) pending messages and add CID
@@ -29,6 +56,7 @@
 	- add media by URL
 	- maybe there's a way to convert CIDs to IDs
 	- might need to use search() to get the data required for grabbing
+	- add playlist:update event
 - Autocomplete
 	- avoid lookup if searchstring is known to fail
 		- e.g. don't look up :emotes: in the string "http://ddg.gg/ cursor is ->|<- here" because of preceding :
@@ -41,11 +69,13 @@
 	- plug³'s twitch emotes (would ideally require TAT to make the twitchEmotes variable globally accessible)
 - Chat notfications / Media-Options
 	# - make .song-stats icons dynamically look up the icons.###.png
-	- only show .song-stats for lastPlay and show .song-notif etc for nextPlay
-		- show collapsed .song-notif for lastPlay
+	- show .song-stats for lastPlay
 	- add an automute button
+	- add a ruleskip button
 	- add a  download button?
-	- replace grab button with remove button when song is already in a playlist
+	- replace grab button with remove button if song is already in a playlist
+		- listen on playlist:update event
+	- fix search-artist function
 - Ponymotes
 	- after adding the message, check if it's wider than the chat (328px) and adjust its size.
 	- add CSS .bpm-emote {max-width: 100%} (do NOT add bg-size: contain! it breaks most ponymotes)
@@ -56,6 +86,7 @@
 	- related videos (remixes, original, PMV)
 	- howMuchPony (has pony video, pony inspired, ponified lyrics, …)
 	- share buttons, lyrics, picture searches, comments, …
+- track djListUpdates and have a DJ-List History
 
 
 - PerformanceEnhancements
@@ -80,7 +111,8 @@
 		- check if artist is pony
 		- check lyrics for pony terms
 - etc
-	- warn on/fix not working join-waitlist
+	- video fullscreen
+	- add info who meh'd to song-notif, song-info and history
 	- show userlist when hovering the woot/grab/meh button (showing who wooted/grabed/meh'd)
 	- add alert-on-mention / alert-on-all / alert-off button
 	- when Stream is off, show a note on the #playback container and an Stream-enable-button

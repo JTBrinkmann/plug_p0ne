@@ -12,6 +12,8 @@
 ####################################*/
 module \ponify, do
     optional: <[ emoticons ]>
+    settings: \enableDisable
+    displayName: 'Ponify Chat'
     /*== TEXT ==*/
     map:
         # "america":    "amareica" # this one was driving me CRAZY
@@ -35,6 +37,9 @@ module \ponify, do
         "cowboys":      "cowponies"
         "cowgirl":      "cowpony"
         "cowgirls":     "cowponies"
+        "disappoint":   "disappony"
+        "disappointed": "disappony"
+        "disappointment": "disapponyment"
         "doctor who":   "doctor whooves"
         "dr who":       "dr whooves"
         "dr. who":      "dr. whooves"
@@ -82,6 +87,7 @@ module \ponify, do
         "noone else":   "nopony else"
         "nobody":       "nopony"
         "nottingham":   "trottingham"
+        "null":         "nullpony"
         "old-timer":    "old-trotter"
         "people":       "ponies"
         "person":       "pony"
@@ -106,10 +112,10 @@ module \ponify, do
         "confound those dover boys":    "confound these ponies"
 
 
-    ponifyNode: (node) ->
+    ponifyNode: (node) !->
         #console.log "ponifying", node
         if node.nodeType != 3
-            for n in node.childNodes || []
+            for n in node.childNodes ||[]
                 @ponifyNode n
 
         else
@@ -117,12 +123,21 @@ module \ponify, do
             hasReplacement = false
             replacement = null
             lastPos = 0
-            str.replace @regexp, (s, i) ~>
+            #str.replace @regexp, (s, pre, i) ~>
+            str.replace @regexp, (_, pre, s, post, i) ~>
                 w = @map[s.toLowerCase!]
                 r = ""
 
                 if not replacement
                     replacement := document.createElement \span
+                if str.substring(lastPos, i)
+                    replacement.appendChild document.createTextNode that
+
+                if pre
+                    if "aeioujyh".has(w.0)
+                        replacement.appendChild document.createTextNode "an "
+                    else
+                        replacement.appendChild document.createTextNode "a "
 
                 /*preserve upper/lower case*/
                 lastUpperCaseLetters = 0
@@ -138,15 +153,19 @@ module \ponify, do
 
                 r += w.substr l
 
-                if str.substring(lastPos, i)
-                    replacement.appendChild document.createTextNode that
                 document.createElement \abbr
                     ..textContent = "#r"
                     ..classList.add \ponified
                     ..title = s
                     replacement.appendChild ..
 
-                lastPos := i + s.length
+                if post
+                    if "szxß".has(w[*-1])
+                        replacement.appendChild document.createTextNode "' "
+                    else
+                        replacement.appendChild document.createTextNode "'s "
+
+                lastPos := i + _.length
                 console.log "replaced '#s' with '#r'", node
 
             if replacement
@@ -213,17 +232,23 @@ module \ponify, do
         wink: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
 
 
-    setup: ({addListener, replace}) ->
-        @regexp = new RegExp "\\b(?:#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})\\b", \gi
+    setup: ({addListener, replace, css}) ->
+        @regexp = //(\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b//gi
         addListener API, \chat, ({cid}) ~> if cid
-            @ponifyNode $("\#chat-messages > [data-cid=#{cid}] .text").0
+            try
+                if getChatText cid .0
+                    @ponifyNode that
+                else
+                    throw "couldn't find message"
+            catch err
+                console.error "[ponify] Error converting message ##cid", err.stack
         if emoticons?
             aEM = ^^emoticons.autoEmoteMap #|| {}
             for emote, url of @autoEmotiponies
                 key = url .replace /.*\/(\w+)\..+/, '$1'
                 aEM[emote] = key
                 @emotiponies[key] = url
-            replace emoticons, \autoEmoteMap, aEM
+            replace emoticons, \autoEmoteMap, -> return aEM
 
             m = ^^emoticons.map
             ponyCSS = """
@@ -231,7 +256,8 @@ module \ponify, do
                 .chat-suggestion-item .ponimoticon { margin-left: -5px }
                 .emoji-glow { width: auto; height: auto }
                 .emoji { position: static; display: inline-block }
-            \n"""
+
+            """
             reversedMap = {}
             for emote, url of @emotiponies
                 if reversedMap[url]
@@ -241,7 +267,7 @@ module \ponify, do
                     m[emote] = "#emote ponimoticon" # hax to add .ponimoticon class
                 ponyCSS += ".emoji-#emote { background: url(#url) }\n"
             css \ponify, ponyCSS
-            replace emoticons, \map, m
+            replace emoticons, \map, -> return m
             emoticons.update?!
     disable: ->
         emoticons.update?!

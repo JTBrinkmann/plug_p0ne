@@ -1,41 +1,21 @@
 /*@author jtbrinkmann aka. Brinkie Pie */
 /*@license https://creativecommons.org/licenses/by-nc/4.0/ */
-p0ne = window.p0ne
-d = new Date
-dayISO = d.toISOString! .substr(0, 10)
-timezoneISO = -d.getTimezoneOffset!
-timezoneISO = "#{Math.floor(timezoneISO / 60)}:#{timezoneISO % 60}"
+
+/*
+ * missing chat inline image plugins:
+ * Derpibooru
+ * imgur.com/a/
+ * tumblr
+ * deviantart
+ * e621.net
+ * paheal.net
+ * gfycat.com
+ * cloud-4.steampowered.com … .resizedimage
+ */
+
 
 chatWidth = 328px
-requireHelper do
-    name: \database
-    test: (.settings)
-    fallback:
-        settings: chatTS: 24h
-requireHelper do
-    name: \lang
-    test: (.welcome?.title)
-    fallback:
-        chat:
-            delete: "Delete"
-
-requireHelper do
-    name: \Chat
-    test: ((it) -> it::?.onDeleteClick and not it::scrollToBottom)
-    fallback: window.app?.room?.chat.constructor
-/*
-requireHelper do
-    name: \ChatPopup
-    test: (.::?.scrollToBottom)
-*/
-requireHelper do
-    name: \ChatHelper
-    test: (it) -> return it.sendChat and it != window.API
-requireHelper do
-    name: \Spinner
-    id: \de369/d86c0/bf208/e0fc2 # 2014-09-03
-    test: (.::?className == \spinner)
-    #ToDo fallback
+roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
 
 
 window.imgError = (elem) ->
@@ -44,61 +24,19 @@ window.imgError = (elem) ->
         ..text ..attr \href
         ..addClass \p0ne_img_failed
 
-p0ne.pendingMessages ||= []
-p0ne.failedMessages ||= []
-p0ne.chatPlugins ||= []
-
-roles = <[ none dj bouncer manager cohost host _ volunteer ambassador leader admin ]>
-
-module \chatShowPending, do
-    require: <[ ChatHelper user Spinner ]>
-    setup: ({replace}) ->
-        replace ChatHelper, \sendChat, -> chatShowPending.sendChat ...
-
-        # every 5min, remove pending messages older than 5min
-        repeat 300_000ms, -> # 5min
-            d = Date.now! - 300_000ms
-            for i from (p0ne.pendingMessages.length - 1) to 0 by -1 when p0ne.pendingMessages[i].timestamp < d
-                p0ne.pendingMessages[i].el?.remove!
-                p0ne.pendingMessages.remove i
-    update: ->
-        ChatHelper.sendChat = -> chatShowPending.sendChat ...
-
-    sendChat: (e) ->
-        console.log "[sendChat]"
-        return if @chatCommand e
-        e = e.replace(/</g, "&lt;").replace(/>/g, "&gt;") # b.cleanTypedString() for the poor
-        _$context.trigger \chat:send, e
-        d = new Date
-        if {'/me ': true, '/em ': true}[e.substr 0, 4]
-            e .= substr 4
-            type = "emote pending"
-        else
-            type = "message pending"
-
-        e .= replace(/\b(https?:\/\/[^\s\)\]]+)([\.,\?\!"']?)/g, '<a href="$1" target="_blank">$1</a>$2')
-        p0ne_chat do
-            message: e
-            type: type
-            un: user.username
-            uid: user.id
-            timestamp: "#{d.getHours!}:#{d.getMinutes!}"
-            pending: true
-        return true
-
 
 module \p0ne_chat_input, do
-    require: <[ chat ]>
-    setup: ->
-        # clean up
-        $ \.textarea_autoresize_helper .remove!
-        $ \.chat-input-name .remove!
-
+    require: <[ chat user ]>
+    optional: <[ user_ _$context PopoutListener ]>
+    displayName: "Better Chat Input"
+    settings: true
+    setup: ({addListener, css, $create}) ->
+        # apply styles
         css \p0ne_chat_input, '
             #chat-input {
                 bottom: 7px;
                 height: auto;
-                background: none;
+                background: transparent !important;
                 min-height: 30px;
             }
             #chat-input-field {
@@ -119,13 +57,13 @@ module \p0ne_chat_input, do
                 display: none;
             }
 
-            .textarea_autoresize_helper {
+            .autoresize_helper {
                 display: none;
                 white-space: pre-wrap;
                 word-wrap: break-word;
             }
 
-            #chat-input-field, .textarea_autoresize_helper {
+            #chat-input-field, .autoresize_helper {
                 width: 295px;
                 padding: 8px 10px 5px 10px;
                 font-weight: 400;
@@ -146,98 +84,177 @@ module \p0ne_chat_input, do
             #chat-input-field:focus + .chat-input-name {
                 color: #ffdd6f !important;
             }
+            /*fix chat-messages size*/
+            #chat-messages {
+                height: auto !important;
+                bottom: 45px;
+            }
         '
 
+        var $form, $name, $autoresize_helper, chat
+        chat = PopoutView.chat || window.chat
+
+        # back up elements that are to be removed
+        @cIF_ = chat.$chatInputField.0
+
+
+        # fix permanent focus class
         chat.$chatInput.removeClass \focused
-        $form = chat.$chatInputField.parent!
-        chat.$chatInputField.remove!
-        chat.$chatInputField.0 = chat.chatInput = $ "<textarea id='chat-input-field' maxlength=256>"
-            .on \keydown, (e) ->
-                chat.onKeyDown e
-            .on \keyup, _.bind(chat.onKeyUp, chat)
-            #.on \focus, _.bind(chat.onFocus, chat)
-            #.on \blur, _.bind(chat.onBlur, chat)
-            .on \input, ->
-                content = chat.$chatInputField .val!
-                content = content.replace(/\n/g, \<br>)
-                textarea_autoresize_helper.html(content + \<br>)
-                oldHeight = chat.$chatInputField .height!
-                newHeight = textarea_autoresize_helper .height!
-                return if oldHeight == newHeight
-                console.log "[chat input] adjusting height"
-                scrollTop = chat.$chatMessages.scrollTop!
-                chat.$chatInputField
-                    .css height: newHeight
-                chat.$chatMessages
-                    .css height: chat.$chatMessages.height! - newHeight + oldHeight
-                    .scrollTop scrollTop + newHeight - oldHeight
-            .appendTo $form
-            .after do
-                textarea_autoresize_helper = $ \<div> .addClass \textarea_autoresize_helper
-            .0
-        $name = $ \<span>
-            .addClass \chat-input-name
-            .text "#{user.username} "
-            .insertAfter chat.$chatInputField
 
-        <- requestAnimationFrame
-        indent = 6px + $name.width!
-        chat.$chatInputField       .css textIndent: indent
-        textarea_autoresize_helper .css textIndent: indent
+        # use $name's width to add proper indent to the input field
+        @fixIndent = -> requestAnimationFrame -> # wait an animation frame so $name is properly added to the DOM
+            indent = 6px + $name.width!
+            chat.$chatInputField .css textIndent: indent
+            $autoresize_helper   .css textIndent: indent
 
-module \p0ne_chat_new_message_notification, require: <[ _$context ]>, callback:
-    target: _$context
-    event: \chat:receive
-    callback: ->
-        message.wasAtBottom ?= chatIsAtBottom!
-        if not message.wasAtBottom
-            $cm! .addClass \has-unread-message
-            message.type += " unread"
+        # add new input text-area
+        addListener API, \popout:open, patchInput = ~>
 
-module \p0ne_chat_plugins, do
-    require: <[ _$context ]>
-    setup: -> @enable!
-    enable: ->
-        _$context.onEarly \chat:receive, @cb
+            chat := PopoutView.chat || window.chat
+            $form := chat.$chatInputField.parent!
+            chat.$chatInputField.remove!
+            chat.$chatInputField.0 = chat.chatInput = $create "<textarea id='chat-input-field' maxlength=256>"
+                .prop \tabIndex, 1
+                # add DOM event Listeners from original input field (not using .bind to allow custom chat.onKey* functions)
+                .on \keydown, (e) ->
+                    chat.onKeyDown e
+                .on \keyup, (e) ->
+                    chat.onKeyUp e
+                #.on \focus, _.bind(chat.onFocus, chat)
+                #.on \blur, _.bind(chat.onBlur, chat)
+
+                # add event listeners for autoresizing
+                .on 'input', ->
+                    content = chat.$chatInputField .val!
+                    if (content2 = content.replace(/\n/g, "")) != content
+                        chat.$chatInputField .val (content=content2)
+                    $autoresize_helper.html(content + \<br>)
+                    oldHeight = chat.$chatInputField .height!
+                    newHeight = $autoresize_helper .height!
+                    return if oldHeight == newHeight
+                    console.log "[chat input] adjusting height"
+                    scrollTop = chat.$chatMessages.scrollTop!
+                    chat.$chatInputField
+                        .css height: newHeight
+                    chat.$chatMessages
+                        .css bottom: newHeight + 30px
+                        .scrollTop scrollTop + newHeight - oldHeight
+                .appendTo $form
+                .after do
+                    $autoresize_helper := $create \<div> .addClass \autoresize_helper
+                .0
+
+            # username field
+            $name := $create \<span>
+                .addClass \chat-input-name
+                .text "#{user.username} "
+                .insertAfter chat.$chatInputField
+
+            @fixIndent!
+
+        patchInput!
+        sleep 2s *s_to_ms, @fixIndent
+
+        if _$context
+            addListener _$context, \chat:send, ->
+                chat.$chatInputField .trigger \input
+
+        if user_?
+            addListener user_, \change:username, @fixIndent
+
+
     disable: ->
-        _$context.off \chat:receive, @cb
-    cb: (message) -> # run plugins that modify chat messages
-        message.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
+        chat.$chatInputField = $ @cIF_
+            .appendTo $cm!.parent!.find \.chat-input-form
 
-        # p0ne.chatPlugins
-        for plugin in p0ne.chatPlugins
-            message = plugin(message, t) || message
+module \chatPlugin, do
+    require: <[ _$context ]>
+    setup: ->
+        p0ne.chatMessagePlugins ||= []
+        p0ne.chatLinkPlugins ||= []
+        _$context .onEarly \chat:receive, @cb
+    disable: ->
+        _$context .off \chat:receive, @cb
+    cb: (msg) -> # run plugins that modify chat msgs
+        msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
+
+        _$context .trigger \chat:plugin, msg
+        API .trigger \chat:plugin, msg
+
+        for plugin in p0ne.chatMessagePlugins
+            try
+                msg.message = that if plugin(msg.message, msg)
+            catch err
+                console.error "[p0ne] error while processing chat link plugin", plugin, err
 
         # p0ne.chatLinkPlugins
-        onload = ''
-        onload = 'onload="chatScrollDown()"' if message.wasAtBottom
-        message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/, (all,pre,completeURL,protocol,domain,url)->
+        if msg.wasAtBottom
+            onload = 'onload="chatScrollDown()"'
+        else
+            onload = ''
+        msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/, (all,pre,completeURL,protocol,domain,url)->
             &6 = onload
+            &7 = msg
             for plugin in p0ne.chatLinkPlugins
-                return that if plugin ...
+                try
+                    return that if plugin ...
+                catch err
+                    console.error "[p0ne] error while processing chat link plugin", plugin, err
             return all
 
+
+/*####################################
+#          MESSAGE CLASSES           #
+####################################*/
+module \chatMessageClasses, do
+    optional: <[ users ]>
+    require: <[ chatPlugin ]>
+    setup: ({addListener}) ->
+        $cm?! .children! .each ->
+            if uid = this.dataset.cid
+                uid .= substr(0, 7)
+                if fromUser = getUser uid and fromUser.role != -1
+                    fromRole = roles[if fromUser.gRole then fromUser.gRole * 5 else fromUser.role]
+                else
+                    fromRole = \ghost
+
+                $ this
+                    .addClass "fromID-#{uid}"
+                    .addClass "from-#{fromRole}"
+
+        addListener _$context, \chat:plugin, ({uid}:message) ->
+            fromUser = getUser uid
+            if fromUser
+                fromRole = roles[if fromUser.gRole then fromUser.gRole * 5 else fromUser.role]
+            else
+                fromRole = \ghost
+            message.type += " fromID-#{uid} from-#{fromRole}"
+
 # inline chat images & YT preview
+/*####################################
+#           INLINE  IMAGES           #
+#             YT PREVIEW             #
+####################################*/
 chatWidth = 500px
 module \chatInlineImages, do
+    require: <[ chatPlugin ]>
     setup: ({add}) ->
-        add p0ne.chatLinkPlugins, @plugin, {bound: true}
-    plugin: (all,pre,completeURL,protocol,domain,url, onload) ->
-        # images
-        if @imgRegx[domain]
-            [rgx, repl] = that
-            img = url.replace(rgx, repl)
-            if img != url
-                console.log "[inline-img]", "[#plugin] #protocol#url ==> #protocol#img"
-                return "<a #pre><img src='#protocol#img' class=p0ne_img #onload onerror='imgError(this)'></a>"
+        add p0ne.chatLinkPlugins, (all,pre,completeURL,protocol,domain,url, onload) ~>
+            # images
+            if @imgRegx[domain]
+                [rgx, repl] = that
+                img = url.replace(rgx, repl)
+                if img != url
+                    console.log "[inline-img]", "[#plugin] #protocol#url ==> #protocol#img"
+                    return "<a #pre><img src='#protocol#img' class=p0ne_img #onload onerror='imgError(this)'></a>"
 
-        # direct images
-        if url.test /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)(?:@\dx)?|image\.php)(?:\?.*|\#.*)?$/
-            console.log "[inline-img]", "[direct] #url"
-            return "<a #pre><img src='#url' class=p0ne_img #onload onerror='imgError(this)'></a>"
+            # direct images
+            if /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)(?:@\dx)?|image\.php)(?:\?.*|\#.*)?$/i .test url
+                console.log "[inline-img]", "[direct] #url"
+                return "<a #pre><img src='#url' class=p0ne_img #onload onerror='imgError(this)'></a>"
 
-        console.log "[inline-img]", "NO MATCH FOR #url (probably isn't an image)"
-        return false
+            console.log "[inline-img]", "NO MATCH FOR #url (probably isn't an image)"
+            return false
 
     imgRegx:
         \imgur.com :       [/^imgur.com\/(?:r\/\w+\/)?(\w\w\w+)/g, "i.imgur.com/$1.gif"]
@@ -249,28 +266,7 @@ module \chatInlineImages, do
         \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
         \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
 
-    imageshackPlugin: (,host,img,ext) ->
-        ext = {j: \jpg, p: \png, g: \gif, b: \bmp, t: \tiff}[ext]
-        return "https://imagizer.imageshack.us/a/img#{parseInt(host,36)}/#{~~(Math.random!*1000)}/#img.#ext"
-
-
-/* image plugins using plugCubed API (credits go to TATDK / plugCubed) */
-module \chatInlineImages_plugCubedAPI, do
-    require: <[ chatInlineImages ]>
-    setup: ->
-        chatInlineImages.imgRegx <<<< @imgRegx
-    imgRegx:
-        \deviantart.com :    [/^[\w\-\.]+\.deviantart.com\/(?:art\/|[\w:\-]+#\/)[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
-        \fav.me :            [/^fav.me\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
-        \sta.sh :            [/^sta.sh\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
-        \gfycat.com :        [/^gfycat.com\/(.+)/, "https://api.plugCubed.net/redirect/gfycat/$1"]
-
-/* meme-plugins inspired by http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html while userscripts.org is down) */
-module \chatInlineImages_memes, do
-    require: <[ chatInlineImages ]>
-    setup: ->
-        chatInlineImages.imgRegx <<<< @imgRegx
-    imgRegx:
+        /* meme-plugins inspired by http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html while userscripts.org is down) */
         \quickmeme.com :     [/^(?:m\.)?quickmeme\.com\/meme\/(\w+)/, "i.qkme.me/$1.jpg"]
         \qkme.me :           [/^(?:m\.)?qkme\.me\/(\w+)/, "i.qkme.me/$1.jpg"]
         \memegenerator.net : [/^memegenerator\.net\/instance\/(\d+)/, "http://cdn.memegenerator.net/instances/#{chatWidth}x/$1.jpg"]
@@ -279,17 +275,48 @@ module \chatInlineImages_memes, do
         \memedad.com :       [/^memedad.com\/meme\/(\d+)/, "memedad.com/memes/$1.jpg"]
         \makeameme.org :     [/^makeameme.org\/meme\/(.+)/, "makeameme.org/media/created/$1.jpg"]
 
+    imageshackPlugin: (,host,img,ext) ->
+        ext = {j: \jpg, p: \png, g: \gif, b: \bmp, t: \tiff}[ext]
+        return "https://imagizer.imageshack.us/a/img#{parseInt(host,36)}/#{~~(Math.random!*1000)}/#img.#ext"
+
+
+# /* image plugins using plugCubed API (credits go to TATDK / plugCubed) */
+# module \chatInlineImages_plugCubedAPI, do
+#    require: <[ chatInlineImages ]>
+#    setup: ->
+#        chatInlineImages.imgRegx <<<< @imgRegx
+#    imgRegx:
+#        \deviantart.com :    [/^[\w\-\.]+\.deviantart.com\/(?:art\/|[\w:\-]+#\/)[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
+#        \fav.me :            [/^fav.me\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
+#        \sta.sh :            [/^sta.sh\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
+#        \gfycat.com :        [/^gfycat.com\/(.+)/, "https://api.plugCubed.net/redirect/gfycat/$1"]
+
 
 module \chatYoutubeThumbnails, do
-    setup: ({add}) ->
+    setup: ({add, addListener}) ->
         add p0ne.chatLinkPlugins, @plugin
-        @animate .= bind this
-        @animate.isbound = true
-    update: ->
-        @animate .= bind this if not @animate.isbound
+        addListener $(\#chat), 'mouseenter mouseleave', \.p0ne_yt_img, (e) ~>
+            clearInterval @interval
+            # assuming that `e.target` always refers to the .p0ne_yt_img
+            id = e.parentElement.dataset.ytCid
+            img = e.target
+            if e.type == \mouseenter
+                if id != @lastID
+                    @frame = 1
+                    @lastID = id
+                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
+                @interval = repeat 1_000ms, ~>
+                    console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
+                    @frame = (@frame % 3) + 1
+                    img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
+                console.log "[p0ne_yt_preview]", "started", e, id, @interval
+                #ToDo show YT-options (grab, open, preview, [automute])
+            else
+                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
+                console.log "[p0ne_yt_preview]", "stopped"
+                #ToDo hide YT-options
     plugin: (all,pre,completeURL,protocol,domain,url, onload) ->
-        yt = /https?:\/\/(?:www\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|embed|e)\/|.*(?:\?|&amp;)v=)|youtu\.be\/)([^"&?\/<>\s]{11})(?:&.*?|#.*?|)$/i
-            .exec(url)
+        yt = YT_REGEX .exec(url)
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
             return "
@@ -304,29 +331,3 @@ module \chatYoutubeThumbnails, do
     interval: -1
     frame: 1
     lastID: ''
-    callback:
-        target: $ \#chat
-        event: 'mouseenter mouseleave'
-        args: [ \.p0ne_yt_img ]
-        bound: true
-        callback: (e) ->
-            clearInterval @interval
-            # assuming that `e.target` always refers to the .p0ne_yt_img
-            id = e.parentElement.dataset.ytCid
-            img = e.target
-            if e.type == \mouseenter
-                if id != @lastID
-                    @frame = 1
-                    @lastID = id
-                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-                @interval = repeat 1_000ms, @animate
-                console.log "[p0ne_yt_preview]", "started", e, id, @interval
-                #ToDo show YT-options (grab, open, preview, [automute])
-            else
-                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
-                console.log "[p0ne_yt_preview]", "stopped"
-                #ToDo hide YT-options
-    animate: ->
-        console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
-        @frame = (@frame % 3) + 1
-        img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
