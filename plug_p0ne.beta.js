@@ -13,10 +13,11 @@
  * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
 */
-var out$ = typeof exports != 'undefined' && exports || this, slice$ = [].slice;
+var p0ne_, out$ = typeof exports != 'undefined' && exports || this, slice$ = [].slice;
 console.info("~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~");
+p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.5.2',
+  version: '1.5.7',
   lastCompatibleVersion: '1.5.0',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
@@ -29,6 +30,9 @@ window.p0ne = {
   lsBound_num: {},
   modules: (typeof p0ne != 'undefined' && p0ne !== null ? p0ne.modules : void 8) || {},
   dependencies: {},
+  reload: function(){
+    return $.getScript(this.host + "/script/plug_p0ne.beta.js");
+  },
   close: function(){
     var i$, ref$, len$, m, results$ = [];
     for (i$ = 0, len$ = (ref$ = this.modules).length; i$ < len$; ++i$) {
@@ -63,6 +67,16 @@ window.compareVersions = function(a, b){
 };
 (function(fn_){
   var fn, v, onMigrated;
+  if (window.P0NE_UPDATE) {
+    window.P0NE_UPDATE = false;
+    if ((p0ne_ != null ? p0ne_.version : void 8) === window.p0ne.version) {
+      return;
+    } else {
+      if (typeof API.chatLog == 'function') {
+        API.chatLog("plug_p0ne automatically updated to v" + p0ne.version, true);
+      }
+    }
+  }
   if (console && typeof (console.group || console.groupCollapsed) === 'function') {
     fn = function(){
       var errors, warnings, error_, warn_;
@@ -118,6 +132,15 @@ window.compareVersions = function(a, b){
   var p0ne, $window, $body, i$, ref$, len$, Constr, $dummy, user, userID, res$, k, ref1$, v, cb, app, friendsList, e, ref2$, cm, rR_, onLoaded, dummyP3, ppStop, CHAT_WIDTH, MAX_IMAGE_HEIGHT, roles, ObjWrap;
   p0ne = window.p0ne;
   localStorage.p0neVersion = p0ne.version;
+  /*setInterval do
+      ->
+          window.P0NE_UPDATE = true
+          p0ne.reload!
+              .then ->
+                  setTimeout do
+                      -> window.P0NE_UPDATE = false
+                      10_000ms
+      30 * 60_000ms*/
   
   /*@source lambda.js */
   /*
@@ -2183,6 +2206,22 @@ window.compareVersions = function(a, b){
         return num + "\xa0" + plural;
       }
     },
+    xth: function(i){
+      var ld;
+      ld = i % 10;
+      switch (true) {
+      case i % 100 - ld === 10:
+        i + "th";
+        break;
+      case ld === 1:
+        return i + "st";
+      case ld === 2:
+        return i + "nd";
+      case ld === 3:
+        return i + "rd";
+      }
+      return i + "th";
+    },
     getTime: function(t){
       t == null && (t = new Date);
       return t.toISOString().replace(/.+?T|\..+/g, '');
@@ -2399,6 +2438,9 @@ window.compareVersions = function(a, b){
   requireHelper('votes', function(it){
     var ref$;
     return (ref$ = it.attributes) != null ? ref$.grabbers : void 8;
+  });
+  requireHelper('chatAuxiliaries', function(it){
+    return it.sendChat;
   });
   requireHelper('tracker', function(it){
     return it.identify;
@@ -3640,16 +3682,17 @@ window.compareVersions = function(a, b){
    * @copyright (c) 2014 J.-T. Brinkmann
    */
   module('socketListeners', {
-    require: ['socketEvents', 'SockJS'],
+    require: ['socketEvents'],
     optional: ['_$context', 'auxiliaries'],
     setup: function(arg$){
-      var replace, ref$, onRoomJoinQueue2, i$, ref1$, len$;
+      var replace, base_url, ref$, onRoomJoinQueue2, i$, ref1$, len$;
       replace = arg$.replace;
-      if (((ref$ = window.socket) != null ? ref$._base_url : void 8) === "https://shalamar.plug.dj:443/socket") {
+      base_url = "wss://godj.plug.dj/socket";
+      if (((ref$ = window.socket) != null ? ref$.url : void 8) === base_url) {
         return;
       }
       onRoomJoinQueue2 = [];
-      for (i$ = 0, len$ = (ref1$ = ['send', 'dispatchEvent']).length; i$ < len$; ++i$) {
+      for (i$ = 0, len$ = (ref1$ = ['send', 'dispatchEvent', 'close']).length; i$ < len$; ++i$) {
         (fn$.call(this, ref1$[i$]));
       }
       function onMessage(t){
@@ -3690,23 +3733,27 @@ window.compareVersions = function(a, b){
       }
       return forEach;
       function fn$(event){
-        replace(SockJS.prototype, event, function(e_){
+        replace(WebSocket.prototype, event, function(e_){
           return function(){
             var this$ = this;
             e_.apply(this, arguments);
-            if (window.socket !== this && this._base_url === "https://shalamar.plug.dj:443/socket") {
+            console.info("socket stuff", event, this);
+            if (window.socket !== this && this.url === base_url) {
               replace(window, 'socket', function(){
                 return this$;
               });
               replace(this, 'onmessage', function(msg_){
                 return function(t){
-                  var i$, ref$, len$, el, type, ref1$;
-                  for (i$ = 0, len$ = (ref$ = t.data || []).length; i$ < len$; ++i$) {
+                  var i$, ref$, d, len$, el, type;
+                  if (t.data === 'h') {
+                    return;
+                  }
+                  for (i$ = 0, len$ = (ref$ = d = JSON.parse(t.data)).length; i$ < len$; ++i$) {
                     el = ref$[i$];
                     _$context.trigger("socket:" + el.a, el);
                     API.trigger("socket:" + el.a, el);
                   }
-                  type = (ref$ = t.data) != null ? (ref1$ = ref$[0]) != null ? ref1$.a : void 8 : void 8;
+                  type = d != null ? (ref$ = d[0]) != null ? ref$.a : void 8 : void 8;
                   if (!type) {
                     console.warn("[SOCKET:WARNING] socket message format changed", t);
                   }
@@ -3729,6 +3776,8 @@ window.compareVersions = function(a, b){
                 }));
               };
               return console.info("[Socket] socket patched (using ." + event + ")", this);
+            } else if (window.socket !== this) {
+              return console.warn("socket found, but url differs '" + this.url + "'");
             }
           };
         });
@@ -3871,15 +3920,43 @@ window.compareVersions = function(a, b){
   ####################################*/
   module('simpleFixes', {
     setup: function(arg$){
-      var replace;
-      replace = arg$.replace;
+      var addListener, replace;
+      addListener = arg$.addListener, replace = arg$.replace;
       this.scm = $('#twitter-menu, #facebook-menu').detach();
-      return replace($('#chat-input-field')[0], 'tabIndex', function(){
+      replace($('#chat-input-field')[0], 'tabIndex', function(){
         return 1;
+      });
+      replace(localStorage, 'clear', function(){
+        return $.noop;
+      });
+      return addListener(API, 'socket:reconnected', function(){
+        var ref$;
+        if ((app != null ? (ref$ = app.dialog.dialog) != null ? ref$.options.title : void 8 : void 8) === Lang.alerts.connectionError) {
+          return app.dialog.$el.hide();
+        }
       });
     },
     disable: function(){
       return this.scm.insertAfter('#playlist-panel');
+    }
+  });
+  module('fixChatLT_GT', {
+    require: ['auxiliaries'],
+    setup: function(arg$){
+      var replace, cTS;
+      replace = arg$.replace;
+      cTS = auxiliaries.cleanTypedString;
+      return replace(chatAuxiliaries, 'sendChat', function(sC_){
+        return function(){
+          var res;
+          auxiliaries.cleanTypedString = function(it){
+            return it;
+          };
+          res = sC_.apply(this, arguments);
+          auxiliaries.cleanTypedString = cTS;
+          return res;
+        };
+      });
     }
   });
   module('fixMediaThumbnails', {
@@ -5449,7 +5526,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var loadStyle;
       loadStyle = arg$.loadStyle;
-      return loadStyle(p0ne.host + "/css/fimplug.css?r=19");
+      return loadStyle(p0ne.host + "/css/fimplug.css?r=20");
     }
   });
   /*####################################
@@ -6807,8 +6884,9 @@ window.compareVersions = function(a, b){
         };
       }
     },
+    connectAttemps: 1,
     connect: function(url, reconnecting, reconnectWarning){
-      var reconnect, connectAttemps, this$ = this;
+      var reconnect, this$ = this;
       if (!reconnecting && this.socket) {
         if (url === this.socket.url && this.socket.readyState === 1) {
           return;
@@ -6817,10 +6895,9 @@ window.compareVersions = function(a, b){
       }
       console.log("[p0ne avatars] using socket as ppCAS avatar server");
       reconnect = true;
-      connectAttemps = 1;
       if (reconnectWarning) {
         setTimeout(function(){
-          if (connectAttemps === 0) {
+          if (this$.connectAttemps === 0) {
             return API.chatLog("[p0ne avatars] lost connection to avatar server \xa0 =(");
           }
         }, 10000);
@@ -6920,7 +6997,7 @@ window.compareVersions = function(a, b){
         });
       });
       this.socket.on('authAccepted', function(){
-        connectAttemps = 0;
+        this$.connectAttemps = 0;
         reconnecting = false;
         return this$.changeBlurb(this$.oldBlurb, {
           success: function(){
@@ -7006,24 +7083,22 @@ window.compareVersions = function(a, b){
         return reconnect = false;
       });
       this.socket.onclose = function(e){
+        var timeout;
         console.warn("[ppCAS] DISCONNECTED", e);
         _$context.trigger('ppCAS:disconnected');
         API.trigger('ppCAS:disconnected');
         if (e.wasClean) {
           return reconnect = false;
-        } else if (reconnect) {
-          if (connectAttemps === 0) {
+        } else if (reconnect && !this$.disabled) {
+          timeout = ~~((5000 + Math.random() * 5000) * this$.connectAttemps);
+          console.info("[ppCAS] reconnecting in " + humanTime(timeout) + " (" + xth(this$.connectAttemps) + " attempt)");
+          return this$.reconnectTimer = sleep(timeout, function(){
             console.log("[ppCAS] reconnecting…");
-            return this$.connect(url, true, true);
-          } else {
-            return sleep((5000 + Math.random() * 5000) * connectAttemps, function(){
-              console.log("[ppCAS] reconnecting…");
-              connectAttemps++;
-              this$.connect(url, true, false);
-              _$context.trigger('ppCAS:connecting');
-              return API.trigger('ppCAS:connecting');
-            });
-          }
+            this$.connectAttemps++;
+            this$.connect(url, true, this$.connectAttemps === 1);
+            _$context.trigger('ppCAS:connecting');
+            return API.trigger('ppCAS:connecting');
+          });
         }
       };
       _$context.trigger('ppCAS:connecting');
@@ -7050,6 +7125,7 @@ window.compareVersions = function(a, b){
       if ((ref$ = this.socket) != null) {
         ref$.close();
       }
+      clearTimeout(this.reconnectTimer);
       for (avatarID in ref1$ = p0ne._avatars) {
         avi = ref1$[avatarID];
         avi.inInventory = false;
@@ -7072,6 +7148,8 @@ window.compareVersions = function(a, b){
    * @copyright (c) 2015 J.-T. Brinkmann
   */
   module('streamSettings', {
+    settings: 'dev',
+    displayName: 'Audio-Only Stream',
     require: ['app', 'currentMedia', '_$context'],
     optional: ['database'],
     audioOnly: false,
@@ -7106,14 +7184,22 @@ window.compareVersions = function(a, b){
         hd720: true
       };
       audio.addEventListener('canplay', function(){
+        var diff;
         console.log("[audioStream] finished buffering");
         if (currentMedia.get('media') === audio.media) {
-          if (audio.init) {
+          diff = currentMedia.get('elapsed') - audio.currentTime;
+          if (diff > 4) {
             audio.init = false;
-            return seek();
+            seek();
+            return sleep(2000, function(){
+              if (audio.paused) {
+                console.warn("[audioStream] still not playing. forcing audio.play()");
+                return audio.play();
+              }
+            });
           } else {
             audio.play();
-            return console.log("[audioStream] audio.play()");
+            return console.log("[audioStream] playing song (diff " + humanTime(diff, true) + ")");
           }
         } else {
           return console.warn("[audioStream] next song already started");
@@ -7125,7 +7211,7 @@ window.compareVersions = function(a, b){
           return oVC_.apply(this, arguments);
         };
       });
-      replace(Playback.prototype, 'onMediaChange', function(){
+      replace(Playback.prototype, 'onMediaChange', function(oMC_){
         return function(){
           var media, startTime, a, this$ = this;
           this.reset();
@@ -7139,12 +7225,10 @@ window.compareVersions = function(a, b){
               return;
             }
             this.ignoreComplete = true;
-            console.log("[audioStream] B");
             sleep(1000, function(){
               return this$.resetIgnoreComplete();
             });
             if (media.get('format') === 1) {
-              console.log("[audioStream] C");
               if (streamSettings.audioOnly && !audio.failed) {
                 /*== audio only streaming ==*/
                 console.log("[audioStream] looking for URL");
@@ -7153,7 +7237,7 @@ window.compareVersions = function(a, b){
                 } else {
                   audio.init = true;
                   return mediaDownload(media, true).then(function(d){
-                    console.log("[audioStream] found url", d);
+                    console.log("[audioStream] found url. Buffering…", d);
                     media.src = d.preferredDownload.url;
                     audio.media = media;
                     audio.src = media.src;
@@ -7161,6 +7245,7 @@ window.compareVersions = function(a, b){
                     return audio.load();
                   }).fail(function(err){
                     console.error("[audioStream] couldn't get audio stream", err);
+                    API.chatLog("[audioStream] couldn't load audio-only stream, using video instead", true);
                     audio.failed = true;
                     refresh();
                     return API.once('advance', function(){
@@ -7185,37 +7270,9 @@ window.compareVersions = function(a, b){
                 return this.$container.append($("<iframe id=yt-frame frameborder=0 src='" + window.location.protocol + "//plgyte.appspot.com/" + a + ".html'>").load(this.ytFrameLoadedBind));
               }
             } else if (media.get('format') === 2) {
-              console.log("[audioStream] loading Soundcloud");
-              if (soundcloud.r) {
-                if (soundcloud.sc) {
-                  this.$container.empty().append($("<iframe id=yt-frame frameborder=0 src='" + this.visualizers[this.random.integer(0, 1)] + "'></iframe>"));
-                  return soundcloud.sc.whenStreamingReady(function(){
-                    var startTime;
-                    if (currentMedia.get('media' === media)) {
-                      startTime = currentMedia.get('elapsed');
-                      return this$.player = soundcloud.sc.stream(media.get('cid'), {
-                        autoPlay: true,
-                        volume: currentMedia.get('volume'),
-                        position: startTime < 4
-                          ? 0
-                          : startTime * 1000,
-                        onload: this$.scOnLoadBind,
-                        whileloading: this$.scLoadingBind,
-                        onfinish: this$.playbackCompleteBind,
-                        ontimeout: this$.scTimeoutBind
-                      });
-                    }
-                  });
-                } else {
-                  return this.$container.append($('<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>').css({
-                    position: 'absolute',
-                    left: 46
-                  }));
-                }
-              }
+              return oMC_.apply(this, arguments);
             } else {
-              console.log("[audioStream] wut", media.get('format'), typeof media.get('format'));
-              return _$context.on('sc:ready', this.onSCReady, this);
+              return console.log("[audioStream] wut", media.get('format'), typeof media.get('format'));
             }
           } else {
             this.$noDJ.show();
@@ -7244,7 +7301,9 @@ window.compareVersions = function(a, b){
       function seek(){
         var startTime;
         startTime = currentMedia.get('elapsed');
-        return audio.currentTime = startTime < 4 ? 0 : startTime;
+        startTime = startTime < 4 ? 0 : startTime;
+        audio.currentTime = startTime;
+        return console.log("[audioStream] seeking…", mediaTime(startTime));
       }
       return seek;
     },
@@ -8625,6 +8684,7 @@ window.compareVersions = function(a, b){
     }
   });
   return module('fimstats', {
+    settings: 'pony',
     setup: function(arg$){
       var addListener, $create, $el;
       addListener = arg$.addListener, $create = arg$.$create;
