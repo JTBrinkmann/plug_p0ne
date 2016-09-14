@@ -15,8 +15,9 @@
 */
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
+p0ne_ = window.p0ne
 window.p0ne =
-    version: \1.5.2
+    version: \1.5.7
     lastCompatibleVersion: \1.5.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -28,6 +29,8 @@ window.p0ne =
     lsBound_num: {}
     modules: p0ne?.modules || {}
     dependencies: {}
+    reload: ->
+        return $.getScript "#{@host}/script/plug_p0ne.beta.js"
     close: ->
         for m in @modules
             m.disable?!
@@ -50,6 +53,13 @@ window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to
 
 
 <-      (fn_) ->
+    if window.P0NE_UPDATE
+        window.P0NE_UPDATE = false
+        if p0ne_?.version == window.p0ne.version
+            return
+        else
+            API.chatLog? "plug_p0ne automatically updated to v#{p0ne.version}", true
+
     if console and typeof (console.group || console.groupCollapsed) == \function
         fn = ->
             if console.groupCollapsed
@@ -90,6 +100,18 @@ window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to
 
 p0ne = window.p0ne # so that modules always refer to their initial `p0ne` object, unless explicitly referring to `window.p0ne`
 localStorage.p0neVersion = p0ne.version
+
+#== Auto-Update ==
+# check for a new version every 30min
+/*setInterval do
+    ->
+        window.P0NE_UPDATE = true
+        p0ne.reload!
+            .then ->
+                setTimeout do
+                    -> window.P0NE_UPDATE = false
+                    10_000ms
+    30 * 60_000ms*/
 
 ``
 /*@source lambda.js */
@@ -1746,6 +1768,14 @@ window <<<<
             return "#num\xa0#singular" # \xa0 is NBSP
         else
             return "#num\xa0#plural"
+    xth: (i) ->
+        ld = i % 10 # last digit
+        switch true
+        | (i%100 - ld == 10) => "#{i}th" # 11th, 12th, 13th, 2311th, …
+        | (ld==1) => return "#{i}st"
+        | (ld==2) => return "#{i}nd"
+        | (ld==3) => return "#{i}rd"
+        return "#{i}th"
 
 
     # formatting
@@ -1880,6 +1910,7 @@ requireHelper \DialogAlert, (.::?.id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
 requireHelper \ActivateEvent, (.ACTIVATE)
 requireHelper \votes, (.attributes?.grabbers)
+requireHelper \chatAuxiliaries, (.sendChat)
 requireHelper \tracker, (.identify)
 requireHelper \currentMedia, (.updateElapsedBind)
 requireHelper \settings, (.settings)
@@ -2779,27 +2810,33 @@ module \perfEmojify, do
  */
 #== patch socket ==
 module \socketListeners, do
-    require: <[ socketEvents SockJS ]>
+    require: <[ socketEvents ]>
     optional: <[ _$context auxiliaries ]>
     setup: ({replace}) ->
-        return if window.socket?._base_url == "https://shalamar.plug.dj:443/socket" # 2015-01-25
+        # base_url = "https://shalamar.plug.dj:443/socket" # 2015-01-25
+        base_url = "wss://godj.plug.dj/socket" # 2015-02-12
+        return if window.socket?.url == base_url
         onRoomJoinQueue2 = []
-        for let event in <[ send dispatchEvent ]>
-            replace SockJS::, event, (e_) -> return ->
+        for let event in <[ send dispatchEvent close ]> # of WebSocket:: 
+            replace WebSocket::, event, (e_) -> return ->
                 e_ ...
+                console.info "socket stuff", event, this
 
-                if window.socket != this and this._base_url == "https://shalamar.plug.dj:443/socket"
+                if window.socket != this and this.url == base_url
                     # patch
                     replace window, \socket, ~> return this
                     replace this, \onmessage, (msg_) -> return (t) ->
-                        for el in t.data || []
+                        return if t.data == \h
+                        for el in d = JSON.parse(t.data)
                             _$context.trigger "socket:#{el.a}", el
                             API.trigger "socket:#{el.a}", el
 
-                        type = t.data?.0?.a
+                        type = d?.0?.a
                         console.warn "[SOCKET:WARNING] socket message format changed", t if not type
 
                         msg_ ...
+
+
                     _$context .on \room:joined, ->
                         while onRoomJoinQueue2.length
                             forEach onRoomJoinQueue2.shift!
@@ -2814,6 +2851,8 @@ module \socketListeners, do
                             d: n
 
                     console.info "[Socket] socket patched (using .#event)", this
+                else if window.socket != this
+                    console.warn "socket found, but url differs '#{@url}'"
 
 
 
@@ -2979,14 +3018,33 @@ define \plug_p0ne/socket, [ "underscore", "sockjs", "da676/df0c1/b4fa4", "da676/
 #                FIXES               #
 ####################################*/
 module \simpleFixes, do
-    setup: ({replace}) ->
+    setup: ({addListener, replace}) ->
         # hide social-menu (because personally, i only accidentally click on it. it's just badly positioned)
         @scm = $ '#twitter-menu, #facebook-menu' .detach! # not using .social-menu in case other scripts use this class to easily add buttons
 
         # add tab-index to chat-input
         replace $(\#chat-input-field).0, \tabIndex, -> return 1
+
+        # why would plug such a horrible thing as cleaning the localStorage?! Q~Q
+        replace localStorage, \clear, -> return $.noop
+
+        # close Connection Error dialog when reconnected
+        # otherwise the dialog FORCES you to refresh the page
+        addListener API, \socket:reconnected, ->
+            if app?.dialog.dialog?.options.title == Lang.alerts.connectionError
+                app.dialog.$el.hide!
     disable: ->
         @scm .insertAfter \#playlist-panel
+
+module \fixChatLT_GT, do
+    require: <[ auxiliaries ]>
+    setup: ({replace}) ->
+        cTS = auxiliaries.cleanTypedString
+        replace chatAuxiliaries, \sendChat, (sC_) -> return ->
+            auxiliaries.cleanTypedString = (it) -> it
+            res = sC_ ...
+            auxiliaries.cleanTypedString = cTS
+            return res
 
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
@@ -4284,7 +4342,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=19"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=20"
 
 /*####################################
 #          ANIMATED DIALOGS          #
@@ -5602,16 +5660,16 @@ module \customAvatars, do
 
         @connect 'https://p0ne.com/_'
 
+    connectAttemps: 1
     connect: (url, reconnecting, reconnectWarning) ->
         if not reconnecting and @socket
             return if url == @socket.url and @socket.readyState == 1
             @socket.close!
         console.log "[p0ne avatars] using socket as ppCAS avatar server"
         reconnect = true
-        connectAttemps = 1
 
         if reconnectWarning
-            setTimeout (-> if connectAttemps==0 then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
+            setTimeout (~> if @connectAttemps==0 then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
 
         @socket = new SockJS(url)
         @socket.url = url
@@ -5677,7 +5735,7 @@ module \customAvatars, do
                         console.info "[ppCAS] blurb reset."
 
         @socket.on \authAccepted, ~>
-            connectAttemps := 0
+            @connectAttemps := 0
             reconnecting := false
             @changeBlurb @oldBlurb, do
                 success: ~>
@@ -5744,16 +5802,15 @@ module \customAvatars, do
             API.trigger \ppCAS:disconnected
             if e.wasClean
                 reconnect := false
-            else if reconnect
-                if connectAttemps==0
-                    console.log "[ppCAS] reconnecting…"; @connect(url, true, true)
-                else
-                    sleep (5_000ms + Math.random!*5_000ms)*connectAttemps, ~>
-                        console.log "[ppCAS] reconnecting…"
-                        connectAttemps++
-                        @connect(url, true, false)
-                        _$context.trigger \ppCAS:connecting
-                        API.trigger \ppCAS:connecting
+            else if reconnect and not @disabled
+                timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps)
+                console.info "[ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
+                @reconnectTimer = sleep timeout, ~>
+                    console.log "[ppCAS] reconnecting…"
+                    @connectAttemps++
+                    @connect(url, true, @connectAttemps==1)
+                    _$context.trigger \ppCAS:connecting
+                    API.trigger \ppCAS:connecting
         _$context.trigger \ppCAS:connecting
         API.trigger \ppCAS:connecting
 
@@ -5767,11 +5824,12 @@ module \customAvatars, do
             success: options.success
             error: options.error
 
-        #setTimeout (-> @socket.emit \reqAuthToken if connectAttemps), 5_000ms
+        #setTimeout (-> @socket.emit \reqAuthToken if @connectAttemps), 5_000ms
 
     disable: ->
         @changeBlurb @oldBlurb if @blurbIsChanged
         @socket? .close!
+        clearTimeout @reconnectTimer
         for avatarID, avi of p0ne._avatars
             avi.inInventory = false
         @updateAvatarStore!
@@ -5788,6 +5846,8 @@ module \customAvatars, do
 */
 
 module \streamSettings, do
+    settings: \dev
+    displayName: 'Audio-Only Stream'
     require: <[ app currentMedia _$context ]>
     optional: <[ database ]>
     audioOnly: false
@@ -5837,12 +5897,16 @@ module \streamSettings, do
         audio.addEventListener \canplay, ->
             console.log "[audioStream] finished buffering"
             if currentMedia.get(\media) == audio.media
-                if audio.init
+                diff = currentMedia.get(\elapsed) - audio.currentTime
+                if diff > 4s
                     audio.init = false
                     seek!
+                    sleep 2_000ms, -> if audio.paused
+                        console.warn "[audioStream] still not playing. forcing audio.play()"
+                        audio.play!
                 else
                     audio.play!
-                    console.log "[audioStream] audio.play()"
+                    console.log "[audioStream] playing song (diff #{humanTime(diff, true)})"
             else
                 console.warn "[audioStream] next song already started"
 
@@ -5850,7 +5914,7 @@ module \streamSettings, do
             audio.volume = currentMedia.get(\volume) / 100perc
             oVC_ ...
 
-        replace Playback::, \onMediaChange, -> return ->
+        replace Playback::, \onMediaChange, (oMC_) -> return ->
             @reset!
             @$controls.removeClass \snoozed
             media = currentMedia.get \media
@@ -5861,10 +5925,8 @@ module \streamSettings, do
                 return if currentMedia.get \streamDisabled
 
                 @ignoreComplete = true
-                console.log "[audioStream] B"
                 sleep 1_000ms, ~> @resetIgnoreComplete!
                 if media.get(\format) == 1 # youtube
-                    console.log "[audioStream] C"
                     if streamSettings.audioOnly and not audio.failed
                         /*== audio only streaming ==*/
                         console.log "[audioStream] looking for URL"
@@ -5874,7 +5936,7 @@ module \streamSettings, do
                             audio.init = true
                             mediaDownload media, true
                                 .then (d) ->
-                                    console.log "[audioStream] found url", d
+                                    console.log "[audioStream] found url. Buffering…", d
                                     media.src = d.preferredDownload.url
 
                                     audio.media = media
@@ -5883,6 +5945,7 @@ module \streamSettings, do
                                     audio.load!
                                 .fail (err) ->
                                     console.error "[audioStream] couldn't get audio stream", err
+                                    API.chatLog "[audioStream] couldn't load audio-only stream, using video instead", true
                                     audio.failed := true
                                     refresh!
                                     API.once \advance, ->
@@ -5904,6 +5967,8 @@ module \streamSettings, do
                             $ "<iframe id=yt-frame frameborder=0 src='#{window.location.protocol}//plgyte.appspot.com/#a.html'>"
                                 .load @ytFrameLoadedBind
                 else if media.get(\format) == 2 # soundcloud
+                    oMC_ ...
+                    /*
                     console.log "[audioStream] loading Soundcloud"
                     if soundcloud.r
                         if soundcloud.sc
@@ -5926,9 +5991,10 @@ module \streamSettings, do
                                     .css do
                                         position: \absolute
                                         left: 46px
+                    _$context.on \sc:ready, @onSCReady, this
+                    */
                 else
                     console.log "[audioStream] wut", media.get(\format), typeof media.get(\format)
-                    _$context.on \sc:ready, @onSCReady, this
             else
                 @$noDJ.show!
                 @$controls.hide!
@@ -5946,7 +6012,9 @@ module \streamSettings, do
 
         function seek
             startTime = currentMedia.get \elapsed
-            audio.currentTime = if startTime < 4s then 0s else startTime
+            startTime = if startTime < 4s then 0s else startTime
+            audio.currentTime = startTime
+            console.log "[audioStream] seeking…", mediaTime(startTime)
     changeStream: (mode) ->
         prevMode =
             if currentMedia.get \streamDisabled
@@ -7097,6 +7165,7 @@ module \songNotifRuleskip, do
                 API.sendChat "!ruleskip #num"
 
 module \fimstats, do
+    settings: \pony
     setup: ({addListener, $create}) ->
         $el = $create '<span class=p0ne-last-played>' .appendTo \#now-playing-bar
         addListener API, \advance, @updateStats = (d) ->
