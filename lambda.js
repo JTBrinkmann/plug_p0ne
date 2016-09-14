@@ -1,6 +1,6 @@
 /*
  * Lambda.js: String based lambdas for Node.js and the browser.
- * edited by JTBrinkmann to support a slightly more CoffeeScript like syntax
+ * edited by JTBrinkmann to support some CoffeeScript like shorthands (e.g. :: for prototype)
  *
  * Copyright (c) 2007 Oliver Steele (steele@osteele.com)
  * Released under MIT license.
@@ -93,77 +93,25 @@
 });
 
 window.l = function(expression) {
-    vars = []
+    var vars = [], refs = 0
+    var replacedNCO = true
     expression = expression
         // :: for prototype
-        .replace(/([\w$]*)\.?::(\?)?\.?([\w$])?/g,
-            lambda("_, pre, nullCoalescingOp, post, i ->"+
-                "(pre ? pre+'.' : i == 0 ? '.' : '') + 'prototype' + (nullCoalescingOp||'') + (post ? '.'+post : '')"
-        ))
+        .replace(/([\w$]*)\.?::(\?)?\.?([\w$])?/g, function(_, pre, nullCoalescingOp, post, i) {
+            return (pre ? pre+'.' : i == 0 ? '.' : '') + 'prototype' + (nullCoalescingOp||'') + (post ? '.'+post : '')
+        })
         // @ for this
-        .replace(/@(\?)?\.?([\w$])?/g,
-            lambda("_, nullCoalescingOp, post, i ->"+
-                "'this' + (nullCoalescingOp||'') + (post ? '.'+post : '')"
-        ))
-        // ?. for Null Coalescing Operator
-        .replace(/([\w$\.]+)\?([\w$\.]+|\[.*?\])/g, lambda("_, pre, post ->"+
-                "vars=['ref$'], '((ref$ = '+(pre[0]=='.'?'$1':'')+pre+') != null && ref$'+post+')'"
-        ))
+        .replace(/@(\?)?\.?([\w$])?/g, function(_, nullCoalescingOp, post, i) {
+            return 'this' + (nullCoalescingOp||'') + (post ? '.'+post : '')
+        })
+    // ?. for Null Coalescing Operator
+    while (replacedNCO) {
+        replacedNCO = false
+        expression = expression.replace(/([\w\.\$]+)\?([\w\.\$]|\[)/, function(_, pre, post) {
+            replacedNCO = true
+            vars[refs++] = 'ref'+refs+'$'
+            return '(ref'+refs+'$ = '+(pre[0]=='.'?'it':'')+pre+') != null && ref'+refs+'$'+(post[0]=="."||post[0]=="[" ? "" : ".")+post
+        })
+    }
     return lambda(expression, vars)
 }
-/*
-    // ~> bound functions
-    // "String #Interpolation"
-    lvl = []; l = -1
-    boundLvls = []; lb = -1
-    bound = false; hasBound = false
-    expression = expression
-        // (preventBS is to prevent escaped opening/closing brackets/quotes from being treated as regular ones)
-        // QS = quotes
-        //        <    pre  preventBS   >  (< opening><quotes>         <closing >)
-        .replace(/((?:[^\\]|(?:\\\\)+)*?)(?:([\(\{\[])|(["'])|(#)|(~>)|([\]\}\)]))/g, function(_, pre, opening, quotes, numberSign, wavyArrow, closing, i) {
-            //                       for interpolated strings-<^> < ^>-for bound functions
-            //TODO compile from LiveScript to JavaScript
-            //TODO add ~> bound functions to this madness
-            if lvl[l] == \# and opening != \{
-                #ToDo interpolate within pre
-                lvl.pop!
-
-            switch true
-            | quotes =>
-                switch lvl[l]
-                | quotes => # leave string
-                    lvl.pop!
-                | "'", '"' => # ignore (we are inside a string)
-                    void # ignore
-                | otherwise => # enter string
-                    lvl[++l] = quotes
-            | true =>
-                if bound
-                    pre.replace(/\bthis\b/g, 'this$') #ToDo check if this is accurate (what about e.g. ```{this: "fun"}```?)
-                fallthrough
-            | numberSign =>
-                if lvl[l] == '"'
-                    lvl[++l] = '#'
-            | opening =>
-                lvl[++l] = opening
-            | closing =>
-                if lvl[l] == closing
-                    #if closing == \} and lvl[l] == \#
-                        #ToDo interpolate within pre
-                    if boundLvls[lb] == l
-                        pre += ")"
-                    if bound == l # range of bound function ends
-                        bound := false
-                    lvl.pop!
-                else
-                    throw new TypeError "unmatched bracket '#closing' at #i"
-            | wavyArrow =>
-                hasBound := true
-                opening = "(var this$=this, ->"
-                boundLvls[++lb] = l
-                bound := l if bound == false
-            return _
-        })
-    if (hasBound) vars.push("this$")
-*/

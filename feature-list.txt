@@ -5,7 +5,6 @@ legend:
 
 = Features =
 - fix plug.dj bugs
-	* popup bug on disconnect (ToDo update)
 	- have a yellow name even when being mod
 	- Zalgo fix (Zalgo messages won't "bleed" out of the senders message)
 	- bugs with autocomplete (e.g. @mention autocomplete not working when there's something infront of the "@")

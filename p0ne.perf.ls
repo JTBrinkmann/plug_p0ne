@@ -56,7 +56,7 @@ module \jQueryPerf, do
                 return false
 
 
-module \perfEmojify,
+module \perfEmojify, do
     require: <[ emoticons ]>
     setup: ({replace}) ->
         # improves .emojify performance by 135% https://i.imgur.com/iBNICkX.png

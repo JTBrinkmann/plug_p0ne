@@ -23,9 +23,9 @@ loadChat
 */
 
 module \saveChat, do
-    require: <[ chat ]>
-    optional: <[ _$contextUpdateEvent ]>
-    _chunkSize: 128messages # note: this needs to be <= 512 to prevent vanilla plug from removing messages
+    require: <[ chat compress ]>
+    optional: <[ _$contextUpdateEvent compressor ]>
+    _chunkSize: 128messages # note: this should be to be <= 512 to prevent vanilla plug from removing messages
 
     $c_: $ \#chat
     $cm_: $ \#chat-messages
@@ -47,33 +47,28 @@ module \saveChat, do
     cbScrollWrapper: null
     scrolling: false
 
-    setup: ({addListener}) ->
+    setup: ({addListener, $create, replace}, saveChat) ->
         # set up variables
-        @update!
         @$cm = chat.$chatMessages
         playSound_ = chat.playSound
         @$dummy = $!
         @$cChunk = @$dummy
 
-        msgs = @$cm .children!
-
-        # load plug_dj.compress.js
-        loadScript \decompressorLoaded, window.compressor, "plug_dj.compress.js"
-            .then ~>
-                console.info "[saveChat] compressor loaded"
-                @loadChat
-            #.timeout 10s *1_000to_ms ->
-            #   ... #ToDo notify user that plug_p0ne is still loading old chatlogs
+        msgs = @$cm .find \.cm
 
         # setup listeners
-        @setupEvents!
-        addListener do
-            target: _$context, event: \context:update, bound: true
-            callback: (d) -> if d.ctx != this and d.event == \chat:receive
+        addListener \early, _$context, \chat:receive, (message) ->
+            saveChat.cbPre this, message
+        addListener API, \chat, (message) ->
+            saveChat.cbPost this, message
+        addListener chatDomEvents, \scroll, ->
+            saveChat.cbScroll this
+        addListener _$context, \context:update, (d) ~>
+            if d.ctx != this and d.event == \chat:receive
                 @disable!; @enable!
 
         # set up HTML
-        @$loadingTop = $ \<span> .text "loading…" .css(\visibility, \hidden) .appendTo @$cm_
+        @$loadingTop = $create \<span> .text "loading…" .hide! .appendTo @$cm_
         @$loadingBottom = @$loadingTop .clone! .appendTo @$cm_
 
         # create Chunk
@@ -81,11 +76,15 @@ module \saveChat, do
         @createChunk!
 
         # p³ fix
-        plugCubedLoaded .then ->
-            replace require(\plugCubed/Utils), \chatLog, (chatLog_) -> return (type, message, color) ->
+        addListener API, \plugCubedLoaded, p3Loaded = ->
+            requireHelper do
+                name: \p3Utils
+                test: (.isPlugCubedDeveloper)
+            replace p3Utils, \chatLog, (cL_) -> return (type, message, color) ->
                 return if (!message)
-                chatLog_ ...
+                cL_ ...
                 appendChat saveChat.$cm.children!.last!
+        p3Loaded! if window.plugCubed
 
         # move old messages in the chunk
         l = 0
@@ -104,22 +103,12 @@ module \saveChat, do
                 l = 0
 
 
-
-    update: ->
-        saveChat = this
-        @cbPreWrapper = (message) -> saveChat.cbPre this, message
-        @cbPostWrapper = (message) -> saveChat.cbPost this, message
-        @cbScrollWrapper = -> saveChat.cbScroll this
-    setupEvents: ->
-        _$context.onEarly \chat:receive, @cbPreWrapper
-        _$context.on \chat:receive, @cbPostWrapper
-        @$cm_ .on \scroll, @cbScrollWrapper
-    enable: ->
-        @setupEvents!
     disable: ->
-        _$context.off \chat:receive, @cbPreWrapper
-        _$context.off \chat:receive, @cbPostWrapper
-        @$cm_ .off \scroll, @cbScrollWrapper
+        @$cm
+            .append @$visibleChunk1.children!
+            .append @$visibleChunk2.children!
+        @$visibleChunk1 .remove!
+        @$visibleChunk2 .remove!
 
 
     cbPre: (chat, message) !-> # run first when receiving a message
@@ -133,7 +122,7 @@ module \saveChat, do
                 # @$cChunk = @$cm.find @cChunkID
                 chat.$chatMessages = @$cChunk
             message.time = Date.now!
-            message.wasAtBottom = chatIsAtBottom! # p0ne.chat also sets this, but usualyl p0ne.saveChat should be run BEFORE p0ne.chat
+            message.wasAtBottom ?= chatIsAtBottom! # p0ne.chat also sets this, but usualyl p0ne.saveChat should be run BEFORE p0ne.chat
 
 
     cbPost: (chat, message) !->
@@ -175,28 +164,28 @@ module \saveChat, do
             # load preceding chunk
             newChunkID = @chunks[@chunks.indexOf(@visibleChunk1) - 1]
             console.info "[saveChat] loading preceding chunk #newChunkID"
-            @$loadingTop .css \visibility, \visible
+            @$loadingTop .show!
             newChunk = @loadChunk(newChunkID)
                 .insertBefore @$visibleChunk1
             @$cm.0.scrollTop += newChunk.height!
             @$visibleChunk2.remove! if not @visibleChunk2 == @cChunkID
             @visibleChunk2 = @visibleChunk1; @$visibleChunk2 = @$visibleChunk1
             @visibleChunk1 = newChunkID; @$visibleChunk1 = newChunk
-            @$loadingTop .css \visibility, \hidden
+            @$loadingTop .hide!
 
         else if @cChunkID != @visibleChunk2 and sT + @$c_.0.scrollHeight + 150px > @$cm.0.scrollHeight
             # load subsequent chunk
             newChunkID = @chunks[@chunks.indexOf(@visibleChunk2) + 1]
             return if newChunkID == @cChunkID
             console.info "[saveChat] loading subsequent chunk #newChunkID"
-            @$loadingBottom .css \visibility, \visible
+            @$loadingBottom .show!
             newChunk = @loadChunk(newChunkID)
                 .insertAfter @$visibleChunk2
             @$visibleChunk1.remove!
             @visibleChunk1 = @visibleChunk2; @$visibleChunk1 = @$visibleChunk2
             @visibleChunk2 = newChunkID; @$visibleChunk2 = newChunk
             #ToDo scroll up, if necessary
-            @$loadingBottom .css \visibility, \hidden
+            @$loadingBottom .hide!
 
 
     createChunk: ->
@@ -211,10 +200,10 @@ module \saveChat, do
         @$cChunk.scrollTop = (d) -> return if d then this else 0 # for performance gain when vanilla chat.onReceive wants to scroll down
 
     loadChunk: (chunkID) ->
-        chunk = $ "<div class='p0ne_chunk' id='#chunkID'>"
+        chunk = $ "<div class=p0ne_chunk id='#chunkID'>"
 
         chat.$chatMessages = chunk
-        chat.playSound = ->
+        chat.playSound = -> # disable notification sounds while loading chunk
         d = JSON.parse(decompress(localStorage.getItem chunkID))
         console.info "[saveChat] loadChunk", d
         for msg in d

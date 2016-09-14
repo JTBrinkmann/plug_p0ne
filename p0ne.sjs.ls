@@ -11,34 +11,36 @@ module \socketListeners, do
     optional: <[ _$context auxiliaries ]>
     setup: ({replace}) ->
         onRoomJoinQueue2 = []
-        replace SockJS::, \send, (c_) -> return ->
-            c_ ...
+        for let event in <[ send dispatchEvent ]>
+            replace SockJS::, event, (e_) -> return ->
+                e_ ...
 
-            if window.socket != this and this._base_url == "https://shalamar.plug.dj:443/socket"
-                # patch
-                replace window, \socket, ~> return this
-                replace this, \onmessage, (msg_) -> return (t) ->
-                    for el in t.data || []
-                        _$context.trigger "socket:#{el.a}", el.p
+                if window.socket != this and this._base_url == "https://shalamar.plug.dj:443/socket"
+                    # patch
+                    replace window, \socket, ~> return this
+                    replace this, \onmessage, (msg_) -> return (t) ->
+                        for el in t.data || []
+                            _$context.trigger "socket:#{el.a}", el
+                            API.trigger "socket:#{el.a}", el
 
-                    type = t.data?.0?.a
-                    console.warn "[SOCKET:WARNING] socket message format changed", t if not type
+                        type = t.data?.0?.a
+                        console.warn "[SOCKET:WARNING] socket message format changed", t if not type
 
-                    msg_ ...
-                _$context .on \room:joined, ->
-                    while onRoomJoinQueue2.length
-                        forEach onRoomJoinQueue2.shift!
+                        msg_ ...
+                    _$context .on \room:joined, ->
+                        while onRoomJoinQueue2.length
+                            forEach onRoomJoinQueue2.shift!
 
-                socket.emit = (e, t, n) ->
-                    #if e != \chat
-                    #   console.log "[socket:#e]", t, n || ""
-                    socket.send JSON.stringify do
-                        a: e
-                        p: t
-                        t: auxiliaries?.getServerEpoch!
-                        d: n
+                    socket.emit = (e, t, n) ->
+                        #if e != \chat
+                        #   console.log "[socket:#e]", t, n || ""
+                        socket.send JSON.stringify do
+                            a: e
+                            p: t
+                            t: auxiliaries?.getServerEpoch!
+                            d: n
 
-                console.info '[Socket] socket patched', this
+                    console.info "[Socket] socket patched (using .#event)", this
 
 
 
@@ -60,9 +62,10 @@ module \socketListeners, do
                 if socketEvents[ el.a ]
                     try
                         socketEvents[ el.a ]( el.p )
-                    catch e
-                        console.error "#{getTime!} [Socket] failed triggering '#{el.a}'"
-                _$context.trigger "socket:#{el.a}", el.p
+                    catch err
+                        console.error "#{getTime!} [Socket] failed triggering '#{el.a}'", err.stack
+                _$context.trigger "socket:#{el.a}", el
+                API.trigger "socket:#{el.a}", el
 
 /*
 # from app.8cf130d413df133d47c418a818ee8cd60e05a2a0.js (2014-11-25)
