@@ -51,3 +51,15 @@ legend:
 	- add metadata to chat HTML (e.g. add .from-#{userID} and .is-ambassador, etc class to messages)
 	- add stuff to Chat-Autocomplete
 	- helper functions for Chat supporting chat-popout (isAtBottom(), playChatSound(), appendChat())
+
+
+
+== not obvious things to do ==
+- click on a song-notif's author / title to search for them on plug
+- song-notif has [open] and [grab] buttons
+- click on a user-rollover's username to see the user's history
+- click on the song title above the playback-container to see the song's info & description
+	- click on the author/title to search on plug or open on Youtube
+- go to Inventory and check out new, custom avatar groups
+- /ppCAS . for veteran avatars (for testing)
+- click on inline-images for previews

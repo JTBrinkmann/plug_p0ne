@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=32"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=35"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -37,7 +37,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=16"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=19"
 
 /*####################################
 #          ANIMATED DIALOGS          #
@@ -75,8 +75,8 @@ module \playlistIconView, do
         $hovered = $!
         $mediaPanel = $ \#media-panel
         addListener $mediaPanel , \mouseover, \.row, ->
-            $hovered.removeClass \hover
             $hovered := $ this
+            $hovered.removeClass \hover
             $hovered.addClass \hover if not $hovered.hasClass \selected
         addListener $mediaPanel, \mouseout, \.hover, ->
             $hovered.removeClass \hover
@@ -140,6 +140,36 @@ module \playlistIconView, do
 
 
 /*####################################
+#          VIDEO PLACEHOLDER         #
+####################################*/
+module \videoPlaceholderImage, do
+    displayName: "Video Placeholder Thumbnail"
+    settings: \look&feel
+    help: '''
+        Shows a thumbnail in place of the video, if you snooze the video or turn off the stream.
+
+        This is useful for knowing WHAT is playing, even when don't want to watch it.
+    '''
+    screenshot: 'https://i.imgur.com/TMHVsrN.gif'
+    setup: ({addListener}) ->
+        #== add video thumbnail to #playback ==
+        $playbackImg = $ \#playback-container
+        addListener API, \advance, updatePic
+        updatePic media: API.getMedia!
+        function updatePic d
+            if not d.media
+                console.log "[Video Placeholder Image] hide", d
+                $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
+            else if d.media.format == 1  # YouTube
+                console.log "[Video Placeholder Image] https://i.ytimg.com/vi/#{d.media.cid}/0.jpg", d
+                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(https://i.ytimg.com/vi/#{d.media.cid}/0.jpg)"
+            else # SoundCloud
+                console.log "[Video Placeholder Image] #{d.media.image}", d
+                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
+    disable: ->
+        $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none
+
+/*####################################
 #             LEGACY CHAT            #
 ####################################*/
 module \legacyChat, do
@@ -149,6 +179,7 @@ module \legacyChat, do
         Shows the chat in the old format, before badges were added to it in December 2014.
         Makes the messages smaller, so more fit on the screen
     '''
+    disabled: true
     setup: ({addListener}) ->
         $body .addClass \legacy-chat
         $cb = $ \#chat-button

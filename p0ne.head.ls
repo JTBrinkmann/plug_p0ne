@@ -11,8 +11,8 @@
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
 window.p0ne =
-    version: \1.4.6
-    lastCompatibleVersion: \1.3.9 /* see below */
+    version: \1.5.2
+    lastCompatibleVersion: \1.5.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
     YOUTUBE_KEY: \AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw

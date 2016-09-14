@@ -137,7 +137,9 @@ module \customAvatars, do
                 Lang.userAvatars[avatar.category] = avatar.category
             #p0ne._myAvatars[*] = avatar
 
-            delete Avatar.IMAGES[avatarID] # delete image cache
+            delete Avatar.IMAGES["#{avatarID}"] # delete image cache
+            delete Avatar.IMAGES["#{avatarID}dj"] # delete image cache
+            delete Avatar.IMAGES["#{avatarID}b"] # delete image cache
             if not updateAvatarStore.loading
                 updateAvatarStore.loading = true
                 requestAnimationFrame -> # throttle to avoid updating every time when avatars get added in bulk
@@ -323,6 +325,7 @@ module \customAvatars, do
                     API.chatLog "hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", true
                 else if server == "."
                     # Veteran avatars
+                    base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/"
                     helper = (fn) ->
                         fn = window[fn]
                         for avatarID in <[ su01 su02 space03 space04 space05 space06 ]>
@@ -360,10 +363,10 @@ module \customAvatars, do
             @socket.close!
         console.log "[p0ne avatars] using socket as ppCAS avatar server"
         reconnect = true
-        connected = false
+        connectAttemps = 1
 
         if reconnectWarning
-            setTimeout (-> if not connected then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
+            setTimeout (-> if connectAttemps==0 then API.chatLog "[p0ne avatars] lost connection to avatar server \xa0 =("), 10_000ms
 
         @socket = new SockJS(url)
         @socket.url = url
@@ -429,7 +432,7 @@ module \customAvatars, do
                         console.info "[ppCAS] blurb reset."
 
         @socket.on \authAccepted, ~>
-            connected := true
+            connectAttemps := 0
             reconnecting := false
             @changeBlurb @oldBlurb, do
                 success: ~>
@@ -472,6 +475,8 @@ module \customAvatars, do
             #API.chatLog "[p0ne avatars] connected to ppCAS"
             if reconnecting
                 API.chatLog "[p0ne avatars] reconnected"
+            _$context.trigger \ppCAS:connected
+            API.trigger \ppCAS:connected
             #else
             #    API.chatLog "[p0ne avatars] avatars loaded. Click on your name in the bottom right corner and then 'Avatars' to become a :horse: pony!"
         @socket.on \changeAvatarID, (userID, avatarID) ->
@@ -490,14 +495,22 @@ module \customAvatars, do
             reconnect := false
         @socket.onclose = (e) ~>
             console.warn "[ppCAS] DISCONNECTED", e
-            return if e.wasClean
-            if reconnect
-                if connected
+            _$context.trigger \ppCAS:disconnected
+            API.trigger \ppCAS:disconnected
+            if e.wasClean
+                reconnect := false
+            else if reconnect
+                if connectAttemps==0
                     console.log "[ppCAS] reconnecting…"; @connect(url, true, true)
                 else
-                    sleep 5_000ms + Math.random()*5_000ms, ~>
+                    sleep (5_000ms + Math.random!*5_000ms)*connectAttemps, ~>
                         console.log "[ppCAS] reconnecting…"
+                        connectAttemps++
                         @connect(url, true, false)
+                        _$context.trigger \ppCAS:connecting
+                        API.trigger \ppCAS:connecting
+        _$context.trigger \ppCAS:connecting
+        API.trigger \ppCAS:connecting
 
 
     changeBlurb: (newBlurb, options={}) ->
@@ -509,7 +522,7 @@ module \customAvatars, do
             success: options.success
             error: options.error
 
-        #setTimeout (-> @socket.emit \reqAuthToken if not connected), 5_000ms
+        #setTimeout (-> @socket.emit \reqAuthToken if connectAttemps), 5_000ms
 
     disable: ->
         @changeBlurb @oldBlurb if @blurbIsChanged

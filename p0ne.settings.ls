@@ -123,6 +123,10 @@ module \p0neSettings, do
         if _$context?
             addListener _$context, 'show:user show:history show:dashboard dashboard:disable', ~> @toggleMenu false
 
+        # plugCubed compatibility
+        addListener $body, \click, \#plugcubed, ~>
+            @toggleMenu false
+
     toggleMenu: (state) ->
         if state ?= not @groupToggles.p0neSettings
             @$ppS.slideDown!

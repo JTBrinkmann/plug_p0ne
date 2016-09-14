@@ -19,7 +19,7 @@ window.module = (name, data) ->
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.persistent ||= {}
-        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName, disabled, _settings} = data
+        {name, require, optional, callback,  setup, update, persistent, disable, module, settings, displayName, disabled, _settings, moderator} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -74,21 +74,32 @@ window.module = (name, data) ->
 
             replace: (target, attr, repl) ->
                 cbs.[]replacements[*] = [target, attr, repl]
-                target["#{attr}_"] ||= target[attr]
+                if attr of target
+                    target["#{attr}_"] ?= target[attr]
+                else
+                    target["#{attr}_"] = false
                 target[attr] = repl(target["#{attr}_"])
 
-            replace_$Listener: (type, callback) ->
-                if not window._$context
-                    console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no _$context)"
+            replaceListener: (emitter, event, ctx, callback) ->
+                if not evts = emitter?._events?[event]
+                    console.error "#{getTime!} [ERROR] unable to replace listener of type '#event' (no such event for event emitter specified)", emitter, ctx
                     return false
-                if not evts = _$context._events[type]
-                    console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no such event)"
-                    return false
-                for e in evts when e.context?.cid
-                    return @replace e, \callback, callback
+                if callback
+                    for e in evts when e.ctx@@ == ctx
+                        return @replace e, \callback, callback
+                else
+                    callback = ctx
+                    for e in evts when e.ctx.cid
+                        return @replace e, \callback, callback
 
-                console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#type'] (no vanilla callback found)"
+                console.error "#{getTime!} [ERROR] unable to replace listener of type '#event' (no appropriate callback found)", emitter, ctx
                 return false
+
+            replace_$Listener: (event, constructor, callback) ->
+                if not _$context?
+                    console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#event'] (no _$context)"
+                    return false
+                helperFNs.replaceListener _$context, event, constructor, callback
 
             add: (target, callback, options) ->
                 d = [target, callback, options]
@@ -118,7 +129,7 @@ window.module = (name, data) ->
             enable: ->
                 return if not @disabled
                 @disabled = false
-                moduleSettings.disabled = false
+                moduleSettings.disabled = false if not module.modDisabled
                 try
                     setup.call module, helperFNs, module, data, module
                     API.trigger \p0neModuleEnabled, module
@@ -147,7 +158,7 @@ window.module = (name, data) ->
                     for m in p0ne.dependencies[name] ||[]
                         m.disable!
                     if not newModule
-                        moduleSettings.disabled = true
+                        moduleSettings.disabled = true if not module.modDisabled
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         API.trigger \p0neModuleDisabled, module
@@ -169,6 +180,9 @@ window.module = (name, data) ->
             module._$settings = module_._$settings
             _settings_ = module_._settings
             module_.disable? module
+
+
+
         failedRequirements = []; l=0
         for r in require ||[]
             if !r
@@ -196,12 +210,14 @@ window.module = (name, data) ->
                 moduleSettings = p0ne.moduleSettings[name] = {disabled: !!disabled}
             @moduleSettings = moduleSettings
 
+            if moderator and API.getUser!.role < 2 and not module.disabled
+                module.modDisabled = true
+                module.disabled = true
+
             # initialize module
             if not module.disabled
                 module._settings = _settings_ || dataLoad "p0ne_#name", _settings if _settings
                 setup?.call module, helperFNs, module, data, module_
-            module.getSetup = ->
-                return setup
 
             p0ne.modules[name] = module
             if module_

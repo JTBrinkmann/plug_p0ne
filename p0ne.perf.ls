@@ -64,6 +64,7 @@ module \perfEmojify, do
             return e .replace /([\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:])/g, "\\$1"
 
         autoEmoteMap =
+            /*NOTE: the keys (emoticons) HAVE to be uppercase! */
             \>:( : \angry
             \>XD : \astonished
             \:DX : \bowtie

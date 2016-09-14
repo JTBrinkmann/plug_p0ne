@@ -135,7 +135,21 @@ type %file%             >> "%output%.ls"
 echo.>> "%output%.ls"
 echo.>> "%output%.ls"
 
+set file=p0ne.stream.ls
+echo - %file%
+echo /*@source %file% */>> "%output%.ls"
+type %file%             >> "%output%.ls"
+echo.>> "%output%.ls"
+echo.>> "%output%.ls"
+
 set file=p0ne.settings.ls
+echo - %file%
+echo /*@source %file% */>> "%output%.ls"
+type %file%             >> "%output%.ls"
+echo.>> "%output%.ls"
+echo.>> "%output%.ls"
+
+set file=p0ne.moderate.ls
 echo - %file%
 echo /*@source %file% */>> "%output%.ls"
 type %file%             >> "%output%.ls"

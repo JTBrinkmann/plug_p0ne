@@ -59,7 +59,7 @@ module \userHistory, do
                                     cid: cid
                                     author: author
                                     title: title
-                                    image: img
+                                    image: httpsify(img)
                     console.info "#{getTime!} [userHistory] loaded history for #{user.get \username}", songs
                     export songs, d
                     replace RoomHistory::, \collection, -> return songs

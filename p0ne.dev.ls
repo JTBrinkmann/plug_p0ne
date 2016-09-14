@@ -22,6 +22,7 @@ module \logEventsToConsole, do
         You can force-enable logging ALL events by running `logEventsToConsole.logAll = true`
     '''
     disabledByDefault: true
+    logAll: false
     setup: ({addListener, replace}) ->
         logEventsToConsole = this
         addListener API, \chat, (data) ->
@@ -79,36 +80,40 @@ module \logEventsToConsole, do
 ####################################*/
 module \downloadLink, do
     setup: ({css}) ->
-        css \downloadLink, '
+        icon = getIcon \icon-arrow-down
+        css \downloadLink, "
             .p0ne_downloadlink::before {
-                content: " ";
+                content: ' ';
                 position: absolute;
                 margin-top: -6px;
                 margin-left: -27px;
                 width: 30px;
                 height: 30px;
-                background-position: -140px -280px;
-                background-image: url(/_/static/images/icons.26d92b9.png);
+                background-position: #{icon.position};
+                background-image: #{icon.image};
             }
-        '
+        "
     module: (name, filename, dataOrURL) ->
         if not dataOrURL
             dataOrURL = filename; filename = name
         if dataOrURL and not isURL(dataOrURL)
             dataOrURL = JSON.stringify dataOrURL if typeof dataOrURL != \string
             dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
-        (window.$cm || $ \#chat-messages) .append "
-            <div class='message p0ne_downloadlink'>
-                <i class='icon'></i>
-                <span class='text'>
-                    <a href='#dataOrURL' download='#filename'>#name</a>
-                </span>
-            </div>
-        "
+        filename .= replace /[\/\\\?%\*\:\|\"\<\>\.]/g, '' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
+        return appendChat "
+                <div class='message p0ne_downloadlink'>
+                    <i class='icon'></i>
+                    <span class='text'>
+                        <a href='#{dataOrURL}' download='#{filename}'>#{name}</a>
+                    </span>
+                </div>
+            "
 
 
 # DEBUGGING
 window <<<<
+    roomState: !-> ajax \GET, \rooms/state
+    export_: (name) -> return (data) !-> console.log "[export] #name =",data; window[name] = data
     searchEvents: (regx) ->
         regx = new RegExp(regx, \i) if regx not instanceof RegExp
         return [k for k of _$context?._events when regx.test k]
@@ -141,6 +146,38 @@ window <<<<
                 console.log "[findModule]", id, module
                 res[*] = module
         return res
+
+    requireHelperHelper: (module) ->
+        if typeof module == \string
+            module = require(module)
+        return false if not module
+
+        for k,v of module
+            keys = 0
+            keysExact = 0
+            isNotObj = typeof v not in <[ object function ]>
+            for id, m2 of require.s.contexts._.defined when m2 and m2[k] and k not in <[ requireID cid id ]>
+                keys++
+                keysExact++ if isNotObj and m2[k] == v
+
+            if keys == 1
+                return "(.#k)"
+            else if keysExact == 1
+                return "(.#k == #{JSON.stringify v})"
+
+        for k,v of module::
+            keys = 0
+            keysExact = 0
+            isNotObj = typeof v != \object
+            for id, m2 of require.s.contexts._.defined when m2 and m2::?[k]
+                keys++
+                keysExact++ if isNotObj and m2[k] == v
+
+            if keys == 1
+                return "(.::?.#k)"
+            else if keysExact == 1
+                return "(.::?.#k == #{JSON.stringify v})"
+        return false
 
     validateUsername: (username, ignoreWarnings, cb) !->
         if typeof ignoreWarnings == \function
@@ -185,10 +222,10 @@ window <<<<
                 base = _$context
             else
                 base = API
-        base.once \event, (...args) ->
-            console.log "[#{event .toUpperCase!}]", args
+        base.once \event, logger(event)
 
     usernameToSlug: (un) ->
+        /* note: this is NOT really accurate! */
         lastCharWasLetter = false
         res = ""
         for char in htmlEscape(un)
@@ -213,6 +250,14 @@ window <<<<
     ghost: ->
         $.get '/'
 
+
+    getAvatars: ->
+        API.once \p0ne:avatarsloaded, logger \AVATARS
+        $.get $("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr(\src) .then (d) ->
+          if d.match /manifest.*/
+            API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
+
+
 module \renameUser, do
     require: <[ users ]>
     module: (idOrName, newName) ->
@@ -234,9 +279,11 @@ module \renameUser, do
 
 
 do ->
-    window._$events = {}
-    for k,v of _$context?._events
-        window._$events[k.replace(/:/g,'_')] = v
+    window._$events =
+        _update: ->
+            for k,v of _$context?._events
+                @[k.replace(/:/g,'_')] = v
+    _$events._update!
 
 
 module \export_, do
