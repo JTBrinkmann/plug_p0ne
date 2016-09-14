@@ -16,8 +16,8 @@
 var out$ = typeof exports != 'undefined' && exports || this, slice$ = [].slice;
 console.info("~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~");
 window.p0ne = {
-  version: '1.4.6',
-  lastCompatibleVersion: '1.3.9',
+  version: '1.5.2',
+  lastCompatibleVersion: '1.5.0',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
   YOUTUBE_KEY: 'AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw',
@@ -214,7 +214,7 @@ window.compareVersions = function(a, b){
       return lambda;
   });
   
-  window.l = function(expression) {
+  window.l = window.l_ = function(expression) {
       var vars = [], refs = 0
       var replacedNCO = true
       expression = expression
@@ -1016,6 +1016,7 @@ window.compareVersions = function(a, b){
         res[l++] = el;
       }
     }
+    return res;
   });
   String.prototype.define('reverse', function(){
     var res, i;
@@ -1194,19 +1195,20 @@ window.compareVersions = function(a, b){
       return (~~(Math.random() * 0xFFFFFF)).toString(16).toUpperCase();
     },
     getUser: function(user){
-      var userList, that, i$, len$, u;
+      var that, userList, i$, len$, u;
       if (!user) {
         return;
       }
       if (typeof user === 'object') {
+        if (that = user.id && getUser(user.id)) {
+          return that;
+        }
         if (user.username) {
           return user;
         } else if (user.attributes && user.toJSON) {
           return user.toJSON();
-        } else if (user.un) {
-          return getUser(user.id) || getUser(user.un);
-        } else if (user.id) {
-          return getUser(user.id);
+        } else if (that = user.username || user.dj || user.user) {
+          return getUser(that);
         }
         return null;
       }
@@ -1222,51 +1224,58 @@ window.compareVersions = function(a, b){
             }
           }
         }
-      }
-      for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
-        u = userList[i$];
-        if (u.username === user) {
-          return u;
-        }
-      }
-      user = user.toLowerCase();
-      for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
-        u = userList[i$];
-        if (u.username.toLowerCase() === user) {
-          return u;
-        }
-      }
-    },
-    getUserInternal: function(user){
-      var users, i$, len$, u;
-      if (!user || !users) {
-        return;
-      }
-      if (typeof user === 'object') {
-        if (user.attributes) {
-          return user;
-        } else if (user.username) {
-          return users.get(user.id);
-        }
-        return null;
-      }
-      if (+user) {
-        users.get(user);
-      } else {
-        users = users.models;
-        for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          u = users[i$];
+      } else if (typeof user === 'string') {
+        for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
+          u = userList[i$];
           if (u.username === user) {
             return u;
           }
         }
         user = user.toLowerCase();
-        for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          u = users[i$];
+        for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
+          u = userList[i$];
           if (u.username.toLowerCase() === user) {
             return u;
           }
         }
+      } else {
+        console.warn("unknown user format", user);
+      }
+    },
+    getUserInternal: function(user){
+      var that, i$, ref$, len$, u;
+      if (!user || !users) {
+        return;
+      }
+      if (typeof user === 'object') {
+        if (that = user.id && getUserInternal(user.id)) {
+          return that;
+        }
+        if (user.attributes) {
+          return user;
+        } else if (that = user.username || user.dj || user.user || user.id) {
+          return getUserInternal(that);
+        }
+        return null;
+      }
+      if (+user) {
+        users.get(user);
+      } else if (typeof user === 'string') {
+        for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          if (u.get('username') === user) {
+            return u;
+          }
+        }
+        user = user.toLowerCase();
+        for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          if (u.get('username').toLowerCase() === user) {
+            return u;
+          }
+        }
+      } else {
+        console.warn("unknown user format", user);
       }
     },
     logger: function(loggerName, fn){
@@ -1472,13 +1481,32 @@ window.compareVersions = function(a, b){
     },
     $djButton: $('#dj-button'),
     mute: function(){
-      return $('.icon-volume-half, .icon-volume-on').click().length;
+      return $('#volume .icon-volume-half, #volume .icon-volume-on').click().length;
     },
     muteonce: function(){
-      return $('.snooze').click().length;
+      mute();
+      muteonce.last = API.getMedia().id;
+      return API.once('advance', function(){
+        if (API.getMedia().id !== muteonce.last) {
+          return unmute();
+        }
+      });
     },
     unmute: function(){
-      return $('.playback-controls.snoozed .refresh, .icon-volume-off, .icon-volume-mute-once'.click()).length;
+      return $('#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click()).length;
+    },
+    snooze: function(){
+      return $('#playback .snooze').click().length;
+    },
+    refresh: function(){
+      return $('#playback .refresh').click().length;
+    },
+    stream: function(val){
+      if (!currentMedia) {
+        return console.error("[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'");
+      } else {
+        return typeof currentMedia != 'undefined' && currentMedia !== null ? currentMedia.set('streamDisabled', val !== true && (val === false || currentMedia.get('streamDisabled'))) : void 8;
+      }
     },
     join: function(){
       if ($djButton.hasClass('is-wait')) {
@@ -1489,12 +1517,60 @@ window.compareVersions = function(a, b){
       }
     },
     leave: function(){
-      if ($djButton.hasClass('is-leave')) {
-        $djButton.click();
-        return true;
-      } else {
-        return false;
+      return $('#dj-button.is-leave').click().length !== 0;
+    },
+    ytItags: function(){
+      var resolutions, list, res, i$, len$, format, j$, ref$, len1$, i, itags, startI, k$, ref1$, len2$, itag;
+      resolutions = [72, 144, 240, 360, 480, 720, 1080, 1440, 2160, 3072];
+      list = [
+        {
+          ext: 'flv',
+          minRes: 240,
+          itags: ['5']
+        }, {
+          ext: '3gp',
+          minRes: 144,
+          itags: ['17', '36']
+        }, {
+          ext: 'mp4',
+          minRes: 240,
+          itags: ['83', '18,82', '_', '22,84', '85']
+        }, {
+          ext: 'webm',
+          minRes: 360,
+          itags: ['43,100']
+        }, {
+          ext: 'ts',
+          minRes: 240,
+          itags: ['151', '132,92', '93', '94', '95', '96']
+        }
+      ];
+      res = {};
+      for (i$ = 0, len$ = list.length; i$ < len$; ++i$) {
+        format = list[i$];
+        for (j$ = 0, len1$ = (ref$ = format.itags).length; j$ < len1$; ++j$) {
+          i = j$;
+          itags = ref$[j$];
+          if (itag !== '_') {
+            startI = resolutions.indexOf(format.minRes);
+            for (k$ = 0, len2$ = (ref1$ = itags.split(",")).length; k$ < len2$; ++k$) {
+              itag = ref1$[k$];
+              res[itag] = {
+                ext: format.ext,
+                resolution: resolutions[startI + i]
+              };
+            }
+          }
+        }
       }
+      return res;
+    }(),
+    mediaSearch: function(query){
+      $('#playlist-button .icon-playlist').click();
+      return $('#search-input-field').val(query).trigger({
+        type: 'keyup',
+        which: 13
+      });
     },
     mediaLookup: function(url, cb){
       var format, id, cid, success, fail, ref$, ref1$, req;
@@ -1533,7 +1609,7 @@ window.compareVersions = function(a, b){
         return $.getJSON("https://gdata.youtube.com/feeds/api/videos/" + cid + "?v=2&alt=json").fail(fail).success(function(d){
           var cid;
           cid = d.entry.id.$t.substr(27);
-          window.mediaLookup.lastData = {
+          return success(window.mediaLookup.lastData = {
             format: 1,
             data: d,
             cid: cid,
@@ -1547,8 +1623,7 @@ window.compareVersions = function(a, b){
             url: "https://youtube.com/watch?v=" + cid,
             description: d.entry.media$group.media$description.$t,
             duration: d.entry.media$group.yt$duration.seconds
-          };
-          return success(window.mediaLookup.lastData);
+          });
         });
       } else if (format === 2) {
         if (cid) {
@@ -1562,7 +1637,7 @@ window.compareVersions = function(a, b){
           });
         }
         return req.fail(fail).success(function(d){
-          window.mediaLookup.lastData = {
+          return success(window.mediaLookup.lastData = {
             format: 2,
             data: d,
             cid: cid,
@@ -1580,74 +1655,235 @@ window.compareVersions = function(a, b){
             download: d.download_url + ("?client_id=" + p0ne.SOUNDCLOUD_KEY),
             downloadSize: d.original_content_size,
             downloadFormat: d.original_format
-          };
-          return success(window.mediaLookup.lastData);
+          });
         });
       } else {
-        return $.Deferred().fail(fail).rejectWith["unsupported format"];
+        return $.Deferred().fail(fail).reject("unsupported format");
       }
     },
-    mediaDownload: function(media, cb){
-      var format, cid, id, success, fail, error;
-      media || (media = API.getMedia());
-      format = media.format, cid = media.cid, id = media.id;
-      if (typeof media === 'function' || media.success || media.fail) {
-        cb = media;
-        media = false;
+    mediaDownload: function(media, audioOnly, cb){
+      var ref$, success, error, format, cid, id, res, url;
+      if (!media || typeof media === 'boolean' || typeof media === 'function' || media.success || media.error) {
+        ref$ = [false, media, cb], media = ref$[0], audioOnly = ref$[1], cb = ref$[2];
+      } else if (typeof audioOnly !== 'boolean') {
+        cb = audioOnly;
+        audioOnly = false;
       }
-      media || (media = API.getMedia());
       if (typeof cb === 'function') {
         success = cb;
       } else if (cb) {
-        success = cb.success, fail = cb.fail;
+        success = cb.success, error = cb.error;
       }
-      success || (success = logger('mediaDownload'));
-      error || (error = logger('mediaDownloadError'));
+      if (media != null && media.attributes) {
+        ref$ = media.attributes, format = ref$.format, cid = ref$.cid, id = ref$.id;
+      } else {
+        media || (media = API.getMedia());
+        format = media.format, cid = media.cid, id = media.id;
+      }
+      res = $.Deferred();
+      res.then(success || logger('mediaDownload')).fail(error || logger('mediaDownloadError')).fail(function(err){
+        if (audioOnly || format === 2) {
+          return media.downloadAudioError = err;
+        } else {
+          return media.downloadError = err;
+        }
+      });
+      if (audioOnly || format === 2) {
+        if (media.downloadAudio) {
+          return res.resolve(media.downloadAudio);
+        }
+        if (media.downloadAudioError) {
+          return res.reject(media.downloadAudioError);
+        }
+      } else {
+        if (media.download) {
+          return res.resolve(media.download);
+        }
+        if (media.downloadError) {
+          return res.reject(media.downloadError);
+        }
+      }
       cid || (cid = id);
       if (format === 1) {
-        return $.ajax({
-          url: p0ne.proxy("https://www.youtube.com/get_video_info?video_id=" + cid),
-          fail: fail,
+        url = p0ne.proxy("https://www.youtube.com/get_video_info?video_id=" + cid);
+        console.info("[mediaDownload] YT lookup", url);
+        $.ajax({
+          url: url,
+          error: res.reject,
           success: function(d){
-            var that;
-            if (that = d.match(/url_encoded_fmt_stream_map=.*url%3D(.*?)%26/)) {
-              return typeof success == 'function' ? success(unescape(unescape(that[1]))) : void 8;
+            /*== Parser ==
+            # useful for debugging
+            parse = (d) ->
+              if d.startsWith "http"
+                return d
+              else if d.has(",")
+                return d.split(",").map(parse)
+              else if d.has "&"
+                res = {}
+                for a in d.split "&"
+                  a .= split "="
+                  if res[a.0]
+                    res[a.0] = [res[a.0]] if not $.isArray res[a.0]
+                    res[a.0][*] = parse unescape(a.1)
+                  else
+                    res[a.0] = parse unescape(a.1)
+                return res
+              else if not isNaN(d)
+                return +d
+              else if d in <[ True False ]>
+                return d == \True
+              else
+                return d
+            parse(d)
+            */
+            var basename, ref$, files, bestVideo, bestVideoSize, that, i$, ref1$, len$, file, url, mimeType, filename, resolution, size, ref2$, video, ref3$, key$;
+            basename = ((ref$ = d.match(/title=(.*?)(?:&|$)/)) != null ? ref$[1] : void 8) || cid;
+            basename = unescape(basename).replace(/\++/g, ' ');
+            files = {};
+            bestVideo = null;
+            bestVideoSize = 0;
+            if (!audioOnly) {
+              if (that = d.match(/adaptive_fmts=(.*?)(?:&|$)/)) {
+                for (i$ = 0, len$ = (ref1$ = unescape(that[1]).split(",")).length; i$ < len$; ++i$) {
+                  file = ref1$[i$];
+                  if (that = file.match(/url=(.*?)(?:&|$)/)) {
+                    url = unescape(that[1]);
+                  }
+                  if (that = file.match(/type=(.*?)%3B/)) {
+                    mimeType = unescape(that[1]);
+                    filename = basename + "." + mimeType.substr(6);
+                    if (that = file.match(/size=(.*?)(?:&|$)/)) {
+                      resolution = unescape(that[1]);
+                      size = resolution.split('x');
+                      size = size[0] * size[1];
+                      (ref2$ = files[resolution] || (files[resolution] = []))[ref2$.length] = video = {
+                        url: url,
+                        size: size,
+                        mimeType: mimeType,
+                        filename: filename,
+                        resolution: resolution
+                      };
+                      if (size > bestVideoSize) {
+                        bestVideo = video;
+                        bestVideoSize = size;
+                      }
+                    }
+                  }
+                }
+              } else if (that = d.match(/url_encoded_fmt_stream_map=(.*?)(?:&|$)/)) {
+                console.warn("[mediaDownload] only a low quality stream could be found for", cid);
+                for (i$ = 0, len$ = (ref1$ = unescape(that[1]).split(",")).length; i$ < len$; ++i$) {
+                  file = ref1$[i$];
+                  if (that = d.match(/url=(.*?)(?:&|$)/)) {
+                    url = that[1];
+                  }
+                  if (that = ytItags[(ref2$ = d.match(/itag=(.*?);/)) != null ? ref2$[1] : void 8]) {
+                    (ref3$ = files[key$ = that.ext] || (files[key$] = []))[ref3$.length] = video = {
+                      file: basename + "." + that.ext,
+                      url: httpsify($baseurl.text()),
+                      mimeType: that.type + "/" + that.ext,
+                      resolution: that.resolution
+                    };
+                    if (that = that.resolution > bestVideoSize) {
+                      bestVideo = video;
+                      bestVideoSize = that.resolution;
+                    }
+                  }
+                }
+              }
+              files.preferredDownload = bestVideo;
+              console.log("[mediaDownload] resolving", files);
+              return res.resolve(media.download = files);
+            } else if (that = d.match(/dashmpd=(http.+?)(?:&|$)/)) {
+              url = p0ne.proxy(unescape(that[1]));
+              console.info("[mediaDownload] DASHMPD lookup", url);
+              return $.get(url).then(function(dashmpd){
+                var $dash, bestVideo;
+                $dash = $($.parseXML(dashmpd));
+                bestVideo = {
+                  size: 0
+                };
+                $dash.find('AdaptationSet').each(function(){
+                  var $set, mimeType, type, l;
+                  $set = $(this);
+                  mimeType = $set.attr('mimeType');
+                  type = mimeType.substr(0, 5);
+                  if (type !== 'audio') {
+                    return;
+                  }
+                  files[mimeType] = [];
+                  l = 0;
+                  return $set.find('BaseURL').each(function(){
+                    var $baseurl, $representation, m;
+                    $baseurl = $(this);
+                    $representation = $baseurl.parent();
+                    files[mimeType][l++] = m = {
+                      file: basename + "." + mimeType.substr(6),
+                      url: httpsify($baseurl.text()),
+                      mimeType: mimeType,
+                      size: $baseurl.attr('yt:contentLength') / 1000000,
+                      samplingRate: $representation.attr('audioSamplingRate') + "Hz"
+                    };
+                    if (audioOnly && ~~m.size > ~~bestVideo.size && (window.chrome || mimeType !== 'audio/webm')) {
+                      return bestVideo = m;
+                    }
+                  });
+                });
+                files.preferredDownload = bestVideo;
+                console.log("[mediaDownload] resolving", files);
+                return res.resolve(media.downloadAudio = files);
+              }).fail(res.reject);
             } else {
-              return typeof fail == 'function' ? fail("unkown error") : void 8;
+              console.error("[mediaDownload] no download found");
+              return res.reject("no download found");
             }
           }
         });
       } else if (format === 2) {
-        return mediaLookup(media).then(function(d){
+        audioOnly = true;
+        mediaLookup(media).then(function(d){
+          var ref$;
           if (d.download) {
-            return typeof success == 'function' ? success(d.download, d.downloadSize, downloadFormat) : void 8;
+            d = (ref$ = {}, ref$[d.downloadFormat + ""] = {
+              url: d.download,
+              size: d.downloadSize
+            }, ref$);
+            return res.resolve(media.downloadAudio = d);
           } else {
-            return typeof fail == 'function' ? fail("download disabled") : void 8;
+            return res.reject("download disabled");
           }
-        }).fail(function(){
-          return typeof fail == 'function' ? fail.apply(this, arguments) : void 8;
-        });
+        }).fail(res.reject);
+      } else {
+        console.error("[mediaDownload] unknown format", media);
+        res.reject("unknown format");
       }
+      return res.promise();
     },
-    mediaSearch: function(query){
-      $('#playlist-button .icon-playlist').click();
-      return $('#search-input-field').val(query).trigger({
-        type: 'keyup',
-        which: 13
-      });
-    },
-    httpsify: function(url){
+    proxify: function(url){
       if (url.startsWith("http:")) {
         return p0ne.proxy(url);
       } else {
         return url;
       }
     },
+    httpsify: function(url){
+      if (url.startsWith("http:")) {
+        return "https://" + url.substr(7);
+      } else {
+        return url;
+      }
+    },
     getChatText: function(cid){
+      var res;
       if (!cid) {
         return $();
+      } else {
+        res = $cm().find(".cid-" + cid).last();
+        if (!res.hasClass('.text')) {
+          res = res.find('.text').last();
+        }
+        return res;
       }
-      return $cm().find(".cid-" + cid).last();
     },
     getChat: function(cid){
       return getChatText(cid).parent().parent();
@@ -1703,7 +1939,7 @@ window.compareVersions = function(a, b){
         res$ = [];
         for (i$ = 0, len$ = this.length; i$ < len$; ++i$) {
           user = this[i$];
-          res$.push(user.username);
+          res$.push("@" + user.username);
         }
         res = res$;
         return humanList(res);
@@ -1955,7 +2191,7 @@ window.compareVersions = function(a, b){
       t == null && (t = new Date);
       return t.toISOString().replace(/T|\..+/g, " ");
     },
-    humanTime: function(diff){
+    humanTime: function(diff, short){
       var b, c;
       if (diff < 0) {
         return "-" + humanTime(-diff);
@@ -1966,7 +2202,11 @@ window.compareVersions = function(a, b){
       while (diff > 2 * b[c]) {
         diff /= b[c++];
       }
-      return plural(~~diff, ['second', 'minute', 'hour', 'day'][c]);
+      if (short) {
+        return ~~diff + "" + ['s', 'm', 'h', 'd'][c];
+      } else {
+        return plural(~~diff, ['second', 'minute', 'hour', 'day'][c]);
+      }
     },
     mediaTime: function(dur){
       var b, c, res;
@@ -2046,6 +2286,7 @@ window.compareVersions = function(a, b){
         var res;
         $icon.addClass(className);
         res = {
+          background: $icon.css('background'),
           image: $icon.css('background-image'),
           position: $icon.css('background-position')
         };
@@ -2155,8 +2396,24 @@ window.compareVersions = function(a, b){
   requireHelper('ActivateEvent', function(it){
     return it.ACTIVATE;
   });
+  requireHelper('votes', function(it){
+    var ref$;
+    return (ref$ = it.attributes) != null ? ref$.grabbers : void 8;
+  });
   requireHelper('tracker', function(it){
     return it.identify;
+  });
+  requireHelper('currentMedia', function(it){
+    return it.updateElapsedBind;
+  });
+  requireHelper('settings', function(it){
+    return it.settings;
+  });
+  requireHelper('soundcloud', function(it){
+    return it.sc;
+  });
+  requireHelper('userList', function(it){
+    return it.id === 'user-lists';
   });
   requireHelper('FriendsList', function(it){
     var ref$;
@@ -2168,7 +2425,7 @@ window.compareVersions = function(a, b){
   });
   requireHelper('WaitlistRow', function(it){
     var ref$;
-    return (ref$ = it.prototype) != null ? ref$.onDJClick : void 8;
+    return (ref$ = it.prototype) != null ? ref$.onAvatar : void 8;
   });
   requireHelper('PlaylistItemRow', function(it){
     var ref$;
@@ -2461,7 +2718,7 @@ window.compareVersions = function(a, b){
    */
   p0ne.moduleSettings = dataLoad('p0ne_moduleSettings', {});
   window.module = function(name, data){
-    var require, optional, callback, setup, update, persistent, enable, disable, module, settings, displayName, disabled, _settings, ref$, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, len$, k, _settings_, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, moduleSettings, e;
+    var require, optional, callback, setup, update, persistent, disable, module, settings, displayName, disabled, _settings, moderator, ref$, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, len$, k, _settings_, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, moduleSettings, e;
     try {
       if (typeof name !== 'string') {
         data = name;
@@ -2474,7 +2731,7 @@ window.compareVersions = function(a, b){
         };
       }
       data.persistent || (data.persistent = {});
-      name = data.name, require = data.require, optional = data.optional, callback = data.callback, setup = data.setup, update = data.update, persistent = data.persistent, enable = data.enable, disable = data.disable, module = data.module, settings = data.settings, displayName = data.displayName, disabled = data.disabled, _settings = data._settings;
+      name = data.name, require = data.require, optional = data.optional, callback = data.callback, setup = data.setup, update = data.update, persistent = data.persistent, disable = data.disable, module = data.module, settings = data.settings, displayName = data.displayName, disabled = data.disabled, _settings = data._settings, moderator = data.moderator;
       if (callback) {
         (ref$ = data.callbacks)[ref$.length] = callback;
       }
@@ -2548,27 +2805,44 @@ window.compareVersions = function(a, b){
         replace: function(target, attr, repl){
           var ref$, key$;
           (ref$ = cbs.replacements || (cbs.replacements = []))[ref$.length] = [target, attr, repl];
-          target[key$ = attr + "_"] || (target[key$] = target[attr]);
+          if (attr in target) {
+            target[key$ = attr + "_"] == null && (target[key$] = target[attr]);
+          } else {
+            target[attr + "_"] = false;
+          }
           return target[attr] = repl(target[attr + "_"]);
         },
-        replace_$Listener: function(type, callback){
-          var evts, i$, len$, e, ref$;
-          if (!window._$context) {
-            console.error(getTime() + " [ERROR] unable to replace listener in _$context._events['" + type + "'] (no _$context)");
+        replaceListener: function(emitter, event, ctx, callback){
+          var evts, ref$, i$, len$, e;
+          if (!(evts = emitter != null ? (ref$ = emitter._events) != null ? ref$[event] : void 8 : void 8)) {
+            console.error(getTime() + " [ERROR] unable to replace listener of type '" + event + "' (no such event for event emitter specified)", emitter, ctx);
             return false;
           }
-          if (!(evts = _$context._events[type])) {
-            console.error(getTime() + " [ERROR] unable to replace listener in _$context._events['" + type + "'] (no such event)");
-            return false;
-          }
-          for (i$ = 0, len$ = evts.length; i$ < len$; ++i$) {
-            e = evts[i$];
-            if ((ref$ = e.context) != null && ref$.cid) {
-              return this.replace(e, 'callback', callback);
+          if (callback) {
+            for (i$ = 0, len$ = evts.length; i$ < len$; ++i$) {
+              e = evts[i$];
+              if (e.ctx.constructor === ctx) {
+                return this.replace(e, 'callback', callback);
+              }
+            }
+          } else {
+            callback = ctx;
+            for (i$ = 0, len$ = evts.length; i$ < len$; ++i$) {
+              e = evts[i$];
+              if (e.ctx.cid) {
+                return this.replace(e, 'callback', callback);
+              }
             }
           }
-          console.error(getTime() + " [ERROR] unable to replace listener in _$context._events['" + type + "'] (no vanilla callback found)");
+          console.error(getTime() + " [ERROR] unable to replace listener of type '" + event + "' (no appropriate callback found)", emitter, ctx);
           return false;
+        },
+        replace_$Listener: function(event, constructor, callback){
+          if (typeof _$context == 'undefined' || _$context === null) {
+            console.error(getTime() + " [ERROR] unable to replace listener in _$context._events['" + event + "'] (no _$context)");
+            return false;
+          }
+          return helperFNs.replaceListener(_$context, event, constructor, callback);
         },
         add: function(target, callback, options){
           var d, ref$;
@@ -2611,7 +2885,9 @@ window.compareVersions = function(a, b){
             return;
           }
           this.disabled = false;
-          moduleSettings.disabled = false;
+          if (!module.modDisabled) {
+            moduleSettings.disabled = false;
+          }
           try {
             setup.call(module, helperFNs, module, data, module);
             API.trigger('p0neModuleEnabled', module);
@@ -2660,7 +2936,9 @@ window.compareVersions = function(a, b){
               m.disable();
             }
             if (!newModule) {
-              moduleSettings.disabled = true;
+              if (!module.modDisabled) {
+                moduleSettings.disabled = true;
+              }
               for (i$ = 0, len$ = (ref$ = cbs.$elementsPersistent || []).length; i$ < len$; ++i$) {
                 $el = ref$[i$];
                 $el.remove();
@@ -2734,6 +3012,10 @@ window.compareVersions = function(a, b){
           };
         }
         this.moduleSettings = moduleSettings;
+        if (moderator && API.getUser().role < 2 && !module.disabled) {
+          module.modDisabled = true;
+          module.disabled = true;
+        }
         if (!module.disabled) {
           if (_settings) {
             module._settings = _settings_ || dataLoad("p0ne_" + name, _settings);
@@ -2742,9 +3024,6 @@ window.compareVersions = function(a, b){
             setup.call(module, helperFNs, module, data, module_);
           }
         }
-        module.getSetup = function(){
-          return setup;
-        };
         p0ne.modules[name] = module;
         if (module_) {
           API.trigger('p0neModuleUpdated', module);
@@ -2882,13 +3161,22 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var replace;
       replace = arg$.replace;
-      return replace(PopoutView, 'render', function(r_){
+      replace(PopoutView, 'render', function(r_){
         return function(){
           r_.apply(this, arguments);
           if (typeof _$context != 'undefined' && _$context !== null) {
             _$context.trigger('popout:open', PopoutView._window, PopoutView);
           }
           return API.trigger('popout:open', PopoutView._window, PopoutView);
+        };
+      });
+      return replace(PopoutView, 'close', function(c_){
+        return function(){
+          c_.apply(this, arguments);
+          if (typeof _$context != 'undefined' && _$context !== null) {
+            _$context.trigger('popout:close', PopoutView._window, PopoutView);
+          }
+          return API.trigger('popout:close', PopoutView._window, PopoutView);
         };
       });
     }
@@ -2915,7 +3203,7 @@ window.compareVersions = function(a, b){
       };
       patchCM = function(){
         var cm, event, ref$, callbacks, lresult$, i$, len$, cb, results$ = [];
-        cm = PopoutListener.chat;
+        cm = PopoutView.chat;
         for (event in ref$ = this$._events) {
           callbacks = ref$[event];
           lresult$ = [];
@@ -3216,6 +3504,7 @@ window.compareVersions = function(a, b){
         return e.replace(/([\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:])/g, "\\$1");
       };
       autoEmoteMap = {
+        /*NOTE: the keys (emoticons) HAVE to be uppercase! */
         '>:(': 'angry',
         '>XD': 'astonished',
         ':DX': 'bowtie',
@@ -3593,7 +3882,7 @@ window.compareVersions = function(a, b){
       return this.scm.insertAfter('#playlist-panel');
     }
   });
-  module('soundCloudThumbnailFix', {
+  module('fixMediaThumbnails', {
     require: ['auxiliaries'],
     help: 'Plug.dj changed the Soundcloud thumbnail file location several times, but never updated the paths in their song database, so many songs have broken thumbnail images.\nThis module fixes this issue.',
     setup: function(arg$){
@@ -3609,8 +3898,10 @@ window.compareVersions = function(a, b){
               if ((ref$ = parseURL(e.image).host) === 'plug.dj' || ref$ === 'cdn.plug.dj') {
                 e.image = "https://i.imgur.com/41EAJBO.png";
               }
-            } else if (e.image.startsWith("http:") || e.image.startsWith("//")) {
-              e.image = "https:" + e.image.substr(e.image.indexOf('//'));
+            } else {
+              if (e.image.startsWith("http:") || e.image.startsWith("//")) {
+                e.image = "https:" + e.image.substr(e.image.indexOf('//'));
+              }
             }
           }
         };
@@ -3777,7 +4068,8 @@ window.compareVersions = function(a, b){
     }
   });
   module('fixStuckDJ', {
-    require: ['Playback', 'socketEvents'],
+    require: ['socketEvents'],
+    optional: ['votes'],
     displayName: "Fix Stuck Advance",
     settings: 'fixes',
     settingsMore: function(){
@@ -3793,38 +4085,29 @@ window.compareVersions = function(a, b){
       _settings = this._settings;
       fixStuckDJ = this;
       if (API.getTimeRemaining() === 0 && API.getMedia()) {
-        fixStuckDJ.timer = sleep(15000, fixStuckDJ);
+        this.timer = sleep(5000, fixStuckDJ);
       }
-      replace(Playback.prototype, 'playbackComplete', function(pC_){
-        return function(){
-          var args, this$ = this;
-          args = arguments;
-          return replace(Playback.prototype, 'playbackComplete', function(){
-            var fn;
-            fn = function(){
-              fixStuckDJ.timer = sleep(15000, fixStuckDJ);
-              clearTimeout(fixStuckDJ.timer);
-              return pC_.apply(this, arguments);
-            };
-            fn.apply(this$, args);
-            return fn;
-          });
-        };
-      });
-      return addListener(API, 'advance', function(){
-        return clearTimeout(this$.timer);
+      return addListener(API, 'advance', function(d){
+        console.log(getTime() + " [API.advance]");
+        clearTimeout(this$.timer);
+        if (d.media) {
+          return this$.timer = sleep(d.media.duration * 1000 + 2000, fixStuckDJ);
+        }
       });
     },
     module: function(){
-      var fixStuckDJ, this$ = this;
+      var fixStuckDJ, showWarning, this$ = this;
       fixStuckDJ = this;
-      console.warn("[fixNoAdvance] song seems to be stuck, trying to fix…");
-      return ajax('GET', 'rooms/state', function(data){
-        var ref$;
-        if (!status === 200) {
+      if (showWarning = API.getTimeRemaining() === 0) {
+        console.warn("[fixNoAdvance] song seems to be stuck, trying to fix…");
+      }
+      return ajax('GET', 'rooms/state', {
+        error: function(data){
           console.error("[fixNoAdvance] cannot load room data:", status, data);
           return this$.timer = sleep(5000, fixStuckDJ);
-        } else {
+        },
+        success: function(data){
+          var ref$, uid, i, v;
           (ref$ = data[0]).playback || (ref$.playback = {});
           socketEvents.advance({
             c: data[0].booth.currentDJ,
@@ -3834,33 +4117,55 @@ window.compareVersions = function(a, b){
             t: data[0].playback.startTime,
             p: data[0].playback.playlistID
           });
-          if (this$._settings.warnings) {
+          if (typeof votes != 'undefined' && votes !== null) {
+            for (uid in data[0].grabs) {
+              votes.grab(uid);
+            }
+            for (i in ref$ = data[0].votes) {
+              v = ref$[i];
+              votes.vote({
+                i: i,
+                v: v
+              });
+            }
+          } else {
+            console.warn("[fixNoAdvance] cannot properly set votes, because optional requirement `votes` is missing");
+          }
+          if (this$._settings.warnings && showWarning) {
             return API.chatLog("[p0ne] fixed DJ not advancing", true);
           }
         }
       });
     }
   });
-  module('fixNoPlaylistCycle', {
-    require: ['_$context', 'ActivateEvent'],
-    displayName: "Fix No Playlist Cycle",
-    settings: 'fixes',
-    settingsMore: function(){
-      return $('<toggle val=warnings>Show Warnings</toggle>');
-    },
-    help: 'Sometimes after DJing, plug.dj does not move the played song to the bottom of the playlist.\n\nThis module automatically detects this bug and moves the song to the bottom.',
-    _settings: {
-      warnings: true
-    },
-    setup: function(arg$){
-      var addListener;
-      addListener = arg$.addListener;
-      return addListener(API, 'socket:reconnected', function(){
-        _$context.dispatch(new LoadEvent(LoadEvent.LOAD));
-        return _$context.dispatch(new ActivateEvent(ActivateEvent.ACTIVATE));
-      });
-    }
-  });
+  /*
+  module \fixNoPlaylistCycle, do
+      require: <[ _$context ActivateEvent ]>
+      displayName: "Fix No Playlist Cycle"
+      settings: \fixes
+      settingsMore: -> return $ '<toggle val=warnings>Show Warnings</toggle>'
+      help: '''
+          Sometimes after DJing, plug.dj does not move the played song to the bottom of the playlist.
+  
+          This module automatically detects this bug and moves the song to the bottom.
+      '''
+      _settings:
+          warnings: true
+      setup: ({addListener}) ->
+          addListener API, \socket:reconnected, ->
+              _$context.dispatch new LoadEvent(LoadEvent.LOAD)
+              _$context.dispatch new ActivateEvent(ActivateEvent.ACTIVATE)
+          / *
+          # manual check
+          addListener API, \advance, ({dj, lastPlay}) ~>
+              #ToDo check if spelling is correctly
+              #ToDo get currentPlaylist
+              if dj?.id == userID and lastPlay.media.id == currentPlaylist.song.id
+                  #_$context .trigger \MediaMoveEvent:move
+                  ajax \PUT, "playlists/#{currentPlaylist.id}/media/move", ids: [lastPlay.media.id], beforeID: 0
+                  API.chatLog "[p0ne] fixed playlist not cycling", true if @_settings.warnings
+          * /
+  */
   module('zalgoFix', {
     settings: 'fixes',
     displayName: 'Fix Zalgo Messages',
@@ -3915,9 +4220,10 @@ window.compareVersions = function(a, b){
     }
   });
   module('disableIntercomTracking', {
+    require: ['tracker'],
     disabled: true,
     settings: 'dev',
-    require: ['tracker'],
+    displayName: 'Disable Tracking',
     setup: function(arg$){
       var replace, k, ref$, v;
       replace = arg$.replace;
@@ -4114,13 +4420,17 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
-  #       MEH-ICON IN USERLIST         #
+  #       MORE ICON IN USERLIST        #
   ####################################*/
   module('userlistIcons', {
     require: ['RoomUserRow'],
+    _settings: {
+      forceMehIcon: false
+    },
     setup: function(arg$){
-      var replace;
+      var replace, settings;
       replace = arg$.replace;
+      settings = this._settings;
       return replace(RoomUserRow.prototype, 'vote', function(){
         return function(){
           var vote, user, ref$, this$ = this;
@@ -4152,7 +4462,7 @@ window.compareVersions = function(a, b){
           if (vote !== 0) {
             this.$icon || (this.$icon = $('<i>'));
             this.$icon.removeClass().addClass('icon').appendTo(this.$el);
-            if (vote === -1) {
+            if (vote === -1 && API.getUser().role > 0 || settings.forceMehIcon) {
               return this.$icon.addClass('icon-meh');
             } else if (vote === 'grab') {
               return this.$icon.addClass('icon-grab');
@@ -4170,54 +4480,6 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
-  #      DISABLE MESSAGE DELETE        #
-  ####################################*/
-  module('disableChatDelete', {
-    require: ['_$context'],
-    optional: ['socketListeners'],
-    settings: 'chat',
-    displayName: 'Show deleted messages',
-    setup: function(arg$){
-      var replace_$Listener, addListener, $create, css;
-      replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $create = arg$.$create, css = arg$.css;
-      $body.addClass('p0ne_showDeletedMessages');
-      css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne_showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
-      addListener(_$context, 'socket:chatDelete', function(arg$){
-        var p, c, mi, ref$;
-        p = arg$.p, c = p.c, mi = p.mi;
-        return markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
-      });
-      addListener('early', _$context, 'chat:delete', function(){
-        return function(cid){
-          if (!socketListeners) {
-            return markAsDeleted(cid);
-          }
-        };
-      });
-      function markAsDeleted(cid, moderator){
-        var $msg, t, wasAtBottom, d;
-        $msg = getChat(cid);
-        console.log("[Chat Delete]", cid, $msg.text());
-        t = getISOTime();
-        if (moderator) {
-          t += " by " + moderator;
-        }
-        try {
-          wasAtBottom = typeof isChatAtBottom == 'function' ? isChatAtBottom() : void 8;
-          $msg.removeClass('deletable').addClass('deleted');
-          d = $create('<time>').addClass('deleted-message').attr('datetime', t).text(t).appendTo($msg);
-          if (wasAtBottom) {
-            return typeof scrollChatDown == 'function' ? scrollChatDown() : void 8;
-          }
-        } catch (e$) {}
-      }
-      return markAsDeleted;
-    },
-    disable: function(){
-      return $body.removeClass('p0ne_showDeletedMessages');
-    }
-  });
-  /*####################################
   #        DBLCLICK to @MENTION        #
   ####################################*/
   module('chatDblclick2Mention', {
@@ -4225,19 +4487,40 @@ window.compareVersions = function(a, b){
     settings: 'chat',
     displayName: 'DblClick username to Mention',
     setup: function(arg$){
-      var replace, addListener, newFromClick, this$ = this;
+      var replace, addListener, module, newFromClick, this$ = this;
       replace = arg$.replace, addListener = arg$.addListener;
+      module = this;
       newFromClick = function(e){
-        if (!this$.timer) {
-          this$.timer = sleep(200, function(){
-            if (this$.timer) {
-              this$.timer = 0;
-              return chat.onFromClick(e);
+        var this$ = this;
+        if (!module.timer) {
+          module.timer = sleep(200, function(){
+            var $this, r, i, pos, err;
+            if (module.timer) {
+              try {
+                module.timer = 0;
+                $this = $(this$);
+                if (r = $this.closest('.cm').children('.badge-box').data('uid') || (i = getUserInternal($this.text())).id) {
+                  pos = {
+                    x: chat.getPosX(),
+                    y: $this.offset().top
+                  };
+                  if (i = getUserInternal(r)) {
+                    return chat.onShowChatUser(i, pos);
+                  } else {
+                    return chat.getExternalUser(r, pos, chat.showChatUserBind);
+                  }
+                } else {
+                  return console.warn("[DblCLick username to Mention] couldn't get userID", this$);
+                }
+              } catch (e$) {
+                err = e$;
+                return console.error(err.stack);
+              }
             }
           });
         } else {
-          clearTimeout(this$.timer);
-          this$.timer = 0;
+          clearTimeout(module.timer);
+          module.timer = 0;
           chat.onInputMention(e.target.textContent);
         }
         e.stopPropagation();
@@ -4266,45 +4549,125 @@ window.compareVersions = function(a, b){
   #           CHAT COMMANDS            #
   ####################################*/
   module('chatCommands', {
+    optional: ['currentMedia'],
     setup: function(arg$){
-      var addListener;
+      var addListener, this$ = this;
       addListener = arg$.addListener;
-      return addListener(API, 'chatCommand', function(c){
-        var ref$;
-        switch ((ref$ = /\/\w+/.exec(c)) != null && ref$[0]) {
-        case '/avail':
-        case '/available':
+      addListener(API, 'chatCommand', function(c){
+        var ref$, key$, ref1$;
+        return typeof (ref$ = this$._commands)[key$ = (ref1$ = /^\/(\w+)/.exec(c)) != null ? ref1$[1] : void 8] == 'function' ? ref$[key$](c) : void 8;
+      });
+      return this.updateCommands();
+    },
+    updateCommands: function(){
+      var k, ref$, v, lresult$, i$, ref1$, len$, results$ = [];
+      this._commands = {};
+      for (k in ref$ = this.commands) {
+        v = ref$[k];
+        lresult$ = [];
+        this._commands[k] = v.callback;
+        for (i$ = 0, len$ = (ref1$ = v.aliases || []).length; i$ < len$; ++i$) {
+          k = ref1$[i$];
+          lresult$.push(this._commands[k] = v.callback);
+        }
+        results$.push(lresult$);
+      }
+      return results$;
+    },
+    commands: {
+      help: {
+        aliases: ['commands'],
+        description: "show this list of commands",
+        callback: function(){
+          var res, k, ref$, command, ref1$, aliases;
+          res = "";
+          for (k in ref$ = chatCommands.commands) {
+            command = ref$[k];
+            if ((ref1$ = command.aliases) != null && ref1$.length) {
+              aliases = "aliases: " + humanList(command.aliases);
+            } else {
+              aliases = '';
+            }
+            res += "<div class='p0ne-help-command' alt='" + aliases + "'><b>/" + k + "</b> " + (command.params || '') + " - " + command.description + "</div>";
+          }
+          return appendChat($("<div class=p0ne-help>").html(res));
+        }
+      },
+      available: {
+        aliases: ['avail'],
+        description: "change your status to <b>available</b>",
+        callback: function(){
           return API.setStatus(0);
-        case '/afk':
-        case '/away':
+        }
+      },
+      away: {
+        aliases: ['afk'],
+        description: "change your status to <b>away</b>",
+        callback: function(){
           return API.setStatus(1);
-        case '/work':
-        case '/busy':
+        }
+      },
+      busy: {
+        aliases: ['work', 'working'],
+        description: "change your status to <b>busy</b>",
+        callback: function(){
           return API.setStatus(2);
-        case '/gaming':
-        case '/ingame':
-        case '/game':
+        }
+      },
+      gaming: {
+        aliases: ['game', 'ingame'],
+        description: "change your status to <b>gaming</b>",
+        callback: function(){
           return API.setStatus(3);
-        case '/join':
-          return join();
-        case '/leave':
-          return leave();
-        case '/mute':
-          return mute();
-        case '/muteonce':
-        case '/onemute':
-          return muteonce();
-        case '/unmute':
-          return unmute();
-        case '/automute':
-          muteonce();
-          if (typeof automute == 'undefined' || automute === null) {
-            return API.chatLog("automute is not yet implemented", true);
+        }
+      },
+      join: {
+        description: "join the waitlist",
+        callback: join
+      },
+      leave: {
+        description: "leave the waitlist",
+        callback: leave
+      },
+      stream: {
+        parameters: " [on|off]",
+        description: "enable/disable the stream (just '/stream' toggles it)",
+        callback: function(){
+          if (typeof currentMedia != 'undefined' && currentMedia !== null) {
+            return stream(c.has('on' || !c.has('off' || 'toggle')));
           } else {
-            return automute();
+            return API.chatLog("couldn't load required module for enabling/disabling the stream.", true);
           }
         }
-      });
+      },
+      snooze: {
+        description: "snoozes the current song",
+        callback: snooze
+      },
+      mute: {
+        description: "mutes the audio",
+        callback: mute
+      },
+      unmute: {
+        description: "unmutes the audio",
+        callback: unmute
+      },
+      muteonce: {
+        aliases: ['muteonce'],
+        description: "mutes the current song",
+        callback: muteonce
+      },
+      automute: {
+        description: "adds/removes this song from the automute list",
+        callback: function(){
+          muteonce();
+          if (typeof automute != 'undefined' && automute !== null) {
+            return automute();
+          } else {
+            return API.chatLog("automute is not yet implemented", true);
+          }
+        }
+      }
     }
   });
   /*####################################
@@ -4323,21 +4686,13 @@ window.compareVersions = function(a, b){
       }
     },
     setup: function(arg$){
-      var addListener, isAutomuted, this$ = this;
+      var addListener, this$ = this;
       addListener = arg$.addListener;
-      isAutomuted = false;
       return addListener(API, 'advance', function(arg$){
-        var media, wasAutomuted;
+        var media;
         media = arg$.media;
-        wasAutomuted = isAutomuted;
-        isAutomuted = false;
-        if (media && in$(media.id, this$.songlist)) {
-          isAutomuted = true;
-        }
-        if (isAutomuted) {
-          return mute();
-        } else if (wasAutomuted) {
-          return unmute();
+        if (media && this$.songlist[media.id]) {
+          return muteonce();
         }
       });
     }
@@ -4427,20 +4782,14 @@ window.compareVersions = function(a, b){
   CHAT_WIDTH = 328;
   MAX_IMAGE_HEIGHT = 300;
   roles = ['none', 'dj', 'bouncer', 'manager', 'cohost', 'host', 'ambassador', 'ambassador', 'ambassador', 'admin'];
-  window.imgError = function(elem){
-    var x$;
-    console.warn("[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML);
-    x$ = $(elem).parent();
-    x$.text(x$.attr('href'));
-    x$.addClass('p0ne_img_failed');
-    return x$;
-  };
   /*####################################
   #      UNREAD CHAT NOTIFICAITON      #
   ####################################*/
   module('unreadChatNotif', {
     require: ['_$context', 'chatDomEvents'],
     bottomMsg: $(),
+    settings: 'chat',
+    displayName: 'Mark Unread Chat',
     setup: function(arg$){
       var addListener, $chatButton, this$ = this;
       addListener = arg$.addListener;
@@ -4461,9 +4810,7 @@ window.compareVersions = function(a, b){
       });
       this.throttled = false;
       addListener(chatDomEvents, 'scroll', updateUnread);
-      addListener($chatButton, 'click', function(){
-        return updateUnread;
-      });
+      addListener($chatButton, 'click', updateUnread);
       function updateUnread(){
         if (this$.throttled) {
           return;
@@ -4526,7 +4873,7 @@ window.compareVersions = function(a, b){
     settings: 'chat',
     help: 'Replaces the default chat input field with a multiline textfield.\nThis allows you to more accurately see how your message will actually look when send',
     setup: function(arg$){
-      var addListener, css, $create, $name, $autoresize_helper, chat, val, oldHeight, this$ = this;
+      var addListener, css, $create, $name, $autoresize_helper, chat, val, oldHeight, chatHidden, this$ = this;
       addListener = arg$.addListener, css = arg$.css, $create = arg$.$create;
       css('p0ne_chat_input', '#chat-input {bottom: 7px;height: auto;background: transparent !important;min-height: 30px;}#chat-input-field {position: static;resize: none;height: 16px;overflow: hidden;margin-left: 8px;color: #eee;background: rgba(0, 24, 33, .7);box-shadow: inset 0 0 0 1px transparent;transition: box-shadow .2s ease-out;}#chat-input-field:focus {box-shadow: inset 0 0 0 1px #009cdd !important;}.muted .chat-input-name {display: none;}.autoresize_helper {display: none;white-space: pre-wrap;word-wrap: break-word;}#chat-input-field, .autoresize_helper {width: 295px;padding: 8px 10px 5px 10px;min-height: 16px;font-weight: 400;font-size: 12px;font-family: Roboto,sans-serif;}.chat-input-name {position: absolute;top: 8px;left: 18px;font-weight: 700;font-size: 12px;font-family: Roboto,sans-serif;color: #666;transition: color .2s ease-out;pointer-events:none;}#chat-input-field:focus + .chat-input-name {color: #ffdd6f !important;}/*fix chat-messages size*/#chat-messages {height: auto !important;bottom: 45px;}');
       chat = PopoutView.chat || window.chat;
@@ -4560,12 +4907,18 @@ window.compareVersions = function(a, b){
         return this$.fixIndent();
       })();
       sleep(2000, this.fixIndent);
+      chatHidden = $cm().parent().css('display') === 'none';
       if (_$context) {
         addListener(_$context, 'chat:send', function(){
           return requestAnimationFrame(function(){
             return chat.$chatInputField.trigger('input');
           });
         });
+        if (chatHidden) {
+          _$context.once('show:chat', this.fixIndent);
+        }
+      } else if (chatHidden) {
+        $('#chat-button').one('click', this.fixIndent);
       }
       if (typeof user_ != 'undefined' && user_ !== null) {
         addListener(user_, 'change:username', this.fixIndent);
@@ -4618,21 +4971,33 @@ window.compareVersions = function(a, b){
         } else {
           onload = '';
         }
-        return msg.message = msg.message.replace(/<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, function(all, pre, completeURL, protocol, domain, url){
-          var ref$, i$, len$, plugin, that, err;
-          ref$ = [url, domain], domain = ref$[0], url = ref$[1];
+        return msg.message = msg.message.replace(/<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, function(all, pre, completeURL, protocol, url, domain, offset){
+          var i$, ref$, len$, ctx, j$, ref1$, len1$, plugin, that, err;
           domain = domain.toLowerCase();
-          arguments[6] = onload;
-          arguments[7] = msg;
-          for (i$ = 0, len$ = (ref$ = p0ne.chatLinkPlugins).length; i$ < len$; ++i$) {
-            plugin = ref$[i$];
-            try {
-              if (that = plugin.apply(this, arguments)) {
-                return that;
+          for (i$ = 0, len$ = (ref$ = [_$context, API]).length; i$ < len$; ++i$) {
+            ctx = ref$[i$];
+            if (ctx._events['chat:image']) {
+              for (j$ = 0, len1$ = (ref1$ = ctx._events['chat:image']).length; j$ < len1$; ++j$) {
+                plugin = ref1$[j$];
+                try {
+                  if (that = plugin.callback.call(plugin.ctx, {
+                    all: all,
+                    pre: pre,
+                    completeURL: completeURL,
+                    protocol: protocol,
+                    domain: domain,
+                    url: url,
+                    offset: offset,
+                    onload: onload,
+                    msg: msg
+                  })) {
+                    return that;
+                  }
+                } catch (e$) {
+                  err = e$;
+                  console.error("[p0ne] error while processing chat link plugin", plugin, err.stack);
+                }
               }
-            } catch (e$) {
-              err = e$;
-              console.error("[p0ne] error while processing chat link plugin", plugin, err);
             }
           }
           return all;
@@ -4643,12 +5008,10 @@ window.compareVersions = function(a, b){
       });
       function addClass(classes){
         var i$, ref$, len$, className, results$ = [];
-        console.log(this.cid + " add class '" + classes + "'");
         if (typeof classes === 'string') {
           for (i$ = 0, len$ = (ref$ = classes.split(/\s+/g)).length; i$ < len$; ++i$) {
             className = ref$[i$];
             if (className) {
-              console.log("\t- added class " + className);
               results$.push(this.classes[className] = true);
             }
           }
@@ -4666,6 +5029,14 @@ window.compareVersions = function(a, b){
         }
       }
       return removeClass;
+    },
+    imgError: function(elem){
+      var x$;
+      console.warn("[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML);
+      x$ = $(elem).parent();
+      x$.text(x$.attr('href'));
+      x$.addClass('p0ne_img_failed');
+      return x$;
     }
   });
   /*####################################
@@ -4690,7 +5061,9 @@ window.compareVersions = function(a, b){
               role = getRank(fromUser);
               if (role !== -1) {
                 fromRole = "from-" + roles[role];
-                if (role > 1) {
+                if (role === 0) {
+                  fromRole += " from";
+                } else {
                   fromRole += " from-staff";
                 }
               }
@@ -4773,26 +5146,34 @@ window.compareVersions = function(a, b){
     displayName: 'Inline Images',
     help: 'Converts image links to images in the chat, so you can see a preview',
     setup: function(arg$){
-      var add, this$ = this;
-      add = arg$.add;
-      return add(p0ne.chatLinkPlugins, function(all, pre, completeURL, protocol, domain, url, onload){
-        var that, rgx, repl, img;
+      var addListener, this$ = this;
+      addListener = arg$.addListener;
+      return addListener(API, 'chat:image', function(arg$){
+        var all, pre, completeURL, protocol, domain, url, onload, msg, offset, that, rgx, repl, forceProtocol, img;
+        all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, msg = arg$.msg, offset = arg$.offset;
+        if (msg.message.hasAny(['nsfw', 'no-inline', 'noinline']) || msg.message[offset + all.length] === ";") {
+          return;
+        }
         if (that = this$.plugins[domain] || this$.plugins[domain = domain.substr(1 + domain.indexOf('.'))]) {
-          rgx = that[0], repl = that[1];
+          rgx = that[0], repl = that[1], forceProtocol = that[2];
           img = url.replace(rgx, repl);
           if (img !== url) {
             console.log("[inline-img]", completeURL + " ==> " + protocol + img);
-            return "<a " + pre + "><img src='" + protocol + img + "' class=p0ne_img " + onload + " onerror='imgError(this)'></a>";
+            return "<a " + pre + "><img src='" + (forceProtocol || protocol) + img + "' class=p0ne_img " + onload + " onerror='chatInlineImages.imgError(this)'></a>";
           }
         }
-        if (/^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)(?:@\dx)?|image\.php)(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i.test(url)) {
+        if (/^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i.test(url)) {
+          if (in$(domain, this$.forceHTTPSDomains)) {
+            completeURL = completeURL.replace(/^.+\/\//, 'https://');
+          }
           console.log("[inline-img]", "[direct] " + completeURL);
-          return "<a " + pre + "><img src='" + completeURL + "' class=p0ne_img " + onload + " onerror='imgError(this)'></a>";
+          return "<a " + pre + "><img src='" + completeURL + "' class=p0ne_img " + onload + " onerror='chatInlineImages.imgError(this)'></a>";
         }
         console.log("[inline-img]", "NO MATCH FOR " + completeURL + " (probably isn't an image)");
         return false;
       });
     },
+    forceHTTPSDomains: ['i.imgur.com'],
     plugins: {
       'imgur.com': [/^imgur.com\/(?:r\/\w+\/)?(\w\w\w+)/g, "i.imgur.com/$1.gif"],
       'prntscrn.com': [/^(prntscr.com\/\w+)(?:\/direct\/)?/g, "$1/direct"],
@@ -4976,49 +5357,55 @@ window.compareVersions = function(a, b){
       }
     }
   });
-  module('chatYoutubeThumbnails', {
-    settings: 'chat',
-    help: 'Convert show thumbnails of linked Youtube videos in the chat.\nWhen hovering the thumbnail, it will animate, alternating between three frames of the video.',
-    setup: function(arg$){
-      var add, addListener, this$ = this;
-      add = arg$.add, addListener = arg$.addListener;
-      add(p0ne.chatLinkPlugins, this.plugin);
-      return addListener($('#chat'), 'mouseenter mouseleave', '.p0ne_yt_img', function(e){
-        var id, img;
-        clearInterval(this$.interval);
-        id = e.parentElement.dataset.ytCid;
-        img = e.target;
-        if (e.type === 'mouseenter') {
-          if (id !== this$.lastID) {
-            this$.frame = 1;
-            this$.lastID = id;
-          }
-          img.style.backgroundImage = "url(http://i.ytimg.com/vi/" + id + "/" + this$.frame + ".jpg)";
-          this$.interval = repeat(1000, function(){
-            console.log("[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/" + id + "/" + this$.frame + ".jpg'");
-            this$.frame = this$.frame % 3 + 1;
-            return img.style.backgroundImage = "url(http://i.ytimg.com/vi/" + id + "/" + this$.frame + ".jpg)";
-          });
-          return console.log("[p0ne_yt_preview]", "started", e, id, this$.interval);
-        } else {
-          img.style.backgroundImage = "url(http://i.ytimg.com/vi/" + id + "/0.jpg)";
-          return console.log("[p0ne_yt_preview]", "stopped");
-        }
-      });
-    },
-    plugin: function(all, pre, completeURL, protocol, domain, url, onload){
-      var yt;
-      yt = YT_REGEX.exec(url);
-      if (yt && (yt = yt[1])) {
-        console.log("[inline-img]", "[YouTube " + yt + "] " + url + " ==> http://i.ytimg.com/vi/" + yt + "/0.jpg");
-        return "<a class=p0ne_yt data-yt-cid='" + yt + "' " + pre + "><div class=p0ne_yt_icon></div><div class=p0ne_yt_img " + onload + " style='background-image:url(http://i.ytimg.com/vi/" + yt + "/0.jpg)'></div>" + url + "</a>";
-      }
-      return false;
-    },
-    interval: -1,
-    frame: 1,
-    lastID: ''
-  });
+  /*
+  module \chatYoutubeThumbnails, do
+      settings: \chat
+      help: '''
+          Convert show thumbnails of linked Youtube videos in the chat.
+          When hovering the thumbnail, it will animate, alternating between three frames of the video.
+      '''
+      setup: ({add, addListener}) ->
+          addListener chatDomEvents, \mouseenter, \.p0ne_yt_img, (e) ~>
+              clearInterval @interval
+              img = this
+              id = this.parentElement
+  
+              if id != @lastID
+                  @frame = 1
+                  @lastID = id
+              img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
+              @interval = repeat 1_000ms, ~>
+                  console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
+                  @frame = (@frame % 3) + 1
+                  img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
+              console.log "[p0ne_yt_preview]", "started", e, id, @interval
+              #ToDo show YT-options (grab, open, preview, [automute])
+  
+          addListener chatDomEvents, \mouseleave, \.p0ne_yt_img, (e) ~>
+              clearInterval @interval
+              img = this
+              id = this.parentElement.dataset.ytCid
+              img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
+              console.log "[p0ne_yt_preview]", "stopped"
+              #ToDo hide YT-options
+  
+          addListener API, \chat:image, ({pre, url, onload}) ->
+          yt = YT_REGEX .exec(url)
+          if yt and (yt = yt.1)
+              console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
+              return "
+                  <a class=p0ne_yt data-yt-cid='#yt' #pre>
+                      <div class=p0ne_yt_icon></div>
+                      <div class=p0ne_yt_img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
+                      #url
+                  </a>
+              " # no `onerror` on purpose # when updating the HTML, check if it breaks the animation callback
+              # default.jpg for smaller thumbnail; 0.jpg for big thumbnail; 1.jpg, 2.jpg, 3.jpg for previews
+          return false
+      interval: -1
+      frame: 1
+      lastID: ''
+  */
   /*@source p0ne.look-and-feel.ls */
   /**
    * plug_p0ne modules to add styles.
@@ -5032,7 +5419,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var loadStyle;
       loadStyle = arg$.loadStyle;
-      return loadStyle(p0ne.host + "/css/plug_p0ne.css?r=32");
+      return loadStyle(p0ne.host + "/css/plug_p0ne.css?r=35");
     }
   });
   /*
@@ -5062,7 +5449,7 @@ window.compareVersions = function(a, b){
     setup: function(arg$){
       var loadStyle;
       loadStyle = arg$.loadStyle;
-      return loadStyle(p0ne.host + "/css/fimplug.css?r=16");
+      return loadStyle(p0ne.host + "/css/fimplug.css?r=19");
     }
   });
   /*####################################
@@ -5111,8 +5498,8 @@ window.compareVersions = function(a, b){
       $hovered = $();
       $mediaPanel = $('#media-panel');
       addListener($mediaPanel, 'mouseover', '.row', function(){
-        $hovered.removeClass('hover');
         $hovered = $(this);
+        $hovered.removeClass('hover');
         if (!$hovered.hasClass('selected')) {
           return $hovered.addClass('hover');
         }
@@ -5161,12 +5548,59 @@ window.compareVersions = function(a, b){
     }
   });
   /*####################################
+  #          VIDEO PLACEHOLDER         #
+  ####################################*/
+  module('videoPlaceholderImage', {
+    displayName: "Video Placeholder Thumbnail",
+    settings: 'look&feel',
+    help: 'Shows a thumbnail in place of the video, if you snooze the video or turn off the stream.\n\nThis is useful for knowing WHAT is playing, even when don\'t want to watch it.',
+    screenshot: 'https://i.imgur.com/TMHVsrN.gif',
+    setup: function(arg$){
+      var addListener, $playbackImg;
+      addListener = arg$.addListener;
+      $playbackImg = $('#playback-container');
+      addListener(API, 'advance', updatePic);
+      updatePic({
+        media: API.getMedia()
+      });
+      function updatePic(d){
+        if (!d.media) {
+          console.log("[Video Placeholder Image] hide", d);
+          return $playbackImg.css({
+            backgroundColor: 'transparent',
+            backgroundImage: 'none'
+          });
+        } else if (d.media.format === 1) {
+          console.log("[Video Placeholder Image] https://i.ytimg.com/vi/" + d.media.cid + "/0.jpg", d);
+          return $playbackImg.css({
+            backgroundColor: '#000',
+            backgroundImage: "url(https://i.ytimg.com/vi/" + d.media.cid + "/0.jpg)"
+          });
+        } else {
+          console.log("[Video Placeholder Image] " + d.media.image, d);
+          return $playbackImg.css({
+            backgroundColor: '#000',
+            backgroundImage: "url(" + d.media.image + ")"
+          });
+        }
+      }
+      return updatePic;
+    },
+    disable: function(){
+      return $('#playback-container').css({
+        backgroundColor: 'transparent',
+        backgroundImage: 'none'
+      });
+    }
+  });
+  /*####################################
   #             LEGACY CHAT            #
   ####################################*/
   module('legacyChat', {
     displayName: "Smaller Chat",
     settings: 'chat',
     help: 'Shows the chat in the old format, before badges were added to it in December 2014.\nMakes the messages smaller, so more fit on the screen',
+    disabled: true,
     setup: function(arg$){
       var addListener, $cb, this$ = this;
       addListener = arg$.addListener;
@@ -5251,7 +5685,7 @@ window.compareVersions = function(a, b){
         return console.warn("[p0ne] no p³ compatible Room Settings found");
       } else if (url = /@p3=(.*)/i.exec(roomDescription)) {
         console.log("[p0ne] p³ compatible Room Settings found", url[1]);
-        return $.getJSON(httpsify(url[1])).then(function(_data){
+        return $.getJSON(proxify(url[1])).then(function(_data){
           this$._data = _data;
           console.log(getTime() + " [p0ne] loaded p³ compatible Room Settings");
           this$._room = roomslug;
@@ -5679,18 +6113,12 @@ window.compareVersions = function(a, b){
       var addListener, $create, $createPersistent, css, lastMedia, that, $description, this$ = this;
       addListener = arg$.addListener, $create = arg$.$create, $createPersistent = arg$.$createPersistent, css = arg$.css;
       this.callback = function(d){
-        var skipped, skipper, reason, media, $div, html, time, mediaURL, image, duration, timestamp, e;
+        var skipped, skipper, reason, media, $div, html, time, mediaURL, duration, timestamp, e;
         try {
           skipped = false;
           skipper = reason = "";
           media = d.media;
-          if (!media) {
-            this$.$playbackImg.css({
-              backgroundImage: null
-            });
-            return;
-          }
-          if (media.id === lastMedia) {
+          if (!media || media.id === lastMedia) {
             return;
           }
           lastMedia = media.id;
@@ -5699,14 +6127,9 @@ window.compareVersions = function(a, b){
           time = getTime();
           if (media.format === 1) {
             mediaURL = "http://youtube.com/watch?v=" + media.cid;
-            image = "https://i.ytimg.com/vi/" + media.cid + "/0.jpg";
           } else {
             mediaURL = "https://soundcloud.com/search?q=" + encodeURIComponent(media.author + ' - ' + media.title);
-            image = media.image;
           }
-          this$.$playbackImg.css({
-            backgroundImage: "url(" + image + ")"
-          });
           duration = mediaTime(media.duration);
           console.logImg(media.image.replace(/^\/\//, 'https://')).then(function(){
             return console.log(time + " [DV_ADVANCE] " + d.dj.username + " is playing '" + media.author + " - " + media.title + "' (" + duration + ")", d);
@@ -5716,7 +6139,7 @@ window.compareVersions = function(a, b){
           } else {
             timestamp = "";
           }
-          html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> --></div>" + timestamp + "<div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
+          html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + media.image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> --><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + timestamp + "<div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
           $div.html(html);
           $div.find('.song-dj').text(d.dj.username);
           $div.find('.song-title').text(d.media.title).prop('title', d.media.title);
@@ -5727,12 +6150,9 @@ window.compareVersions = function(a, b){
               then: function(d){}
             }).then(function(d){
               var that;
-              $div.removeClass('loading');
-              $div.find('.song-open').attr('href', d.url);
-              $div.data('description', d.description);
+              $div.removeClass('loading').data('description', d.description).find('.song-open').attr('href', d.url);
               if (d.download) {
-                $div.find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
-                return $div.addClass('downloadable');
+                return $div.addClass('downloadable').find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
               }
             });
           }
@@ -5742,7 +6162,6 @@ window.compareVersions = function(a, b){
           return console.error("[p0ne.notif]", e);
         }
       };
-      this.$playbackImg = $('#playback-container');
       addListener(API, 'advance', this.callback);
       if (_$context) {
         addListener(_$context, 'room:joined', function(){
@@ -5752,7 +6171,7 @@ window.compareVersions = function(a, b){
           });
         });
       }
-      loadStyle(p0ne.host + "/css/p0ne.notif.css?r=13");
+      loadStyle(p0ne.host + "/css/p0ne.notif.css?r=14");
       if (that = !module_ && API.getMedia()) {
         this.callback({
           media: that,
@@ -5760,7 +6179,7 @@ window.compareVersions = function(a, b){
         });
       }
       addListener(_$context, 'RestrictedSearchEvent:search', function(){
-        return muteonce();
+        return snooze();
       });
       if (typeof popMenu != 'undefined' && popMenu !== null) {
         addListener(chatDomEvents, 'click', '.song-add', function(){
@@ -5842,7 +6261,7 @@ window.compareVersions = function(a, b){
         }
       });
       function showDescription($notif, text){
-        var h, $cm, offsetTop, ref$, ch;
+        var h, cm, offsetTop, ref$, ch;
         $description.removeClass('song-description-btn loading').css({
           opacity: 0,
           position: 'absolute'
@@ -5859,12 +6278,12 @@ window.compareVersions = function(a, b){
             height: 'auto'
           });
         });
-        $cm = $('#chat-messages');
+        cm = $cm();
         offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
-        ch = $cm.height();
+        ch = cm.height();
         if (offsetTop + h > ch) {
           return $cm.animate({
-            scrollTop: $cm.scrollTop() + Math.min(offsetTop + h - ch + 100, offsetTop)
+            scrollTop: cm.scrollTop() + Math.min(offsetTop + h - ch + 100, offsetTop)
           });
         }
       }
@@ -5889,7 +6308,7 @@ window.compareVersions = function(a, b){
         if (offsetTop < 0) {
           cm = $cm();
           return cm.animate({
-            scrollTop: $cm.scrollTop() + offsetTop - 100
+            scrollTop: cm.scrollTop() + offsetTop - 100
           });
         }
       }
@@ -6139,7 +6558,9 @@ window.compareVersions = function(a, b){
         if (!(avatar.category in Lang.userAvatars)) {
           Lang.userAvatars[avatar.category] = avatar.category;
         }
-        delete Avatar.IMAGES[avatarID];
+        delete Avatar.IMAGES[avatarID + ""];
+        delete Avatar.IMAGES[avatarID + "dj"];
+        delete Avatar.IMAGES[avatarID + "b"];
         if (!updateAvatarStore.loading) {
           updateAvatarStore.loading = true;
           return requestAnimationFrame(function(){
@@ -6319,12 +6740,13 @@ window.compareVersions = function(a, b){
       this.blurbIsChanged = false;
       urlParser = document.createElement('a');
       addListener(API, 'chatCommand', function(str){
-        var server, helper;
+        var server, base_url, helper;
         if (0 === str.toLowerCase().indexOf("/ppcas")) {
           server = $.trim(str.substr(6));
           if (server === "<url>") {
             API.chatLog("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", true);
           } else if (server === ".") {
+            base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/";
             helper = function(fn){
               var i$, ref$, len$, avatarID, results$ = [];
               fn = window[fn];
@@ -6386,7 +6808,7 @@ window.compareVersions = function(a, b){
       }
     },
     connect: function(url, reconnecting, reconnectWarning){
-      var reconnect, connected, this$ = this;
+      var reconnect, connectAttemps, this$ = this;
       if (!reconnecting && this.socket) {
         if (url === this.socket.url && this.socket.readyState === 1) {
           return;
@@ -6395,10 +6817,10 @@ window.compareVersions = function(a, b){
       }
       console.log("[p0ne avatars] using socket as ppCAS avatar server");
       reconnect = true;
-      connected = false;
+      connectAttemps = 1;
       if (reconnectWarning) {
         setTimeout(function(){
-          if (!connected) {
+          if (connectAttemps === 0) {
             return API.chatLog("[p0ne avatars] lost connection to avatar server \xa0 =(");
           }
         }, 10000);
@@ -6498,7 +6920,7 @@ window.compareVersions = function(a, b){
         });
       });
       this.socket.on('authAccepted', function(){
-        connected = true;
+        connectAttemps = 0;
         reconnecting = false;
         return this$.changeBlurb(this$.oldBlurb, {
           success: function(){
@@ -6562,8 +6984,10 @@ window.compareVersions = function(a, b){
           this$.changeAvatar(userID, avatarID);
         }
         if (reconnecting) {
-          return API.chatLog("[p0ne avatars] reconnected");
+          API.chatLog("[p0ne avatars] reconnected");
         }
+        _$context.trigger('ppCAS:connected');
+        return API.trigger('ppCAS:connected');
       }
       this.socket.on('changeAvatarID', function(userID, avatarID){
         var ref$;
@@ -6581,23 +7005,29 @@ window.compareVersions = function(a, b){
         console.warn("[ppCAS] connection closed", reason);
         return reconnect = false;
       });
-      return this.socket.onclose = function(e){
+      this.socket.onclose = function(e){
         console.warn("[ppCAS] DISCONNECTED", e);
+        _$context.trigger('ppCAS:disconnected');
+        API.trigger('ppCAS:disconnected');
         if (e.wasClean) {
-          return;
-        }
-        if (reconnect) {
-          if (connected) {
+          return reconnect = false;
+        } else if (reconnect) {
+          if (connectAttemps === 0) {
             console.log("[ppCAS] reconnecting…");
             return this$.connect(url, true, true);
           } else {
-            return sleep(5000 + Math.random() * 5000, function(){
+            return sleep((5000 + Math.random() * 5000) * connectAttemps, function(){
               console.log("[ppCAS] reconnecting…");
-              return this$.connect(url, true, false);
+              connectAttemps++;
+              this$.connect(url, true, false);
+              _$context.trigger('ppCAS:connecting');
+              return API.trigger('ppCAS:connecting');
             });
           }
         }
       };
+      _$context.trigger('ppCAS:connecting');
+      return API.trigger('ppCAS:connecting');
     },
     changeBlurb: function(newBlurb, options){
       options == null && (options = {});
@@ -6632,6 +7062,215 @@ window.compareVersions = function(a, b){
         }
       }
       return results$;
+    }
+  });
+  /*@source p0ne.stream.ls */
+  /**
+   * Modules for Audio-Only stream and stream settings for plug_p0ne
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @license MIT License
+   * @copyright (c) 2015 J.-T. Brinkmann
+  */
+  module('streamSettings', {
+    require: ['app', 'currentMedia', '_$context'],
+    optional: ['database'],
+    audioOnly: false,
+    setup: function(arg$, streamSettings, arg1$, m_){
+      var addListener, replace, replaceListener, $create, css, $playback, $el, $btn, audio, HDsettings, this$ = this;
+      addListener = arg$.addListener, replace = arg$.replace, replaceListener = arg$.replaceListener, $create = arg$.$create, css = arg$.css;
+      $playback = $('#playback');
+      $el = $create('<div class=p0ne-stream-select>');
+      if (m_) {
+        this.audioOnly = m_.audioOnly;
+      }
+      css('streamSettings', ".icon-stream-video {background: " + getIcon('icon-chat-sound-on').background + ";}.icon-stream-audio {background: " + getIcon('icon-chat-room').background + ";}.icon-stream-off {background: " + getIcon('icon-chat-sound-off').background + ";}");
+      replace(Playback.prototype, 'onHDClick', function(){
+        return $.noop;
+      });
+      $btn = $('#playback .hd').addClass('p0ne-stream-select').html('<div class="box"><span id=p0ne-stream-label>Stream: Video</span><div class="p0ne-stream-buttons"><i class="icon icon-stream-video"></i> <i class="icon icon-stream-audio"></i> <i class="icon icon-stream-off"></i> <div class="p0ne-stream-fancy"></div></div></div>');
+      this.$label = $btn.find('#p0ne-stream-label');
+      addListener($btn.find('.icon-stream-video'), 'click', function(){
+        return this$.changeStream('video');
+      });
+      addListener($btn.find('.icon-stream-audio'), 'click', function(){
+        return this$.changeStream('audio');
+      });
+      addListener($btn.find('.icon-stream-off'), 'click', function(){
+        return this$.changeStream('off');
+      });
+      this.changeStream();
+      this.audio = audio = new Audio();
+      out$.audio = audio;
+      audio.volume = currentMedia.get('volume') / 100;
+      HDsettings = (typeof database != 'undefined' && database !== null ? database.settings : void 8) || {
+        hd720: true
+      };
+      audio.addEventListener('canplay', function(){
+        console.log("[audioStream] finished buffering");
+        if (currentMedia.get('media') === audio.media) {
+          if (audio.init) {
+            audio.init = false;
+            return seek();
+          } else {
+            audio.play();
+            return console.log("[audioStream] audio.play()");
+          }
+        } else {
+          return console.warn("[audioStream] next song already started");
+        }
+      });
+      replace(Playback.prototype, 'onVolumeChange', function(oVC_){
+        return function(){
+          audio.volume = currentMedia.get('volume') / 100;
+          return oVC_.apply(this, arguments);
+        };
+      });
+      replace(Playback.prototype, 'onMediaChange', function(){
+        return function(){
+          var media, startTime, a, this$ = this;
+          this.reset();
+          this.$controls.removeClass('snoozed');
+          media = currentMedia.get('media');
+          audio.src = null;
+          audio.media = {};
+          if (media) {
+            this.$noDJ.hide();
+            if (currentMedia.get('streamDisabled')) {
+              return;
+            }
+            this.ignoreComplete = true;
+            console.log("[audioStream] B");
+            sleep(1000, function(){
+              return this$.resetIgnoreComplete();
+            });
+            if (media.get('format') === 1) {
+              console.log("[audioStream] C");
+              if (streamSettings.audioOnly && !audio.failed) {
+                /*== audio only streaming ==*/
+                console.log("[audioStream] looking for URL");
+                if (media.id === audio.media.id) {
+                  return seek();
+                } else {
+                  audio.init = true;
+                  return mediaDownload(media, true).then(function(d){
+                    console.log("[audioStream] found url", d);
+                    media.src = d.preferredDownload.url;
+                    audio.media = media;
+                    audio.src = media.src;
+                    seek();
+                    return audio.load();
+                  }).fail(function(err){
+                    console.error("[audioStream] couldn't get audio stream", err);
+                    audio.failed = true;
+                    refresh();
+                    return API.once('advance', function(){
+                      return audio.failed = false;
+                    });
+                  });
+                }
+              } else {
+                console.log("[audioStream] loading video stream");
+                startTime = currentMedia.get('elapsed');
+                this.buffering = false;
+                this.yto = {
+                  id: media.get('cid'),
+                  volume: currentMedia.get('volume'),
+                  seek: startTime < 4 ? 0 : startTime,
+                  quality: HDsettings.hdVideo ? 'hd720' : ""
+                };
+                a = 'yt5';
+                if (window.location.host !== 'plug.dj') {
+                  a += window.location.host === 'localhost' ? 'local' : 'staging';
+                }
+                return this.$container.append($("<iframe id=yt-frame frameborder=0 src='" + window.location.protocol + "//plgyte.appspot.com/" + a + ".html'>").load(this.ytFrameLoadedBind));
+              }
+            } else if (media.get('format') === 2) {
+              console.log("[audioStream] loading Soundcloud");
+              if (soundcloud.r) {
+                if (soundcloud.sc) {
+                  this.$container.empty().append($("<iframe id=yt-frame frameborder=0 src='" + this.visualizers[this.random.integer(0, 1)] + "'></iframe>"));
+                  return soundcloud.sc.whenStreamingReady(function(){
+                    var startTime;
+                    if (currentMedia.get('media' === media)) {
+                      startTime = currentMedia.get('elapsed');
+                      return this$.player = soundcloud.sc.stream(media.get('cid'), {
+                        autoPlay: true,
+                        volume: currentMedia.get('volume'),
+                        position: startTime < 4
+                          ? 0
+                          : startTime * 1000,
+                        onload: this$.scOnLoadBind,
+                        whileloading: this$.scLoadingBind,
+                        onfinish: this$.playbackCompleteBind,
+                        ontimeout: this$.scTimeoutBind
+                      });
+                    }
+                  });
+                } else {
+                  return this.$container.append($('<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>').css({
+                    position: 'absolute',
+                    left: 46
+                  }));
+                }
+              }
+            } else {
+              console.log("[audioStream] wut", media.get('format'), typeof media.get('format'));
+              return _$context.on('sc:ready', this.onSCReady, this);
+            }
+          } else {
+            this.$noDJ.show();
+            return this.$controls.hide();
+          }
+        };
+      });
+      replace(Playback.prototype, 'stop', function(s_){
+        return function(){
+          audio.pause();
+          return s_.apply(this, arguments);
+        };
+      });
+      replaceListener(currentMedia, 'change:media', Playback, function(){
+        return bind$(app.room.playback, 'onMediaChange');
+      });
+      replaceListener(currentMedia, 'change:streamDisabled', Playback, function(){
+        return bind$(app.room.playback, 'onMediaChange');
+      });
+      replaceListener(currentMedia, 'change:volume', Playback, function(){
+        return bind$(app.room.playback, 'onVolumeChange');
+      });
+      if (streamSettings.audioOnly) {
+        refresh();
+      }
+      function seek(){
+        var startTime;
+        startTime = currentMedia.get('elapsed');
+        return audio.currentTime = startTime < 4 ? 0 : startTime;
+      }
+      return seek;
+    },
+    changeStream: function(mode){
+      var prevMode;
+      prevMode = currentMedia.get('streamDisabled')
+        ? 'off'
+        : streamSettings.audioOnly ? 'audio' : 'video';
+      if (mode !== prevMode) {
+        mode || (mode = prevMode);
+        console.log("[streamSettings] stream-" + mode);
+        this.$label.text("Stream: " + mode);
+        streamSettings.audioOnly = mode === 'audio';
+        stream(mode !== 'off');
+        $body.removeClass("p0ne-stream-" + prevMode).addClass("p0ne-stream-" + mode);
+        return refresh();
+      }
+    },
+    disable: function(){
+      this.audio.src = null;
+      sleep(0, function(){
+        if (streamSettings.audioOnly) {
+          return refresh();
+        }
+      });
+      return $body.removeClass('p0ne-stream-video').removeClass('p0ne-stream-audio').removeClass('p0ne-stream-off');
     }
   });
   /*@source p0ne.settings.ls */
@@ -6754,10 +7393,13 @@ window.compareVersions = function(a, b){
         }
       });
       if (typeof _$context != 'undefined' && _$context !== null) {
-        return addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
+        addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
           return this$.toggleMenu(false);
         });
       }
+      return addListener($body, 'click', '#plugcubed', function(){
+        return this$.toggleMenu(false);
+      });
     },
     toggleMenu: function(state){
       if (state != null
@@ -6818,6 +7460,312 @@ window.compareVersions = function(a, b){
             @throttled = false
     */
   });
+  /*@source p0ne.moderate.ls */
+  /**
+   * plug_p0ne modules to help moderators do their job
+   * @author jtbrinkmann aka. Brinkie Pie
+   * @version 1.0
+   * @license MIT License
+   * @copyright (c) 2014 J.-T. Brinkmann
+   */
+  module('enableModeratorModules', {
+    require: ['user_'],
+    setup: function(arg$){
+      var addListener, prevRole;
+      addListener = arg$.addListener;
+      prevRole = user_.attributes.role;
+      return addListener(user_, 'change:role', function(user, newRole){
+        var i$, ref$, len$, m, results$ = [];
+        if (newRole > 1 && prevRole < 2) {
+          for (i$ = 0, len$ = (ref$ = p0ne.modules).length; i$ < len$; ++i$) {
+            m = ref$[i$];
+            if (m.modDisabled) {
+              m.enable();
+              results$.push(m.modDisabled = false);
+            }
+          }
+          return results$;
+        } else {
+          for (i$ = 0, len$ = (ref$ = p0ne.modules).length; i$ < len$; ++i$) {
+            m = ref$[i$];
+            if (m.moderator && !m.modDisabled) {
+              m.modDisabled = true;
+              results$.push(m.disable());
+            }
+          }
+          return results$;
+        }
+      });
+    }
+  });
+  module('warnOnHistory', {
+    moderator: true,
+    setup: function(arg$){
+      var addListener, this$ = this;
+      addListener = arg$.addListener;
+      return addListener(API, 'advance', function(d){
+        var hist, inHistory, skipped, lastTime, i$, len$, i, m, lastPlay, msg;
+        if (!d.media) {
+          return;
+        }
+        hist = API.getHistory();
+        inHistory = 0;
+        skipped = 0;
+        lastTime = 0;
+        for (i$ = 0, len$ = hist.length; i$ < len$; ++i$) {
+          i = i$;
+          m = hist[i$];
+          if (m.id === d.id && d.historyID !== m.historyID) {
+            inHistory++;
+            m.i = i;
+            lastPlay || (lastPlay = m);
+            if (m.skipped) {
+              skipped++;
+            }
+          }
+        }
+        if (inHistory) {
+          msg = "Song is in history";
+          if (inHistory > 1) {
+            msg += " (" + inHistory + " times) one:";
+          }
+          msg += " " + ago(PARSESOMEHOW(lastPlay.datetime)) + " (" + (i + 1) + "/" + hist.length + ")";
+          if (skipped === inHistory) {
+            msg = " but was skipped last time";
+          }
+          if (skipped > 1) {
+            msg = " it was skipped " + skipped + "/" + inHistory + " times";
+          }
+          API.chatLog(msg, true);
+          return API.trigger('p0ne_songInHistory');
+        }
+      });
+    }
+  });
+  /*####################################
+  #      DISABLE MESSAGE DELETE        #
+  ####################################*/
+  module('disableChatDelete', {
+    require: ['_$context', 'user_'],
+    optional: ['socketListeners'],
+    settings: 'chat',
+    displayName: 'Show deleted messages',
+    moderator: true,
+    setup: function(arg$){
+      var replace_$Listener, addListener, $createPersistent, css;
+      replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $createPersistent = arg$.$createPersistent, css = arg$.css;
+      css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne_showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
+      $body.addClass('p0ne_showDeletedMessages');
+      addListener(_$context, 'socket:chatDelete', function(arg$){
+        var p, c, mi, ref$;
+        p = arg$.p, c = p.c, mi = p.mi;
+        return markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
+      });
+      replace_$Listener('chat:delete', function(){
+        return function(cid){
+          if (!socketListeners) {
+            return markAsDeleted(cid);
+          }
+        };
+      });
+      function markAsDeleted(cid, moderator){
+        var $msg, t, d, cm;
+        $msg = getChat(cid);
+        console.log("[Chat Delete]", cid, $msg.text());
+        t = getISOTime();
+        if (moderator) {
+          t += " by " + moderator;
+        }
+        try {
+          $msg.removeClass('deletable').addClass('deleted');
+          d = $createPersistent('<time>').addClass('deleted-message').attr('datetime', t).text(t).appendTo($msg);
+          cm = $cm();
+          return cm.scrollTop(cm.scrollTop() + d.height());
+        } catch (e$) {}
+      }
+      return markAsDeleted;
+    },
+    disable: function(){
+      return $body.removeClass('p0ne_showDeletedMessages');
+    }
+  });
+  /*####################################
+  #           MESSAGE CLASSES          #
+  ####################################*/
+  module('chatDeleteOwnMessages', {
+    moderator: true,
+    setup: function(arg$){
+      var addListener;
+      addListener = arg$.addListener;
+      $cm().find("fromID-" + userID).addClass('deletable').append('<div class="delete-button">Delete</div>');
+      return addListener(API, 'chat', function(message){
+        var cid, uid;
+        cid = message.cid, uid = message.uid;
+        if (uid === userID) {
+          return getChat(cid).addClass('deletable').append('<div class="delete-button">Delete</div>');
+        }
+      });
+    }
+  });
+  /*####################################
+  #            WARN ON MEHER           #
+  ####################################*/
+  module('warnOnMehers', {
+    users: {},
+    moderator: true,
+    _settings: {
+      instantWarn: false,
+      maxMehs: 3
+    },
+    setup: function(arg$, arg1$, arg2$, m_){
+      var addListener, users, current, lastAdvance, this$ = this;
+      addListener = arg$.addListener;
+      if (m_) {
+        this.users = m_.users;
+      }
+      users = this.users;
+      current = {};
+      addListener(API, 'voteUpdate', function(d){
+        current[d.user.id] = d.vote;
+        if (this$._settings.instantWarn && d.vote === -1) {
+          return API.chatLog(d.user.username + " (lvl " + d.user.level + ") meh'd this song", true);
+        }
+      });
+      lastAdvance = 0;
+      return addListener(API, 'advance', function(d){
+        var k, ref$, v, ref1$;
+        d = Date.now();
+        for (k in ref$ = current) {
+          v = ref$[k];
+          if (v === -1) {
+            users[k] || (users[k] = 0);
+            if (++users[k] > this$._settings.maxMehs) {
+              API.chatLog(d.dj.username + " (lvl " + d.dj.level + ") meh'd the past " + users[k] + " songs!", true);
+            }
+          } else if (d > lastAdvance + 10000 && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== k) {
+            delete users[k];
+          }
+        }
+        current = {};
+        return lastAdvance = d;
+      });
+    }
+  });
+  module('afkTimer', {
+    require: ['RoomUserRow', 'WaitlistRow'],
+    optional: ['socketListeners', 'app', 'userList', '_$context'],
+    moderator: true,
+    lastActivity: {},
+    _settings: {
+      highlightOver: 45 .min
+    },
+    setup: function(arg$, arg1$, arg2$, m_){
+      var addListener, settings, start, i$, ref$, len$, user, lastActivity, timer, d, noActivityYet, fn, Constr;
+      addListener = arg$.addListener;
+      settings = this._settings;
+      this.start = start = (m_ != null ? m_.start : void 8) || Date.now();
+      if (m_) {
+        this.lastActivity = m_.lastActivity;
+      } else {
+        for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
+          user = ref$[i$];
+          this.lastActivity[user.id] = start;
+        }
+      }
+      lastActivity = this.lastActivity;
+      addListener(API, 'socket:skip socket:grab', function(id){
+        return updateUser(id);
+      });
+      addListener(API, 'userJoin socket:nameChanged', function(u){
+        return updateUser(u.id);
+      });
+      addListener(API, 'chat', function(u){
+        return updateUser(u.uid);
+      });
+      addListener(API, 'socket:gifted', function(e){
+        return updateUser(e.s);
+      });
+      addListener(API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', function(u){
+        return updateUser(u.mid);
+      });
+      addListener(API, 'userLeave', function(u){
+        var key$, ref$;
+        return ref$ = lastActivity[key$ = u.id], delete lastActivity[key$], ref$;
+      });
+      if ((typeof _$context != 'undefined' && _$context !== null) && (app != null || (typeof userList != 'undefined' && userList !== null))) {
+        addListener(_$context, 'show:users show:waitlist', function(){
+          return timer = repeat(60000, forceRerender);
+        });
+        addListener(_$context, 'show:chat', function(){
+          return clearInterval(timer);
+        });
+      }
+      d = 0;
+      for (i$ = 0, len$ = (ref$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
+        fn = i$;
+        Constr = ref$[i$];
+        replace(Constr.prototype, 'render', fn$);
+      }
+      function updateUser(uid){
+        var i$, ref$, ref1$, len$, r, results$ = [];
+        lastActivity[uid] = Date.now();
+        for (i$ = 0, len$ = (ref$ = (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || (app != null ? app.room.waitlist.rows : void 8)).length; i$ < len$; ++i$) {
+          r = ref$[i$];
+          if (r.model.id === uid) {
+            console.log("updated " + r.model.username + "'s row", r);
+            results$.push(r.render(true));
+          }
+        }
+        return results$;
+      }
+      function forceRerender(){
+        var i$, ref$, ref1$, len$, r, results$ = [];
+        for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+          r = ref$[i$];
+          console.log("rerendering " + r.model.username + "'s row", r);
+          results$.push(r.render());
+        }
+        return results$;
+      }
+      return forceRerender();
+      function fn$(r_){
+        return function(isUpdate){
+          var ago, time, noActivityYet, $span;
+          r_.apply(this, arguments);
+          if (!d) {
+            d = Date.now();
+            requestAnimationFrame(function(){
+              d = 0;
+              return noActivityYet = null;
+            });
+          }
+          ago = d - lastActivity[this.model.id];
+          if (lastActivity[this.model.id] === start) {
+            time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
+          } else if (ago < 60000) {
+            time = "<1m";
+          } else if (ago < 120000) {
+            time = "<2m";
+          } else {
+            time = humanTime(ago, true);
+          }
+          $span = $('<span class=p0ne-last-activity>').text(time);
+          if (ago > settings.highlightOver) {
+            $span.addClass('p0ne-last-activity-warn');
+          }
+          if (isUpdate) {
+            $span.addClass('p0ne-last-activity-update');
+          }
+          this.$el.append($span);
+          if (isUpdate) {
+            return requestAnimationFrame(function(){
+              return $span.removeClass('p0ne-last-activity-update');
+            });
+          }
+        };
+      }
+    }
+  });
   /*@source p0ne.dev.ls */
   /**
    * plug_p0ne dev
@@ -6837,6 +7785,7 @@ window.compareVersions = function(a, b){
     settings: 'dev',
     help: 'This will log events to the JavaScript console.\nThis is mainly for programmers. If you are none, keep this disabled for better performance.\n\nBy default this will leave out some events to avoid completly spamming the console.\nYou can force-enable logging ALL events by running `logEventsToConsole.logAll = true`',
     disabledByDefault: true,
+    logAll: false,
     setup: function(arg$){
       var addListener, replace, logEventsToConsole;
       addListener = arg$.addListener, replace = arg$.replace;
@@ -6913,9 +7862,10 @@ window.compareVersions = function(a, b){
   ####################################*/
   module('downloadLink', {
     setup: function(arg$){
-      var css;
+      var css, icon;
       css = arg$.css;
-      return css('downloadLink', '.p0ne_downloadlink::before {content: " ";position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: -140px -280px;background-image: url(/_/static/images/icons.26d92b9.png);}');
+      icon = getIcon('icon-arrow-down');
+      return css('downloadLink', ".p0ne_downloadlink::before {content: ' ';position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: " + icon.position + ";background-image: " + icon.image + ";}");
     },
     module: function(name, filename, dataOrURL){
       if (!dataOrURL) {
@@ -6930,10 +7880,20 @@ window.compareVersions = function(a, b){
           type: 'text/plain'
         }));
       }
-      return (window.$cm || $('#chat-messages')).append("<div class='message p0ne_downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
+      filename = filename.replace(/[\/\\\?%\*\:\|\"\<\>\.]/g, '');
+      return appendChat("<div class='message p0ne_downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
     }
   });
   importAll$(window, {
+    roomState: function(){
+      ajax('GET', 'rooms/state');
+    },
+    export_: function(name){
+      return function(data){
+        console.log("[export] " + name + " =", data);
+        window[name] = data;
+      };
+    },
     searchEvents: function(regx){
       var k;
       if (!(regx instanceof RegExp)) {
@@ -6994,6 +7954,56 @@ window.compareVersions = function(a, b){
       }
       return res;
     },
+    requireHelperHelper: function(module){
+      var k, v, keys, keysExact, isNotObj, ref$, id, m2, ref1$, ref2$;
+      if (typeof module === 'string') {
+        module = require(module);
+      }
+      if (!module) {
+        return false;
+      }
+      for (k in module) {
+        v = module[k];
+        keys = 0;
+        keysExact = 0;
+        isNotObj = (ref$ = typeof v) !== 'object' && ref$ !== 'function';
+        for (id in ref$ = require.s.contexts._.defined) {
+          m2 = ref$[id];
+          if (m2 && m2[k] && (k !== 'requireID' && k !== 'cid' && k !== 'id')) {
+            keys++;
+            if (isNotObj && m2[k] === v) {
+              keysExact++;
+            }
+          }
+        }
+        if (keys === 1) {
+          return "(." + k + ")";
+        } else if (keysExact === 1) {
+          return "(." + k + " == " + JSON.stringify(v) + ")";
+        }
+      }
+      for (k in ref$ = module.prototype) {
+        v = ref$[k];
+        keys = 0;
+        keysExact = 0;
+        isNotObj = typeof v !== 'object';
+        for (id in ref1$ = require.s.contexts._.defined) {
+          m2 = ref1$[id];
+          if (m2 && ((ref2$ = m2.prototype) != null && ref2$[k])) {
+            keys++;
+            if (isNotObj && m2[k] === v) {
+              keysExact++;
+            }
+          }
+        }
+        if (keys === 1) {
+          return "(.::?." + k + ")";
+        } else if (keysExact === 1) {
+          return "(.::?." + k + " == " + JSON.stringify(v) + ")";
+        }
+      }
+      return false;
+    },
     validateUsername: function(username, ignoreWarnings, cb){
       if (typeof ignoreWarnings === 'function') {
         cb = ignoreWarnings;
@@ -7049,13 +8059,10 @@ window.compareVersions = function(a, b){
           base = API;
         }
       }
-      return base.once('event', function(){
-        var args;
-        args = slice$.call(arguments);
-        return console.log("[" + event.toUpperCase() + "]", args);
-      });
+      return base.once('event', logger(event));
     },
     usernameToSlug: function(un){
+      /* note: this is NOT really accurate! */
       var lastCharWasLetter, res, i$, ref$, len$, char, lc;
       lastCharWasLetter = false;
       res = "";
@@ -7083,6 +8090,15 @@ window.compareVersions = function(a, b){
     },
     ghost: function(){
       return $.get('/');
+    },
+    getAvatars: function(){
+      API.once('p0ne:avatarsloaded', logger('AVATARS'));
+      return $.get($("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr('src')).then(function(d){
+        var that;
+        if (that = d.match(/manifest.*/)) {
+          return API.trigger('p0ne:avatarsloaded', JSON.parse(that[0].substr(11, that[0].length - 12)));
+        }
+      });
     }
   });
   module('renameUser', {
@@ -7117,13 +8133,17 @@ window.compareVersions = function(a, b){
     }
   });
   (function(){
-    var k, ref$, v, results$ = [];
-    window._$events = {};
-    for (k in ref$ = typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
-      v = ref$[k];
-      results$.push(window._$events[k.replace(/:/g, '_')] = v);
-    }
-    return results$;
+    window._$events = {
+      _update: function(){
+        var k, ref$, v, results$ = [];
+        for (k in ref$ = typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
+          v = ref$[k];
+          results$.push(this[k.replace(/:/g, '_')] = v);
+        }
+        return results$;
+      }
+    };
+    return _$events._update();
   })();
   module('export_', {
     require: ['downloadLink'],
@@ -7253,7 +8273,7 @@ window.compareVersions = function(a, b){
                   cid: cid,
                   author: author,
                   title: title,
-                  image: img
+                  image: httpsify(img)
                 })
               }));
             }
@@ -7460,12 +8480,12 @@ window.compareVersions = function(a, b){
         name: 'unsuresweetie',
         url: "https://i.imgur.com/EATu0iu.png"
       },
-      ':o': {
+      ':O': {
         name: 'pinkiegasp',
         url: "https://i.imgur.com/b9G2kaz.png"
       },
-      ':x': {
-        name: 'fluttershbad',
+      ':X': {
+        name: 'fluttershybad',
         url: "https://i.imgur.com/mnJHnsv.png"
       },
       ':|': {
@@ -7543,7 +8563,7 @@ window.compareVersions = function(a, b){
         return this$.ponifyMsg(msg);
       });
       if (typeof emoticons != 'undefined' && emoticons !== null) {
-        aEM = clone$(emoticons.autoEmoteMap);
+        aEM = importAll$({}, emoticons.autoEmoteMap);
         for (emote in ref$ = this.autoEmotiponies) {
           ref1$ = ref$[emote], name = ref1$.name, url = ref1$.url;
           aEM[emote] = name;
@@ -7585,7 +8605,7 @@ window.compareVersions = function(a, b){
    * @copyright (c) 2014 J.-T. Brinkmann
    */
   /*not really implemented yet*/
-  return module('songNotifRuleskip', {
+  module('songNotifRuleskip', {
     require: ['songNotif'],
     setup: function(arg$){
       var replace, addListener;
@@ -7602,6 +8622,39 @@ window.compareVersions = function(a, b){
           return API.sendChat("!ruleskip " + num);
         }
       });
+    }
+  });
+  return module('fimstats', {
+    setup: function(arg$){
+      var addListener, $create, $el;
+      addListener = arg$.addListener, $create = arg$.$create;
+      $el = $create('<span class=p0ne-last-played>').appendTo('#now-playing-bar');
+      addListener(API, 'advance', this.updateStats = function(d){
+        d || (d = {
+          media: API.getMedia()
+        });
+        if (d.media) {
+          return $.getJSON("https://fimstats.anjanms.com/_/media/" + d.media.format + "/" + d.media.cid).then(function(d){
+            var first, last;
+            first = d.data[0].firstPlay.user + " " + ago(d.data[0].firstPlay.time * 1000);
+            last = d.data[0].lastPlay.user + " " + ago(d.data[0].lastPlay.time * 1000);
+            if (first !== last) {
+              return $el.text("last played by " + last + " \xa0 - \xa0 first played by " + first);
+            } else {
+              return $el.text("first&last played by " + first);
+            }
+          }).fail(function(arg$, arg1$, status){
+            if (status === "Not Found") {
+              return $el.text("first played just now!");
+            } else {
+              return $el.text("");
+            }
+          });
+        } else {
+          return $el.text("");
+        }
+      });
+      return this.updateStats();
     }
   });
   function fn$(needle){
