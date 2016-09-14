@@ -1,0 +1,7 @@
+window.compressor=window.compressor||{};
+window.compressor.decompress=function(k){
+	for(var l=[],m=4,n=4,q=3,c="",g="",r,d,e,a,h,s=0,f=k.charCodeAt(0),b=32768,p=1,g=0;3>g;g+=1)l[g]=g;c=0;e=Math.pow(2,2);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=1;switch(c){case 0:c=0;e=Math.pow(2,8);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=1;h=String.fromCharCode(c);break;case 1:c=0;e=Math.pow(2,16);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=
+	1;h=String.fromCharCode(c);break;case 2:return""}for(r=g=l[3]=h;;){c=0;e=Math.pow(2,q);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=1;switch(h=c){case 0:if(1E4<s++)return"Error";c=0;e=Math.pow(2,8);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=1;l[n++]=String.fromCharCode(c);h=n-1;m--;break;case 1:c=0;e=Math.pow(2,16);for(a=1;a!=e;)d=f&b,b>>=1,0==b&&(b=32768,f=k.charCodeAt(p++)),c|=(0<d?1:0)*a,a<<=1;l[n++]=String.fromCharCode(c);
+	h=n-1;m--;break;case 2:return g}0==m&&(m=Math.pow(2,q),q++);if(l[h])c=l[h];else{if(h!==n)return null;c=r+r.charAt(0)}g+=c;l[n++]=r+c.charAt(0);m--;r=c;0==m&&(m=Math.pow(2,q),q++)}
+}
+$(window).trigger("decompressorLoaded");

@@ -1,0 +1,56 @@
+== Feature List ==
+legend:
+- already implemented
+* still pending
+
+= Features =
+- fix plug.dj bugs
+	* popup bug on disconnect (ToDo update)
+	- have a yellow name even when being mod
+	- Zalgo fix (Zalgo messages won't "bleed" out of the senders message)
+	- bugs with autocomplete (e.g. @mention autocomplete not working when there's something infront of the "@")
+	* fix unmuting after previewing a song/video
+	* move social-menu to a less annoying place
+* improved preview-popup (not blocking the chat anymore)
+* show songs stats in chat (with thumbnails and add-to-playlist button)
+- vastly improve the chat
+	- Restore Chat Script
+		* load chat from when the user was offline (if the room offers it)
+		* dynamically load older messages
+	* offer an option to show/hide deleted messages
+	- disable event that clears the chat (ChatFacadeEvent:clear)
+	- inline images
+		- direct images, Imgur, PrntScrn, Dropbox, Twitter
+		- doesn't break if the image can't be loaded
+		* filter on tags (e.g. #nsfw)
+	- Youtube thumbnails
+		- animated when hovering
+		* add-to-playlist button
+	- show pending messages (ones that are still sending)
+	* warn on problematic messages
+		* e.g. containing a link, if the user just joined (there's a timeout)
+		* e.g. containing characters that will be removed
+	- Ponymotes (without requiring the BetterPonymotes Addon)
+	- improved autocomplete (for @mentions, /commands, :emoticons:, !botcommands, [](/ponymotes), …)
+	* don't remove chat messages after 512
+	* optionally get an alert on all messages / messages with trigger-keywords
+	* optionally show/show-on-hower country-flags next to messages (depending on the language)
+	* custom colors (also affecting the icons)
+	* improved performance (#ToDo: CHECK THIS… I am not really sure if other added features negate this :I)
+		- faster Chat
+		* faster Avatar drawing
+		* improved Chat-Autocomplete (when writing ":cat: bla bla" it will check for emotes on each keydown, because there's a colon somewhere in the text)
+* show a galery of images/videos/files/links, linked in the chat
+* Waitlist ETA
+* in playlists, show songs that are in history
+* avoid playing songs that are in history
+* fix autowoot to not prevent voteskips
+* audio-only streams (if the room offers it)
+* custom avatars (if the room offers it)
+- offer some auxiliaries that can be used by other scripts
+	- _$context fix
+	- helper for requiring modules from room.js (even if the ID changed)
+	- grab function
+	- add metadata to chat HTML (e.g. add .from-#{userID} and .is-ambassador, etc class to messages)
+	- add stuff to Chat-Autocomplete
+	- helper functions for Chat supporting chat-popout (isAtBottom(), playChatSound(), appendChat())
