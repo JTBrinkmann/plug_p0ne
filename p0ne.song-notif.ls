@@ -65,10 +65,10 @@ module \songNotif, do
                         <span class='song-duration'>#duration</span>
                         <div class='song-add btn'><i class='icon icon-add'></i></div>
                         <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
-                        <div class='song-skip btn right'><i class='icon icon-skip'></i></div>
+                        <!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> -->
                     </div>
                     #timestamp
-                    <div class='song-dj'></div>
+                    <div class='song-dj un'></div>
                     <b class='song-title'></b>
                     <span class='song-author'></span>
                     <div class='song-description-btn'>Description</div>
@@ -108,7 +108,7 @@ module \songNotif, do
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?v=1.2"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=13"
 
 
         #== show current song ==
@@ -123,12 +123,12 @@ module \songNotif, do
         if popMenu?
             addListener chatDomEvents, \click, \.song-add, ->
                 $el = $ this
-                $notif = $el.closest \.song-notif-next
+                $notif = $el.closest \.song-notif
                 id = $notif.data \id
                 format = $notif.data \format
                 console.log "[add from notif]", $notif, id, format
 
-                msgOffset = $notif.closest \.song-notif .offset!
+                msgOffset = $notif .offset!
                 $el.offset = -> # to fix position
                     return { left: msgOffset.left + 17px, top: msgOffset.top + 18px }
 

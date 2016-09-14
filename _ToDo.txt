@@ -5,7 +5,6 @@
 - Playlist Manager
 
 == TEMP ==
-- change songNotif thumbnail container to #playback-container for proper sizing
 
 == COMPLETE ==
 - p0ne.close()
@@ -21,6 +20,7 @@
 - FIXES
 	- remember video stream on/off
 	- spinning wheel of death when editing playlists
+	- @mentions /me-emotes
 - p0ne Bugfixes
 	- make plug_p0ne work with Popout Chat (legacyChat & ChatInput)
 	- add-icon derps in .history in icon-view

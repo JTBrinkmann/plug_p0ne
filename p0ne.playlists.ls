@@ -4,7 +4,6 @@
 if not auxiliaries
     window.auxiliaries = requireHelper do
         name: \auxiliaries
-        id: \de369/a7486/bc55d # 2014-09-03
         test: (.deserializeMedia)
 
 if auxiliaries

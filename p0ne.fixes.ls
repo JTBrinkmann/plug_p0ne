@@ -13,13 +13,12 @@
 module \simpleFixes, do
     setup: ({replace}) ->
         # hide social-menu (because personally, i only accidentally click on it. it's just badly positioned)
-        @$sm = $ \.social-menu .remove!
+        @scm = $ '#twitter-menu, #facebook-menu' .detach! # not using .social-menu in case other scripts use this class to easily add buttons
 
         # add tab-index to chat-input
-        $ \#chat-input-field .prop \tabIndex, 1
+        replace $(\#chat-input-field).0, \tabIndex, -> return 1
     disable: ->
-        @$sm .insertAfter \#playlist-panel
-        $ \#chat-input-field .prop \tabIndex, null
+        @scm .insertAfter \#playlist-panel
 
 module \soundCloudThumbnailFix, do
     require: <[ auxiliaries ]>
@@ -36,8 +35,8 @@ module \soundCloudThumbnailFix, do
                     if parseURL(e.image).host in <[ plug.dj cdn.plug.dj ]>
                         e.image = "https://i.imgur.com/41EAJBO.png"
                         #"https://cdn.plug.dj/_/static/images/soundcloud_thumbnail.c6d6487d52fe2e928a3a45514aa1340f4fed3032.png" # 2014-12-22
-                else if e.image.startsWith("http:") or e.0 == e.1 == '/'
-                    e.image = "https:#{e.image.substr(5)}"
+                else if e.image.startsWith("http:") or e.image.startsWith("//")
+                    e.image = "https:#{e.image.substr(e.image.indexOf('//'))}"
 
 
 module \fixGhosting, do
@@ -88,6 +87,8 @@ module \fixGhosting, do
                                 for req in queue
                                     req.execute! # re-attempt whatever ajax requests just failed
                                 rejoining := false
+                                _$context?.trigger \p0ne:reconnected
+                                API.trigger \p0ne:reconnected
                         error: ({statusCode, responseJSON}:data) ~>
                             status = responseJSON?.status
                             switch status
@@ -208,7 +209,7 @@ module \fixNoPlaylistCycle, do
     _settings:
         warnings: true
     setup: ({addListener}) ->
-        addListener API, \sjs:reconnected, ->
+        addListener API, \socket:reconnected, ->
             _$context.dispatch new LoadEvent(LoadEvent.LOAD)
             _$context.dispatch new ActivateEvent(ActivateEvent.ACTIVATE)
         /*
@@ -246,3 +247,28 @@ module \fixWinterThumbnails, do
                 background-position-y: 0 !important;
             }
         "
+
+module \warnOnAdblockPopoutBlock, do
+    require: <[ PopoutView ]>
+    setup: ({replace}) ->
+        warningShown = false
+        replace PopoutView, \resizeBind, (r_) -> return ->
+            try
+                r_ ...
+            catch e
+                window.e = e
+                console.log "[PopoutView:resize] error", e.stack
+                if not this._window and not warningShown
+                    API.chatLog "[p0ne] your adblocker is preventing plug.dj from opening the popout chat. You have to make an exception for plug.dj or disable your adblocker. Adblock Plus is known for causing this", true
+                    warningShown = true
+                    sleep 10_000ms, ->
+                        warningShown = false
+
+module \disableIntercomTracking, do
+    disabled: true
+    settings: \dev
+    require: <[ tracker ]>
+    setup: ({replace}) ->
+        for k,v of tracker when typeof v == \function
+            replace tracker, k, -> return -> return $.noop
+        replace tracker, \event, -> return -> return this

@@ -1,0 +1,701 @@
+/**
+ *@author jtbrinkmann aka. Brinkie Pie
+ *@license MIT License http://opensource.org/licenses/MIT
+ *@copyright 2014 J.-T. Brinkmann
+ */
+
+/*== Backgrounds ==*/
+/* optimized to work along with plugCubed's RSS theme for friendshipismagic */
+.room-background {
+    display: none;
+}
+
+/* clear background */
+#app {
+    background: url("https://i.imgur.com/b8M0n1c.png") fixed center center / cover !important;
+}
+/* blurred background */
+.popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions,
+#user-rollover, #footer-user .back, .communities, .history, .pop-menu, .p0ne-song-info
+/*#user-inventory div.avatars, #user-inventory div.badges, #inventory-view div.history
+#user-store div.avatars, #user-store div.badges, #user-store div.misc,
+#user-view>div>.section*/ {
+    background: url(https://i.imgur.com/cWuL5f4.png) fixed center center / cover !important;
+}
+
+
+
+/* transparent background */
+#playlist-panel .button, #chat .moderation, #chat .skip, #chat .update, #chat .welcome,
+#footer-user .item, #user-inventory>.avatars .avatar, #user-menu .avatar,
+#user-view .cell, #waitlist .list .user, #room-info .button,
+.dialog-body, #search-suggestion ul, #search-suggestion li, #app-menu .list,
+.app-right .friends, .pop-menu ul, #history-button,
+.popout #vote #woot, .popout #vote #grab, .popout #vote #meh,
+#user-rollover .meta, #footer-user,
+#dialog-ban-user .duration .toggle, #dialog-mute-user .duration .toggle {
+    background: transparent !important;
+}
+
+/* slightly opaque background */
+#playlist-panel .row:hover, #search-bar, #filter-bar, .youtube-input,
+#chat .emote, #chat .message, #user-menu, #user-inventory>.avatars .top, #user-rollover .info,
+.user-content.profile .notifications .row, .dialog .dialog-body .divider, .experience .xp .bar,
+#user-settings .container button, .dropdown, #volume .slider,
+.input-background, .search, #user-friends .list .row, .app-right .group,
+.pop-menu li:hover, .user-content .grid .cell:hover>.top,
+#user-inventory, #user-store, #user-friends, #user-settings {
+    background: rgba(0,0,0,0.2) !important;
+}
+
+/* opaque background */
+#playlist-panel .row.selected, #search, #playlist-menu,
+#room-info .welcome, .user-content.profile .meta .blurb .box,
+.user-content.profile .meta .blurb>input, #footer-user.open-status .image,
+#footer-user.open-user .info, #dj-button, #vote .crowd-response, #search-suggestion li:hover,
+#search-suggestion li.selected, #footer-user .back span, #app-menu .item:hover,
+#user-friends .list .row .buttons button, #friends-button .request-count,
+.pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio {
+    background: rgba(0,0,0,0.4) !important;
+}
+
+/* dark background (when overlaying other text) */
+#footer-user .menu, #room-info, #search-suggestion, #app-menu.open, .dialog,
+.dialog-input-background, .swap, #history-panel {
+    background: rgba(20,20,20,0.85) !important;
+}
+
+#footer-user .item:hover {
+    background: rgba(35,37,40,0.8) !important;
+}
+
+/* button selected */
+#dialog-ban-user .duration .toggle.selected, #dialog-mute-user .duration .toggle.selected,
+.dialog.choice .selected .radio {
+    background: linear-gradient(to bottom, rgba(5, 60, 80, .5) 0, rgba(5, 72, 100, .7) 100%) !important;
+}
+/* button */
+#dialog-ban-user.bouncer .duration .toggle {
+    border-radius: 10px;
+    box-shadow: none;
+}
+#dialog-container .duration {
+    border: none !important;
+    padding: 0 10px;
+    box-sizing: border-box;
+}
+
+/*== dialogs ==*/
+.dialog-frame .title {
+    text-shadow: 0 0 10px #f98;
+}
+.dialog .divider {
+    display: none;
+}
+.dialog.choice ul {
+    width: 100%;
+    left: 0;
+}
+.dialog.choice li {
+    padding: 0 10%;
+    width: 80%;
+    position: relative;
+    text-align: left;
+}
+.dialog.choice li span {
+    position: static;
+    /* display: inline-block; */
+    margin-left: 60px;
+}
+.dialog.choice li .radio {
+    position: relative;
+    display: block;
+    margin-bottom: -5px;
+}
+
+/*= small, unsorted adjustments */
+#user-view {
+    background: linear-gradient(to bottom, rgb(44, 26, 97) 0, rgb(5, 82, 98) 100%) !important;
+}
+.communities .host {
+    margin-top: -85px !important;
+    text-align: center;
+}
+.dropdown dt {
+    box-shadow: inset -39px 0 0 0 rgba(88, 94, 129, .4);
+}
+#search {
+    width: auto !important;
+    right: 0;
+}
+
+
+/*= DJ booth =*/
+#avatars-container::before {
+    content: url(https://i.imgur.com/tzlDl3L.png);
+    position: absolute;
+    bottom: 45px;
+    width: 100%;
+    text-align: center;
+    z-index: 2;
+}
+
+/*= dialogs =*/
+.dialog {
+    box-shadow: 0 0 25px #111, 0 0 10px #000;
+}
+.dialog.youtube {
+    background: transparent !important;
+    /* background: rgba(255,255,255,0.1) !important; */
+}
+.dialog.destructive .button.submit, #playlist-create.drag-over {
+    background: linear-gradient(to bottom,rgb(244, 107, 64) 0,rgb(240, 79, 48) 100%) !important;
+    border-radius: 5px;
+}
+.dialog.destructive.no-submit .button.submit {
+    background: linear-gradient(to bottom,rgba(50, 50, 50, .4) 0,rgba(70, 70, 70, .6) 100%) !important;
+    color: #aaa !important;
+}
+.youtube .dialog-body .message {
+    left: 0 !important;
+    right: 0;
+    width: auto !important;
+    top: 0 !important;
+    height: 35px;
+    padding-top: 5px;
+    background: linear-gradient(to bottom,rgba(27, 27, 27, 0.8) 0, rgba(27, 27, 27, .95) 20%, rgba(27, 27, 27, 1) 100%);
+}
+.youtube .dialog-frame:first-child {
+    background: rgba(27, 27, 27, 0.8);
+}
+.youtube .dialog-frame:last-child {
+    background: linear-gradient(to bottom,rgba(27, 27, 27, 1) 0,rgba(27, 27, 27, 0.8) 100%);
+}
+
+/*= playlist panel =*/
+.swap {
+    box-shadow: 0 0 10px rgb(102, 204, 255);
+    background: rgba(0, 54, 105, .3) !important;
+}
+
+#playlist-panel {
+    right: 0;
+    width: auto !important;
+}
+
+/*= chat messages =*/
+#chat-messages .cm {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    transition: border-left-width 100ms linear, padding-left 100ms linear;
+    border-left: #FFF 0 solid;
+    padding-left: 3px;
+}
+
+/*= avatar list (store & inventory) + friend list =*/
+#user-view .cell .top, #user-friends .list .row {
+    opacity: .6;
+    border-radius: 90px;
+    transition: border-radius 0.2s ease-out;
+}
+#user-inventory>.avatars .grid .cell:hover>.top, #user-inventory>.avatars .my-avatars .grid .cell.selected .top {
+    border-radius: 12px
+}
+#user-friends .list .row {
+    opacity: .6;
+    border-bottom-right-radius: 0;
+    border-top-right-radius: 0;
+}
+#user-view .selected .top, #user-view .cell:hover .top, #user-friends .list .row:hover {
+    opacity: 1;
+}
+
+/*= fancy gradients =*/
+.app-header {
+    background: linear-gradient(to bottom,rgba(46, 0, 116, 1) 0,rgba(83, 30, 104, .2) 100%);
+}
+#footer {
+    background: linear-gradient(to bottom,rgba(16, 92, 107, .2) 0,rgba(0, 0, 0, .8) 100%);
+}
+
+/*#history-button, #app-menu .button, #plugcubed, .popout .header::before*/
+.header-panel-button.selected {
+    background: linear-gradient(to bottom, rgba(164, 39, 150, .8) 0, rgba(92, 2, 85, 0) 100%) !important;
+}
+
+.app-right .list-header, #waitlist .header,
+#chat-header /*, .popout .header*/ {
+    background: linear-gradient(to bottom, rgba(0,0,0, .4) 0, rgba(0,0,0, 0) 100%) !important;
+    width: auto;
+}
+
+/*= toolbar icons =*/
+.app-right .header {
+    border-bottom: none;
+    margin-bottom: 0;
+    text-align: center;
+    background: rgba(31,12,44, .8) !important;
+    z-index: 3;
+    right: 12px;
+    width: auto;
+}
+#media-panel .header, #chat-header, .app-right .list-header /*, .popout .header*/ {
+    background: linear-gradient(to bottom, rgba(31,12,44, .8) 0, rgba(57,27,78, .8) 50%, rgba(57,27,78, .5) 100%) !important;
+    /* background: linear-gradient(to bottom, rgba(31,12,44, 1) 0, rgba(0,0,0, 0.5) 100%) !important; */
+    z-index: 3;
+    box-shadow: 0 0 2px #000;
+}
+#app-menu, #app #plugcubed, .header-panel-button { /* make them transparent for a clean look*/
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none;
+}
+#app-menu.open {
+    background: rgba(20, 20, 20, 0.85098) url(https://i.imgur.com/tJ6bT3m.png) center bottom no-repeat !important;
+}
+.app-right .friends .header {
+    width: auto;
+}
+
+
+.app-right .header::after, #chat-header::after, .popout .header::after {
+    content: " ";
+    width: 100%;
+    display: inline-block;
+}
+#chat-header, .popout .header {
+    text-align: justify;
+    left: 0;
+    right: 17px;
+}
+.popout .button, .app-right .button {
+    padding-right: 0;
+    padding-left: 0;
+}
+.app-right .header .icon {
+    position: static;
+    margin-top: 7px;
+    display: inline-block;
+    left: 0px !important;
+}
+.popout .button, .app-right .button, .chat-header-button {
+    display: inline-block !important;
+    float: none !important;
+    margin-left: 0;
+    margin-right: 0 !important;
+}
+#user-lists .button {
+    width: 66px !important; /* magic number at which it doesn't break into two lines (when being staff) */
+}
+#user-lists .header .button.bans, #user-lists .header .button.mutes {
+    cursor: not-allowed !important;
+}
+#user-lists .header.manager .button.bans, #user-lists .header.manager .button.mutes {
+    cursor: pointer !important;
+}
+
+/* fancy selected tab */
+#user-lists .room.selected    { background: linear-gradient(to bottom,  rgba(0,0,0,0) 0,  rgba(100, 100, 100, .3) 100%); }
+#user-lists .staff.selected   { background: linear-gradient(to bottom,  rgba(0,0,0,0) 0,  rgba(172, 118, 255, .3) 100%); }
+#user-lists .ignored.selected { background: linear-gradient(to bottom,  rgba(0,0,0,0) 0,  rgba(240,  79,  48, .3) 100%); }
+
+
+/*= improve readability =*/
+#playlist-menu .title, .experience .xp .next-level, .user-content .points .label, .user-content .row .timestamp{
+    color: white !important;
+}
+.dark-label, .user-content .header span, #app-menu .list, #app-menu a, .user-content.profile .meta .joined {
+    color: #bbb !important
+}
+
+
+/*= rounded top-left border =*/
+#user-settings .container .item::before {
+    content: "";
+    width: 20px;
+    height: 21px;
+    margin-left: -2px;
+    background: rgba(0,0,0,0.2);
+    display: block;
+    float: left;
+    border-radius: 7px;
+}
+
+
+/*= animated XP bars =*/
+.progress {
+    background: linear-gradient(to bottom, rgb(0, 196, 255) 0, rgb(0, 136, 196) 100%) !important;
+}
+
+.progress:after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background-image:
+       -webkit-gradient(linear, 0 0, 100% 100%,
+          color-stop(.25, rgba(255, 255, 255, .2)),
+          color-stop(.25, transparent), color-stop(.5, transparent),
+          color-stop(.5, rgba(255, 255, 255, .2)),
+          color-stop(.75, rgba(255, 255, 255, .2)),
+          color-stop(.75, transparent), to(transparent)
+       );
+    z-index: 0;
+    background-size: 50px 50px;
+    animation: move 4s linear infinite;
+}
+
+@-webkit-keyframes move {
+    0% {
+       background-position: 0 0;
+    }
+    100% {
+       background-position: 50px 50px;
+    }
+}
+.experience .level {
+    opacity: .5;
+}
+.experience .level.earned {
+    opacity: 1;
+}
+
+
+/*== bigger video thumbnails in playlist ==*/
+.history img {
+    margin: 0;
+    height: 75px;
+    width: 100px;
+}
+.media-list img {
+    margin: 0;
+    width: 80px;
+    height: 55px;
+    position: absolute;
+    float: none;
+}
+
+
+/*
+#user-rollover .meta.available {
+    background: linear-gradient(to bottom,rgba(76, 122, 50, 0.6) 0,rgba(28, 31, 37, 0) 100%) !important;
+}
+#user-rollover .meta.working {
+    background: linear-gradient(to bottom,rgba(132, 41, 25, 0.6) 0,rgba(28, 31, 37, 0) 100%);
+}
+#user-rollover .meta.gaming {
+    background: linear-gradient(to bottom,rgba(94, 68, 135, 0.6) 0,rgba(28, 31, 37, 0) 100%);
+}
+#user-rollover .meta.away {
+    background: linear-gradient(to bottom,rgba(109, 92, 40, 0.6) 0,rgba(28, 31, 37, 0) 100%);
+}*/
+
+
+/*= askew tabbars =*/
+.tab-menu {
+    position: relative;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0;
+    width: auto !important;
+    border-bottom: 1px solid rgba(0,0,0,0.5);
+    height: 50px;
+    padding-bottom: 0;
+    padding: 0px 0 0 30px;
+    background: rgba(0,0,0,.2);
+    margin: 0 !important;
+}
+.tab-menu>button {
+    background: transparent !important;
+    color: white;
+    box-shadow: none;
+    height: 50px;
+    overflow: visible;
+    border-right: 30px solid transparent;
+    box-sizing: border-box;
+}
+.tab-menu .selected {
+    background: #4C2E85 content-box !important;
+}
+.tab-menu .selected::before {
+    content: " ";
+    border-right: 15px solid #4C2E85;
+    border-bottom: 25px solid  #4C2E85;
+    border-left: 15px solid transparent;
+    border-top: 25px solid transparent;
+    position: absolute;
+    left: -30px;
+    top: 0;
+}
+.tab-menu .selected::after {
+    content: " ";
+    border-left: 15px solid #4C2E85;
+    border-top: 25px solid  #4C2E85;
+    border-right: 15px solid transparent;
+    border-bottom: 25px solid transparent;
+    position: absolute;
+    right: -30px;
+    top: 0;
+}
+
+/*= fix Back-button size (e.g. when in #user-view) =*/
+#footer-user .back span {
+    top: 0;
+    bottom: 0;
+    vertical-align: middle;
+    line-height: 54px;
+}
+
+/*= red Logout button =*/
+#app-menu .list .logout {
+    background: rgba(80,0,20, 0.8)
+}
+
+/*= user-profile adjustments =*/
+.user-content.profile .link {
+    top: 20px;
+    right: 20px;
+    left: auto;
+    height: auto;
+    bottom: auto;
+}
+
+.user-content.profile .meta {
+    background: rgba(0,0,0,0.2);
+    margin: 0;
+    padding: 12px 5px 0 5px;
+    right: 40px !important;
+    left: 0;
+    position: relative !important;
+    width: auto;
+}
+
+/* #user-view pages */
+#user-inventory div.avatars, #user-inventory div.badges, #user-inventory div.history,
+#user-store div.avatars, #user-store div.badges, #user-store div.misc,
+#user-view>div>.section {
+    box-sizing: border-box;
+    left: 0 !important;
+    top: 0;
+    /* bottom: -5px; */
+    margin: 0;
+    width: 100% !important;
+    height: 100% !important;
+    border-top-left-radius: 5px;
+    border-top: 1px solid rgba(0,0,0,0.5);
+}
+
+#user-view .tab-menu {
+    left: 4px !important;
+    background: transparent;
+    border: none;
+}
+#user-view .box, #user-view .jspContainer, #user-view .jspPane {
+    /* height: 100% !important; */
+    width: 100% !important;
+    top: 0;
+}
+#user-view .header {
+    width: 100% !important;
+}
+#user-view .cell {
+    display: inline-block;
+    float: none;
+}
+#user-view .grid {
+    text-align: center;
+}
+#user-inventory div.history {
+    padding-top: 15px;
+}
+#user-inventory .history .legend {
+    margin-top: 0;
+}
+#user-view .header {
+    box-shadow: none;
+    margin-top: 15px;
+    float: none !important;
+    /* position: static; */
+}
+#user-store .misc .grid .cell .title-bar {
+    background: transparent;
+}
+#user-settings .left {
+    float: none;
+}
+
+/*== Chat ==*/
+#chat .delete-button {
+    background: rgba(255,0,0,0.2);
+    box-shadow: 0 0 3px #800;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity .5s ease-out;
+    transition-delay: 1s;
+    display: block !important;
+}
+
+#chat .cm:hover .delete-button {
+    opacity: 1
+}
+
+
+/*= vote buttons =*/
+#vote .crowd-response { margin-right: 0; }
+#meh.selected  { background: #c42e3b !important; box-shadow: +3px 0 20px #c42e3b !important;}
+#woot.selected { background: #90ad2f !important; box-shadow: -3px 0 20px #90ad2f !important;}
+#grab.selected { background: #aa74ff !important; box-shadow:  0   0 20px #aa74ff !important;}
+
+
+/*== smaller playlist rows ==*/
+/* (for when you have more than just a few playlists ;D) */
+#playlist-menu .menu .row {
+    height: 25px;
+}
+#playlist-menu .menu .row .activate-button {
+    top: -5px;
+}
+#playlist-menu .menu .row .name, #playlist-menu .menu .row .count {
+    top: 0;
+}
+#playlist-menu .row .spinner {
+    top: 12px !important;
+}
+
+/*= transparent header =*/
+#media-panel {
+    height: 100%;
+}
+#playlist-panel .media-list {
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 54px !important;
+    height: auto !important;
+}
+#playlist-panel .media-list .jspPane {
+    margin-top: 55px;
+    padding-bottom: 100px !important;
+}
+
+
+
+/* playlist import icon */
+.playlist-icon-view .import-playlist-list .row::before {
+    content: " ";
+    display: block;
+    position: relative;
+    top: 50px;
+    left: 60px;
+    background: url('https://cdn.plug.dj/_/static/images/icons.587753be68926f7cf19ad9feb14752446cb87fd8.png');
+    background-position: -280px -105px;
+    width: 30px;
+    height: 30px;
+}
+.playlist-icon-view .import-playlist-list .row .meta {
+    text-align: center;
+}
+
+
+/*== Dashboard / Communities ==*/
+.communities .tab-menu {
+    background: transparent;
+    border-bottom: none
+}
+.communities::before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 67px;
+    background: rgba(0,0,0, 0.2);
+    border-bottom: 1px solid rgba(0,0,0, 0.4);
+}
+#dashboard-search {
+    text-align: center;
+}
+
+
+/*= Waitlist position number =*/
+#waitlist .user .position {
+    width: 22px;
+    text-align: right;
+}
+#waitlist .user .position::after {
+    content: "."
+}
+
+/*== fixes for Popout Chat ==*/
+.popout .header {
+    left: 70px !important;
+    right: 20px;
+    width: auto !important;
+}
+.popout .header .icon-chat {
+    left: -60px !important;
+}
+.popout .header::before {
+    content: " ";
+    width: 48px;
+    height: 48px;
+    position: absolute;
+    left: -70px;
+}
+.popout #chat-messages {
+    color: white !important;
+    font-size: 12px;
+}
+
+/*= make lists in .app-right larger =*/
+.app-right .list {
+    height: auto !important;
+    bottom: 0;
+    top: 0 !important;
+}
+.app-right .list .jspContainer {
+    height: 100% !important;
+}
+
+/*= transparent #user-rollover =*/
+#user-rollover, .pop-menu {
+    opacity: 0.95;
+}
+
+/*== playback controls ==*/
+
+#playback-controls .refresh { background: linear-gradient(to bottom, rgba(  0, 181, 230, .7) 0, rgba(  0, 181, 230, .1) 100%) !important; }
+#playback-controls .hd {      background: linear-gradient(to bottom, rgba(  0, 230,  99, .7) 0, rgba(  0, 230,  99, .1) 100%) !important; }
+#playback-controls .snooze {  background: linear-gradient(to bottom, rgba(172, 118, 255, .7) 0, rgba(172, 118, 255, .1) 100%) !important; }
+
+/* transparent Chat Header */
+/*#chat-messages { // was bugging out the chat scroll
+    bottom: 45px;
+    padding-top: 46px;
+}
+#chat-messages, */
+/*== transparent headers in .app-right ==*/
+.app-right .jspScrollable {
+    top: 0;
+    height: auto !important;
+}
+#user-lists .jspPane { padding-top: 100px !important; }
+#waitlist .jspPane { padding-top: 50px !important; }
+.app-right .friends .jspPane { padding-top: 50px !important; }
+.app-right .friends.has-requests .jspPane { padding-top: 100px !important; }
+
+.app-right .list-header {
+    right: 12px;
+    width: auto !important;
+}
+.app-right .jspVerticalBar {
+    opacity: 1;
+}
+
+
+
+
+
+
+#user-rollover.chat {
+    left: auto !important;
+    right: 352px;
+}

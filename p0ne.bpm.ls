@@ -22,7 +22,11 @@ do ->
             <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
             <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
             <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
-            <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
+            #{if \webkitAnimation of document.body.style
+                "<link rel='stylesheet' href='#host/css/extracss-webkit.css' type='text/css'>"
+            else
+                "<link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>"
+            }
         </div>
     "
     /*

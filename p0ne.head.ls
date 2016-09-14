@@ -11,16 +11,26 @@
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
 window.p0ne =
-    version: \1.3.1
-    lastCompatibleVersion: \1.2.1 /* see below */
+    version: \1.4.6
+    lastCompatibleVersion: \1.3.9 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
     YOUTUBE_KEY: \AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw
-    proxy: (url) -> return "https://jsonp.nodejitsu.com/?raw=true&url=#url" # for cross site requests
+    proxy: (url) -> return "https://jsonp.nodejitsu.com/?raw=true&url=#{escape url}" # for cross site requests
+    #proxy: (url) -> return "https://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20json%20where%20url%3D"#{escape url}"
     started: new Date()
     lsBound: {}
-    modules: []
+    lsBound_num: {}
+    modules: p0ne?.modules || {}
     dependencies: {}
+    close: ->
+        for m in @modules
+            m.disable?!
+console.info "plug_p0ne v#{p0ne.version}"
+
+try
+    /* save data of previous p0ne instances */
+    saveData?!
 
 /*####################################
 #           COMPATIBILITY            #
@@ -29,15 +39,32 @@ window.p0ne =
 window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to `b`; e.g. "1.2.0" is greater than "1.1.4.9" */
     a .= split \.
     b .= split \.
-    for ,i in a
-        if a[i] < b[i]
-            return false
-        else if a[i] > b[i]
-            return true
-    return true
+    for ,i in a when a[i] != b[i]
+        return a[i] > b[i]
+    return b.length > a.length
 
 
-<-      (fn) ->
+<-      (fn_) ->
+    if console and typeof (console.group || console.groupCollapsed) == \function
+        fn = ->
+            if console.groupCollapsed
+                console.groupCollapsed "[p0ne] initializing… (click on this message to expand/collapse the group)"
+            else
+                console.group "[p0ne] initializing…"
+
+            errors = warnings = 0
+            error_ = console.error; console.error = -> errors++; error_ ...
+            warn_ = console.warn; console.warn = -> warnings++; warn_ ...
+
+            fn_!
+
+            console.groupEnd!
+            console.info "[p0ne] initialized!"
+            console.error = error_; console.warn = warn_
+            console.error "[p0ne] There have been #errors errors" if errors
+            console.warn "[p0ne] There have been #warnings warnings" if warnings
+    else
+        fn = fn_
     if not (v = localStorage.p0neVersion)
         # no previous version of p0ne found, looks like we're good to go
         return fn!
@@ -47,9 +74,14 @@ window.compareVersions = (a, b) -> /* returns whether `a` is greater-or-equal to
         fn!
     else
         # incompatible, load migration script and continue when it's done
-        console.warn "[p0ne] obsolete p0ne version detected (#v), migrating…"
-        API.once "p0ne_migrated_#{p0ne.lastCompatibleVersion}", fn
-        $.getScript "#{p0ne.host}/script/plug_p0ne.migrate.#{vArr.0}.js?from=#v&to=#{p0ne.version}"
+        console.warn "[p0ne] obsolete p0ne version detected (#v), loading migration script…"
+        API.off \p0ne_migrated
+        API.once \p0ne_migrated, onMigrated = (newVersion) ->
+            if newVersion == p0ne.lastCompatibleVersion
+                fn!
+            else
+                API.once \p0ne_migrated, onMigrated # did you mean "recursion"?
+        $.getScript "#{p0ne.host}/script/plug_p0ne.migrate.#{v.substr(0,v.indexOf(\.))}.js?from=#v&to=#{p0ne.version}"
 
-p0ne = window.p0ne
+p0ne = window.p0ne # so that modules always refer to their initial `p0ne` object, unless explicitly referring to `window.p0ne`
 localStorage.p0neVersion = p0ne.version

@@ -6,8 +6,8 @@
  * @copyright (c) 2014 J.-T. Brinkmann
 */
 
-$window = $ window
-$body = $ document.body
+export $window = $ window
+export $body = $ document.body
 
 
 /*####################################
@@ -38,7 +38,6 @@ String::define \reverse, ->
     while i--
         res += @[i]
     return res
-String::define \has, (needle) -> return -1 != @indexOf needle
 String::define \startsWith, (str) ->
     i=0
     while char = str[i]
@@ -46,17 +45,27 @@ String::define \startsWith, (str) ->
     return true
 String::define \endsWith, (str) ->
     return this.lastIndexOf == @length - str.length
+for Constr in [String, Array]
+    Constr::define \has, (needle) -> return -1 != @indexOf needle
+    Constr::define \hasAny, (needles) ->
+        for needle in needles when -1 != @indexOf needle
+            return true
+        return false
 
 Number::defineGetter \min, ->   return this * 60_000min_to_ms
 Number::defineGetter \s, ->     return this * 1_000min_to_ms
 
 
 jQuery.fn <<<<
-    fixSize: -> #… this is not really used?
-        for el in this
-            el.style .width = "#{el.width}px"
-            el.style .height = "#{el.height}px"
-        return this
+    indexOf: (selector) ->
+        /* selector may be a String jQuery Selector or an HTMLElement */
+        if @length and selector not instanceof HTMLElement
+            i = [].indexOf.call this, selector
+            return i if i != -1
+        for el, i in this when jQuery(el).is selector
+            return i
+        return -1
+
     concat: (arr2) ->
         l = @length
         return this if not arr2 or not arr2.length
@@ -65,36 +74,53 @@ jQuery.fn <<<<
             @[i+l] = el
         @length += arr2.length
         return this
+    fixSize: -> #… only used in saveChat so far
+        for el in this
+            el.style .width = "#{el.width}px"
+            el.style .height = "#{el.height}px"
+        return this
 
 /*####################################
 #            DATA MANAGER            #
 ####################################*/
-window{compress, decompress} = LZString
-if not window.dataSave?.p0ne
-    window.dataLoad = (name, defaultVal={}) ->
-        return p0ne.lsBound[name] if p0ne.lsBound[name]
-        if localStorage[name]
-            if decompress(localStorage[name])
-                return p0ne.lsBound[name] = JSON.parse(that)
-            else
-                name_ = Date.now!
-                console.warn "failed to load '#name' from localStorage, it seems to be corrupted! made a backup to '#name_' and continued with default value"
-                localStorage[name_] = localStorage[name]
-        return p0ne.lsBound[name] = defaultVal
-    window.dataSave = !->
-        err = ""
-        for k,v of p0ne.lsBound
-            try
-                localStorage[k] = compress(v.toJSON?! || JSON.stringify(v))
-            catch
-                err += "failed to store '#k' to localStorage\n"
-        if err
-            alert err
+if window.dataSave
+    window.dataSave!
+    $window .off \beforeunload, window.dataSave.cb
+    clearInterval window.dataSave.interval
+
+if window.chrome
+    window{compress, decompress} = LZString
+else
+    window{compressToUTF16:compress, decompressFromUTF16:decompress} = LZString
+window.dataLoad = (name, defaultVal={}) ->
+    return p0ne.lsBound[name] if p0ne.lsBound[name]
+    if localStorage[name]
+        if decompress(localStorage[name])
+            return p0ne.lsBound[name] = JSON.parse(that)
         else
-            console.log "[Data Manager] saved data"
-    window.dataSave.p0ne = true
-    $window .on \beforeunload, dataSave
-    setInterval dataSave, 15.min
+            name_ = Date.now!
+            console.warn "failed to load '#name' from localStorage, it seems to be corrupted! made a backup to '#name_' and continued with default value"
+            localStorage[name_] = localStorage[name]
+    p0ne.lsBound_num[name] = (p0ne.lsBound_num[name] ||0) + 1
+    return p0ne.lsBound[name] = defaultVal
+window.dataUnload = (name) !->
+    if p0ne.lsBound_num[name]
+        p0ne.lsBound_num[name]--
+    if p0ne.lsBound_num[name] == 0
+        delete p0ne.lsBound[name]
+window.dataSave = !->
+    err = ""
+    for k,v of p0ne.lsBound
+        try
+            localStorage[k] = compress(v.toJSON?! || JSON.stringify(v))
+        catch
+            err += "failed to store '#k' to localStorage\n"
+    if err
+        alert err
+    else
+        console.log "[Data Manager] saved data"
+$window .on \beforeunload, dataSave.cb = dataSave
+dataSave.interval = setInterval dataSave, 15.min
 
 
 /*####################################
@@ -130,11 +156,15 @@ window <<<<
                 return user
             else if user.attributes and user.toJSON
                 return user.toJSON!
+            else if user.un
+                return getUser(user.id) || getUser(user.un)
+            else if user.id
+                return getUser(user.id)
             return null
         userList = API.getUsers!
         if +user
             if users?.get? user
-                return that
+                return that .toJSON!
             else
                 for u in userList when u.id == user
                     return u
@@ -186,7 +216,7 @@ window <<<<
             $ window .one loadedEvent, d.resolve #Note: .resolve() is always bound to the Deferred
         return d.promise!
 
-    requireIDs: dataLoad \requireIDs, {}
+    requireIDs: dataLoad \p0ne_requireIDs, {}
     requireHelper: (name, test, {id, onfail, fallback}=0) ->
         if (module = window[name] || require.s.contexts._.defined[id]) and test module
             id = module.requireID
@@ -339,7 +369,7 @@ window <<<<
                         uploadDate:   d.entry.published.$t
                         url:          "https://youtube.com/watch?v=#cid"
                         description:  d.entry.media$group.media$description.$t
-                        duration:     d.entry.media$group.yt$duration.seconds
+                        duration:     d.entry.media$group.yt$duration.seconds # in s
                     success window.mediaLookup.lastData
         else if format == 2
             if cid
@@ -365,7 +395,7 @@ window <<<<
                         uploadDate:     d.created_at
                         url:            d.permalink_url
                         description:    d.description
-                        duration:       d.duration # in s
+                        duration:       d.duration / 1000ms_to_s # in s
 
                         download:       d.download_url + "?client_id=#{p0ne.SOUNDCLOUD_KEY}"
                         downloadSize:   d.original_content_size
@@ -399,10 +429,13 @@ window <<<<
                         success? unescape(unescape(that.1))
                     else
                         fail? "unkown error"
-        else if format == 2
+        else if format == 2 # soundcloud
             mediaLookup media
                 .then (d) ->
-                    success? d.download, d.downloadSize, downloadFormat
+                    if d.download
+                        success? d.download, d.downloadSize, downloadFormat
+                    else
+                        fail? "download disabled"
                 .fail ->
                     fail? ...
 
@@ -414,10 +447,6 @@ window <<<<
             .trigger do
                 type: \keyup
                 which: 13 # Enter
-        /*app.footer.playlist.onBarClick!
-        app.footer.playlist.playlist.search.searchInput.value = query
-        app.footer.playlist.playlist.search.onSubmitSearch!
-        */
 
     httpsify: (url) ->
         if url.startsWith("http:")
@@ -432,8 +461,13 @@ window <<<<
     getChat: (cid) ->
         return getChatText cid .parent! .parent!
     #ToDo test this
-    getMentions: (data) ->
-        names = []; l=0
+    getMentions: (data, safeOffsets) ->
+        if safeOffsets
+            attr = \mentionsWithOffsets
+        else
+            attr = \mentions
+        return that if data[attr]
+        mentions = []; l=0
         users = API.getUsers!
         msgLength = data.message.length
         data.message.replace /@/g, (_, offset) ->
@@ -443,20 +477,26 @@ window <<<<
             while possibleMatches.length and i < msgLength
                 possibleMatches2 = []; l3 = 0
                 for m in possibleMatches when m.username[i] == data.message[offset + i]
-                    console.log ">", data.message.substr(offset, 5), i, "#{m.username .substr(0,i)}#{m.username[i].toUpperCase!}#{m.username .substr i+1}"
+                    #console.log ">", data.message.substr(offset, 5), i, "#{m.username .substr(0,i)}#{m.username[i].toUpperCase!}#{m.username .substr i+1}"
                     if m.username.length == i + 1
                         res = m
-                        console.log ">>>", m.username
+                        #console.log ">>>", m.username
                     else
                         possibleMatches2[l3++] = m
                 possibleMatches = possibleMatches2
                 i++
-            if res and names.indexOf(res) == -1
-                names[l++] = res.username
+            if res
+                if safeOffsets
+                    mentions[l++] = res with offset: offset - 1
+                else if not mentions.has(res)
+                    mentions[l++] = res
 
-        names = [data.un] if not names.length
-        names.toString = -> return humanList this
-        return names
+        mentions = [getUser(data)] if not mentions.length and not safeOffsets
+        mentions.toString = ->
+            res = [user.username for user in this]
+            return humanList res # both lines seperate for performance optimization
+        data[attr] = mentions
+        return mentions
 
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
@@ -483,10 +523,32 @@ window <<<<
         map = window.emoticons?.map
         return str if not map
         str .replace /<span class="emoji-glow"><span class="emoji emoji-(\w+)"><\/span><\/span>/g, (_, emoteID) ->
-            if emoticons.reverseMap[emoteID]
+            if emoticons.reversedMap[emoteID]
                 return ":#that:"
             else
                 return _
+
+    #== RTL emulator ==
+    # str = "abc\u202edef\u202dghi"
+    # [str, resolveRTL(str)]
+    resolveRTL: (str, dontJoin) ->
+        a = b = ""
+        isRTLoverridden = false
+        "#str\u202d".replace /(.*?)(\u202e|\u202d)/g, (_,pre,c) ->
+            if isRTLoverridden
+                b += pre.reverse!
+            else
+                a += pre
+            isRTLoverridden := (c == \\u202e)
+            return _
+        if dontJoin
+            return [a,b]
+        else
+            return a+b
+
+    collapseWhitespace: (str) ->
+        return str.replace /\s+/g, ' '
+    cleanMessage: (str) -> return str |> unemotify |> stripHTML |> htmlUnescape |> resolveRTL |> collapseWhitespace
 
     formatPlainText: (text) -> # used for song-notif and song-info
         lvl = 0
@@ -514,27 +576,8 @@ window <<<<
         text += "</i>" if lvl
         return text .replace /\n/g, \<br>
 
-    #== RTL emulator ==
-    # str = "abc\u202edef\u202dghi"
-    # [str, resolveRTL(str)]
-    resolveRTL: (str, dontJoin) ->
-        a = b = ""
-        isRTLoverridden = false
-        "#str\u202d".replace /(.*?)(\u202e|\u202d)/g, (_,pre,c) ->
-            if isRTLoverridden
-                b += pre.reverse!
-            else
-                a += pre
-            isRTLoverridden := (c == \\u202e)
-            return _
-        if dontJoin
-            return [a,b]
-        else
-            return a+b
-    cleanMessage: (str) -> return str |> unemotify |> stripHTML |> htmlUnescape |> resolveRTL
 
-
-    colorKeywords: do ->
+    /*colorKeywords: do ->
         <[ %undefined% black silver gray white maroon red purple fuchsia green lime olive yellow navy blue teal aqua orange aliceblue antiquewhite aquamarine azure beige bisque blanchedalmond blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen gainsboro ghostwhite gold goldenrod greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow limegreen linen mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite oldlace olivedrab orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna skyblue slateblue slategray slategrey snow springgreen steelblue tan thistle tomato turquoise violet wheat whitesmoke yellowgreen rebeccapurple ]>
             ..0 = void
             return ..
@@ -546,11 +589,15 @@ window <<<<
         if tmp and tmp.1 in window.colorKeywords
             return str
         else
-            return false
+            return false*/
+    isColor: (str) ->
+        $dummy.0 .style.color = ""
+        $dummy.0 .style.color = str
+        return $dummy.0 .style.color == ""
 
     isURL: (str) ->
         return false if typeof str != \string
-        str.trim!
+        str .= trim! .replace /\\\//g, '/'
         if parseURL(str).host != location.host
             return str
         else
@@ -614,9 +661,10 @@ window <<<<
 
     lssize: (sizeWhenDecompressed) ->
         size = 0mb
-        for ,x of localStorage
-            x = decompress x if sizeWhenDecompressed
-            size += x.length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
+        for k,v of localStorage when k != \length
+            if sizeWhenDecompressed
+                try v = decompress v
+            size += v.length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
         return size
     formatMB: ->
         return "#{it.toFixed(2)}MB"
@@ -637,12 +685,28 @@ window <<<<
         $dummy.0.href = href
         return $dummy.0{hash, host, hostname, href, pathname, port, protocol, search}
 
+    getIcon: do ->
+        # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
+        # if you plan to use it over and over again, use fn.enableCaching()
+        $icon = $ '<i class=icon>'
+                .css visibility: \hidden
+                .appendTo \body
+        fn = (className) ->
+            $icon.addClass className
+            res =
+                image:    $icon .css \background-image
+                position: $icon .css \background-position
+            $icon.removeClass className
+            return res
+        fn.enableCaching = -> res = _.memoize(fn); res.enableCaching = $.noop; window.getIcon = res
+        return fn
+
 
 
 
     # variables
     disabled: false
-    userID: API?.getUser!.id
+    userID: API?.getUser!.id # API.getUser! will fail when used on the Dashboard if no room has been visited before
     user: API?.getUser! # for usage with things that should not change, like userID, joindate, …
     getRoomSlug: ->
         return room?.get?(\slug) || decodeURIComponent location.pathname.substr(1)
@@ -656,65 +720,67 @@ window <<<<
 ####################################*/
 #= _$context =
 requireHelper \_$context, (._events?['chat:receive']), do
-    fallback: {_events: {}}
     onfail: ->
-        console.error "[p0ne require] couldn't load '_$context'. Some modules might not work"
-window._$context.onEarly = (type, callback, context) ->
+        console.error "[p0ne require] couldn't load '_$context'. Quite a alot modules rely on this and thus might not work"
+window._$context?.onEarly = (type, callback, context) ->
     this._events[][type] .unshift({callback, context, ctx: context || this})
         # ctx:  used for .trigger in Backbone
         # context:  used for .off in Backbone
     return this
 
-#= app =
-window.app = null if window.app?.nodeType
-<-   (cb) ->
-    return cb! if window.app
 
-    requireHelper \App, (.::?.el == \body)
-    if App
-        App::animate = let animate_ = App::animate then !->
-            console.log "[p0ne] got `app`"
-            export p0ne.app = this
-            App::animate = animate_ # restore App::animate
-            animate_ ...
-            cb!
-    else
-        cb!
 
 # continue only after `app` was loaded
-#= room =
+#= require plug.dj modules  =
 requireHelper \user_, (.canModChat) #(._events?.'change:username')
-window.users = user_.collection if user_
 
-requireHelper \room, (.attributes?.hostID?)
-requireHelper \Curate, (.::?execute?.toString!.has("/media/insert"))
+if user_
+    window.users = user_.collection
+    if not userID
+        user = user_.toJSON!
+        userID = user.id
+
+
+window.Lang = require \lang/Lang
+requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
 requireHelper \playlists, (.activeMedia)
 requireHelper \auxiliaries, (.deserializeMedia)
 requireHelper \database, (.settings)
 requireHelper \socketEvents, (.ack)
 requireHelper \permissions, (.canModChat)
-requireHelper \Playback, (.::?id == \playback)
+requireHelper \Playback, (.::?.id == \playback)
 requireHelper \PopoutView, (\_window of)
-requireHelper \MediaPanel, (.::?onPlaylistVisible)
+requireHelper \MediaPanel, (.::?.onPlaylistVisible)
 requireHelper \PlugAjax, (.::?.hasOwnProperty \permissionAlert)
 requireHelper \backbone, (.Events), id: \backbone
 requireHelper \roomLoader, (.onVideoResize)
 requireHelper \Layout, (.getSize)
-requireHelper \RoomUserRow, (.::?.vote)
-requireHelper \DialogAlert, (.::?id == \dialog-alert)
+requireHelper \DialogAlert, (.::?.id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
 requireHelper \ActivateEvent, (.ACTIVATE)
+requireHelper \tracker, (.identify)
+requireHelper \FriendsList, (.::?.className == \friends)
+requireHelper \RoomUserRow, (.::?.vote)
+requireHelper \WaitlistRow, (.::?.onDJClick)
+requireHelper \PlaylistItemRow, (.::?.listClass == \playlist-media)
+requireHelper \room, (.attributes?.hostID?)
 
 requireHelper \emoticons, (.emojify)
-emoticons.reverseMap = {[v, k] for k,v of emoticons.map} if window.emoticons
+emoticons.reversedMap = {[v, k] for k,v of emoticons.map} if window.emoticons
 
-requireHelper \FriendsList, (.::?className == \friends)
-window.friendsList = app.room.friends
+
+# `app` is like the ultimate root object on plug.dj, just about everything is somewhere in there! great for debugging
+for cb in (room._events[\change:name] || _$context?._events[\show:room] || Layout?._events[\resize] ||[]) when cb.ctx.room
+    export app = cb.ctx
+    export friendsList = app.room.friends
+    break
+
+
 
 
 # chat
-if not window.chat = app.room.chat
-    for e in _$context?._events[\chat:receive] || [] when e.context?.cid
+if app and not window.chat = app.room.chat
+    for e in _$context?._events[\chat:receive] ||[] when e.context?.cid
         window.chat = e.context
         break
 
@@ -757,6 +823,16 @@ window <<<<
     chatScrollDown: ->
         cm = $cm!
         cm.scrollTop( cm.0 .scrollHeight )
+
+    chatInput: (msg, append) ->
+        $input = chat?.$chatInputField || $ \#chat-input-field
+        if append and $input.text!
+            msg = "#that #msg"
+        $input
+            .val msg
+            .trigger \input
+            .focus!
+
 
 
 /*####################################
