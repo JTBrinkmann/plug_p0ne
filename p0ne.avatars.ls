@@ -1,11 +1,16 @@
 /**
  * plug_p0ne Custom Avatars
  * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
+ *
  * @author jtbrinkmann aka. Brinkie Pie
  * @version 1.0
- * @license all rights reserved! You may run the bookmarklet provided to you to run this.
- *          You may NOT read, copy or edit this file. STOP EVEN LOOKING AT IT!
+ * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
+ *
+ * Developer's note: if you create your own custom avatar script or use a modified version of this,
+ * you are hereby granted permission connect to this one's default avatar server.
+ * However, please drop me an e-mail so I can keep an overview of things.
+ * I remain the right to revoke this right anytime.
  */
 
 /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
@@ -54,6 +59,7 @@ requireHelper \avatarAuxiliaries, (.getAvatarUrl)
 requireHelper \Avatar, (.AUDIENCE)
 requireHelper \AvatarList, (._byId?.admin01)
 requireHelper \myAvatars, (.comparator == \id) # (_) -> _.comparator == \id and _._events?.reset and (!_.length || _.models[0].attributes.type == \avatar)
+requireHelper \InventoryDropdown, (.selected)
 
 window.Lang = require \lang/Lang
 
@@ -61,7 +67,16 @@ window.Cells = requireAll (m) -> m::?.className == \cell and m::getBlinkFrame
 
 module \customAvatars, do
     require: <[ users Lang avatarAuxiliaries Avatar myAvatars ]>
-    settings: \enableDisable
+    displayName: 'Custom Avatars'
+    settings: \base
+    help: '''
+        This adds a few custom avatars to plug.dj
+
+        You can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".
+        Click on the Dropdown field in the top-left to select another category.
+
+        Everyone who uses plug_p0ne sees you with your custom avatar.
+    '''
     persistent: <[ socket ]>
     setup: ({addListener, replace, css}) ->
         @replace = replace
@@ -88,7 +103,6 @@ module \customAvatars, do
             #   soon also {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn}
             avatarID = d.avatarID
             if p0ne._avatars[avatarID]
-                delete Avatar.IMAGES[avatarID] # delete image cache
                 console.info "[p0ne avatars] updating '#avatarID'"
             else if not d.isVanilla
                 console.info "[p0ne avatars] adding '#avatarID'"
@@ -122,6 +136,8 @@ module \customAvatars, do
             if avatar.category not of Lang.userAvatars
                 Lang.userAvatars[avatar.category] = avatar.category
             #p0ne._myAvatars[*] = avatar
+
+            delete Avatar.IMAGES[avatarID] # delete image cache
             if not updateAvatarStore.loading
                 updateAvatarStore.loading = true
                 requestAnimationFrame -> # throttle to avoid updating every time when avatars get added in bulk
@@ -219,6 +235,31 @@ module \customAvatars, do
             console.log "[p0ne avatars] store reset"
             updateAvatarStore! if vanillaTrigger
 
+        #== patch avatar inventory view ==
+        replace InventoryDropdown::, \draw, (d_) -> return ->
+            html = ""
+            categories = {}
+
+            for avi in myAvatars.models
+                categories[avi.get \category] = true
+
+            for category of categories
+                html += """
+                    <div class="row" data-value="#category"><span>#{Lang.userAvatars[category]}</span></div>
+                """
+
+            @$el.html """
+                <dl class="dropdown">
+                    <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
+                    <dd>#html</dd>
+                </dl>
+            """
+
+            $ \dt   .on \click, (e) ~> @onBaseClick e
+            $ \.row .on \click, (e) ~> @onRowClick  e
+            @select InventoryDropdown.selected
+
+            @$el.show!
 
 
         Lang.userAvatars.p0ne = "Custom Avatars"
@@ -358,10 +399,19 @@ module \customAvatars, do
 
             @socket.trigger type, data
 
-        replace @socket, close, (close_) ~> return ->
+        @replace @socket, close, (close_) ~> return ->
                 @trigger close
                 close_ ...
 
+        # replace old authTokens
+        do ->
+            user = API.getUser!
+            oldBlurb = user.blurb || ""
+            newBlurb = oldBlurb .replace /🐎\w{4}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
+            if oldBlurb != newBlurb
+                @changeBlurb newBlurb, do
+                    success: ~>
+                        console.info "[ppCAS] removed old authToken from user blurb"
 
         @socket.on \authToken, (authToken) ~>
             console.log "[ppCAS] authToken: ", authToken
@@ -369,8 +419,8 @@ module \customAvatars, do
             @oldBlurb = user.blurb || ""
             if not user.blurb # user.blurb is actually `null` by default, not ""
                 newBlurb = authToken
-            else if user.blurb.length >= 73
-                newBlurb = "#{user.blurb.substr(0, 72)}… #authToken"
+            else if user.blurb.length >= 72
+                newBlurb = "#{user.blurb.substr(0, 71)}… 🐎#authToken"
             else
                 newBlurb = "#{user.blurb} #authToken"
 
@@ -442,6 +492,8 @@ module \customAvatars, do
             console.log "[ppCAS] user disconnected:", userID
             @changeAvatarID userID, avatarID
 
+        @socket.on \disconnected, (reason) ->
+            @socket.trigger \close, reason
         @socket.on \close, (reason) ->
             console.warn "[ppCAS] connection closed", reason
             reconnect := false
@@ -452,7 +504,7 @@ module \customAvatars, do
                 if connected
                     console.log "[ppCAS] reconnecting…"; @connect(url, true, true)
                 else
-                    sleep 5_000ms + Math.random()*5_000ms, ->
+                    sleep 5_000ms + Math.random()*5_000ms, ~>
                         console.log "[ppCAS] reconnecting…"
                         @connect(url, true, false)
 

@@ -8,8 +8,63 @@
 
 $window = $ window
 $body = $ document.body
-window.s_to_ms = 1_000
-window.min_to_ms = 60_000
+
+
+/*####################################
+#         PROTOTYPE FUNCTIONS        #
+####################################*/
+# helper for defining non-enumerable functions via Object.defineProperty
+let (d = (property, value) -> if @[property] != value then Object.defineProperty this, property, {-enumerable, +writable, +configurable, value})
+    d.call Object::, \define, d
+Object::define \defineGetter, (property, get) -> if @[property] != get then Object.defineProperty this, property, {-enumerable, +configurable, get}
+
+Array::define \remove, (i) -> return @splice i, 1
+Array::define \removeItem, (el) ->
+    if -1 != (i = @indexOf(el))
+        @splice i, 1
+    return this
+Array::define \random, -> return this[~~(Math.random! * @length)]
+Array::define \unique, ->
+    res = []; l=0
+    for el, i in this
+        for o til i
+            break if @[o] == el
+        else
+            res[l++] = el
+    return
+String::define \reverse, ->
+    res = ""
+    i = @length
+    while i--
+        res += @[i]
+    return res
+String::define \has, (needle) -> return -1 != @indexOf needle
+String::define \startsWith, (str) ->
+    i=0
+    while char = str[i]
+        return false if char != this[i++]
+    return true
+String::define \endsWith, (str) ->
+    return this.lastIndexOf == @length - str.length
+
+Number::defineGetter \min, ->   return this * 60_000min_to_ms
+Number::defineGetter \s, ->     return this * 1_000min_to_ms
+
+
+jQuery.fn <<<<
+    fixSize: -> #… this is not really used?
+        for el in this
+            el.style .width = "#{el.width}px"
+            el.style .height = "#{el.height}px"
+        return this
+    concat: (arr2) ->
+        l = @length
+        return this if not arr2 or not arr2.length
+        return arr2 if not l
+        for el, i in arr2
+            @[i+l] = el
+        @length += arr2.length
+        return this
 
 /*####################################
 #            DATA MANAGER            #
@@ -39,52 +94,7 @@ if not window.dataSave?.p0ne
             console.log "[Data Manager] saved data"
     window.dataSave.p0ne = true
     $window .on \beforeunload, dataSave
-    setInterval dataSave, 15min *min_to_ms
-
-
-/*####################################
-#         PROTOTYPE FUNCTIONS        #
-####################################*/
-# helper for defining non-enumerable functions via Object.defineProperty
-let (d = (property, fn) -> if @[property] != fn then Object.defineProperty this, property, { enumerable: false, writable: true, configurable: true, value: fn })
-    d.call Object::, \define, d
-
-
-Array::define \remove, (i) -> return @splice i, 1
-Array::define \removeItem, (el) ->
-    if -1 != (i = @indexOf(el))
-        @splice i, 1
-    return this
-Array::define \random, -> return this[~~(Math.random! * @length)]
-String::define \reverse, ->
-    res = ""
-    i = @length
-    while i--
-        res += @[i]
-    return res
-String::define \has, (needle) -> return -1 != @indexOf needle
-String::define \startsWith, (str) ->
-    i=0
-    while char = str[i]
-        return false if char != this[i++]
-    return true
-String::define \endsWith, (str) ->
-    return this.lastIndexOf == @length - str.length
-
-jQuery.fn <<<<
-    fixSize: -> #… this is not really used?
-        for el in this
-            el.style .width = "#{el.width}px"
-            el.style .height = "#{el.height}px"
-        return this
-    concat: (arr2) ->
-        l = @length
-        return this if not arr2 or not arr2.length
-        return arr2 if not l
-        for el, i in arr2
-            @[i+l] = el
-        @length += arr2.length
-        return this
+    setInterval dataSave, 15.min
 
 
 /*####################################
@@ -95,43 +105,71 @@ window <<<<
     YT_REGEX: /https?:\/\/(?:www\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|embed|e)\/|.*(?:\?|&amp;)v=)|youtu\.be\/)([^"&?\/<>\s]{11})(?:&.*?|#.*?|)$/i
     repeat: (timeout, fn) -> return setInterval (-> fn ... if not disabled), timeout
     sleep: (timeout, fn) -> return setTimeout fn, timeout
-    pad: (num) -> return switch true
-        | num < 0   => num
-        | num < 10  => "0#num"
-        | num == 0  => "00"
-        | otherwise => num
+    pad: (num, digits) ->
+        if digits
+            return "#num" if not isFinite num
+            a = ~~num
+            b = "#{num - a}"
+            num = "#a"
+            while num.length < digits
+                num = "0#num"
+            return "#num#{b .substr 1}"
+        else
+            return
+                if 0 <= num < 10 then "0#num"
+                else             then "#num"
 
     generateID: -> return (~~(Math.random!*0xFFFFFF)) .toString(16).toUpperCase!
 
 
-    getUser: (nameOrID) !->
-        return if not nameOrID
-        users = API.getUsers!
-        if +nameOrID
-            for user in users when user.id == nameOrID
+
+    getUser: (user) !->
+        return if not user
+        if typeof user == \object
+            if user.username
                 return user
-        else
-            for user in users when user.username == nameOrID
+            else if user.attributes and user.toJSON
+                return user.toJSON!
+            return null
+        userList = API.getUsers!
+        if +user
+            if users?.get? user
+                return that
+            else
+                for u in userList when u.id == user
+                    return u
+
+        for u in userList when u.username == user
+            return u
+        user .= toLowerCase!
+        for u in userList when u.username .toLowerCase! == user
+            return u
+    getUserInternal: (user) !->
+        return if not user or not users
+        if typeof user == \object
+            if user.attributes
                 return user
-            nameOrID .= toLowerCase!
-            for user in users when user.username .toLowerCase! == nameOrID
-                return user
-    getUserInternal: (nameOrID) !->
-        return if not users
-        if +nameOrID
-            users.get nameOrID
+            else if user.username
+                return users.get(user.id)
+            return null
+
+        if +user
+            users.get user
         else
             users = users.models
-            for user in users when user.username == nameOrID
-                return user
-            nameOrID .= toLowerCase!
-            for user in users when user.username .toLowerCase! == nameOrID
-                return user
+            for u in users when u.username == user
+                return u
+            user .= toLowerCase!
+            for u in users when u.username .toLowerCase! == user
+                return u
 
     logger: (loggerName, fn) ->
-        return ->
-            console.log "[#loggerName]", arguments
-            return fn? ...
+        if typeof fn == \function
+            return ->
+                console.log "[#loggerName]", arguments
+                return fn ...
+        else
+            return -> console.log "[#loggerName]", arguments
 
     replace: (context, attribute, cb) ->
         context["#{attribute}_"] ||= context[attribute]
@@ -176,9 +214,10 @@ window <<<<
 
 
     /* callback gets called with the arguments cb(errorCode, response, event) */
-    ajax: (type, url,  data, cb) ->
+    floodAPI_counter: 0
+    ajax: (type, url, data, cb) ->
         if typeof url != \string
-            [type, url, data] = [url, data, cb]
+            [url, data, cb] = [type, url, data]
             type = data?.type || \POST
         if typeof data == \function
             success = data; data = null
@@ -190,20 +229,33 @@ window <<<<
             delete data.error
         else if typeof cb == \object
             {success, fail} = cb if cb
-        delete data.type if data
+
         options = do
                 type: type
                 url: "https://plug.dj/_/#url"
                 success: ({data}) ->
-                    console.info "[#url]", data
+                    console.info "[#url]", data if not silent
                     success? data
                 error: (err) ->
-                    console.error "[#url]", data
+                    console.error "[#url]", data if not silent
                     error? data
+
         if data
-            options.contentType = \application/json
-            options.data = JSON.stringify(data)
-        return $.ajax options
+            silent = data.silent
+            delete data.type
+            delete data.silent
+            if Object.keys(data).length
+                options.contentType = \application/json
+                options.data = JSON.stringify(data)
+        def = $.Deferred!
+        do delay = ->
+            if window.floodAPI_counter >= 15 /* 20 requests / 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
+                sleep 1_000ms, delay
+            else
+                window.floodAPI_counter++; sleep 10_000ms, -> window.floodAPI_counter--
+                return $.ajax options
+                    .then def.resolve, def.reject, def.progress
+        return def
 
     befriend: (userID, cb) -> ajax \POST, "friends", id: userID, cb
     ban: (userID, cb) -> ajax \POST, "bans/add", userID: userID, duration: API.BAN.HOUR, reason: 1, cb
@@ -217,6 +269,15 @@ window <<<<
         <- sleep 1_000ms
         unban userID, cb
 
+    getUserData: (user, cb) !->
+        if typeof user != \number
+            user = getUser user
+        cb ||= (data) -> console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+        return $.get "/_/users/#user"
+            .then ({[data]:data}:arg) ->
+                return data
+            .fail ->
+                console.warn "couldn't get slug for user with id '#{id}'"
 
     $djButton: $ \#dj-button
     mute: ->
@@ -315,13 +376,19 @@ window <<<<
                 .fail fail
                 .rejectWith"unsupported format"
 
-    mediaDownload: ({format, cid, id}:media, cb) ->
-        if cb
+    mediaDownload: (media, cb) ->
+        media ||= API.getMedia!
+        {format, cid, id} = media
+        if typeof media == \function or media.success or media.fail
+            cb = media; media = false
+        media ||= API.getMedia!
+        if typeof cb == \function
+            success = cb
+        else if cb
             {success, fail} = cb
-        else
-            success = logger \mediaDownload
-            error = logger \mediaDownloadError
-        # success(downloadURL, downloadSize)
+        success ||= logger \mediaDownload # success(downloadURL, downloadSize)
+        error ||= logger \mediaDownloadError
+
         cid ||= id
         if format == 1 # youtube
             $.ajax do
@@ -367,23 +434,27 @@ window <<<<
     #ToDo test this
     getMentions: (data) ->
         names = []; l=0
-        data.message.replace /@(\w+)/g, (_, name, i) ->
-            helper = (name) ->
-                possibleMatches = [username for {username} in API.getUsers! when username.indexOf(name) == 0]
-                switch possibleMatches.length
-                | 0 =>
-                | 1 => if data.message.substr(i + 1, possibleMatches.0.length) == possibleMatches.0
-                    names[l++] = possibleMatches.0
-                | otherwise =>
-                    return helper(data.message.substr(i + 1, _.length))
-                return _
-            return helper(name)
+        users = API.getUsers!
+        msgLength = data.message.length
+        data.message.replace /@/g, (_, offset) ->
+            offset++
+            possibleMatches = users
+            i = 0
+            while possibleMatches.length and i < msgLength
+                possibleMatches2 = []; l3 = 0
+                for m in possibleMatches when m.username[i] == data.message[offset + i]
+                    console.log ">", data.message.substr(offset, 5), i, "#{m.username .substr(0,i)}#{m.username[i].toUpperCase!}#{m.username .substr i+1}"
+                    if m.username.length == i + 1
+                        res = m
+                        console.log ">>>", m.username
+                    else
+                        possibleMatches2[l3++] = m
+                possibleMatches = possibleMatches2
+                i++
+            if res and names.indexOf(res) == -1
+                names[l++] = res.username
 
-        if not names.length
-            names = [data.un]
-        else
-            names = $.unique names
-
+        names = [data.un] if not names.length
         names.toString = -> return humanList this
         return names
 
@@ -480,12 +551,21 @@ window <<<<
     isURL: (str) ->
         return false if typeof str != \string
         str.trim!
-        if parseURL().host != location.host
+        if parseURL(str).host != location.host
             return str
         else
             return false
 
 
+    mention: (list) ->
+        if not list?.length
+            return ""
+        else if list.0.username
+            return humanList ["@#{list[i].username}" for ,i in list]
+        else if list.0.attributes?.username
+            return humanList ["@#{list[i].get \username}" for ,i in list]
+        else
+            return humanList ["@#{list[i]}" for ,i in list]
     humanList: (arr) ->
         return "" if not arr.length
         arr = []<<<<arr
@@ -542,14 +622,16 @@ window <<<<
         return "#{it.toFixed(2)}MB"
 
     getRank: (user) -> # returns the name of a rank of a user
-        if typeof user == \number and user > 10_000
-            user = users.get(user)
-        if user.gRole || user.get?(\gRole)
+        user = getUser(user)
+        if not user or (role = user.role || user.get?(\role)) == -1
+            return \ghost
+        else if user.gRole || user.get?(\gRole)
             if that == 5
                 return \admin
             else
                 return \BA
-        return <[ user RDJ bouncer manager co-host host ]>[user.role || user.get?(\role) || 0]
+        else
+            return <[ none rdj bouncer manager cohost host ]>[role || 0]
 
     parseURL: (href) ->
         $dummy.0.href = href
@@ -621,6 +703,7 @@ requireHelper \Layout, (.getSize)
 requireHelper \RoomUserRow, (.::?.vote)
 requireHelper \DialogAlert, (.::?id == \dialog-alert)
 requireHelper \popMenu, (.className == \pop-menu)
+requireHelper \ActivateEvent, (.ACTIVATE)
 
 requireHelper \emoticons, (.emojify)
 emoticons.reverseMap = {[v, k] for k,v of emoticons.map} if window.emoticons

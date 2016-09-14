@@ -128,13 +128,6 @@ type %file%             >> %output%.ls
 echo.>> %output%.ls
 echo.>> %output%.ls
 
-set file=p0ne.ponify.ls
-echo - %file%
-echo /*@source %file% */>> %output%.ls
-type %file%             >> %output%.ls
-echo.>> %output%.ls
-echo.>> %output%.ls
-
 set file=p0ne.avatars.ls
 echo - %file%
 echo /*@source %file% */>> %output%.ls
@@ -150,6 +143,27 @@ echo.>> %output%.ls
 echo.>> %output%.ls
 
 set file=p0ne.dev.ls
+echo - %file%
+echo /*@source %file% */>> %output%.ls
+type %file%             >> %output%.ls
+echo.>> %output%.ls
+echo.>> %output%.ls
+
+set file=p0ne.userHistory.ls
+echo - %file%
+echo /*@source %file% */>> %output%.ls
+type %file%             >> %output%.ls
+echo.>> %output%.ls
+echo.>> %output%.ls
+
+set file=p0ne.ponify.ls
+echo - %file%
+echo /*@source %file% */>> %output%.ls
+type %file%             >> %output%.ls
+echo.>> %output%.ls
+echo.>> %output%.ls
+
+set file=p0ne.fimplug.ls
 echo - %file%
 echo /*@source %file% */>> %output%.ls
 type %file%             >> %output%.ls

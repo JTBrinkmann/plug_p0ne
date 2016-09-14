@@ -13,8 +13,18 @@
 module \songNotif, do
     require: <[ chatDomEvents ]>
     optional: <[ _$context database auxiliaries app popMenu ]>
-    settings: \enableDisable
+    settings: \base
+    help: '''
+        Shows notifications for playing songs in the chat.
+        Besides the songs' name, it also features a thumbnail and some extra buttons.
+
+        By clicking on the song's or author's name, a search on plug.dj for that name will be started, to easily find similar tracks.
+
+        By hovering the notification and clicking "description" the songs description will be loaded.
+        You can click anywhere on it to close it again.
+    '''
     setup: ({addListener, $create, $createPersistent, css},,,module_) ->
+        var lastMedia
         @callback = (d) ~>
             try
                 skipped = false #ToDo
@@ -22,8 +32,11 @@ module \songNotif, do
 
                 media = d.media
                 if not media
-                    @$playbackImg .hide!
+                    @$playbackImg .css backgroundImage: null
                     return
+                if media.id == lastMedia
+                    return
+                lastMedia := media.id
 
                 $div = $createPersistent "<div class='update song-notif' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
                 html = ""
@@ -37,7 +50,6 @@ module \songNotif, do
                     image = media.image
                 @$playbackImg
                     .css backgroundImage: "url(#image)"
-                    .show!
 
                 duration = mediaTime media.duration
                 console.logImg media.image.replace(/^\/\//, 'https://') .then ->
@@ -51,8 +63,9 @@ module \songNotif, do
                     <div class='song-thumb-wrapper'>
                         <img class='song-thumb' src='#image' />
                         <span class='song-duration'>#duration</span>
-                        <div class='song-add'><i class='icon icon-add'></i></div>
-                        <a class='song-open' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                        <div class='song-add btn'><i class='icon icon-add'></i></div>
+                        <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                        <div class='song-skip btn right'><i class='icon icon-skip'></i></div>
                     </div>
                     #timestamp
                     <div class='song-dj'></div>
@@ -83,18 +96,20 @@ module \songNotif, do
             catch e
                 console.error "[p0ne.notif]" e
 
+        #== add video thumbnail to #playback ==
+        @$playbackImg = $ \#playback-container
+        #$create \<div>
+        #    .addClass \playback-thumb
+        #    .insertBefore $ '#playback .background'
+
         addListener API, \advance, @callback
         if _$context
             addListener _$context, \room:joined, ~>
-                @callback media: API.getMedia!
+                @callback media: API.getMedia!, dj: API.getDJ!
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?v=1.2"
 
-        #== add video thumbnail to #playback ==
-        @$playbackImg = $create \<div>
-            .addClass \playback-thumb
-            .insertBefore $ '#playback .background'
 
         #== show current song ==
         if not module_ and API.getMedia!
@@ -102,10 +117,7 @@ module \songNotif, do
 
         # hide non-playable videos
         addListener _$context, \RestrictedSearchEvent:search, ->
-            if window.app?.room?.playback?
-                that .onSnoozeClick!
-            else
-                $ '#playback-controls .snooze' .click!
+            muteonce!
 
         #== Grab Songs ==        if not popMenu?
         if popMenu?
@@ -129,6 +141,19 @@ module \songNotif, do
                 popMenu.show $el, [obj]
         else
             css \songNotificationsAdd, '.song-add {display:none}'
+
+        #== fimplug ruleskip ==
+        addListener chatDomEvents, \click, \.song-add, ->
+            showDescription $(this).closest(".song-notif"), """
+                <span class='ruleskip'>!ruleskip 1 - nonpony</span>
+                <span class='ruleskip'>!ruleskip 2 - </span>
+                <span class='ruleskip'>!ruleskip 3 - </span>
+                <span class='ruleskip'>!ruleskip 4 - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+                <span class='ruleskip'>!ruleskip  - </span>
+            """
 
         #== search for author ==
         addListener chatDomEvents, \click, \.song-author, ->
@@ -229,7 +254,8 @@ module \songNotif, do
                 cm.animate do
                     scrollTop: $cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
 
+        @showDescription = showDescription
         @hideDescription = hideDescription
 
     disable: ->
-        @hideDescription!
+        @hideDescription?!

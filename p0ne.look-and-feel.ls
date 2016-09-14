@@ -8,7 +8,9 @@
  */
 
 
-loadStyle "#{p0ne.host}/css/plug_p0ne.css?v=1.2"
+module \p0neStylesheet, do
+    setup: ({loadStyle}) ->
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?v=1.8"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -32,18 +34,16 @@ window.moduleStyle = (name, d) ->
 #            FIMPLUG THEME           #
 ####################################*/
 module \fimplugTheme, do
-    settings: true
+    settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
-    module: -> @toggle!
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css"
+        loadStyle "#{p0ne.host}/css/fimplug.css?v=1.2"
 
 /*####################################
 #          ANIMATED DIALOGS          #
 ####################################*/
 module \animatedUI, do
     require: <[ DialogAlert ]>
-    module: -> @toggle!
     setup: ({replace}) ->
         $ \.dialog .addClass \opaque
         # animate dialogs
@@ -66,13 +66,12 @@ module \animatedUI, do
 # fix drag'n'drop styles for playlist icon view
 module \playlistIconView, do
     displayName: "Playlist Icon View"
+    settings: \look&feel
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
-    settings: true
-    module: -> @toggle!
-    setup: ({addListener, replace, $create}, playlistIconView,, isUpdate) ->
-        $body .addClass \playlist-icon-view if not isUpdate
+    setup: ({addListener, replace, $create}, playlistIconView) ->
+        $body .addClass \playlist-icon-view
         $hovered = $!
         $mediaPanel = $ \#media-panel
         addListener $mediaPanel , \mouseover, \.row, ->
@@ -96,13 +95,12 @@ module \playlistIconView, do
 ####################################*/
 module \legacyChat, do
     displayName: "Legacy Chat"
+    settings: \chat
     help: '''
         Shows the chat in the old format, before badges were added to it in December 2014.
     '''
-    settings: true
-    module: -> @toggle!
-    setup: ({addListener},,, isUpdate) ->
-        $body .addClass \legacy-chat if not isUpdate
+    setup: ({addListener}) ->
+        $body .addClass \legacy-chat
         $cb = $ \#chat-button
         addListener $cb, \dblclick, (e) ~>
             @toggle!
@@ -116,13 +114,12 @@ module \legacyChat, do
 
 module \censor, do
     displayName: "Censor"
+    settings: \dev
     help: '''
         blurs some information like playlist names, counts, EP and Plug Notes.
         Great for taking screenshots
     '''
     disabled: true
-    settings: true
-    module: -> @toggle!
     setup: ->
         $body .addClass \censored
     disable: ->

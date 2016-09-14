@@ -5,6 +5,7 @@
 - Playlist Manager
 
 == TEMP ==
+- change songNotif thumbnail container to #playback-container for proper sizing
 
 == COMPLETE ==
 - p0ne.close()
@@ -20,7 +21,7 @@
 - FIXES
 	- remember video stream on/off
 	- spinning wheel of death when editing playlists
-- P0ne Bugfixes
+- p0ne Bugfixes
 	- make plug_p0ne work with Popout Chat (legacyChat & ChatInput)
 	- add-icon derps in .history in icon-view
 - Options Menu
@@ -34,6 +35,10 @@
 		- test if works
 	- improve no-leave
 		- in the require with .execute, the .onError sends you to "/" on auth-error
+- Custom Avatars
+	- only send change:avatarID for users in the same room
+	- emit changed:room events
+	- throttle avatarID changes
 - Chat
 	- fix emoticons like :<3
 	// - instead of rendering messages by the user twice (once when pending, once when received) only move (animated) pending messages and add CID
@@ -87,6 +92,7 @@
 	- howMuchPony (has pony video, pony inspired, ponified lyrics, …)
 	- share buttons, lyrics, picture searches, comments, …
 - track djListUpdates and have a DJ-List History
+- song-info for preview popups
 
 
 - PerformanceEnhancements

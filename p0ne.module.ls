@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2014 J.-T. Brinkmann
  */
+p0ne.moduleSettings = dataLoad \moduleSettings, {}
 window.module = (name, data) ->
     try
         # setup(helperFNs, module, args)
@@ -18,7 +19,7 @@ window.module = (name, data) ->
 
         # set defaults here so that modifying their local variables will also modify them inside `module`
         data.persistent ||= {}
-        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName} = data
+        {name, require, optional, callback,  setup, update, persistent, enable, disable, module, settings, displayName, moduleSettings} = data
         data.callbacks[*] = callback if callback
         if module
             if typeof module == \function
@@ -64,11 +65,12 @@ window.module = (name, data) ->
                     [target, ...args] = args
                 cbs.[]listeners[*] = {target, args}
                 if not early
-                    return target.on .apply target, args
+                    target.on .apply target, args
                 else if not target.onEarly
                     console.warn "[#name] cannot use .onEarly on", target
                 else
-                    return target.onEarly .apply target, args
+                    target.onEarly .apply target, args
+                return args[*-1] # return callback so one can do `do addListener(…)` to initially trigger the callback
 
             replace: (target, attr, repl) ->
                 cbs.[]replacements[*] = [target, attr, repl]
@@ -103,7 +105,6 @@ window.module = (name, data) ->
                 p0neCSS.css name, str
                 cbs.{}css[name] = str
             loadStyle: (url) ->
-                return if p0neCSS.$el.filter "[href='#url']" .length
                 p0neCSS.loadStyle url
                 cbs.{}loadedStyles[url] = true
 
@@ -117,9 +118,13 @@ window.module = (name, data) ->
             enable: ->
                 return if not @disabled
                 @disabled = false
-                setup?.call module, helperFNs, module, data, module_
-                API.trigger \p0neModuleEnabled, module
-                console.info "[#name] enabled"
+                delete p0ne.moduleSettings[name].disabled
+                try
+                    setup.call module, helperFNs, module, data, module
+                    API.trigger \p0neModuleEnabled, module
+                    console.info "[#name] enabled", setup != null
+                catch err
+                    console.error "[#name] error while re-enabling", err.stack
             disable: (newModule) ->
                 return if module.disabled
                 try
@@ -136,11 +141,12 @@ window.module = (name, data) ->
                         p0neCSS.css style, "/* disabled */"
                     for url of cbs.loadedStyles
                         p0neCSS.unloadStyle url
-                    for m in p0ne.dependencies[name] ||[]
-                        m.disable!
                     for $el in cbs.$elements ||[]
                         $el .remove!
+                    for m in p0ne.dependencies[name] ||[]
+                        m.disable!
                     if not newModule
+                        p0ne.moduleSettings[name].disabled = true
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         API.trigger \p0neModuleDisabled, module
@@ -157,6 +163,7 @@ window.module = (name, data) ->
             if persistent
                 for k in persistent ||[]
                     module[k] = module_[k]
+            module._$settings = module_._$settings
             module_.disable? module
         failedRequirements = []; l=0
         for r in require ||[]
@@ -178,9 +185,14 @@ window.module = (name, data) ->
             # set up Help and Settings
             module.help? .= replace /\n/g, "<br>\n"
 
+            if p0ne.moduleSettings{}[name].disabled
+                module.disabled = true
+
             # initialize module
             if not module.disabled
                 setup?.call module, helperFNs, module, data, module_
+            module.getSetup = ->
+                return setup
 
             p0ne.modules[*] = module
             if module_
