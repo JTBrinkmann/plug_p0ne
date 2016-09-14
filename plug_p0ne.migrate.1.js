@@ -727,17 +727,18 @@ if( typeof module !== 'undefined' && module != null ) {
  * so it is expected, that window.compareVersions is defined
  */
 (function(){
-  var vArr, lastCompatibleVersion, migrated, v, i$, ref$, len$, key;
-  lastCompatibleVersion = '1.2.0';
+  /* lastCompatibleVersion = \1.3.3 */
+  var vArr, migrated, v, i$, ref$, len$, key, k, err, res$, ref1$, m;
   migrated = function(v){
-    API.trigger("p0ne_migrated_" + v);
+    API.trigger('p0ne_migrated', v);
     return localStorage.p0neVersion = v;
   };
   if (!(v = localStorage.p0neVersion)) {
-    return migrated();
+    return;
   }
+  console.info("[p0ne migrate] migrating p0ne…");
   switch (false) {
-  case !compareVersions(v, '1.2.0'):
+  case compareVersions(v, '1.2.0'):
     console.info("[p0ne migrate] updating user settings to plug_p0ne v1.2.0 (new compression)");
     for (i$ = 0, len$ = (ref$ = ['requireIDs', 'playlistData', 'songData']).length; i$ < len$; ++i$) {
       key = ref$[i$];
@@ -748,6 +749,52 @@ if( typeof module !== 'undefined' && module != null ) {
     }
     migrated('1.2.0');
     // fallthrough
+  case compareVersions(v, '1.3.3'):
+    console.info("[p0ne migrate] updating user settings to plug_p0ne v1.3.2 (fixed settings compression; changed p0ne.modules from Array to Object)");
+    if (!window.chrome) {
+      for (k in ref$ = localStorage) {
+        v = ref$[k];
+        if (k !== 'amplitude_lastEventId' && k !== 'amplitude_lastEventTime' && k !== 'amplitude_unsent' && k !== 'length' && k !== 'p0neVersion' && k !== 'vanillaAvatarID') {
+          try {
+            localStorage[k] = LZString.compressToUTF16(
+            LZString.decompress(
+            v));
+          } catch (e$) {
+            err = e$;
+            if (k === 'automute' || k === 'moduleSettings' || k === 'requireIDs') {
+              console.warn("could not migrate " + v);
+            }
+          }
+        }
+      }
+    }
+    if ((typeof p0ne != 'undefined' && p0ne !== null) && ((ref$ = p0ne.modules) != null && ref$.length)) {
+      res$ = {};
+      for (i$ = 0, len$ = (ref1$ = p0ne.modules).length; i$ < len$; ++i$) {
+        m = ref1$[i$];
+        res$[m.name] = m;
+      }
+      p0ne.modules = res$;
+    }
+    migrated('1.3.3');
+    // fallthrough
+  case compareVersions(v, '1.3.9'):
+    console.info("[p0ne migrate] updating user settings to plug_p0ne v1.3.9 (renamed attributes in localStorage)");
+    for (k in ref1$ = localStorage) {
+      v = ref1$[k];
+      if (k.substr(0, 5) === "p0ne/") {
+        localStorage["p0ne_" + k.substr(5)] = localStorage[k];
+        delete localStorage[k];
+      }
+    }
+    for (i$ = 0, len$ = (ref1$ = ['requireIDs', 'automute', 'moduleSettings']).length; i$ < len$; ++i$) {
+      k = ref1$[i$];
+      if (k in localStorage) {
+        localStorage["p0ne_" + k] = localStorage[k];
+        delete localStorage[k];
+      }
+    }
+    migrated('1.3.9');
+    // fallthrough
   }
-  return migrated();
 })();
