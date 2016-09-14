@@ -796,5 +796,15 @@ if( typeof module !== 'undefined' && module != null ) {
     }
     migrated('1.3.9');
     // fallthrough
+  case compareVersions(v, '1.5.0'):
+    console.info("[p0ne migrate] fixed a bug introduced by the plug.dj update on 2015-02-05 causing CSS classes to be incorrect added to the chat");
+    $('#chat-messages').removeClass();
+    if (typeof PopoutView != 'undefined' && PopoutView !== null) {
+      if ((ref1$ = PopoutView.chat) != null) {
+        ref1$.$el.removeClass();
+      }
+    }
+    migrated('1.5.0');
+    // fallthrough
   }
 })();
