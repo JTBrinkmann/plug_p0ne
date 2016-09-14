@@ -16,7 +16,7 @@
 var out$ = typeof exports != 'undefined' && exports || this, slice$ = [].slice;
 console.info("~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~");
 window.p0ne = {
-  version: '1.2.3',
+  version: '1.3.1',
   lastCompatibleVersion: '1.2.1',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
@@ -907,8 +907,120 @@ window.compareVersions = function(a, b){
   */
   $window = $(window);
   $body = $(document.body);
-  window.s_to_ms = 1000;
-  window.min_to_ms = 60000;
+  /*####################################
+  #         PROTOTYPE FUNCTIONS        #
+  ####################################*/
+  (function(d){
+    d.call(Object.prototype, 'define', d);
+  }.call(this, function(property, value){
+    if (this[property] !== value) {
+      return Object.defineProperty(this, property, {
+        enumerable: false,
+        writable: true,
+        configurable: true,
+        value: value
+      });
+    }
+  }));
+  Object.prototype.define('defineGetter', function(property, get){
+    if (this[property] !== get) {
+      return Object.defineProperty(this, property, {
+        enumerable: false,
+        configurable: true,
+        get: get
+      });
+    }
+  });
+  Array.prototype.define('remove', function(i){
+    return this.splice(i, 1);
+  });
+  Array.prototype.define('removeItem', function(el){
+    var i;
+    if (-1 !== (i = this.indexOf(el))) {
+      this.splice(i, 1);
+    }
+    return this;
+  });
+  Array.prototype.define('random', function(){
+    return this[~~(Math.random() * this.length)];
+  });
+  Array.prototype.define('unique', function(){
+    var res, l, i$, len$, i, el, j$, yet$, o;
+    res = [];
+    l = 0;
+    for (i$ = 0, len$ = this.length; i$ < len$; ++i$) {
+      i = i$;
+      el = this[i$];
+      for (yet$ = true, j$ = 0; j$ < i; ++j$) {
+        o = j$;
+        yet$ = false;
+        if (this[o] === el) {
+          break;
+        }
+      } if (yet$) {
+        res[l++] = el;
+      }
+    }
+  });
+  String.prototype.define('reverse', function(){
+    var res, i;
+    res = "";
+    i = this.length;
+    while (i--) {
+      res += this[i];
+    }
+    return res;
+  });
+  String.prototype.define('has', function(needle){
+    return -1 !== this.indexOf(needle);
+  });
+  String.prototype.define('startsWith', function(str){
+    var i, char;
+    i = 0;
+    while (char = str[i]) {
+      if (char !== this[i++]) {
+        return false;
+      }
+    }
+    return true;
+  });
+  String.prototype.define('endsWith', function(str){
+    return this.lastIndexOf === this.length - str.length;
+  });
+  Number.prototype.defineGetter('min', function(){
+    return this * 60000;
+  });
+  Number.prototype.defineGetter('s', function(){
+    return this * 1000;
+  });
+  importAll$(jQuery.fn, {
+    fixSize: function(){
+      var i$, len$, el;
+      for (i$ = 0, len$ = this.length; i$ < len$; ++i$) {
+        el = this[i$];
+        el.style.width = el.width + "px";
+        el.style.height = el.height + "px";
+      }
+      return this;
+    },
+    concat: function(arr2){
+      var l, i$, len$, i, el;
+      l = this.length;
+      if (!arr2 || !arr2.length) {
+        return this;
+      }
+      if (!l) {
+        return arr2;
+      }
+      for (i$ = 0, len$ = arr2.length; i$ < len$; ++i$) {
+        i = i$;
+        el = arr2[i$];
+        this[i + l] = el;
+      }
+      this.length += arr2.length;
+      return this;
+    }
+  });
   /*####################################
   #            DATA MANAGER            #
   ####################################*/
@@ -951,89 +1063,8 @@ window.compareVersions = function(a, b){
     };
     window.dataSave.p0ne = true;
     $window.on('beforeunload', dataSave);
-    setInterval(dataSave, 15 * min_to_ms);
+    setInterval(dataSave, 15 .min);
   }
-  /*####################################
-  #         PROTOTYPE FUNCTIONS        #
-  ####################################*/
-  (function(d){
-    d.call(Object.prototype, 'define', d);
-  }.call(this, function(property, fn){
-    if (this[property] !== fn) {
-      return Object.defineProperty(this, property, {
-        enumerable: false,
-        writable: true,
-        configurable: true,
-        value: fn
-      });
-    }
-  }));
-  Array.prototype.define('remove', function(i){
-    return this.splice(i, 1);
-  });
-  Array.prototype.define('removeItem', function(el){
-    var i;
-    if (-1 !== (i = this.indexOf(el))) {
-      this.splice(i, 1);
-    }
-    return this;
-  });
-  Array.prototype.define('random', function(){
-    return this[~~(Math.random() * this.length)];
-  });
-  String.prototype.define('reverse', function(){
-    var res, i;
-    res = "";
-    i = this.length;
-    while (i--) {
-      res += this[i];
-    }
-    return res;
-  });
-  String.prototype.define('has', function(needle){
-    return -1 !== this.indexOf(needle);
-  });
-  String.prototype.define('startsWith', function(str){
-    var i, char;
-    i = 0;
-    while (char = str[i]) {
-      if (char !== this[i++]) {
-        return false;
-      }
-    }
-    return true;
-  });
-  String.prototype.define('endsWith', function(str){
-    return this.lastIndexOf === this.length - str.length;
-  });
-  importAll$(jQuery.fn, {
-    fixSize: function(){
-      var i$, len$, el;
-      for (i$ = 0, len$ = this.length; i$ < len$; ++i$) {
-        el = this[i$];
-        el.style.width = el.width + "px";
-        el.style.height = el.height + "px";
-      }
-      return this;
-    },
-    concat: function(arr2){
-      var l, i$, len$, i, el;
-      l = this.length;
-      if (!arr2 || !arr2.length) {
-        return this;
-      }
-      if (!l) {
-        return arr2;
-      }
-      for (i$ = 0, len$ = arr2.length; i$ < len$; ++i$) {
-        i = i$;
-        el = arr2[i$];
-        this[i + l] = el;
-      }
-      this.length += arr2.length;
-      return this;
-    }
-  });
   /*####################################
   #         GENERAL AUXILIARIES        #
   ####################################*/
@@ -1050,81 +1081,111 @@ window.compareVersions = function(a, b){
     sleep: function(timeout, fn){
       return setTimeout(fn, timeout);
     },
-    pad: function(num){
-      return (function(){
-        switch (true) {
-        case num < 0:
-          return num;
-        case num < 10:
-          return "0" + num;
-        case num === 0:
-          return "00";
-        default:
-          return num;
+    pad: function(num, digits){
+      var a, b;
+      if (digits) {
+        if (!isFinite(num)) {
+          return num + "";
         }
-      }());
+        a = ~~num;
+        b = (num - a) + "";
+        num = a + "";
+        while (num.length < digits) {
+          num = "0" + num;
+        }
+        return num + "" + b.substr(1);
+      } else {
+        return 0 <= num && num < 10
+          ? "0" + num
+          : num + "";
+      }
     },
     generateID: function(){
       return (~~(Math.random() * 0xFFFFFF)).toString(16).toUpperCase();
     },
-    getUser: function(nameOrID){
-      var users, i$, len$, user;
-      if (!nameOrID) {
+    getUser: function(user){
+      var userList, that, i$, len$, u;
+      if (!user) {
         return;
       }
-      users = API.getUsers();
-      if (+nameOrID) {
-        for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          user = users[i$];
-          if (user.id === nameOrID) {
-            return user;
+      if (typeof user === 'object') {
+        if (user.username) {
+          return user;
+        } else if (user.attributes && user.toJSON) {
+          return user.toJSON();
+        }
+        return null;
+      }
+      userList = API.getUsers();
+      if (+user) {
+        if (that = typeof users != 'undefined' && users !== null ? typeof users.get == 'function' ? users.get(user) : void 8 : void 8) {
+          return that;
+        } else {
+          for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
+            u = userList[i$];
+            if (u.id === user) {
+              return u;
+            }
           }
         }
-      } else {
-        for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          user = users[i$];
-          if (user.username === nameOrID) {
-            return user;
-          }
+      }
+      for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
+        u = userList[i$];
+        if (u.username === user) {
+          return u;
         }
-        nameOrID = nameOrID.toLowerCase();
-        for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          user = users[i$];
-          if (user.username.toLowerCase() === nameOrID) {
-            return user;
-          }
+      }
+      user = user.toLowerCase();
+      for (i$ = 0, len$ = userList.length; i$ < len$; ++i$) {
+        u = userList[i$];
+        if (u.username.toLowerCase() === user) {
+          return u;
         }
       }
     },
-    getUserInternal: function(nameOrID){
-      var users, i$, len$, user;
-      if (!users) {
+    getUserInternal: function(user){
+      var users, i$, len$, u;
+      if (!user || !users) {
         return;
       }
-      if (+nameOrID) {
-        users.get(nameOrID);
+      if (typeof user === 'object') {
+        if (user.attributes) {
+          return user;
+        } else if (user.username) {
+          return users.get(user.id);
+        }
+        return null;
+      }
+      if (+user) {
+        users.get(user);
       } else {
         users = users.models;
         for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          user = users[i$];
-          if (user.username === nameOrID) {
-            return user;
+          u = users[i$];
+          if (u.username === user) {
+            return u;
           }
         }
-        nameOrID = nameOrID.toLowerCase();
+        user = user.toLowerCase();
         for (i$ = 0, len$ = users.length; i$ < len$; ++i$) {
-          user = users[i$];
-          if (user.username.toLowerCase() === nameOrID) {
-            return user;
+          u = users[i$];
+          if (u.username.toLowerCase() === user) {
+            return u;
           }
         }
       }
     },
     logger: function(loggerName, fn){
-      return function(){
-        console.log("[" + loggerName + "]", arguments);
-        return typeof fn == 'function' ? fn.apply(this, arguments) : void 8;
-      };
+      if (typeof fn === 'function') {
+        return function(){
+          console.log("[" + loggerName + "]", arguments);
+          return fn.apply(this, arguments);
+        };
+      } else {
+        return function(){
+          return console.log("[" + loggerName + "]", arguments);
+        };
+      }
     },
     replace: function(context, attribute, cb){
       var key$;
@@ -1196,10 +1257,11 @@ window.compareVersions = function(a, b){
       }());
     }
     /* callback gets called with the arguments cb(errorCode, response, event) */,
+    floodAPI_counter: 0,
     ajax: function(type, url, data, cb){
-      var ref$, success, error, fail, options;
+      var ref$, success, error, fail, options, silent, def, delay;
       if (typeof url !== 'string') {
-        ref$ = [url, data, cb], type = ref$[0], url = ref$[1], data = ref$[2];
+        ref$ = [type, url, data], url = ref$[0], data = ref$[1], cb = ref$[2];
         type = (data != null ? data.type : void 8) || 'POST';
       }
       if (typeof data === 'function') {
@@ -1216,28 +1278,46 @@ window.compareVersions = function(a, b){
           success = cb.success, fail = cb.fail;
         }
       }
-      if (data) {
-        delete data.type;
-      }
       options = {
         type: type,
         url: "https://plug.dj/_/" + url,
         success: function(arg$){
           var data;
           data = arg$.data;
-          console.info("[" + url + "]", data);
+          if (!silent) {
+            console.info("[" + url + "]", data);
+          }
           return typeof success == 'function' ? success(data) : void 8;
         },
         error: function(err){
-          console.error("[" + url + "]", data);
+          if (!silent) {
+            console.error("[" + url + "]", data);
+          }
           return typeof error == 'function' ? error(data) : void 8;
         }
       };
       if (data) {
-        options.contentType = 'application/json';
-        options.data = JSON.stringify(data);
+        silent = data.silent;
+        delete data.type;
+        delete data.silent;
+        if (Object.keys(data).length) {
+          options.contentType = 'application/json';
+          options.data = JSON.stringify(data);
+        }
       }
-      return $.ajax(options);
+      def = $.Deferred();
+      (delay = function(){
+        if (window.floodAPI_counter >= 15) {
+          return sleep(1000, delay);
+        } else {
+          window.floodAPI_counter++;
+          sleep(10000, function(){
+            return window.floodAPI_counter--;
+          });
+          return $.ajax(options).then(def.resolve, def.reject, def.progress);
+        }
+      })();
+      return def;
     },
     befriend: function(userID, cb){
       return ajax('POST', "friends", {
@@ -1279,6 +1359,21 @@ window.compareVersions = function(a, b){
         return sleep(1000, function(){
           return unban(userID, cb);
         });
+      });
+    },
+    getUserData: function(user, cb){
+      if (typeof user !== 'number') {
+        user = getUser(user);
+      }
+      cb || (cb = function(data){
+        return console.log("[userdata]", data, data.level >= 5 ? "https://plug.dj/@/" + encodeURI(data.slug) : void 8);
+      });
+      return $.get("/_/users/" + user).then(function(arg){
+        var data;
+        data = arg.data, data = data[0];
+        return data;
+      }).fail(function(){
+        return console.warn("couldn't get slug for user with id '" + id + "'");
       });
     },
     $djButton: $('#dj-button'),
@@ -1400,13 +1495,20 @@ window.compareVersions = function(a, b){
     },
     mediaDownload: function(media, cb){
       var format, cid, id, success, fail, error;
+      media || (media = API.getMedia());
       format = media.format, cid = media.cid, id = media.id;
-      if (cb) {
-        success = cb.success, fail = cb.fail;
-      } else {
-        success = logger('mediaDownload');
-        error = logger('mediaDownloadError');
+      if (typeof media === 'function' || media.success || media.fail) {
+        cb = media;
+        media = false;
       }
+      media || (media = API.getMedia());
+      if (typeof cb === 'function') {
+        success = cb;
+      } else if (cb) {
+        success = cb.success, fail = cb.fail;
+      }
+      success || (success = logger('mediaDownload'));
+      error || (error = logger('mediaDownloadError'));
       cid || (cid = id);
       if (format === 1) {
         return $.ajax({
@@ -1453,40 +1555,40 @@ window.compareVersions = function(a, b){
       return getChatText(cid).parent().parent();
     },
     getMentions: function(data){
-      var names, l;
+      var names, l, users, msgLength;
       names = [];
       l = 0;
-      data.message.replace(/@(\w+)/g, function(_, name, i){
-        var helper;
-        helper = function(name){
-          var possibleMatches, res$, i$, ref$, len$, username;
-          res$ = [];
-          for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-            username = ref$[i$].username;
-            if (username.indexOf(name) === 0) {
-              res$.push(username);
+      users = API.getUsers();
+      msgLength = data.message.length;
+      data.message.replace(/@/g, function(_, offset){
+        var possibleMatches, i, possibleMatches2, l3, i$, len$, m, res;
+        offset++;
+        possibleMatches = users;
+        i = 0;
+        while (possibleMatches.length && i < msgLength) {
+          possibleMatches2 = [];
+          l3 = 0;
+          for (i$ = 0, len$ = possibleMatches.length; i$ < len$; ++i$) {
+            m = possibleMatches[i$];
+            if (m.username[i] === data.message[offset + i]) {
+              console.log(">", data.message.substr(offset, 5), i, m.username.substr(0, i) + "" + m.username[i].toUpperCase() + m.username.substr(i + 1));
+              if (m.username.length === i + 1) {
+                res = m;
+                console.log(">>>", m.username);
+              } else {
+                possibleMatches2[l3++] = m;
+              }
             }
           }
-          possibleMatches = res$;
-          switch (possibleMatches.length) {
-          case 0:
-            break;
-          case 1:
-            if (data.message.substr(i + 1, possibleMatches[0].length) === possibleMatches[0]) {
-              names[l++] = possibleMatches[0];
-            }
-            break;
-          default:
-            return helper(data.message.substr(i + 1, _.length));
-          }
-          return _;
-        };
-        return helper(name);
+          possibleMatches = possibleMatches2;
+          i++;
+        }
+        if (res && names.indexOf(res) === -1) {
+          return names[l++] = res.username;
+        }
       });
       if (!names.length) {
         names = [data.un];
-      } else {
-        names = $.unique(names);
       }
       names.toString = function(){
         return humanList(this);
@@ -1673,10 +1775,43 @@ window.compareVersions = function(a, b){
         return false;
       }
       str.trim();
-      if (parseURL().host !== location.host) {
+      if (parseURL(str).host !== location.host) {
         return str;
       } else {
         return false;
+      }
+    },
+    mention: function(list){
+      var i, ref$;
+      if (!(list != null && list.length)) {
+        return "";
+      } else if (list[0].username) {
+        return humanList((function(){
+          var i$, len$, results$ = [];
+          for (i$ = 0, len$ = list.length; i$ < len$; ++i$) {
+            i = i$;
+            results$.push("@" + list[i].username);
+          }
+          return results$;
+        }()));
+      } else if ((ref$ = list[0].attributes) != null && ref$.username) {
+        return humanList((function(){
+          var i$, len$, results$ = [];
+          for (i$ = 0, len$ = list.length; i$ < len$; ++i$) {
+            i = i$;
+            results$.push("@" + list[i].get('username'));
+          }
+          return results$;
+        }()));
+      } else {
+        return humanList((function(){
+          var i$, len$, results$ = [];
+          for (i$ = 0, len$ = list.length; i$ < len$; ++i$) {
+            i = i$;
+            results$.push("@" + list[i]);
+          }
+          return results$;
+        }()));
       }
     },
     humanList: function(arr){
@@ -1755,18 +1890,19 @@ window.compareVersions = function(a, b){
       return it.toFixed(2) + "MB";
     },
     getRank: function(user){
-      var that;
-      if (typeof user === 'number' && user > 10000) {
-        user = users.get(user);
-      }
-      if (that = user.gRole || (typeof user.get == 'function' ? user.get('gRole') : void 8)) {
+      var role, that;
+      user = getUser(user);
+      if (!user || (role = user.role || (typeof user.get == 'function' ? user.get('role') : void 8)) === -1) {
+        return 'ghost';
+      } else if (that = user.gRole || (typeof user.get == 'function' ? user.get('gRole') : void 8)) {
         if (that === 5) {
           return 'admin';
         } else {
           return 'BA';
         }
+      } else {
+        return ['none', 'rdj', 'bouncer', 'manager', 'cohost', 'host'][role || 0];
       }
-      return ['user', 'RDJ', 'bouncer', 'manager', 'co-host', 'host'][user.role || (typeof user.get == 'function' ? user.get('role') : void 8) || 0];
     },
     parseURL: function(href){
       var ref$;
@@ -1837,7 +1973,7 @@ window.compareVersions = function(a, b){
       return cb();
     }
   }(function(){
-    var res$, k, ref$, v, i$, len$, e, ref1$, cm, rR_, onLoaded, dummyP3, ppStop, chatWidth, roles;
+    var res$, k, ref$, v, i$, len$, e, ref1$, cm, rR_, onLoaded, dummyP3, ppStop, chatWidth, roles, ObjWrap;
     requireHelper('user_', function(it){
       return it.canModChat;
     });
@@ -1903,6 +2039,9 @@ window.compareVersions = function(a, b){
     });
     requireHelper('popMenu', function(it){
       return it.className === 'pop-menu';
+    });
+    requireHelper('ActivateEvent', function(it){
+      return it.ACTIVATE;
     });
     requireHelper('emoticons', function(it){
       return it.emojify;
@@ -2174,8 +2313,9 @@ window.compareVersions = function(a, b){
      * @license MIT License
      * @copyright (c) 2014 J.-T. Brinkmann
      */
+    p0ne.moduleSettings = dataLoad('moduleSettings', {});
     window.module = function(name, data){
-      var require, optional, callback, setup, update, persistent, enable, disable, module, settings, displayName, ref$, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, len$, k, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, e;
+      var require, optional, callback, setup, update, persistent, enable, disable, module, settings, displayName, moduleSettings, ref$, fn, cbs, arrEqual, objEqual, helperFNs, module_, i$, len$, k, failedRequirements, l, r, ref1$, ref2$, optionalRequirements, res$, e;
       try {
         if (typeof name !== 'string') {
           data = name;
@@ -2188,7 +2328,7 @@ window.compareVersions = function(a, b){
           };
         }
         data.persistent || (data.persistent = {});
-        name = data.name, require = data.require, optional = data.optional, callback = data.callback, setup = data.setup, update = data.update, persistent = data.persistent, enable = data.enable, disable = data.disable, module = data.module, settings = data.settings, displayName = data.displayName;
+        name = data.name, require = data.require, optional = data.optional, callback = data.callback, setup = data.setup, update = data.update, persistent = data.persistent, enable = data.enable, disable = data.disable, module = data.module, settings = data.settings, displayName = data.displayName, moduleSettings = data.moduleSettings;
         if (callback) {
           (ref$ = data.callbacks)[ref$.length] = callback;
         }
@@ -2251,12 +2391,13 @@ window.compareVersions = function(a, b){
               args: args
             };
             if (!early) {
-              return target.on.apply(target, args);
+              target.on.apply(target, args);
             } else if (!target.onEarly) {
-              return console.warn("[" + name + "] cannot use .onEarly on", target);
+              console.warn("[" + name + "] cannot use .onEarly on", target);
             } else {
-              return target.onEarly.apply(target, args);
+              target.onEarly.apply(target, args);
             }
+            return args[args.length - 1];
           },
           replace: function(target, attr, repl){
             var ref$, key$;
@@ -2306,9 +2447,6 @@ window.compareVersions = function(a, b){
             return (cbs.css || (cbs.css = {}))[name] = str;
           },
           loadStyle: function(url){
-            if (p0neCSS.$el.filter("[href='" + url + "']").length) {
-              return;
-            }
             p0neCSS.loadStyle(url);
             return (cbs.loadedStyles || (cbs.loadedStyles = {}))[url] = true;
           },
@@ -2322,18 +2460,23 @@ window.compareVersions = function(a, b){
             }
           },
           enable: function(){
+            var err;
             if (!this.disabled) {
               return;
             }
             this.disabled = false;
-            if (setup != null) {
-              setup.call(module, helperFNs, module, data, module_);
+            delete p0ne.moduleSettings[name].disabled;
+            try {
+              setup.call(module, helperFNs, module, data, module);
+              API.trigger('p0neModuleEnabled', module);
+              return console.info("[" + name + "] enabled", setup !== null);
+            } catch (e$) {
+              err = e$;
+              return console.error("[" + name + "] error while re-enabling", err.stack);
             }
-            API.trigger('p0neModuleEnabled', module);
-            return console.info("[" + name + "] enabled");
           },
           disable: function(newModule){
-            var i$, ref$, len$, ref1$, target, args, attr, d, style, url, m, $el, err;
+            var i$, ref$, len$, ref1$, target, args, attr, d, style, url, $el, m, err;
             if (module.disabled) {
               return;
             }
@@ -2361,15 +2504,16 @@ window.compareVersions = function(a, b){
               for (url in cbs.loadedStyles) {
                 p0neCSS.unloadStyle(url);
               }
-              for (i$ = 0, len$ = (ref$ = p0ne.dependencies[name] || []).length; i$ < len$; ++i$) {
-                m = ref$[i$];
-                m.disable();
-              }
               for (i$ = 0, len$ = (ref$ = cbs.$elements || []).length; i$ < len$; ++i$) {
                 $el = ref$[i$];
                 $el.remove();
               }
+              for (i$ = 0, len$ = (ref$ = p0ne.dependencies[name] || []).length; i$ < len$; ++i$) {
+                m = ref$[i$];
+                m.disable();
+              }
               if (!newModule) {
+                p0ne.moduleSettings[name].disabled = true;
                 for (i$ = 0, len$ = (ref$ = cbs.$elementsPersistent || []).length; i$ < len$; ++i$) {
                   $el = ref$[i$];
                   $el.remove();
@@ -2395,6 +2539,7 @@ window.compareVersions = function(a, b){
               module[k] = module_[k];
             }
           }
+          module._$settings = module_._$settings;
           if (typeof module_.disable == 'function') {
             module_.disable(module);
           }
@@ -2430,11 +2575,17 @@ window.compareVersions = function(a, b){
           if (module.help != null) {
             module.help = module.help.replace(/\n/g, "<br>\n");
           }
+          if (((ref$ = p0ne.moduleSettings)[name] || (ref$[name] = {})).disabled) {
+            module.disabled = true;
+          }
           if (!module.disabled) {
             if (setup != null) {
               setup.call(module, helperFNs, module, data, module_);
             }
           }
+          module.getSetup = function(){
+            return setup;
+          };
           (ref$ = p0ne.modules)[ref$.length] = module;
           if (module_) {
             API.trigger('p0neModuleUpdated', module);
@@ -2464,13 +2615,37 @@ window.compareVersions = function(a, b){
     /*####################################
     #            AUXILIARIES             #
     ####################################*/
-    module('updateUserObj', {
-      require: ['user_'],
+    module('updateUserData', {
+      require: ['user_', 'users', '_$context'],
+      setup: function(arg$){
+        var addListener, i$, ref$, len$, user, results$ = [];
+        addListener = arg$.addListener;
+        addListener(window.user_, 'change:username', function(){
+          return user.username = window.user_.get('username');
+        });
+        addListener(_$context, 'user:join', function(arg$){
+          var id;
+          id = arg$.id;
+          return users.get(id).set('joinedRoom', Date.now());
+        });
+        for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+          user = ref$[i$];
+          results$.push(user.set('joinedRoom', -1));
+        }
+        return results$;
+      }
+    });
+    module('throttleOnFloodAPI', {
       setup: function(arg$){
         var addListener;
         addListener = arg$.addListener;
-        return addListener(window.user_, 'change:username', function(){
-          return user.username = window.user_.get('username');
+        return addListener(API, 'socket:floodAPI', function(){
+          /* all AJAX and Socket functions should check if the counter is AT LEAST below 20 */
+          window.floodAPI_counter += 20;
+          return sleep(15000, function(){
+            /* it is assumed, that the API counter resets every 10 seconds. 15s is to provide enough buffer */
+            return window.floodAPI_counter -= 20;
+          });
         });
       }
     });
@@ -2529,10 +2704,10 @@ window.compareVersions = function(a, b){
       }
     });
     module('grabMedia', {
-      require: ['playlists'],
+      require: ['playlists', 'auxiliaries'],
       optional: ['_$context'],
       module: function(playlistIDOrName, media, appendToEnd){
-        var currentPlaylist, i$, ref$, len$, pl, playlist, id;
+        var currentPlaylist, i$, ref$, len$, pl, playlist;
         currentPlaylist = playlists.get(playlists.getActiveID());
         if (typeof playlistIDOrName === 'string' && !playlistIDOrName.startsWith('http')) {
           for (i$ = 0, len$ = (ref$ = playlists.models).length; i$ < len$; ++i$) {
@@ -2542,9 +2717,7 @@ window.compareVersions = function(a, b){
               break;
             }
           }
-        } else if (id = +playlistIDOrName) {
-          playlist = playlists.get(playlistIDOrName);
-        } else {
+        } else if (!(playlist = playlists.get(playlistIDOrName))) {
           playlist = currentPlaylist;
           appendToEnd = media;
           media = playlistIDOrName;
@@ -2555,6 +2728,8 @@ window.compareVersions = function(a, b){
         }
         if (!media) {
           addMedia(API.getMedia());
+        } else if (media.id) {
+          addMedia(media);
         } else {
           mediaLookup(media, {
             success: addMedia,
@@ -2567,7 +2742,7 @@ window.compareVersions = function(a, b){
           console.log("[grabMedia] add '" + media.author + " - " + media.title + "' to playlist: " + playlist);
           playlist.set('syncing', true);
           return ajax('POST', "playlists/" + playlist.id + "/media/insert", {
-            media: [media],
+            media: auxiliaries.serializeMediaItems([media]),
             append: !!appendToEnd
           }).then(function(e){
             if (playlist.id !== e.id) {
@@ -2596,12 +2771,13 @@ window.compareVersions = function(a, b){
       optional: ['PopoutListener', 'PopoutView'],
       $popoutEl: $(),
       styles: {},
+      urlMap: {},
       persistent: ['styles'],
       setup: function(arg$){
-        var addListener, $create, $el, $popoutEl, styles, throttled;
+        var addListener, $create, $el, $popoutEl, styles, urlMap, throttled;
         addListener = arg$.addListener, $create = arg$.$create;
         this.$el = $create('<style>').appendTo('head');
-        $el = this.$el, $popoutEl = this.$popoutEl, styles = this.styles;
+        $el = this.$el, $popoutEl = this.$popoutEl, styles = this.styles, urlMap = this.urlMap;
         addListener(API, 'popout:open', function(_window){
           return $popoutEl = $el.clone().appendTo(_window.document.head);
         });
@@ -2625,20 +2801,20 @@ window.compareVersions = function(a, b){
         };
         throttled = false;
         out$.css = this.css = function(name, css){
-          var res, n, ref$;
           if (css == null) {
             return styles[name];
           }
           styles[name] = css;
-          res = "";
-          for (n in ref$ = styles) {
-            css = ref$[n];
-            res += "/* " + n + " */\n" + css + "\n\n";
-          }
           if (!throttled) {
             throttled = true;
             return requestAnimationFrame(function(){
+              var res, n, ref$, css;
               throttled = false;
+              res = "";
+              for (n in ref$ = styles) {
+                css = ref$[n];
+                res += "/* " + n + " */\n" + css + "\n\n";
+              }
               $el.first().text(res);
               return $popoutEl.first().text(res);
             });
@@ -2647,6 +2823,11 @@ window.compareVersions = function(a, b){
         out$.loadStyle = this.loadStyle = function(url){
           var s;
           console.log("[loadStyle]", url);
+          if (urlMap[url]) {
+            return urlMap[url]++;
+          } else {
+            urlMap[url] = 1;
+          }
           s = $("<link rel='stylesheet' >").attr('href', url).appendTo(document.head);
           $el.push(s[0]);
           if ((typeof PopoutView != 'undefined' && PopoutView !== null) && PopoutView._window) {
@@ -2654,8 +2835,19 @@ window.compareVersions = function(a, b){
           }
         };
         out$.unloadStyle = this.unloadStyle = function(url){
-          $el.find("[href='" + url + "']").remove();
-          return $popoutEl.find("[href='" + url + "']").remove()[0];
+          var i;
+          if (urlMap[url] > 0) {
+            urlMap[url]--;
+          }
+          if (urlMap[url] === 0) {
+            delete urlMap[url];
+            i = $el.index("[href='" + url + "']");
+            $el.eq(i).remove();
+            $el.splice(i, 1);
+            i = $popoutEl.index("[href='" + url + "']");
+            $popoutEl.eq(i).remove();
+            return $popoutEl.splice(i, 1);
+          }
         };
         return this.disable = function(){
           $el.remove();
@@ -2682,7 +2874,6 @@ window.compareVersions = function(a, b){
       }
     });
     module('login', {
-      settings: false,
       persistent: ['showLogin'],
       module: function(){
         if (this.showLogin) {
@@ -3192,7 +3383,8 @@ window.compareVersions = function(a, b){
       displayName: 'Fix Ghosting',
       require: ['PlugAjax'],
       optional: ['login'],
-      settings: function(){
+      settings: 'fixes',
+      settingsMore: function(){
         return $('<toggle val=warnings>Show Warnings</toggle>');
       },
       help: 'Plug.dj sometimes marks you internally as "not in any room" even though you still are. This is also called "ghosting" because you can chat in a room that technically you are not in anymore. While ghosting you can still chat, but not join the waitlist or moderate. If others want to @mention you, you don\'t show up in the autocomplete.\n\ntl;dr this module automatically rejoins the room when you are ghosting',
@@ -3285,7 +3477,7 @@ window.compareVersions = function(a, b){
                     API.chatLog("[fixGhosting] cannot rejoin the room, unexpected error " + statusCode + " (" + datastatus + ")", true);
                   }
                 }
-                return sleep(10 * min_to_ms, function(){
+                return sleep(10 .min, function(){
                   return rejoining = false;
                 });
               }
@@ -3297,7 +3489,8 @@ window.compareVersions = function(a, b){
     module('fixOthersGhosting', {
       require: ['users', 'socketEvents'],
       displayName: "Fix Other Users Ghosting",
-      settings: function(){
+      settings: 'fixes',
+      settingsMore: function(){
         return $('<toggle val=warnings>Show Warnings</toggle>');
       },
       help: 'Sometimes plug.dj does not properly emit join notifications, so that clients don\'t know another user joined a room. Thus they appear as "ghosts", as if they were not in the room but still can chat\n\nThis module detects "ghost" users and force-adds them to the room.',
@@ -3344,7 +3537,8 @@ window.compareVersions = function(a, b){
     module('fixStuckDJ', {
       require: ['Playback', 'socketEvents'],
       displayName: "Fix Stuck Advance",
-      settings: function(){
+      settings: 'fixes',
+      settingsMore: function(){
         return $('<toggle val=warnings>Show Warnings</toggle>');
       },
       help: 'Sometimes plug.dj does not automatically start playing the next song. Usually you would have to reload the page to fix this bug.\n\nThis module detects stuck advances and automatically force-loads the next song.',
@@ -3356,8 +3550,8 @@ window.compareVersions = function(a, b){
         replace = arg$.replace, addListener = arg$.addListener;
         _settings = this._settings;
         fixStuckDJ = this;
-        if (API.getTimeRemaining() === 0) {
-          fixStuckDJ.timer = sleep(15 * s_to_ms, fixStuckDJ);
+        if (API.getTimeRemaining() === 0 && API.getMedia()) {
+          fixStuckDJ.timer = sleep(15000, fixStuckDJ);
         }
         replace(Playback.prototype, 'playbackComplete', function(pC_){
           return function(){
@@ -3366,7 +3560,7 @@ window.compareVersions = function(a, b){
             return replace(Playback.prototype, 'playbackComplete', function(){
               var fn;
               fn = function(){
-                fixStuckDJ.timer = sleep(15 * s_to_ms, fixStuckDJ);
+                fixStuckDJ.timer = sleep(15000, fixStuckDJ);
                 clearTimeout(fixStuckDJ.timer);
                 return pC_.apply(this, arguments);
               };
@@ -3384,10 +3578,12 @@ window.compareVersions = function(a, b){
         fixStuckDJ = this;
         console.warn("[fixNoAdvance] song seems to be stuck, trying to fix…");
         return ajax('GET', 'rooms/state', function(data){
+          var ref$;
           if (!status === 200) {
             console.error("[fixNoAdvance] cannot load room data:", status, data);
-            return this$.timer = sleep(5 * s_to_ms, fixStuckDJ);
+            return this$.timer = sleep(5000, fixStuckDJ);
           } else {
+            (ref$ = data[0]).playback || (ref$.playback = {});
             socketEvents.advance({
               c: data[0].booth.currentDJ,
               d: data[0].booth.waitingDJs,
@@ -3404,9 +3600,10 @@ window.compareVersions = function(a, b){
       }
     });
     module('fixNoPlaylistCycle', {
-      require: ['NOT_FINISHED'],
+      require: ['_$context', 'ActivateEvent'],
       displayName: "Fix No Playlist Cycle",
-      settings: function(){
+      settings: 'fixes',
+      settingsMore: function(){
         return $('<toggle val=warnings>Show Warnings</toggle>');
       },
       help: 'Sometimes after DJing, plug.dj does not move the played song to the bottom of the playlist.\n\nThis module automatically detects this bug and moves the song to the bottom.',
@@ -3414,26 +3611,18 @@ window.compareVersions = function(a, b){
         warnings: true
       },
       setup: function(arg$){
-        var addListener, this$ = this;
+        var addListener;
         addListener = arg$.addListener;
-        return addListener(API, 'advance', function(arg$){
-          var dj, lastPlay;
-          dj = arg$.dj, lastPlay = arg$.lastPlay;
-          if ((dj != null ? dj.id : void 8) === userID && lastPlay.media.id === currentPlaylist.song.id) {
-            ajax('PUT', "playlists/" + currentPlaylist.id + "/media/move", {
-              ids: [lastPlay.media.id],
-              beforeID: 0
-            });
-            if (this$._settings.warnings) {
-              return API.chatLog("[p0ne] fixed playlist not cycling", true);
-            }
-          }
+        return addListener(API, 'sjs:reconnected', function(){
+          _$context.dispatch(new LoadEvent(LoadEvent.LOAD));
+          return _$context.dispatch(new ActivateEvent(ActivateEvent.ACTIVATE));
         });
       }
     });
     module('zalgoFix', {
-      settings: true,
+      settings: 'fixes',
       displayName: 'Fix Zalgo Messages',
+      help: 'This avoids messages\' text bleeding out of the message, as it is the case with so called "Zalgo" messages.\nEnable this if you are dealing with spammers in the chat who use Zalgo.',
       setup: function(arg$){
         var css;
         css = arg$.css;
@@ -3550,7 +3739,7 @@ window.compareVersions = function(a, b){
     #             YELLOW MOD             #
     ####################################*/
     module('yellowMod', {
-      settings: true,
+      settings: 'chat',
       displayName: 'Have yellow name as mod',
       setup: function(arg$){
         var css, id;
@@ -3563,7 +3752,7 @@ window.compareVersions = function(a, b){
     #         08/15 PLUG SCRIPTS         #
     ####################################*/
     module('autojoin', {
-      settings: true,
+      settings: 'base',
       setup: function(arg$){
         var addListener;
         addListener = arg$.addListener;
@@ -3571,7 +3760,7 @@ window.compareVersions = function(a, b){
           if (join()) {
             return console.log("[autojoin] joined waitlist", API.getWaitListPosition());
           }
-        });
+        })();
       }
     });
     module('friendslistUserPopup', {
@@ -3651,25 +3840,26 @@ window.compareVersions = function(a, b){
     module('disableChatDelete', {
       require: ['_$context'],
       optional: ['socketListeners'],
-      settings: true,
+      settings: 'chat',
       displayName: 'Show deleted messages',
       setup: function(arg$){
         var replace_$Listener, addListener, $create, css;
         replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $create = arg$.$create, css = arg$.css;
         $body.addClass('p0ne_showDeletedMessages');
         css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne_showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
-        replace_$Listener('chat:delete', function(){
-          return function(cid){
-            if (!window.socket) {
+        if (socketListeners) {
+          addListener(_$context, 'socket:chatDelete', function(arg$){
+            var p, c, mi, ref$;
+            p = arg$.p, c = p.c, mi = p.mi;
+            return markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
+          });
+        } else {
+          replace_$Listener('chat:delete', function(){
+            return function(cid){
               return markAsDeleted(cid);
-            }
-          };
-        });
-        addListener(_$context, 'socket:chatDelete', function(arg$){
-          var p, c, mi, ref$;
-          p = arg$.p, c = p.c, mi = p.mi;
-          return markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
-        });
+            };
+          });
+        }
         function markAsDeleted(cid, moderator){
           var $msg, t, wasAtBottom, d;
           $msg = getChat(cid);
@@ -3699,7 +3889,7 @@ window.compareVersions = function(a, b){
     module('chatDblclick2Mention', {
       require: ['chat'],
       optional: ['PopoutListener'],
-      settings: true,
+      settings: 'chat',
       displayName: 'DblClick username to Mention',
       setup: function(arg$){
         var replace, newFromClick, this$ = this;
@@ -3809,7 +3999,7 @@ window.compareVersions = function(a, b){
     #      JOIN/LEAVE NOTIFICATION       #
     ####################################*/
     module('joinLeaveNotif', {
-      optional: ['chatDomEvents', 'chat'],
+      optional: ['chatDomEvents', 'chat', 'auxiliaries', 'database'],
       setup: function(arg$, arg1$, arg2$, update){
         var addListener, css, lastMsg, $lastNotif, verbRefreshed, usersInRoom, i$, ref$, d, len$, user, results$ = [];
         addListener = arg$.addListener, css = arg$.css;
@@ -3854,7 +4044,9 @@ window.compareVersions = function(a, b){
             } else {
               delete usersInRoom[user.id];
             }
-            $msg = $("<span data-uid=" + user.id + ">").append(document.createTextNode((event === 'userJoin' ? '+ ' : '- ') + "")).append($("<span class=from>" + user.username + "</span>")).text(user.username).append(document.createTextNode(" just " + verb + " the room"));
+            $msg = $("<span data-uid=" + user.id + ">" + (event === 'userJoin' ? '+ ' : '- ') + "<span class=from>" + resolveRTL(user.username) + "</span> " + verb + " the room" + (!(window.auxiliaries && window.database)
+              ? ''
+              : '<div class=timestamp>' + auxiliaries.getChatTimestamp(database.settings.chatTS === 24) + '</div>') + "</span>");
             if (false) {
               return $lastNotif.append($msg);
             } else {
@@ -3869,6 +4061,30 @@ window.compareVersions = function(a, b){
         }
       }
     });
+    /*@source p0ne.chat.ls */
+    /*@author jtbrinkmann aka. Brinkie Pie */
+    /*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+    /*
+     * missing chat inline image plugins:
+     * Derpibooru
+     * imgur.com/a/
+     * tumblr
+     * deviantart
+     * e621.net
+     * paheal.net
+     * gfycat.com
+     * cloud-4.steampowered.com … .resizedimage
+     */
+    chatWidth = 328;
+    roles = ['none', 'dj', 'bouncer', 'manager', 'cohost', 'host', 'ambassador', 'ambassador', 'ambassador', 'admin'];
+    window.imgError = function(elem){
+      var x$;
+      console.warn("[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML);
+      x$ = $(elem).parent();
+      x$.text(x$.attr('href'));
+      x$.addClass('p0ne_img_failed');
+      return x$;
+    };
     /*####################################
     #      UNREAD CHAT NOTIFICAITON      #
     ####################################*/
@@ -3943,42 +4159,20 @@ window.compareVersions = function(a, b){
         return $cm().removeClass('has-unread').find('.unread').removeClass('unread');
       }
     });
-    /*@source p0ne.chat.ls */
-    /*@author jtbrinkmann aka. Brinkie Pie */
-    /*@license https://creativecommons.org/licenses/by-nc/4.0/ */
-    /*
-     * missing chat inline image plugins:
-     * Derpibooru
-     * imgur.com/a/
-     * tumblr
-     * deviantart
-     * e621.net
-     * paheal.net
-     * gfycat.com
-     * cloud-4.steampowered.com … .resizedimage
-     */
-    chatWidth = 328;
-    roles = ['none', 'dj', 'bouncer', 'manager', 'cohost', 'host', 'ambassador', 'ambassador', 'ambassador', 'admin'];
-    window.imgError = function(elem){
-      var x$;
-      console.warn("[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML);
-      x$ = $(elem).parent();
-      x$.text(x$.attr('href'));
-      x$.addClass('p0ne_img_failed');
-      return x$;
-    };
     module('p0ne_chat_input', {
       require: ['chat', 'user'],
-      optional: ['user_', '_$context', 'PopoutListener'],
+      optional: ['user_', '_$context', 'PopoutListener', 'Lang'],
       displayName: "Better Chat Input",
-      settings: true,
+      settings: 'chat',
+      help: 'Replaces the default chat input field with a multiline textfield.\nThis allows you to more accurately see how your message will actually look when send',
       setup: function(arg$){
-        var addListener, css, $create, $form, $name, $autoresize_helper, chat, patchInput, this$ = this;
+        var addListener, css, $create, $name, $autoresize_helper, chat, val, oldHeight, this$ = this;
         addListener = arg$.addListener, css = arg$.css, $create = arg$.$create;
-        css('p0ne_chat_input', '#chat-input {bottom: 7px;height: auto;background: transparent !important;min-height: 30px;}#chat-input-field {position: static;resize: none;overflow: hidden;margin-left: 8px;color: #eee;background: rgba(0, 24, 33, .7);box-shadow: inset 0 0 0 1px transparent;transition: box-shadow .2s ease-out;height: 16px; /* default before first resize */}#chat-input-field:focus {box-shadow: inset 0 0 0 1px #009cdd !important;}.muted .chat-input-name {display: none;}.autoresize_helper {display: none;white-space: pre-wrap;word-wrap: break-word;}#chat-input-field, .autoresize_helper {width: 295px;padding: 8px 10px 5px 10px;font-weight: 400;font-size: 12px;font-family: Roboto,sans-serif;}.chat-input-name {position: absolute;top: 8px;left: 18px;font-weight: 700;font-size: 12px;font-family: Roboto,sans-serif;color: #666;transition: color .2s ease-out;pointer-events:none;}#chat-input-field:focus + .chat-input-name {color: #ffdd6f !important;}/*fix chat-messages size*/#chat-messages {height: auto !important;bottom: 45px;}');
+        css('p0ne_chat_input', '#chat-input {bottom: 7px;height: auto;background: transparent !important;min-height: 30px;}#chat-input-field {position: static;resize: none;height: 16px;overflow: hidden;margin-left: 8px;color: #eee;background: rgba(0, 24, 33, .7);box-shadow: inset 0 0 0 1px transparent;transition: box-shadow .2s ease-out;}#chat-input-field:focus {box-shadow: inset 0 0 0 1px #009cdd !important;}.muted .chat-input-name {display: none;}.autoresize_helper {display: none;white-space: pre-wrap;word-wrap: break-word;}#chat-input-field, .autoresize_helper {width: 295px;padding: 8px 10px 5px 10px;min-height: 16px;font-weight: 400;font-size: 12px;font-family: Roboto,sans-serif;}.chat-input-name {position: absolute;top: 8px;left: 18px;font-weight: 700;font-size: 12px;font-family: Roboto,sans-serif;color: #666;transition: color .2s ease-out;pointer-events:none;}#chat-input-field:focus + .chat-input-name {color: #ffdd6f !important;}/*fix chat-messages size*/#chat-messages {height: auto !important;bottom: 45px;}');
         chat = PopoutView.chat || window.chat;
         this.cIF_ = chat.$chatInputField[0];
         chat.$chatInput.removeClass('focused');
+        val = chat.$chatInput.val();
         this.fixIndent = function(){
           return requestAnimationFrame(function(){
             var indent;
@@ -3991,51 +4185,56 @@ window.compareVersions = function(a, b){
             });
           });
         };
-        addListener(API, 'popout:open', patchInput = function(){
+        oldHeight = 0;
+        addListener(API, 'popout:open', function(){
           chat = PopoutView.chat || window.chat;
-          $form = chat.$chatInputField.parent();
-          chat.$chatInputField.remove();
-          chat.$chatInputField[0] = chat.chatInput = $create("<textarea id='chat-input-field' maxlength=256>").prop('tabIndex', 1).on('keydown', function(e){
+          this$.$form = chat.$chatInputField.parent();
+          oldHeight = chat.$chatInputField.height();
+          chat.$chatInputField.detach();
+          chat.$chatInputField[0] = chat.chatInput = $create("<textarea id='chat-input-field' maxlength=256>").attr('tabIndex', 1).val(val).attr('placeholder', typeof Lang != 'undefined' && Lang !== null ? Lang.chat.placeholder : void 8).on('keydown', function(e){
             return chat.onKeyDown(e);
           }).on('keyup', function(e){
             return chat.onKeyUp(e);
-          }).on('input', function(){
-            var content, content2, oldHeight, newHeight, scrollTop;
-            content = chat.$chatInputField.val();
-            if ((content2 = content.replace(/\n/g, "")) !== content) {
-              chat.$chatInputField.val(content = content2);
-            }
-            $autoresize_helper.html(content + '<br>');
-            oldHeight = chat.$chatInputField.height();
-            newHeight = $autoresize_helper.height();
-            if (oldHeight === newHeight) {
-              return;
-            }
-            console.log("[chat input] adjusting height");
-            scrollTop = chat.$chatMessages.scrollTop();
-            chat.$chatInputField.css({
-              height: newHeight
-            });
-            return chat.$chatMessages.css({
-              bottom: newHeight + 30
-            }).scrollTop(scrollTop + newHeight - oldHeight);
-          }).appendTo($form).after($autoresize_helper = $create('<div>').addClass('autoresize_helper'))[0];
+          }).on('input', onInput).appendTo(this$.$form).after($autoresize_helper = $create('<div>').addClass('autoresize_helper'))[0];
           $name = $create('<span>').addClass('chat-input-name').text(user.username + " ").insertAfter(chat.$chatInputField);
           return this$.fixIndent();
-        });
-        patchInput();
-        sleep(2 * s_to_ms, this.fixIndent);
+        })();
+        sleep(2000, this.fixIndent);
         if (_$context) {
           addListener(_$context, 'chat:send', function(){
-            return chat.$chatInputField.trigger('input');
+            return requestAnimationFrame(function(){
+              return chat.$chatInputField.trigger('input');
+            });
           });
         }
         if (typeof user_ != 'undefined' && user_ !== null) {
-          return addListener(user_, 'change:username', this.fixIndent);
+          addListener(user_, 'change:username', this.fixIndent);
         }
+        function onInput(){
+          var content, content2, newHeight, scrollTop;
+          content = chat.$chatInputField.val();
+          if ((content2 = content.replace(/\n/g, "")) !== content) {
+            chat.$chatInputField.val(content = content2);
+          }
+          $autoresize_helper.text(content + "");
+          newHeight = $autoresize_helper.height();
+          if (oldHeight === newHeight) {
+            return;
+          }
+          console.log("[chat input] adjusting height");
+          scrollTop = chat.$chatMessages.scrollTop();
+          chat.$chatInputField.css({
+            height: newHeight
+          });
+          chat.$chatMessages.css({
+            bottom: newHeight + 30
+          }).scrollTop(scrollTop + newHeight - oldHeight);
+          return oldHeight = newHeight;
+        }
+        return onInput;
       },
       disable: function(){
-        return chat.$chatInputField = $(this.cIF_).appendTo($cm().parent().find('.chat-input-form'));
+        return chat.$chatInputField = $(this.cIF_).appendTo(this.$form);
       }
     });
     module('chatPlugin', {
@@ -4049,10 +4248,15 @@ window.compareVersions = function(a, b){
         return _$context.off('chat:receive', this.cb);
       },
       cb: function(msg){
-        var i$, ref$, len$, plugin, that, err, onload;
+        var e, i$, ref$, len$, plugin, that, err, onload;
         msg.wasAtBottom == null && (msg.wasAtBottom = chatIsAtBottom());
-        _$context.trigger('chat:plugin', msg);
-        API.trigger('chat:plugin', msg);
+        try {
+          _$context.trigger('chat:plugin', msg);
+          API.trigger('chat:plugin', msg);
+        } catch (e$) {
+          e = e$;
+          console.error("[chat:plugin] Error when triggering plugin", window.e = e);
+        }
         for (i$ = 0, len$ = (ref$ = p0ne.chatMessagePlugins).length; i$ < len$; ++i$) {
           plugin = ref$[i$];
           try {
@@ -4097,34 +4301,48 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var addListener;
         addListener = arg$.addListener;
-        if (typeof $cm == 'function') {
-          $cm().children().each(function(){
-            var uid, fromUser, fromRole;
-            if (uid = this.dataset.cid) {
-              uid = uid.substr(0, 7);
-              if (fromUser = getUser(uid) && fromUser.role !== -1) {
-                fromRole = roles[fromUser.gRole
-                  ? fromUser.gRole * 5
-                  : fromUser.role];
-              } else {
-                fromRole = 'ghost';
-              }
-              return $(this).addClass("fromID-" + uid).addClass("from-" + fromRole);
+        $cm().children().each(function(){
+          var uid, $this, fromUser, role, fromRole, i$, ref$, ref1$, len$, yet$, r;
+          if (uid = this.dataset.cid) {
+            uid = uid.substr(0, 7);
+            if (!uid) {
+              return;
             }
-          });
-        }
-        return addListener(_$context, 'chat:plugin', function(message){
-          var uid, fromUser, fromRole;
-          uid = message.uid;
-          fromUser = getUser(uid);
-          if (fromUser) {
-            fromRole = roles[fromUser.gRole
-              ? fromUser.gRole * 5
-              : fromUser.role];
-          } else {
-            fromRole = 'ghost';
+            $this = $(this);
+            if (fromUser = users.get(uid)) {
+              role = getRank(fromUser);
+              if (role !== -1) {
+                fromRole = "from-" + roles[role];
+                if (role > 1) {
+                  fromRole += " from-staff";
+                }
+              }
+            }
+            if (!fromRole) {
+              for (yet$ = true, i$ = 0, len$ = (ref$ = ((ref1$ = $this.find('.icon').prop('className')) != null ? ref1$.split(" ") : void 8) || []).length; i$ < len$; ++i$) {
+                r = ref$[i$];
+                yet$ = false;
+                if (r.startsWith('icon-chat-')) {
+                  fromRole = "from-" + r.substr(10);
+                }
+              } if (yet$) {
+                fromRole = "from-none";
+              }
+            }
+            return $this.addClass("fromID-" + uid + " " + fromRole);
           }
-          return message.type += " fromID-" + uid + " from-" + fromRole;
+        });
+        return addListener(_$context, 'chat:plugin', function(message){
+          var type, uid, user, fromRole;
+          type = message.type, uid = message.uid;
+          if (type === 'message' || type === 'emote') {
+            user = getUser(uid);
+            fromRole = "from-" + getRank(user || uid);
+            if ((user != null ? user.role : void 8) > 1) {
+              fromRole += " from-staff";
+            }
+            return message.type += " fromID-" + uid + " " + fromRole;
+          }
         });
       }
     });
@@ -4135,6 +4353,9 @@ window.compareVersions = function(a, b){
     chatWidth = 500;
     module('chatInlineImages', {
       require: ['chatPlugin'],
+      settings: 'chat',
+      displayName: 'Inline Images',
+      help: 'Converts image links to images in the chat, so you can see a preview',
       setup: function(arg$){
         var add, this$ = this;
         add = arg$.add;
@@ -4198,6 +4419,8 @@ window.compareVersions = function(a, b){
       }
     });
     module('chatYoutubeThumbnails', {
+      settings: 'chat',
+      help: 'Convert show thumbnails of linked Youtube videos in the chat.\nWhen hovering the thumbnail, it will animate, alternating between three frames of the video.',
       setup: function(arg$){
         var add, addListener, this$ = this;
         add = arg$.add, addListener = arg$.addListener;
@@ -4247,7 +4470,13 @@ window.compareVersions = function(a, b){
      * @license MIT License
      * @copyright (c) 2014 J.-T. Brinkmann
      */
-    loadStyle(p0ne.host + "/css/plug_p0ne.css?v=1.2");
+    module('p0neStylesheet', {
+      setup: function(arg$){
+        var loadStyle;
+        loadStyle = arg$.loadStyle;
+        return loadStyle(p0ne.host + "/css/plug_p0ne.css?v=1.8");
+      }
+    });
     /*
     window.moduleStyle = (name, d) ->
         options =
@@ -4270,15 +4499,12 @@ window.compareVersions = function(a, b){
     #            FIMPLUG THEME           #
     ####################################*/
     module('fimplugTheme', {
-      settings: true,
+      settings: 'look&feel',
       displayName: "Brinkie's fimplug Theme",
-      module: function(){
-        return this.toggle();
-      },
       setup: function(arg$){
         var loadStyle;
         loadStyle = arg$.loadStyle;
-        return loadStyle(p0ne.host + "/css/fimplug.css");
+        return loadStyle(p0ne.host + "/css/fimplug.css?v=1.2");
       }
     });
     /*####################################
@@ -4286,9 +4512,6 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('animatedUI', {
       require: ['DialogAlert'],
-      module: function(){
-        return this.toggle();
-      },
       setup: function(arg$){
         var replace, Dialog;
         replace = arg$.replace;
@@ -4321,17 +4544,12 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('playlistIconView', {
       displayName: "Playlist Icon View",
+      settings: 'look&feel',
       help: 'Shows songs in the playlist and history panel in an icon view instead of the default list view.',
-      settings: true,
-      module: function(){
-        return this.toggle();
-      },
-      setup: function(arg$, playlistIconView, arg1$, isUpdate){
+      setup: function(arg$, playlistIconView){
         var addListener, replace, $create, $hovered, $mediaPanel;
         addListener = arg$.addListener, replace = arg$.replace, $create = arg$.$create;
-        if (!isUpdate) {
-          $body.addClass('playlist-icon-view');
-        }
+        $body.addClass('playlist-icon-view');
         $hovered = $();
         $mediaPanel = $('#media-panel');
         addListener($mediaPanel, 'mouseover', '.row', function(){
@@ -4360,17 +4578,12 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('legacyChat', {
       displayName: "Legacy Chat",
+      settings: 'chat',
       help: 'Shows the chat in the old format, before badges were added to it in December 2014.',
-      settings: true,
-      module: function(){
-        return this.toggle();
-      },
-      setup: function(arg$, arg1$, arg2$, isUpdate){
+      setup: function(arg$){
         var addListener, $cb, this$ = this;
         addListener = arg$.addListener;
-        if (!isUpdate) {
-          $body.addClass('legacy-chat');
-        }
+        $body.addClass('legacy-chat');
         $cb = $('#chat-button');
         addListener($cb, 'dblclick', function(e){
           this$.toggle();
@@ -4387,12 +4600,9 @@ window.compareVersions = function(a, b){
     });
     module('censor', {
       displayName: "Censor",
+      settings: 'dev',
       help: 'blurs some information like playlist names, counts, EP and Plug Notes.\nGreat for taking screenshots',
       disabled: true,
-      settings: true,
-      module: function(){
-        return this.toggle();
-      },
       setup: function(){
         return $body.addClass('censored');
       },
@@ -4411,8 +4621,8 @@ window.compareVersions = function(a, b){
      * @copyright (c) 2014 J.-T. Brinkmann
     */
     module('roomSettings', {
+      require: ['room'],
       optional: ['_$context'],
-      settings: false,
       persistent: ['_data', '_room'],
       setup: function(arg$){
         var addListener;
@@ -4430,23 +4640,19 @@ window.compareVersions = function(a, b){
         if (this._data && roomslug === this._room) {
           return;
         }
-        if (!(roomDescription = $('#room-info .description .value').text())) {
-          return;
+        if (!(roomDescription = room.get('description'))) {
+          return console.warn("[p0ne] no p³ compatible Room Settings found");
+        } else if (url = /@p3=(.*)/i.exec(roomDescription)) {
+          console.log("[p0ne] p³ compatible Room Settings found", url[1]);
+          return $.getJSON(httpsify(url[1])).then(function(_data){
+            this$._data = _data;
+            console.log(getTime() + " [p0ne] loaded p³ compatible Room Settings");
+            this$._room = roomslug;
+            return this$._trigger();
+          }).fail(function(){
+            return API.chatLog("[p0ne] cannot load Room Settings", true);
+          });
         }
-        url = /@p3=(.*)/i.exec(roomDescription);
-        if (!url) {
-          return;
-        }
-        $.getJSON(p0ne.proxy(url[1])).then(function(_data){
-          this$._data = _data;
-          console.log("[p0ne] loaded p³ compatible Room Settings");
-          this$._room = roomslug;
-          return this$._trigger();
-        }).fail(fail);
-        function fail(){
-          return API.chatLog("[p0ne] cannot load Room Settings", true);
-        }
-        return fail;
       },
       _trigger: function(){
         var i$, ref$, len$, fn, results$ = [];
@@ -4481,15 +4687,18 @@ window.compareVersions = function(a, b){
       displayName: "Room Theme",
       require: ['roomSettings'],
       optional: ['roomLoader'],
-      settings: true,
+      settings: 'look&feel',
+      help: 'Applies the room theme, if this room has one.\nRoom Settings and thus a Room Theme can be added by (co-) hosts of the room.',
       setup: function(arg$){
         var addListener, replace, css, loadStyle, roles, x$, this$ = this;
         addListener = arg$.addListener, replace = arg$.replace, css = arg$.css, loadStyle = arg$.loadStyle;
         roles = ['residentdj', 'bouncer', 'manager', 'cohost', 'host', 'ambassador', 'admin'];
         x$ = this.$playbackBackground = $('#playback .background img');
         x$.data('_o', x$.data('_o') || x$.attr('src'));
+        console.log(getTime() + " [roomTheme] initializing");
         return addListener(roomSettings, 'loaded', function(d){
           var roomslug, styles, role, ref$, color, colorMap, k, selector, rule, attrs, v, i$, len$, ref1$, name, url, x$, key, text, lang;
+          console.log(getTime() + " [roomTheme] loading theme");
           if (!d || this$.currentRoom === (roomslug = getRoomSlug())) {
             return;
           }
@@ -4547,12 +4756,12 @@ window.compareVersions = function(a, b){
           /*== images ==*/
           if (d.images) {
             if (isURL(d.images.background)) {
-              styles += "#app { background-image: url(" + d.images.background + ") }\n";
+              styles += "#app { background-image: url(" + d.images.background + ") fixed center center / cover }\n";
             }
             if (isURL(d.images.playback) && (typeof roomLoader != 'undefined' && roomLoader !== null) && (typeof Layout != 'undefined' && Layout !== null)) {
               x$ = new Image;
-              x$.onload(function(){
-                this.$playbackBackground.attr('src', d.images.playback);
+              x$.onload = function(){
+                this$.$playbackBackground.attr('src', d.images.playback);
                 replace(roomLoader, 'frameHeight', function(){
                   return x$.height - 10;
                 });
@@ -4560,18 +4769,18 @@ window.compareVersions = function(a, b){
                   return x$.width - 18;
                 });
                 roomLoader.onVideoResize(Layout.getSize());
-                return console.log("[roomTheme] loaded playback frame");
-              });
-              x$.onerror(function(){
-                return console.error("[roomTheme] failed to load playback frame");
-              });
+                return console.log(getTime() + " [roomTheme] loaded playback frame");
+              };
+              x$.onerror = function(){
+                return console.error(getTime() + " [roomTheme] failed to load playback frame");
+              };
               x$.src = d.images.playback;
               replace(roomLoader, 'src', function(){
                 return d.images.playback;
               });
             }
             if (isURL(d.images.booth)) {
-              styles += "#avatars-container::before {\n    background-image: url(" + d.images.booth + ");\n}\n";
+              styles += "/* custom booth */\n#avatars-container::before {\n    background-image: url(" + d.images.booth + ");\n}\n";
             }
             for (role in ref$ = d.images.icons) {
               url = ref$[role];
@@ -4598,6 +4807,7 @@ window.compareVersions = function(a, b){
       },
       clear: function(skipDisables){
         var i$, ref$, len$, ref1$, target, attr, style, url;
+        console.log(getTime() + " [roomTheme] clearing RoomTheme");
         if (!skipDisables) {
           for (i$ = 0, len$ = (ref$ = this._cbs.replacements || []).length; i$ < len$; ++i$) {
             ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1];
@@ -4611,6 +4821,7 @@ window.compareVersions = function(a, b){
           }
           delete this._cbs.replacements, delete this._cbs.css, delete this._cbs.loadedStyles;
         }
+        this.currentRoom = null;
         if ((typeof roomLoader != 'undefined' && roomLoader !== null) && (typeof Layout != 'undefined' && Layout !== null)) {
           if (typeof roomLoader != 'undefined' && roomLoader !== null) {
             roomLoader.onVideoResize(Layout.getSize());
@@ -4638,7 +4849,7 @@ window.compareVersions = function(a, b){
         ref$.disable();
       }
       window.emote_map || (window.emote_map = {});
-      host = ((ref1$ = window.p0ne) != null ? ref1$.host : void 8) || "https://dl.dropboxusercontent.com/u/4217628/plug_p0ne";
+      host = ((ref1$ = window.p0ne) != null ? ref1$.host : void 8) || "https://cdn.p0ne.com";
       /*== external sources ==*/
       $.getScript(host + "/script/bpm-resources.js").then(function(){
         return API.trigger('p0ne_emotes_map');
@@ -4847,9 +5058,10 @@ window.compareVersions = function(a, b){
     module('songNotif', {
       require: ['chatDomEvents'],
       optional: ['_$context', 'database', 'auxiliaries', 'app', 'popMenu'],
-      settings: 'enableDisable',
+      settings: 'base',
+      help: 'Shows notifications for playing songs in the chat.\nBesides the songs\' name, it also features a thumbnail and some extra buttons.\n\nBy clicking on the song\'s or author\'s name, a search on plug.dj for that name will be started, to easily find similar tracks.\n\nBy hovering the notification and clicking "description" the songs description will be loaded.\nYou can click anywhere on it to close it again.',
       setup: function(arg$, arg1$, arg2$, module_){
-        var addListener, $create, $createPersistent, css, that, $description, this$ = this;
+        var addListener, $create, $createPersistent, css, lastMedia, that, $description, this$ = this;
         addListener = arg$.addListener, $create = arg$.$create, $createPersistent = arg$.$createPersistent, css = arg$.css;
         this.callback = function(d){
           var skipped, skipper, reason, media, $div, html, time, mediaURL, image, duration, timestamp, e;
@@ -4858,9 +5070,15 @@ window.compareVersions = function(a, b){
             skipper = reason = "";
             media = d.media;
             if (!media) {
-              this$.$playbackImg.hide();
+              this$.$playbackImg.css({
+                backgroundImage: null
+              });
               return;
             }
+            if (media.id === lastMedia) {
+              return;
+            }
+            lastMedia = media.id;
             $div = $createPersistent("<div class='update song-notif' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
             html = "";
             time = getTime();
@@ -4873,7 +5091,7 @@ window.compareVersions = function(a, b){
             }
             this$.$playbackImg.css({
               backgroundImage: "url(" + image + ")"
-            }).show();
+            });
             duration = mediaTime(media.duration);
             console.logImg(media.image.replace(/^\/\//, 'https://')).then(function(){
               return console.log(time + " [DV_ADVANCE] " + d.dj.username + " is playing '" + media.author + " - " + media.title + "' (" + duration + ")", d);
@@ -4883,7 +5101,7 @@ window.compareVersions = function(a, b){
             } else {
               timestamp = "";
             }
-            html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add'><i class='icon icon-add'></i></div><a class='song-open' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a></div>" + timestamp + "<div class='song-dj'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
+            html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><div class='song-skip btn right'><i class='icon icon-skip'></i></div></div>" + timestamp + "<div class='song-dj'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
             $div.html(html);
             $div.find('.song-dj').text(d.dj.username);
             $div.find('.song-title').text(d.media.title).prop('title', d.media.title);
@@ -4909,16 +5127,17 @@ window.compareVersions = function(a, b){
             return console.error("[p0ne.notif]", e);
           }
         };
+        this.$playbackImg = $('#playback-container');
         addListener(API, 'advance', this.callback);
         if (_$context) {
           addListener(_$context, 'room:joined', function(){
             return this$.callback({
-              media: API.getMedia()
+              media: API.getMedia(),
+              dj: API.getDJ()
             });
           });
         }
-        loadStyle(p0ne.host + "/css/p0ne.notif.css");
-        this.$playbackImg = $create('<div>').addClass('playback-thumb').insertBefore($('#playback .background'));
+        loadStyle(p0ne.host + "/css/p0ne.notif.css?v=1.2");
         if (that = !module_ && API.getMedia()) {
           this.callback({
             media: that,
@@ -4926,12 +5145,7 @@ window.compareVersions = function(a, b){
           });
         }
         addListener(_$context, 'RestrictedSearchEvent:search', function(){
-          var that, ref$, ref1$;
-          if ((that = (ref$ = window.app) != null ? (ref1$ = ref$.room) != null ? ref1$.playback : void 8 : void 8) != null) {
-            return that.onSnoozeClick();
-          } else {
-            return $('#playback-controls .snooze').click();
-          }
+          return muteonce();
         });
         if (typeof popMenu != 'undefined' && popMenu !== null) {
           addListener(chatDomEvents, 'click', '.song-add', function(){
@@ -4962,6 +5176,9 @@ window.compareVersions = function(a, b){
         } else {
           css('songNotificationsAdd', '.song-add {display:none}');
         }
+        addListener(chatDomEvents, 'click', '.song-add', function(){
+          return showDescription($(this).closest(".song-notif"), "<span class='ruleskip'>!ruleskip 1 - nonpony</span>\n<span class='ruleskip'>!ruleskip 2 - </span>\n<span class='ruleskip'>!ruleskip 3 - </span>\n<span class='ruleskip'>!ruleskip 4 - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>\n<span class='ruleskip'>!ruleskip  - </span>");
+        });
         addListener(chatDomEvents, 'click', '.song-author', function(){
           return mediaSearch(this.textContent);
         });
@@ -5061,10 +5278,11 @@ window.compareVersions = function(a, b){
             });
           }
         }
+        this.showDescription = showDescription;
         return this.hideDescription = hideDescription;
       },
       disable: function(){
-        return this.hideDescription();
+        return typeof this.hideDescription == 'function' ? this.hideDescription() : void 8;
       }
     });
     /*@source p0ne.song-info.ls */
@@ -5078,9 +5296,9 @@ window.compareVersions = function(a, b){
      */
     module('songInfo', {
       optional: ['_$context'],
-      settings: 'enableDisable',
+      settings: 'base',
       displayName: 'Song-Info Dropdown',
-      help: 'clicking on the now-playing-bar (in the top-center of the page) will open a panel with the song\'s description and links to the artist and song.',
+      help: 'A panel with the song\'s description and links to the artist and song.\nClick on the now-playing-bar (in the top-center of the page) to open it.',
       setup: function(arg$){
         var addListener, $create, css, this$ = this;
         addListener = arg$.addListener, $create = arg$.$create, css = arg$.css;
@@ -5127,350 +5345,73 @@ window.compareVersions = function(a, b){
         var media, this$ = this;
         media = arg$.media;
         console.log("[song-info]", media);
-        this.lastMedia = media;
-        mediaLookup(media, {
-          fail: function(){
-            if (isRetry) {
-              this$.$el.html("error loading, retrying…");
-              return load({
-                media: media
-              }, true);
-            } else {
-              return this$.$el.html("Couldn't load song info, sorry =(");
+        if (this.lastMedia === media) {
+          return this.showInfo(media);
+        } else {
+          this.lastMedia = media;
+          this.mediaData = null;
+          mediaLookup(media, {
+            fail: function(err){
+              console.error("[song-info]", err);
+              if (isRetry) {
+                this$.$el.html("error loading, retrying…");
+                return load({
+                  media: media
+                }, true);
+              } else {
+                return this$.$el.html("Couldn't load song info, sorry =(");
+              }
+            },
+            success: function(mediaData){
+              this$.mediaData = mediaData;
+              console.log("[song-info] got data", this$.mediaData);
+              return this$.showInfo(media);
             }
-          },
-          success: function(d){
-            var $meta, $parts;
-            console.log("[song-info] got data", this$.lastMedia !== media);
-            if (this$.lastMedia !== media || this$.disabled) {
-              return;
-            }
-            this$.$el.html("");
-            $meta = this$.$create('<div>').addClass('p0ne-song-info-meta').appendTo(this$.$el);
-            $parts = {};
-            this$.$create('<span>').addClass('p0ne-song-info-author').appendTo($meta).click(function(){
-              return mediaSearch(media.author);
-            }).attr('title', "search for '" + media.author + "'").text(media.author);
-            this$.$create('<span>').addClass('p0ne-song-info-title').appendTo($meta).click(function(){
-              return mediaSearch(media.title);
-            }).attr('title', "search for '" + media.title + "'").text(media.title);
-            this$.$create('<br>').appendTo($meta);
-            this$.$create('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', "https://www.youtube.com/channel/" + d.uploader.id).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
-            this$.$create('<a>').addClass('p0ne-song-info-ytTitle').appendTo($meta).attr('href', "http://youtube.com/watch?v=" + media.cid).attr('target', '_blank').attr('title', "open video on Youtube").text(d.title);
-            this$.$create('<br>').appendTo($meta);
-            this$.$create('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getISOTime(new Date(d.uploadDate)));
-            this$.$create('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text(mediaTime(+d.duration));
-            return this$.$create('<div>').addClass('p0ne-song-info-description').appendTo(this$.$el).html(formatPlainText(d.description));
-          }
-        });
-        return API.once('advance', this.loadBind);
+          });
+          return API.once('advance', this.loadBind);
+        }
+      },
+      showInfo: function(media){
+        var d, $meta, $parts;
+        d = this.mediaData;
+        if (this.lastMedia.id !== media.id || this.disabled) {
+          return;
+        }
+        this.$el.html("");
+        $meta = this.$create('<div>').addClass('p0ne-song-info-meta').appendTo(this.$el);
+        $parts = {};
+        this.$create('<span>').addClass('p0ne-song-info-author').appendTo($meta).click(function(){
+          return mediaSearch(media.author);
+        }).attr('title', "search for '" + media.author + "'").text(media.author);
+        this.$create('<span>').addClass('p0ne-song-info-title').appendTo($meta).click(function(){
+          return mediaSearch(media.title);
+        }).attr('title', "search for '" + media.title + "'").text(media.title);
+        this.$create('<br>').appendTo($meta);
+        this.$create('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', "https://www.youtube.com/channel/" + d.uploader.id).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
+        this.$create('<a>').addClass('p0ne-song-info-ytTitle').appendTo($meta).attr('href', "http://youtube.com/watch?v=" + media.cid).attr('target', '_blank').attr('title', "open video on Youtube").text(d.title);
+        this.$create('<br>').appendTo($meta);
+        this.$create('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getISOTime(new Date(d.uploadDate)));
+        this.$create('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text(mediaTime(+d.duration));
+        return this.$create('<div>').addClass('p0ne-song-info-description').appendTo(this.$el).html(formatPlainText(d.description));
       },
       disable: function(){
         return this.$el.remove();
-      }
-    });
-    /*@source p0ne.ponify.ls */
-    /**
-     * ponify chat - a script to ponify some words in the chat on plug.dj
-     * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
-     * @author jtbrinkmann aka. Brinkie Pie
-     * @version 1.0
-     * @license MIT License
-     * @copyright (c) 2014 J.-T. Brinkmann
-     */
-    /*####################################
-    #            PONIFY CHAT             #
-    ####################################*/
-    module('ponify', {
-      optional: ['emoticons'],
-      settings: 'enableDisable',
-      displayName: 'Ponify Chat'
-      /*== TEXT ==*/,
-      map: {
-        "anybody": "anypony",
-        "anyone": "anypony",
-        "ass": "flank",
-        "asses": "flanks",
-        "boner": "wingboner",
-        "boy": "colt",
-        "boyfriend": "coltfriend",
-        "boyfriends": "coltfriends",
-        "boys": "colts",
-        "bro fist": "brohoof",
-        "bro-fist": "brohoof",
-        "butt": "flank",
-        "butthurt": "saddle-sore",
-        "butts": "flanks",
-        "child": "foal",
-        "children": "foals",
-        "cowboy": "cowpony",
-        "cowboys": "cowponies",
-        "cowgirl": "cowpony",
-        "cowgirls": "cowponies",
-        "disappoint": "disappony",
-        "disappointed": "disappony",
-        "disappointment": "disapponyment",
-        "doctor who": "doctor whooves",
-        "dr who": "dr whooves",
-        "dr. who": "dr. whooves",
-        "everybody": "everypony",
-        "everyone": "everypony",
-        "fap": "clop",
-        "faps": "clops",
-        "foot": "hoof",
-        "feet": "hooves",
-        "folks": "foalks",
-        "fool": "foal",
-        "foolish": "foalish",
-        "germany": "germaneigh",
-        "gentleman": "gentlecolt",
-        "gentlemen": "gentlecolts",
-        "girl": "filly",
-        "girls": "fillies",
-        "girlfriend": "fillyfriend",
-        "girlfriends": "fillyfriends",
-        "halloween": "nightmare night",
-        "hand": "hoof",
-        "hands": "hooves",
-        "handed": "hoofed",
-        "handedly": "hoofedly",
-        "handers": "hoofers",
-        "handmade": "hoofmade",
-        "hey": "hay",
-        "high-five": "hoof-five",
-        "highfive": "hoof-five",
-        "human": "pony",
-        "humans": "ponies",
-        "ladies": "fillies",
-        "main": "mane",
-        "man": "stallion",
-        "men": "stallions",
-        "manhattan": "manehattan",
-        "marathon": "mareathon",
-        "miracle": "mareacle",
-        "miracles": "mareacles",
-        "money": "bits",
-        "naysayer": "neighsayer",
-        "no one else": "nopony else",
-        "no-one else": "nopony else",
-        "noone else": "nopony else",
-        "nobody": "nopony",
-        "nottingham": "trottingham",
-        "null": "nullpony",
-        "old-timer": "old-trotter",
-        "people": "ponies",
-        "person": "pony",
-        "persons": "ponies",
-        "philadelphia": "fillydelphia",
-        "somebody": "somepony",
-        "someone": "somepony",
-        "stalingrad": "stalliongrad",
-        "sure as hell": "sure as hay",
-        "tattoo": "cutie mark",
-        "tattoos": "cutie mark",
-        "da heck": "da hay",
-        "the heck": "the hay",
-        "the hell": "the hay",
-        "troll": "parasprite",
-        "trolls": "parasprites",
-        "trolled": "parasprited",
-        "trolling": "paraspriting",
-        "trollable": "paraspritable",
-        "woman": "mare",
-        "women": "mares",
-        "confound those dover boys": "confound these ponies"
-      },
-      ponifyNode: function(node){
-        var i$, ref$, len$, n, str, hasReplacement, replacement, lastPos, this$ = this;
-        if (node.nodeType !== 3) {
-          for (i$ = 0, len$ = (ref$ = node.childNodes || []).length; i$ < len$; ++i$) {
-            n = ref$[i$];
-            this.ponifyNode(n);
-          }
-        } else {
-          str = node.nodeValue;
-          hasReplacement = false;
-          replacement = null;
-          lastPos = 0;
-          str.replace(this.regexp, function(_, pre, s, post, i){
-            var w, r, that, lastUpperCaseLetters, l, ref$, ref1$, i$, o, x$;
-            w = this$.map[s.toLowerCase()];
-            r = "";
-            if (!replacement) {
-              replacement = document.createElement('span');
-            }
-            if (that = str.substring(lastPos, i)) {
-              replacement.appendChild(document.createTextNode(that));
-            }
-            if (pre) {
-              if ("aeioujyh".has(w[0])) {
-                replacement.appendChild(document.createTextNode("an "));
-              } else {
-                replacement.appendChild(document.createTextNode("a "));
-              }
-            }
-            /*preserve upper/lower case*/
-            lastUpperCaseLetters = 0;
-            l = (ref$ = s.length) < (ref1$ = w.length) ? ref$ : ref1$;
-            for (i$ = 0; i$ < l; ++i$) {
-              o = i$;
-              if (s[o].toLowerCase() !== s[o]) {
-                r += w[o].toUpperCase();
-                lastUpperCaseLetters++;
-              } else if (l >= s.length && lastUpperCaseLetters === 3) {
-                r += w[o].toUpperCase();
-              } else {
-                r += w[o];
-              }
-            }
-            r += w.substr(l);
-            x$ = document.createElement('abbr');
-            x$.textContent = r + "";
-            x$.classList.add('ponified');
-            x$.title = s;
-            replacement.appendChild(x$);
-            if (post) {
-              if ("szxß".has(w[w.length - 1])) {
-                replacement.appendChild(document.createTextNode("' "));
-              } else {
-                replacement.appendChild(document.createTextNode("'s "));
-              }
-            }
-            lastPos = i + _.length;
-            return console.log("replaced '" + s + "' with '" + r + "'", node);
-          });
-          if (replacement) {
-            replacement.appendChild(document.createTextNode(str.substr(lastPos)));
-            if ((ref$ = node.parentNode) != null) {
-              ref$.replaceChild(replacement, node);
-            }
-          }
-        }
-      }
-      /*== EMOTICONS ==*/,
-      autoEmotiponies: {
-        "8)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png",
-        ":(": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
-        ":)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
-        ":?": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowhuh.png",
-        ":B": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png",
-        ":D": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiehappy.png",
-        ":S": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
-        ":o": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png",
-        ":x": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png",
-        ":|": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajbemused.png",
-        ";)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png",
-        "<3": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/heart.png",
-        "B)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png",
-        "D:": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritydespair.png"
-      },
-      emotiponies: {
-        "???": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackconfused.png",
-        aj: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png",
-        applebloom: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applecry.png",
-        applejack: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png",
-        blush: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png",
-        cool: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png",
-        cry: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritycry.png",
-        derp: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpyderp2.png",
-        derpy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpytongue2.png",
-        eek: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png",
-        evil: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png",
-        fluttershy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
-        fs: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
-        idea: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritystarry.png",
-        lol: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowlaugh.png",
-        loveme: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png",
-        mad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightangry2.png",
-        mrgreen: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesick.png",
-        oops: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png",
-        photofinish: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png",
-        pinkie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png",
-        pinkiepie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png",
-        rage: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png",
-        rainbowdash: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png",
-        rarity: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png",
-        razz: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowwild.png",
-        rd: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png",
-        roll: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackunsure.png",
-        sad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
-        scootaloo: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/scootangel.png",
-        shock: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png",
-        sweetie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
-        sweetiebelle: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
-        trixie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftright.png",
-        trixie2: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png",
-        trixieleft: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png",
-        twi: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
-        twilight: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
-        twist: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png",
-        twisted: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png",
-        wink: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
-      },
-      setup: function(arg$){
-        var addListener, replace, css, aEM, emote, ref$, url, key, m, ponyCSS, reversedMap, this$ = this;
-        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
-        this.regexp = RegExp('(\\b|an?\\s+)(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
-        addListener(API, 'chat', function(arg$){
-          var cid, that, err;
-          cid = arg$.cid;
-          if (cid) {
-            try {
-              if (that = getChatText(cid)[0]) {
-                return this$.ponifyNode(that);
-              } else {
-                throw "couldn't find message";
-              }
-            } catch (e$) {
-              err = e$;
-              return console.error("[ponify] Error converting message #" + cid, err.stack);
-            }
-          }
-        });
-        if (typeof emoticons != 'undefined' && emoticons !== null) {
-          aEM = clone$(emoticons.autoEmoteMap);
-          for (emote in ref$ = this.autoEmotiponies) {
-            url = ref$[emote];
-            key = url.replace(/.*\/(\w+)\..+/, '$1');
-            aEM[emote] = key;
-            this.emotiponies[key] = url;
-          }
-          replace(emoticons, 'autoEmoteMap', function(){
-            return aEM;
-          });
-          m = clone$(emoticons.map);
-          ponyCSS = ".ponimoticon { width: 27px; height: 27px }\n.chat-suggestion-item .ponimoticon { margin-left: -5px }\n.emoji-glow { width: auto; height: auto }\n.emoji { position: static; display: inline-block }\n";
-          reversedMap = {};
-          for (emote in ref$ = this.emotiponies) {
-            url = ref$[emote];
-            if (reversedMap[url]) {
-              m[emote] = reversedMap[url] + " ponimoticon";
-            } else {
-              reversedMap[url] = emote;
-              m[emote] = emote + " ponimoticon";
-            }
-            ponyCSS += ".emoji-" + emote + " { background: url(" + url + ") }\n";
-          }
-          css('ponify', ponyCSS);
-          replace(emoticons, 'map', function(){
-            return m;
-          });
-          return typeof emoticons.update == 'function' ? emoticons.update() : void 8;
-        }
-      },
-      disable: function(){
-        return typeof emoticons.update == 'function' ? emoticons.update() : void 8;
       }
     });
     /*@source p0ne.avatars.ls */
     /**
      * plug_p0ne Custom Avatars
      * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
+     *
      * @author jtbrinkmann aka. Brinkie Pie
      * @version 1.0
-     * @license all rights reserved! You may run the bookmarklet provided to you to run this.
-     *          You may NOT read, copy or edit this file. STOP EVEN LOOKING AT IT!
+     * @license MIT License
      * @copyright (c) 2014 J.-T. Brinkmann
+     *
+     * Developer's note: if you create your own custom avatar script or use a modified version of this,
+     * you are hereby granted permission connect to this one's default avatar server.
+     * However, please drop me an e-mail so I can keep an overview of things.
+     * I remain the right to revoke this right anytime.
      */
     /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
     /* (this includes things mentioned in the "notes" section below) */
@@ -5517,6 +5458,9 @@ window.compareVersions = function(a, b){
     requireHelper('myAvatars', function(it){
       return it.comparator === 'id';
     });
+    requireHelper('InventoryDropdown', function(it){
+      return it.selected;
+    });
     window.Lang = require('lang/Lang');
     window.Cells = requireAll(function(m){
       var ref$;
@@ -5524,7 +5468,9 @@ window.compareVersions = function(a, b){
     });
     module('customAvatars', {
       require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars'],
-      settings: 'enableDisable',
+      displayName: 'Custom Avatars',
+      settings: 'base',
+      help: 'This adds a few custom avatars to plug.dj\n\nYou can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".\nClick on the Dropdown field in the top-left to select another category.\n\nEveryone who uses plug_p0ne sees you with your custom avatar.',
       persistent: ['socket'],
       setup: function(arg$){
         var addListener, replace, css, user, hasNewAvatar, getAvatarUrl_, _internal_addAvatar, i$, ref$, len$, ref1$, avatarID, category, Cell, that, urlParser, this$ = this;
@@ -5546,7 +5492,6 @@ window.compareVersions = function(a, b){
           var avatarID, avatar, base_url;
           avatarID = d.avatarID;
           if (p0ne._avatars[avatarID]) {
-            delete Avatar.IMAGES[avatarID];
             console.info("[p0ne avatars] updating '" + avatarID + "'");
           } else if (!d.isVanilla) {
             console.info("[p0ne avatars] adding '" + avatarID + "'");
@@ -5573,6 +5518,7 @@ window.compareVersions = function(a, b){
           if (!(avatar.category in Lang.userAvatars)) {
             Lang.userAvatars[avatar.category] = avatar.category;
           }
+          delete Avatar.IMAGES[avatarID];
           if (!updateAvatarStore.loading) {
             updateAvatarStore.loading = true;
             return requestAnimationFrame(function(){
@@ -5690,6 +5636,29 @@ window.compareVersions = function(a, b){
           if (vanillaTrigger) {
             return updateAvatarStore();
           }
+        });
+        replace(InventoryDropdown.prototype, 'draw', function(d_){
+          return function(){
+            var html, categories, i$, ref$, len$, avi, category, this$ = this;
+            html = "";
+            categories = {};
+            for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
+              avi = ref$[i$];
+              categories[avi.get('category')] = true;
+            }
+            for (category in categories) {
+              html += "<div class=\"row\" data-value=\"" + category + "\"><span>" + Lang.userAvatars[category] + "</span></div>";
+            }
+            this.$el.html("<dl class=\"dropdown\">\n    <dt><span></span><i class=\"icon icon-arrow-down-grey\"></i><i class=\"icon icon-arrow-up-grey\"></i></dt>\n    <dd>" + html + "</dd>\n</dl>");
+            $('dt').on('click', function(e){
+              return this$.onBaseClick(e);
+            });
+            $('.row').on('click', function(e){
+              return this$.onRowClick(e);
+            });
+            this.select(InventoryDropdown.selected);
+            return this.$el.show();
+          };
         });
         Lang.userAvatars.p0ne = "Custom Avatars";
         for (i$ = 0, len$ = (ref$ = AvatarList.models).length; i$ < len$; ++i$) {
@@ -5868,12 +5837,25 @@ window.compareVersions = function(a, b){
           }
           return this$.socket.trigger(type, data);
         };
-        replace(this.socket, close, function(close_){
+        this.replace(this.socket, close, function(close_){
           return function(){
             this.trigger(close);
             return close_.apply(this, arguments);
           };
         });
+        (function(){
+          var user, oldBlurb, newBlurb, this$ = this;
+          user = API.getUser();
+          oldBlurb = user.blurb || "";
+          newBlurb = oldBlurb.replace(/🐎\w{4}/g, '');
+          if (oldBlurb !== newBlurb) {
+            return this.changeBlurb(newBlurb, {
+              success: function(){
+                return console.info("[ppCAS] removed old authToken from user blurb");
+              }
+            });
+          }
+        })();
         this.socket.on('authToken', function(authToken){
           var user, newBlurb;
           console.log("[ppCAS] authToken: ", authToken);
@@ -5881,8 +5863,8 @@ window.compareVersions = function(a, b){
           this$.oldBlurb = user.blurb || "";
           if (!user.blurb) {
             newBlurb = authToken;
-          } else if (user.blurb.length >= 73) {
-            newBlurb = user.blurb.substr(0, 72) + "… " + authToken;
+          } else if (user.blurb.length >= 72) {
+            newBlurb = user.blurb.substr(0, 71) + "… 🐎" + authToken;
           } else {
             newBlurb = user.blurb + " " + authToken;
           }
@@ -5982,6 +5964,9 @@ window.compareVersions = function(a, b){
           console.log("[ppCAS] user disconnected:", userID);
           return this.changeAvatarID(userID, avatarID);
         });
+        this.socket.on('disconnected', function(reason){
+          return this.socket.trigger('close', reason);
+        });
         this.socket.on('close', function(reason){
           console.warn("[ppCAS] connection closed", reason);
           return reconnect = false;
@@ -5998,7 +5983,7 @@ window.compareVersions = function(a, b){
             } else {
               return sleep(5000 + Math.random() * 5000, function(){
                 console.log("[ppCAS] reconnecting…");
-                return this.connect(url, true, false);
+                return this$.connect(url, true, false);
               });
             }
           }
@@ -6054,7 +6039,7 @@ window.compareVersions = function(a, b){
         this.$create = $create;
         this.$ppM = $create("<div id=p0ne_menu>").insertAfter('#app-menu');
         this.$ppI = $create("<div class=p0ne_icon>p<div class=p0ne_icon_sub>0</div></div>").appendTo(this.$ppM);
-        this.$ppS = $create("<div class=p0ne_settings>").appendTo(this.$ppM).slideUp(0);
+        this.$ppS = $create("<div class=p0ne_settings>").appendTo($("<div class=p0ne_settings_wrapper>").appendTo(this.$ppM)).slideUp(1);
         this.$ppP = $ppP = $create("<div class=p0ne_settings_popup>").appendTo(this.$ppS).fadeOut(0);
         for (i$ = 0, len$ = (ref$ = p0ne.modules).length; i$ < len$; ++i$) {
           module = ref$[i$];
@@ -6084,20 +6069,30 @@ window.compareVersions = function(a, b){
           }
         });
         addListener(this.$ppS, 'mouseover', '.p0ne_settings_has_more', function(){
-          var $this, module, h, t, ref$;
+          var $this, module, h, t, tt, ref$;
           $this = $(this);
           module = $this.data('module');
-          $ppP.html("<h3>" + module.displayName + "</h3>" + (!module.screenshot
+          $ppP.html("<div class=p0ne_settings_popup_triangle></div><h3>" + module.displayName + "</h3>" + (!module.screenshot
             ? ''
             : '<img src=' + module.screenshot + '>') + "" + module.help + "");
           h = $ppP.height();
-          t = $this.offset().top;
-          return $ppP.css('top', (ref$ = t - h) > 0 ? ref$ : 0).stop().fadeIn();
+          t = $this.offset().top - 50;
+          tt = (ref$ = t - h / 2) > 0 ? ref$ : 0;
+          $ppP.css({
+            top: tt
+          }).stop().fadeIn();
+          if (tt === 0) {
+            return $ppP.find('.p0ne_settings_popup_triangle').css({
+              top: t
+            });
+          }
         });
         addListener(this.$ppS, 'mouseout', '.p0ne_settings_has_more', function(){
           return $ppP.stop().fadeOut();
         });
-        addListener(API, 'p0neModuleLoaded', bind$(this, 'addModule'));
+        addListener(API, 'p0neModuleLoaded', function(module){
+          return this$.addModule(module);
+        });
         addListener(API, 'p0neModuleDisabled', function(module){
           var ref$;
           return (ref$ = module._$settings) != null ? ref$.find('.checkbox')[0].checked = false : void 8;
@@ -6106,18 +6101,24 @@ window.compareVersions = function(a, b){
           var ref$;
           return (ref$ = module._$settings) != null ? ref$.find('.checkbox')[0].checked = true : void 8;
         });
-        return addListener(API, 'p0neModuleUpdated', function(module){
+        addListener(API, 'p0neModuleUpdated', function(module){
           if (module._$settings) {
             module._$settings.find('.checkbox')[0].checked = true;
             module._$settings.addClass('updated');
             return sleep(2000, function(){
               return module._$settings.removeClass('updated');
             });
+          } else if (module.settings) {
+            return this$.addModule(module);
           }
         });
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          return addListener(_$context('show:user show:history show:dashboard dashboard:disable', bind$(this.$ppS, 'slideUp')));
+        }
       },
+      groups: {},
       addModule: function(module){
-        var itemClasses, icons, i$, ref$, len$, k;
+        var itemClasses, icons, i$, ref$, len$, k, key$;
         if (module.settings) {
           module.more = typeof module.settings === 'function';
           itemClasses = 'p0ne_settings_item';
@@ -6132,7 +6133,8 @@ window.compareVersions = function(a, b){
             icons = "<div class=p0ne_settings_icons>" + icons + "</div>";
             itemClasses += ' p0ne_settings_has_more';
           }
-          this.$ppS.append(module._$settings = $("<label class='" + itemClasses + "'><input type=checkbox class=checkbox " + (module.disabled ? '' : 'checked') + " /><div class=togglebox><div class=knob></div></div>" + module.displayName + "" + icons + "</label>").data('module', module));
+          (ref$ = this.groups)[key$ = module.settings] || (ref$[key$] = $('<details>').append($('<summary>').text(module.settings.toUpperCase())).appendTo(this.$ppS));
+          this.groups[module.settings].append(module._$settings = $("<label class='" + itemClasses + "'><input type=checkbox class=checkbox " + (module.disabled ? '' : 'checked') + " /><div class=togglebox><div class=knob></div></div>" + module.displayName + "" + icons + "</label>").data('module', module));
         }
       },
       updateSettings: function(m){
@@ -6168,21 +6170,27 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('logEventsToConsole', {
       optional: ['_$context', 'socketListeners'],
-      displayName: "[dev] Log Events to Console",
-      settings: true,
+      displayName: "Log Events to Console",
+      settings: 'dev',
+      help: 'This will log events to the JavaScript console.\nThis is mainly for programmers. If you are none, keep this disabled for better performance.\n\nBy default this will leave out some events to avoid completly spamming the console.\nYou can force-enable logging ALL events by running `logEventsToConsole.logAll = true`',
+      disabledByDefault: true,
       setup: function(arg$){
-        var addListener, replace;
+        var addListener, replace, logEventsToConsole;
         addListener = arg$.addListener, replace = arg$.replace;
+        logEventsToConsole = this;
         addListener(API, 'chat', function(data){
           var message, name;
           message = htmlUnescape(data.message).replace(/\u202e/g, '\\u202e');
           if (data.un) {
-            name = data.un.replace(/\u202e/g, '\\u202e') + ":";
+            name = data.un.replace(/\u202e/g, '\\u202e');
             name = repeatString$(" ", 24 - name.length) + name;
-            return console.log(getTime() + " [CHAT]", name + " " + message);
+            if (data.type === 'emote') {
+              return console.log(getTime() + " [CHAT] " + name + ": %c" + message, "font-style: italic;");
+            } else {
+              return console.log(getTime() + " [CHAT] " + name + ": " + message);
+            }
           } else {
-            name = "[system]";
-            return console.info(getTime() + " [CHAT]", name + " " + message);
+            return console.info(getTime() + " [CHAT] [system] %c" + message, "font-size: 1.2em; color: red; font-weight: bold");
           }
         });
         addListener(API, 'userJoin', function(data){
@@ -6205,7 +6213,7 @@ window.compareVersions = function(a, b){
           return function(type){
             var group, e;
             group = type.substr(0, type.indexOf(":"));
-            if ((group !== 'socket' && group !== 'tooltip' && group !== 'djButton' && group !== 'chat' && group !== 'sio' && group !== 'playback' && group !== 'playlist' && group !== 'notify' && group !== 'drag' && group !== 'audience' && group !== 'anim' && group !== 'HistorySyncEvent' && group !== 'user' && group !== 'ShowUserRolloverEvent') && (type !== 'ChatFacadeEvent:muteUpdate' && type !== 'PlayMediaEvent:play' && type !== 'userPlaying:update' && type !== 'context:update') || window.LOGALL) {
+            if ((group !== 'socket' && group !== 'tooltip' && group !== 'djButton' && group !== 'chat' && group !== 'sio' && group !== 'playback' && group !== 'playlist' && group !== 'notify' && group !== 'drag' && group !== 'audience' && group !== 'anim' && group !== 'HistorySyncEvent' && group !== 'user' && group !== 'ShowUserRolloverEvent') && (type !== 'ChatFacadeEvent:muteUpdate' && type !== 'PlayMediaEvent:play' && type !== 'userPlaying:update' && type !== 'context:update') || logEventsToConsole.logAll) {
               console.log(getTime() + " [" + type + "]", (typeof getArgs == 'function' ? getArgs() : void 8) || arguments);
             } else if (group === 'socket' && (type !== 'socket:chat' && type !== 'socket:vote' && type !== 'socket:grab' && type !== 'socket:earn')) {
               console.log(getTime() + " [" + type + "]", [].slice.call(arguments, 1));
@@ -6243,19 +6251,20 @@ window.compareVersions = function(a, b){
         css = arg$.css;
         return css('downloadLink', '.p0ne_downloadlink::before {content: " ";position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: -140px -280px;background-image: url(/_/static/images/icons.26d92b9.png);}');
       },
-      module: function(name, filename, data){
-        var url;
-        if (!data) {
-          data = filename;
+      module: function(name, filename, dataOrURL){
+        if (!dataOrURL) {
+          dataOrURL = filename;
           filename = name;
         }
-        if (typeof data !== 'string') {
-          data = JSON.stringify(data);
+        if (dataOrURL && !isURL(dataOrURL)) {
+          if (typeof dataOrURL !== 'string') {
+            dataOrURL = JSON.stringify(dataOrURL);
+          }
+          dataOrURL = URL.createObjectURL(new Blob([dataOrURL], {
+            type: 'text/plain'
+          }));
         }
-        url = URL.createObjectURL(new Blob([data], {
-          type: 'text/plain'
-        }));
-        return (window.$cm || $('#chat-messages')).append("<div class='message p0ne_downloadlink'><i class='icon'></i><span class='text'><a href='" + url + "' download='" + filename + "'>" + name + "</a></span></div>");
+        return (window.$cm || $('#chat-messages')).append("<div class='message p0ne_downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
       }
     });
     importAll$(window, {
@@ -6301,31 +6310,6 @@ window.compareVersions = function(a, b){
           slug: slug
         });
       },
-      getUserData: function(user){
-        var i$, ref$, len$, u;
-        if (typeof user === 'number') {
-          return $.get("/_/users/" + user).then(function(arg$){
-            var data, user;
-            data = arg$.data, user = data[0];
-            console.log("[userdata]", user);
-            if (user.level >= 5) {
-              return console.log("[userdata] https://plug.dj/@/" + encodeURI(user.slug));
-            }
-          }).fail(function(){
-            return console.warn("couldn't get slug for user with id '" + id + "'");
-          });
-        } else if (typeof user === 'string') {
-          user = user.toLowerCase();
-          for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-            u = ref$[i$];
-            if (u.username.toLowerCase() === user) {
-              return getUserData(u.id);
-            }
-          }
-          console.warn("[userdata] user '" + user + "' not found");
-          return null;
-        }
-      },
       findModule: function(test){
         var res, id, ref$, module;
         if (typeof test === 'string' && window.l) {
@@ -6336,7 +6320,7 @@ window.compareVersions = function(a, b){
           module = ref$[id];
           if (module) {
             if (test(module, id)) {
-              module.id || (module.id = id);
+              module.requireID || (module.requireID = id);
               console.log("[findModule]", id, module);
               res[res.length] = module;
             }
@@ -6374,10 +6358,10 @@ window.compareVersions = function(a, b){
         }
       },
       getRequireArg: function(haystack, needle){
-        var ref$, b, a, that;
-        ref$ = haystack.split("], function("), b = ref$[0], a = ref$[1];
-        a = a.substr(b[0].indexOf('"')).split('", "');
-        b = b.substr(0, b[1].indexOf(')')).split(', ');
+        var ref$, a, b, that;
+        ref$ = haystack.split("], function("), a = ref$[0], b = ref$[1];
+        a = a.substr(a.indexOf('"')).split('", "');
+        b = b.substr(0, b.indexOf(')')).split(', ');
         if (that = b[a.indexOf(needle)]) {
           try {
             window[that] = require(needle);
@@ -6406,7 +6390,30 @@ window.compareVersions = function(a, b){
         });
       },
       usernameToSlug: function(un){
-        return htmlEscape(un).replace(/[&;\s]+/g, '-');
+        var lastCharWasLetter, res, i$, ref$, len$, char, lc;
+        lastCharWasLetter = false;
+        res = "";
+        for (i$ = 0, len$ = (ref$ = htmlEscape(un)).length; i$ < len$; ++i$) {
+          char = ref$[i$];
+          if ((lc = char.toLowerCase()) !== char.toUpperCase()) {
+            if (/\w/.test(lc)) {
+              res += char.toLowerCase();
+            } else {
+              res += "\\u" + pad(lc.charCodeAt(0), 4);
+            }
+            lastCharWasLetter = true;
+          } else if (lastCharWasLetter) {
+            res += "-";
+            lastCharWasLetter = false;
+          }
+        }
+        if (!lastCharWasLetter) {
+          res = res.substr(0, res.length - 1);
+        }
+        return res;
+      },
+      reconnectSocket: function(){
+        return _$context.trigger('force:reconnect');
       },
       ghost: function(){
         return $.get('/');
@@ -6475,7 +6482,7 @@ window.compareVersions = function(a, b){
         }
       }
     });
-    return window.copyChat = function(copy){
+    window.copyChat = function(copy){
       var host, res;
       $('#chat-messages img').fixSize();
       host = p0ne.host;
@@ -6505,6 +6512,386 @@ window.compareVersions = function(a, b){
       res += "\n\n</head>\n<body id=\"chatlog\">\n" + $('.app-right').html().replace(/https:\/\/api\.plugCubed\.net\/proxy\//g, '').replace(/src="\/\//g, 'src="https://') + "\n</body>";
       return copy(res);
     };
+    /*@source p0ne.userHistory.ls */
+    requireHelper('userRollover', function(it){
+      return it.id === 'user-rollover';
+    });
+    requireHelper('RoomHistory', function(it){
+      var ref$;
+      return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'history' && it.prototype.hasOwnProperty('listClass');
+    });
+    ObjWrap = function(obj){
+      obj.get = function(name){
+        return this[name];
+      };
+      return obj;
+    };
+    module('userHistory', {
+      require: ['userRollover', 'RoomHistory'],
+      help: 'Shows another user\'s song history when clicking on their username in the user-rollover.\n\nDue to technical restrictions, only Youtube songs can be shown.',
+      setup: function(arg$){
+        var addListener, replace, css;
+        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
+        css('userHistory', '#user-rollover .username { cursor: pointer }');
+        addListener($('body'), 'click', '#user-rollover .username', function(){
+          var user, userID, username, userlevel, userslug;
+          $('#history-button.selected').click();
+          user = userRollover.user;
+          userID = user.id;
+          username = user.get('username');
+          userlevel = user.get('level');
+          userslug = user.get('slug');
+          if (userlevel < 5) {
+            userRollover.$level.text(userlevel + " (user-history requires >4!)");
+            return;
+          }
+          console.log(getTime() + " [userHistory] loading " + username + "'s history");
+          if (!userslug) {
+            return getUserData(userID).then(function(d){
+              user.set('slug', d.slug);
+              return loadUserHistory(user);
+            });
+          } else {
+            return loadUserHistory(user);
+          }
+        });
+        function loadUserHistory(user){
+          return $.get("https://plug.dj/@/" + user.get('slug')).fail(function(){
+            return console.error("! couldn't load user's history");
+          }).then(function(d){
+            var songs;
+            userRollover.cleanup();
+            songs = new backbone.Collection();
+            d.replace(/<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, function(arg$, img, author, roomName, positive, grabs, negative, listeners){
+              var cid, ref$, title;
+              if (cid = /\/vi\/(.{11})\//.exec(img)) {
+                cid = cid[1];
+                ref$ = author.split(" - "), title = ref$[0], author = ref$[1];
+                return songs.add(new ObjWrap({
+                  user: {
+                    id: user.id,
+                    username: "in " + roomName
+                  },
+                  room: {
+                    name: roomName
+                  },
+                  score: {
+                    positive: positive,
+                    grabs: grabs,
+                    negative: negative,
+                    listeners: listeners,
+                    skipped: 0
+                  },
+                  media: new ObjWrap({
+                    format: 1,
+                    cid: cid,
+                    author: author,
+                    title: title,
+                    image: img
+                  })
+                }));
+              }
+            });
+            console.info(getTime() + " [userHistory] loaded history for " + user.get('username'), songs);
+            out$.songs = songs;
+            out$.d = d;
+            replace(RoomHistory.prototype, 'collection', function(){
+              return songs;
+            });
+            _$context.trigger('show:history');
+            return _.defer(function(){
+              RoomHistory.prototype.collection = RoomHistory.prototype.collection_;
+              return console.log(getTime() + " [userHistory] restoring room's proper history");
+            });
+          });
+        }
+        return loadUserHistory;
+      }
+    });
+    /*@source p0ne.ponify.ls */
+    /**
+     * ponify chat - a script to ponify some words in the chat on plug.dj
+     * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @version 1.0
+     * @license MIT License
+     * @copyright (c) 2014 J.-T. Brinkmann
+     */
+    /*####################################
+    #            PONIFY CHAT             #
+    ####################################*/
+    module('ponify', {
+      optional: ['emoticons'],
+      displayName: 'Ponify Chat',
+      settings: 'pony',
+      help: 'Ponify the chat! (replace words like "anyone" with "anypony")\nReplaced words will be underlined. Move your cursor over the word to see it\'s original.\n\nIt also replaces some of the emoticons with pony emoticons.'
+      /*== TEXT ==*/,
+      map: {
+        "anybody": "anypony",
+        "anyone": "anypony",
+        "ass": "flank",
+        "asses": "flanks",
+        "boner": "wingboner",
+        "boy": "colt",
+        "boyfriend": "coltfriend",
+        "boyfriends": "coltfriends",
+        "boys": "colts",
+        "bro fist": "brohoof",
+        "bro-fist": "brohoof",
+        "butt": "flank",
+        "butthurt": "saddle-sore",
+        "butts": "flanks",
+        "child": "foal",
+        "children": "foals",
+        "cowboy": "cowpony",
+        "cowboys": "cowponies",
+        "cowgirl": "cowpony",
+        "cowgirls": "cowponies",
+        "disappoint": "disappony",
+        "disappointed": "disappony",
+        "disappointment": "disapponyment",
+        "doctor who": "doctor whooves",
+        "dr who": "dr whooves",
+        "dr. who": "dr. whooves",
+        "everybody": "everypony",
+        "everyone": "everypony",
+        "fap": "clop",
+        "faps": "clops",
+        "foot": "hoof",
+        "feet": "hooves",
+        "folks": "foalks",
+        "fool": "foal",
+        "foolish": "foalish",
+        "germany": "germaneigh",
+        "gentleman": "gentlecolt",
+        "gentlemen": "gentlecolts",
+        "girl": "filly",
+        "girls": "fillies",
+        "girlfriend": "fillyfriend",
+        "girlfriends": "fillyfriends",
+        "halloween": "nightmare night",
+        "hand": "hoof",
+        "hands": "hooves",
+        "handed": "hoofed",
+        "handedly": "hoofedly",
+        "handers": "hoofers",
+        "handmade": "hoofmade",
+        "hey": "hay",
+        "high-five": "hoof-five",
+        "highfive": "hoof-five",
+        "human": "pony",
+        "humans": "ponies",
+        "ladies": "fillies",
+        "main": "mane",
+        "man": "stallion",
+        "men": "stallions",
+        "manhattan": "manehattan",
+        "marathon": "mareathon",
+        "miracle": "mareacle",
+        "miracles": "mareacles",
+        "money": "bits",
+        "naysayer": "neighsayer",
+        "no one else": "nopony else",
+        "no-one else": "nopony else",
+        "noone else": "nopony else",
+        "nobody": "nopony",
+        "nottingham": "trottingham",
+        "null": "nullpony",
+        "old-timer": "old-trotter",
+        "people": "ponies",
+        "person": "pony",
+        "persons": "ponies",
+        "philadelphia": "fillydelphia",
+        "somebody": "somepony",
+        "someone": "somepony",
+        "stalingrad": "stalliongrad",
+        "sure as hell": "sure as hay",
+        "tattoo": "cutie mark",
+        "tattoos": "cutie mark",
+        "da heck": "da hay",
+        "the heck": "the hay",
+        "the hell": "the hay",
+        "troll": "parasprite",
+        "trolls": "parasprites",
+        "trolled": "parasprited",
+        "trolling": "paraspriting",
+        "trollable": "paraspritable",
+        "woman": "mare",
+        "women": "mares",
+        "confound those dover boys": "confound these ponies"
+      },
+      ponifyMsg: function(msg){
+        var this$ = this;
+        msg.message = msg.message.replace(this.regexp, function(_, pre, s, post, i){
+          var w, r, lastUpperCaseLetters, l, ref$, ref1$, i$, o;
+          w = this$.map[s.toLowerCase()];
+          r = "";
+          /*preserve upper/lower case*/
+          lastUpperCaseLetters = 0;
+          l = (ref$ = s.length) < (ref1$ = w.length) ? ref$ : ref1$;
+          for (i$ = 0; i$ < l; ++i$) {
+            o = i$;
+            if (s[o].toLowerCase() !== s[o]) {
+              r += w[o].toUpperCase();
+              lastUpperCaseLetters++;
+            } else {
+              r += w[o];
+              lastUpperCaseLetters = 0;
+            }
+          }
+          if (w.length >= s.length && lastUpperCaseLetters >= 3) {
+            r += w.substr(l).toUpperCase();
+          } else {
+            r += w.substr(l);
+          }
+          r = "<abbr class=ponified title='" + s + "'>" + r + "</abbr>";
+          if (pre) {
+            if ("aeioujyh".has(w[0])) {
+              r = "an " + r;
+            } else {
+              r = "a " + r;
+            }
+          }
+          if (post) {
+            if ("szxß".has(w[w.length - 1])) {
+              r += "' ";
+            } else {
+              r += "'s ";
+            }
+          }
+          console.log("replaced '" + s + "' with '" + r + "'", msg.cid);
+          return r;
+        });
+      }
+      /*== EMOTICONS ==*/,
+      autoEmotiponies: {
+        "8)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png",
+        ":(": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
+        ":)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
+        ":?": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowhuh.png",
+        ":B": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png",
+        ":D": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiehappy.png",
+        ":S": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
+        ":o": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png",
+        ":x": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png",
+        ":|": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajbemused.png",
+        ";)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png",
+        "<3": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/heart.png",
+        "B)": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png",
+        "D:": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritydespair.png"
+      },
+      emotiponies: {
+        "???": "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackconfused.png",
+        aj: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png",
+        applebloom: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applecry.png",
+        applejack: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/ajsmug.png",
+        blush: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png",
+        cool: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowdetermined2.png",
+        cry: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritycry.png",
+        derp: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpyderp2.png",
+        derpy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/derpytongue2.png",
+        eek: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershbad.png",
+        evil: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png",
+        fluttershy: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
+        fs: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
+        idea: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritystarry.png",
+        lol: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowlaugh.png",
+        loveme: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png",
+        mad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightangry2.png",
+        mrgreen: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesick.png",
+        oops: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightblush.png",
+        photofinish: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/coolphoto.png",
+        pinkie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png",
+        pinkiepie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiesmile.png",
+        rage: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/flutterrage.png",
+        rainbowdash: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png",
+        rarity: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png",
+        razz: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowwild.png",
+        rd: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/rainbowkiss.png",
+        roll: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/applejackunsure.png",
+        sad: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/fluttershysad.png",
+        scootaloo: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/scootangel.png",
+        shock: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiegasp.png",
+        sweetie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
+        sweetiebelle: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/unsuresweetie.png",
+        trixie: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftright.png",
+        trixie2: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png",
+        trixieleft: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/trixieshiftleft.png",
+        twi: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
+        twilight: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twilightsmile.png",
+        twist: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/twistnerd.png",
+        twisted: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/pinkiecrazy.png",
+        wink: "http://www.bronyland.com/wp-includes/images/smilies/emotiponies/raritywink.png"
+      },
+      setup: function(arg$){
+        var addListener, replace, css, aEM, emote, ref$, url, key, m, ponyCSS, reversedMap, this$ = this;
+        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
+        this.regexp = RegExp('/(?:^|https?:)(\\b|an?\\s+)(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
+        addListener(_$context, 'chat:plugin', function(msg){
+          return this$.ponifyMsg(msg);
+        });
+        if (typeof emoticons != 'undefined' && emoticons !== null) {
+          aEM = clone$(emoticons.autoEmoteMap);
+          for (emote in ref$ = this.autoEmotiponies) {
+            url = ref$[emote];
+            key = url.replace(/.*\/(\w+)\..+/, '$1');
+            aEM[emote] = key;
+            this.emotiponies[key] = url;
+          }
+          replace(emoticons, 'autoEmoteMap', function(){
+            return aEM;
+          });
+          m = clone$(emoticons.map);
+          ponyCSS = ".ponimoticon { width: 27px; height: 27px }\n.chat-suggestion-item .ponimoticon { margin-left: -5px }\n.emoji-glow { width: auto; height: auto }\n.emoji { position: static; display: inline-block }\n";
+          reversedMap = {};
+          for (emote in ref$ = this.emotiponies) {
+            url = ref$[emote];
+            if (reversedMap[url]) {
+              m[emote] = reversedMap[url] + " ponimoticon";
+            } else {
+              reversedMap[url] = emote;
+              m[emote] = emote + " ponimoticon";
+            }
+            ponyCSS += ".emoji-" + emote + " { background: url(" + url + ") }\n";
+          }
+          css('ponify', ponyCSS);
+          replace(emoticons, 'map', function(){
+            return m;
+          });
+          return typeof emoticons.update == 'function' ? emoticons.update() : void 8;
+        }
+      },
+      disable: function(){
+        return typeof emoticons.update == 'function' ? emoticons.update() : void 8;
+      }
+    });
+    /*@source p0ne.fimplug.ls */
+    /**
+     * fimplug related modules
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @version 1.0
+     * @license MIT License
+     * @copyright (c) 2014 J.-T. Brinkmann
+     */
+    return module('songNotifRuleskip', {
+      require: ['songNotif'],
+      setup: function(arg$){
+        var replace, addListener;
+        replace = arg$.replace, addListener = arg$.addListener;
+        replace(songNotif, 'skip', function(){
+          return function($notif){
+            return songNotif.showDescription($notif, "<span class=\"ruleskip-btn ruleskip-1\" data-rule=1>!ruleskip 1 MLP-related only</span>\n<span class=\"ruleskip-btn\" data-rule=2>!ruleskip 2 Loops / Pictures</span>\n<span class=\"ruleskip-btn\" data-rule=3>!ruleskip 3 low-efford mixes</span>\n<span class=\"ruleskip-btn\" data-rule=4>!ruleskip 4 history</span>\n<span class=\"ruleskip-btn\" data-rule=6>!ruleskip 6 &gt;10min</span>\n<span class=\"ruleskip-btn\" data-rule=13>!ruleskip 13 clop/porn/gote</span>\n<span class=\"ruleskip-btn\" data-rule=14>!ruleskip 14 episode / not music</span>\n<span class=\"ruleskip-btn\" data-rule=23>!ruleskip 23 WD-only</span>");
+          };
+        });
+        return addListener(chatDomEvents, 'click', '.ruleskip-btn', function(btn){
+          var num;
+          songNotif.hideDescription();
+          if (num = $(btn).data('rule')) {
+            return API.sendChat("!ruleskip " + num);
+          }
+        });
+      }
+    });
   });
 });
 function importAll$(obj, src){
@@ -6519,11 +6906,11 @@ function in$(x, xs){
 function bind$(obj, key, target){
   return function(){ return (target || obj)[key].apply(obj, arguments) };
 }
-function clone$(it){
-  function fun(){} fun.prototype = it;
-  return new fun;
-}
 function repeatString$(str, n){
   for (var r = ''; n > 0; (n >>= 1) && (str += str)) if (n & 1) r += str;
   return r;
+}
+function clone$(it){
+  function fun(){} fun.prototype = it;
+  return new fun;
 }
