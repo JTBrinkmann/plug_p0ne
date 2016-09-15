@@ -232,7 +232,7 @@ module \fixStuckDJ, do
                 @timer := sleep 10_000ms, fixStuckDJ
             success: (data) !~>
                 data.0.playback ||= {}
-                if m.id == data.0.playback.media
+                if m.id == data.0.playback?.media?.id
                     console.log "[fixNoAdvance] the same song is still playing."
                 else
                     # "manually" trigger socket event for DJ advance

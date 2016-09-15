@@ -51,6 +51,11 @@ module \fimstats, do
                 z-index: 6;
                 transition: opacity .2s ease-out;
             }
+            .video-only .p0ne-fimstats {
+                bottom: 116px;
+                padding-top: 0px;
+                background: rgba(0,0,0, 0.8);
+            }
 
             .p0ne-fimstats-field {
                 display: block;
@@ -102,11 +107,9 @@ module \fimstats, do
             if d.media
                 lookup d.media
                     .then (d) ->
-                        $el
-                            .html d.html
+                        $el .html d.html
                     .fail (err) ->
-                        $el
-                            .html err.html
+                        $el .html err.html
 
             else
                 $el.html ""
@@ -126,9 +129,8 @@ module \fimstats, do
                         $ '<div class=p0ne-fimstats>' .html d.html
 
         # prevent the p0ne settings from overlaying the ETA
-        do addListener API, \p0ne:stylesLoaded, ->
-            $ \#p0ne-menu .css bottom: 54px + 21px
-        addListener API, \p0ne:moduleEnabled, (m) -> if m.name == \p0neSettings
+        console.info "[fimstats] prevent p0neSettings overlay", $(\#p0ne-menu).css bottom: 54px + 21px
+        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) -> if m.name == \p0neSettings
             $ \#p0ne-menu .css bottom: 54px + 21px
 
         # show stats for current song
@@ -138,10 +140,16 @@ module \fimstats, do
         $ \#p0ne-menu .css bottom: 54px
         def = $.Deferred!
         $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
-            .then (d) ->
+            .then (d,,res) ->
                 # note: `d.plays` (playcount) doesn't contain current play
                 d = d.data.0
-
+                # note: data is HTML escaped, but let's make sure
+                if res.responseText .hasAny ['<', '>']
+                    chatWarn do
+                        d.text = d.html = "fimstats data might contain malicious code (#{media.format}/#{media.cid})"
+                        "fimstats warning"
+                    def .reject!
+                    return
                 if d.firstPlay.time != d.lastPlay.time
                     d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
                     d.html = "

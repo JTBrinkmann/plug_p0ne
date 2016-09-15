@@ -235,7 +235,7 @@ module \warnOnMehers, do
                     $warning
                         .fadeIn!
                         .text "please enter a valid number >1"
-                    resetTimer := sleep 2.min, !->
+                    resetTimer := sleep 2.min, !~>
                         @value = warnOnMehers._settings.maxMehs
                         resetTimer := 0
                     console.warn "#{getTime!} [warnOnMehers] invalid input for maxMehs", @value

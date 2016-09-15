@@ -121,7 +121,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replace @regexp, (_, pronoun, s, possessive, htmltag, i) ~>
+        msg.message .= replaceSansHTML @regexp, (_, pronoun, s, possessive, i) ~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -155,7 +155,7 @@ module \ponify, do
                     r += "'s "
 
             console.log "replaced '#s' with '#r'", msg.cid
-            return r+htmltag
+            return r
 
 
     /*== EMOTICONS ==*/
@@ -223,7 +223,6 @@ module \ponify, do
     setup: ({addListener, replace, css}) ->
         @regexp = //
             \b(an?\s+)?(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
-            ((?:<.+?</.+?>|$).*?) # avoid ponifying urls
         //gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?

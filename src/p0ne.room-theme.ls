@@ -126,9 +126,12 @@ module \customColors, do
         scope = @_settings.global
 
         @rolesHashmap = {}
-        for role in @roles
+        i = @roles.length
+        while role = @roles[--i]
             @rolesHashmap[role.name] = role
-            c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name] || "##{role.default.toString(16)}"
+            if not c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name]
+                c = "##{role.default.toString(16)}"
+                isDefault = true
             $ "
                 <div data-role=#{role.name} class='
                         p0ne-cc-row from-#{role.name}
@@ -163,6 +166,7 @@ module \customColors, do
                     .addClass \p0ne-cc-default
                 delete scope[name]
                 cc.updateCSS!
+                return false
             .on \click, \.p0ne-cc-row, ->
                 $row := $ this
                 roleName := $row .data \role
@@ -215,7 +219,7 @@ module \customColors, do
     disable: ->
         if @$cp
             @$cp .ColorPickerHide!
-            $ @$cp.data(\colorpickerId) .remove!
+            $ "##{@$cp.data(\colorpickerId)}" .remove!
             @$cp .remove!
         @$el?.remove!
 
