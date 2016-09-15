@@ -236,12 +236,17 @@ module \chatPlugin, do
 
         addListener _$context, \chat:receive, (e) !->
             getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
+        addClassesCB = _$context._events[\chat:receive][*-1]
 
-        function addClass classes
+        addListener _$context, \popout:open, !->
+            _$context._events[\chat:receive].removeItem(addClassesCB)
+            _$context._events[\chat:receive].push(addClassesCB)
+
+        !function addClass classes
             if typeof classes == \string
                 for className in classes.split /\s+/g when className
                     @classes[className] = true
-        function removeClass classes
+        !function removeClass classes
             if typeof classes == \string
                 for className in classes.split /\s+/g
                     delete @classes[className]
@@ -259,21 +264,22 @@ module \chatMessageClasses, do
     optional: <[ users ]>
     require: <[ chatPlugin ]>
     setup: ({addListener}) !->
+        /* designed to be compatible with p³-compatible Room Themes */
         try
-            $cm! .children! .each !->
+            $cms! .children! .each !->
                 if uid = this.dataset.cid
                     uid .= substr(0, 7)
                     return if not uid
                     $this = $ this
                     if fromUser = users.get uid
-                        role = getRank(fromUser)
+                        role = getRank(fromUser, true)
                         #if role != \ghost
                         fromRole = "from-#role"
                         if role == \regular
                             fromRole = \from-you if uid == userID
                         else
                             fromRole += " from-staff"
-                        /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                        /*else # stupid p³. who would abuse the class `from` instead of using something sensible instead?!
                             fromRole += " from"
                         */
                         fromRole += " from-friend" if fromUser.friend
@@ -293,7 +299,7 @@ module \chatMessageClasses, do
 
 
             if message.user = getUser(uid)
-                rank = getRank message.user
+                rank = getRank(message.user, true)
                 if uid == userID
                     message.addClass \from-you
                     also = \-also
@@ -303,7 +309,6 @@ module \chatMessageClasses, do
                 if rank == \regular
                     message.addClass \from-subscriber if message.user.sub
                     message.addClass \from-friend if message.user.friend
-
 
 
 /*####################################
@@ -399,15 +404,13 @@ module \chatOthersMentions, do
             for mention in getMentions(message, true) when mention.id != userID or type == \emote
                 res += "
                     #{message.message .substring(lastI, mention.offset)}
-                    <span class='mention-other mentionID-#{mention.id} mention-#{getRank(mention)} #{if! (mention.role||mention.gRole) then '' else \mention-staff}'>
+                    <span class='mention-other mentionID-#{mention.id} mention-#{getRank(mention, false)} #{if (mention.role||mention.gRole) then \mention-staff else ''} #{if type == \emote and mention.id == userID then \mention-you else ''}'>
                         @#{mention.rawun}
                     </span>
                 "
                 lastI = mention.offset + 1 + mention.rawun.length
-            else
-                return
-
-            message.message = res + message.message.substr(lastI)
+            if res
+                message.message = res + message.message.substr(lastI)
 
 
 /*####################################
@@ -427,17 +430,27 @@ module \chatInlineImages, do
         ☢ The taglist is subject to improvement
     '''
     _settings:
-        filterTags: <[ nsfw suggestive gore spoiler no-inline noinline ]>
+        filterTags: <[ nsfw suggestive gore spoiler questionable no-inline noinline ]>
     setup: ({addListener}) !->
         addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
             if img = @inlineify ...
-                msg.hasFilterWord ?= msg.message.toLowerCase!.hasAny @_settings.filterTags
+                if not msg.hasFilterWord?
+                    msg.hasFilterWord = false
+                    msgLC = msg.message.toLowerCase!
+                    for tag in @_settings.filterTags when msgLC.has tag
+                        msg.hasFilterWord = true
+                        console.warn "[inline-img] message contains \"#tag\", images will not be converted"
+                        break
+
                 if msg.hasFilterWord or msg.message[offset + all.length] == ";" or domain == \plug.dj
                     console.info "[inline-img] filtered image", "#completeURL ==> #protocol#img"
-                    return "<a #{pre .replace /class=('|")?(\S+)/i, (,q,cl) !->
+                    if pre .has "class="
+                        pre .= replace /class=('|")?(\S+)/i, (,q,cl) !->
                             return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
-                        } data-image-url='#img'>#completeURL</a>"
+                    else
+                        pre = "class=p0ne-img-filtered #pre"
+                    return "<a #pre src='#img'>#completeURL</a>"
                 else
                     console.log "[inline-img]", "#completeURL ==> #img"
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
@@ -451,8 +464,8 @@ module \chatInlineImages, do
         #= images =
         if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
             [rgx, repl, forceProtocol] = that
-            if url != (img = url.replace(rgx, repl))
-                return "#{forceProtocol||protocol}#img"
+            if rgx.test(url)
+                return "#{forceProtocol||protocol}#{url.replace(rgx, repl)}"
 
         #= direct images =
         if @regDirect .test url
@@ -471,12 +484,15 @@ module \chatInlineImages, do
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.filterTags.join " "
             .on \input, !~>
-                @_settings.filterTags = [$.trim(tag) for tag in $input.val!.split " "]
+                @_settings.filterTags = []; l=0; map={"":true}
+                for tag in $input.val!.split " "
+                    tag = $.trim(tag)
+                    @_settings.filterTags[l++] = tag if not map[tag]
             .appendTo $el
 
     forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
-        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,7}(?:[&,][\w]{5,7})*)(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif"] # from RedditEnhancementSuite
+        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
         \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"]
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
@@ -484,6 +500,10 @@ module \chatInlineImages, do
         \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, (,src) !-> return decodeURIComponent url]
         \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
         \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
+
+        # direct image URLs that are not automatically detected
+        \gstatic.com : [/^https:\/\/encrypted-tbn\d.gstatic.com\/images/, "$&"]
+        \i.chzbgr.com : [/(?:)/, ""]
 
         /* meme-plugins based on http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html ) */
         \quickmeme.com :     [/^(?:m\.)?quickmeme\.com\/meme\/(\w+)/, "i.qkme.me/$1.jpg"]
@@ -602,7 +622,7 @@ module \imageLightbox, do
                     cb?!
         dialog.closeBind = dialog~close
 
-        addListener chatDomEvents, \click, \.p0ne-img, (e) !->
+        addListener chatDomEvents, \click, '.p0ne-img, .p0ne-img-filtered', (e) !->
             $img_ = $ this
             e.preventDefault!
 
@@ -725,7 +745,7 @@ module \customChatNotificationTrigger, do
 
     updateRegexp: !->
         @regexp = //
-            \b(?:#{@_settings.triggerwords .join '|'})\b
+            \b(?:#{@_settings.triggerwords .join '|' |> escapeRegExp})\b
         //gi
         @hasUsernameTrigger = false
         @usernameTriggers = {}

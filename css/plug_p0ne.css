@@ -15,6 +15,7 @@
  * Playlist Icon View
  * Animated Popup
  * deleted messages
+ * deleteOwnMessage
  * Legacy-Chat
  * p0ne settings
  * waitlist ETA
@@ -45,34 +46,42 @@
         background: url(//ssl.gstatic.com/i18n/phonenumbers/phoneinputwidget/flags4.png) no-repeat 5px center;
         height: 11px
     }
-    .flag-bg { background-position: 0px -2586px; } /* Bulgarian */
-    .flag-cs { background-position: 0px -2256px }  /* Czech */
-    .flag-de { background-position: 0px -2509px }  /* German */
-    .flag-da { background-position: 0px -1386px }  /* Danish */
-    .flag-en { background-position: 0px -55px;}    /* English */
-    .flag-es { background-position: 0px -1155px }  /* Spanish */
-    .flag-fi { background-position: 0px -1903px }  /* Finnish */
-    .flag-fr { background-position: 0px -1012px }  /* French */
-    .flag-hr { background-position: 0px -902px; }  /* Croatian */
-    .flag-it { background-position: 0px -143px }   /* Italian */
-    .flag-lt { background-position: 0px -1122px;}  /* Polish */
-    .flag-ms { background-position: 0px -1870px }  /* Malay */
-    .flag-nl { background-position: 0px -1441px }  /* Dutch */
-    .flag-pl { background-position: 0px -1177px }  /* Polish */
-    .flag-pt { background-position: 0px -770px;}   /* Portuguese (Brazil flag) */
-    .flag-sk { background-position: 0px -1221px }  /* Slovak */
-    .flag-sr { background-position: 0px -2465px }  /* Serbian */
-    .flag-zh { background-position: 0px -825px; }  /* Chinese */
-
-    /*
-    .flag-bs { background-position: 0px -1474px; } /* Bosnian * /
-    .flag-et { background-position: 0px -2410px }  /* Estonian * /
-    .flag-hu { background-position: 0px -682px }   /* Hungarian * /
-    .flag-ja { background-position: 0px -429px }   /* Japanese * /
-    .flag-ko { background-position: 0px -2245px }  /* Korean * /
-    .flag-no { background-position: 0px -836px }   /* Norwegian * /
-    .flag-ru { background-position: 0px -660px }   /* Russian * /
-    */
+    /* full flag list under flags.css */
+    .flag-bg { background-position: 0px -2586px } /* Bulgarian */
+    .flag-bs { background-position: 0px -1474px } /* Bosnian */
+    .flag-cs { background-position: 0px -2256px } /* Czech */
+    .flag-da { background-position: 0px -1386px } /* Danish */
+    .flag-de { background-position: 0px -2509px } /* German */
+    .flag-en { background-position: 0px   -55px } /* English */
+    .flag-es { background-position: 0px -1155px } /* Spanish */
+    .flag-et { background-position: 0px -2410px } /* Estonian */
+    .flag-fi { background-position: 0px -1903px } /* Finnish */
+    .flag-fr { background-position: 0px -1012px } /* French */
+    .flag-gr { background-position: 0px  -165px } /* Greek */
+    .flag-hr { background-position: 0px  -902px } /* Croatian */
+    .flag-hu { background-position: 0px  -682px } /* Hungarian */
+    .flag-id { background-position: 0px -1958px } /* Indonesian */
+    .flag-it { background-position: 0px  -143px } /* Italian */
+    .flag-ja { background-position: 0px  -429px } /* Japanese */
+    .flag-ko { background-position: 0px -2245px } /* Korean */
+    .flag-lt { background-position: 0px -1122px } /* Polish */
+    .flag-lv { background-position: 0px -1936px } /* Latvian */
+    .flag-ms { background-position: 0px -1870px } /* Malay */
+    .flag-nl { background-position: 0px -1441px } /* Dutch */
+    .flag-no { background-position: 0px  -836px } /* Norwegian */
+    .flag-pl { background-position: 0px -1177px } /* Polish */
+    .flag-pt { background-position: 0px  -770px } /* Portuguese (Brazil flag) */
+    .flag-ro { background-position: 0px  -671px } /* Romania */
+    .flag-ru { background-position: 0px  -660px } /* Russian */
+    .flag-sk { background-position: 0px -1221px } /* Slovak */
+    .flag-sl { background-position: 0px -1221px } /* Slovenia */
+    .flag-sr { background-position: 0px -2465px } /* Serbian */
+    .flag-sv { background-position: 0px  -385px } /* Sveden */
+    .flag-th { background-position: 0px  -957px } /* Thai */
+    .flag-tr { background-position: 0px -1606px } /* Turkish */
+    .flag-uk { background-position: 0px -2002px } /* Ukrainian */
+    .flag-vi { background-position: 0px  -968px } /* Vietnamese */
+    .flag-zh { background-position: 0px  -825px } /* Chinese */
 
     /*
     .flag-bg { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/bg.png') } /* Bulgarian * /
@@ -99,8 +108,7 @@
     .flag-pi {
         background: url('https://i.imgur.com/h04cOa9.png');
         height: 16px;
-
-}
+    }
 
 /*== p0ne-notification ==*/
     #chat .p0ne-notif-loaded {
@@ -323,7 +331,7 @@
     .playlist-icon-view .media-list .playlist-media-item:hover {
         background: rgba(0,0,0, 0.5) !important;
     }
-    .playlist-icon-view .media-list .actions i {
+    .playlist-icon-view .media-list .actions .icon {
         top: 0;
         left: 0;
     }
@@ -498,15 +506,21 @@
     }
 
 
+/*== deleteOwnMessage */
+    #chat .message:hover .delete-button {
+        /* display: block; */
+    }
+
+
 
 
     /* song-info */
     .p0ne-song-info {
         position: absolute;
-        background: #222;
+        background: #111317;
         color: #aaa;
         z-index: 3;
-        top: 54px;
+        top: 49px;
         left: 495px;
         right: 345px;
         min-width: 300px;
@@ -733,14 +747,10 @@
     }
 
     .p0ne-settings-icons {
-        /* position: absolute; */
-        right: 0;
-        /* width: 100%; */
+        position: relative;
         height: 44px;
         margin-top: -30px;
     }
-
-    .p0ne-settings-icons {}
     .p0ne-settings-help::before {
         content: "?";
         width: 15px;
@@ -1013,6 +1023,9 @@
     .mention-other.mention-ambassador {
         color: #8b6;
     }
+    .mention-other.mention-you {
+        color: #ffdd6f;
+    }
 
 /*== fancy togglebox ==*/
     .togglebox {
@@ -1074,22 +1087,12 @@
     .togglebox:active::after {
         width: 21.875px;
     }
-    .checkbox:checked + .togglebox::before, .togglebox:active::before {
-        transform: scale(0);
-    }
-
-    .togglebox {
-        background-color: #555;
-    }
-    .togglebox::before {
-        background-color: #444;
-    }
-    .togglebox::after {
-        background: #ffffff;
-    }
     .checkbox:checked + .togglebox {
         background-color: #2AA1C6;
         background-image: linear-gradient(-180deg,#2AA1C6 0%, #2ba0c5 100%);
+    }
+    .checkbox:checked + .togglebox::before, .togglebox:active::before {
+        transform: scale(0);
     }
 
     .p0ne-settings .togglebox {
@@ -1455,13 +1458,11 @@
         color: white;
         padding: 3px 10px;
         box-shadow: inset 0 0 0 1px #444;
-        transition: box-shadow .2s ease-out;
+        transition: box-shadow .2s ease-in;
     }
     .p0ne-settings-input:focus {
         box-shadow: inset 0 0 0 1px #009cdd;
-    }
-    .colorpicker {
-        z-index: 2;
+        transition: box-shadow .2s ease-out;
     }
     .booth-alert {
         width: 4em;
@@ -1470,39 +1471,46 @@
 /*== Custom Colors ==*/
     .p0ne-cc-settings {
         position: absolute;
-        top: 54px;
+        top: 290px;
         right: 345px;
-        padding-right: 30px;
+        width: 240px;
+        min-height: 370px;
+        padding: 5px 30px 10px 20px;
         z-index: 12;
         background: #222;
+    
     }
-    .p0ne-cc-row {
+    .p0ne-cc-name {
         position: relative;
-        padding: 2px 5px 2px 10px;
-        white-space: nowrap;
+        padding: 1px 5px 3px 20px;
+    }
+    .p0ne-cc-row.selected {
+        background: #333;
     }
 
     .p0ne-cc-row .name {
-        padding-left: 20px;
         cursor: pointer;
+        padding-left: 19px;
     }
 
     .p0ne-cc-row .icon {
         top: 5px;
         cursor: pointer;
     }
+    .p0ne-cc-users .p0ne-cc-row .icon {
+        height: 15px;
+        width: 15px;
+    }
 
-    .p0ne-cc-row .icon-clear-input {
+    .p0ne-cc-row .icon.p0ne-cc-clear-icon {
         top: -3px;
         right: -25px;
+        height: 30px;
+        width: 30px;
     }
 
     .p0ne-cc-default .icon-clear-input {
         display: none;
-    }
-
-    .colorpicker {
-        z-index: 12;
     }
 
 /*== warnOnMehers ==*/
@@ -1543,5 +1551,5 @@
     }
 
 /*== Chat Commands ==*/
-    .p0ne-help-command { color: #BBB; }
-    .p0ne-help-command b { color: #FFF; }
+.p0ne-help-command { color: #BBB; }
+.p0ne-help-command b { color: #FFF; }

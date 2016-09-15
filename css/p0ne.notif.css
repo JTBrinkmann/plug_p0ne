@@ -20,7 +20,7 @@
 }
 
 .song-current .song-stats::before {
-	content: "next song played by:";
+	content: "current played by:";
 	color: #aaa;
 }
 
@@ -105,7 +105,8 @@
 	cursor: pointer;
 }
 .song-author::before {
-	content: "- ";
+	content: " by ";
+	color: #aaa;
 }
 .song-description-btn {
 	color: #bbb;

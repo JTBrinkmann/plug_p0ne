@@ -20,7 +20,6 @@ setlocal EnableDelayedExpansion
 :append
 	set filename="%~nx1"&& set filename=!filename:~1,-1!
 	:: escape filenames
-	echo - !filename!
 	echo /*@source !filename! */>> %output%
 	if "%~x1"==".js" (
 		echo ``>>  %output%

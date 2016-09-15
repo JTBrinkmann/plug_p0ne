@@ -15,12 +15,12 @@
 module \streamSettings, do
     #settings: \dev
     #displayName: 'Stream-Settings'
-    require: <[ app currentMedia database _$context ]>
+    require: <[ app Playback currentMedia database _$context ]>
     optional: <[ database ]>
     audioOnly: false
     _settings:
         audioOnly: false
-    setup: ({addListener, replace, revert, replaceListener, $create, css}, streamSettings,,m_) !->
+    setup: ({addListener, replace, revert, replaceListener, $create, css}, streamSettings, m_) !->
         css \streamSettings "
             .icon-stream-video {
                 background: #{getIcon \icon-chat-sound-on .background};
@@ -50,7 +50,7 @@ module \streamSettings, do
         @$btn_ = $btn.children!
         $btn .html '
                 <div class="box">
-                    <span id=p0ne-stream-label>Stream: Video</span>
+                    <span id=p0ne-stream-label></span>
                     <div class="p0ne-stream-buttons">
                         <i class="icon icon-stream-video enabled"></i> <i class="icon icon-stream-audio enabled"></i> <i class="icon icon-stream-off enabled"></i> <div class="p0ne-stream-fancy"></div>
                     </div>
@@ -100,9 +100,9 @@ module \streamSettings, do
                 else
                     @media = media
                     @getURL(media)
-            getURL: !->
+            /*getURL: !->
                 ...
-                /*@media.src = ...
+                @media.src = ...
                 @start!*/
             start: !->
                 @seek!
@@ -175,6 +175,7 @@ module \streamSettings, do
                         $playback .addClass \p0ne-stream-audio-failed
 
         #= Unblocked Youtube Player =
+        /*not working*/
         unblocker.name = "Youtube (unblocked)"
         unblocker.mode = \video
         unblocker.getURL = (media) !->
@@ -213,7 +214,6 @@ module \streamSettings, do
                     .appendTo playback.$container
             disable: !->
                 $playbackContainer .empty!
-            #seekTo: $.noop
             updateVolume: (vol) !->
                 playback.tx "setVolume=#vol"
 
@@ -228,17 +228,17 @@ module \streamSettings, do
                         playback.$container
                             .empty!
                             .append "<iframe id=yt-frame frameborder=0 src='#{playback.visualizers.random!}'></iframe>"
+                        b = setTimeout playback.scTimeoutBind, 5_000ms
                         soundcloud.sc.whenStreamingReady !->
-                            if media == currentMedia.get \media # SC DOUBLE PLAY FIX
-                                startTime = currentMedia.get \elapsed
-                                playback.player = soundcloud.sc.stream media.get(\cid), do
-                                    autoPlay: true
-                                    volume: currentMedia.get \volume
-                                    position: if startTime < 4s then 0s else startTime * 1_000ms
-                                    onload: playback.scOnLoadBind
-                                    whileloading: playback.scLoadingBind
-                                    onfinish: playback.playbackCompleteBind
-                                    ontimeout: playback.scTimeoutBind
+                            d.sc.stream do
+                                n.get \cid
+                                autoPlay: true
+                                !-> if media == currentMedia.get \media # SC DOUBLE PLAY FIX
+                                    clearTimeout(b)
+                                    playback.player = e
+                                    e.seek(if startTime < 4_000ms then 0ms else startTime *1_000ms)
+                                    e.setVolume(currentMedia.get \volume / 100)
+                                    e._player.on \stateChange, playback.scStateBind
                     else
                         playback.$container.append do
                             $ '<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>'
@@ -256,7 +256,6 @@ module \streamSettings, do
             disable: !->
                 playback.player?
                     .stop!
-                    .destruct!
                 playback.buffering = false
                 $playbackContainer .empty!
             #seekTo: $.noop
@@ -264,8 +263,12 @@ module \streamSettings, do
                 playback.player.setVolume vol
 
         # pseudo players
-        #ToDo check if all of those are even used
-        noDJ = Player with
+        DummyPlayer =
+            enable: $.noop
+            disable: $.noop
+            updateVolume: $.noop
+
+        noDJ = DummyPlayer with
             name: "No DJ"
             mode: \off
             enable: !->
@@ -273,32 +276,33 @@ module \streamSettings, do
                 playback.$controls.hide!
             disable: !->
                 playback.$noDJ.hide!
-            updateVolume: $.noop
 
-        syncingPlayer = Player with
+        syncingPlayer = DummyPlayer with
             name: "waiting…"
             mode: \off
             enable: !->
                 $playbackContainer
-                    .append "<iframe id=yt-frame frameborder=0 src='#{m.syncing}'></iframe>"
+                    .html "<iframe id=yt-frame frameborder=0 src='#{m.syncing}'></iframe>"
             updateVolume: $.noop
 
-        streamOff =
-            name: "Stream OFF"
+        streamOff = DummyPlayer with
+            name: "Stream: OFF"
             mode: \off
-        snoozed =
+        snoozed = DummyPlayer with
             name: "Snoozed"
             mode: \off
 
-        if currentMedia.get(\media)
-            player = [youtube, sc][that .get(\format) - 1]
-            if isSnoozed!
-                changeStream \off, "Snoozed"
-            else
-                changeStream player.mode, player.name
+        if m = currentMedia.get \media
+            player = do
+                if database.settings.streamDisabled
+                    streamOff
+                else if isSnoozed!
+                    snoozed
+                else
+                    [youtube, sc][m .get(\format) - 1]
         else
             player = noDJ
-            changeStream \off, "No DJ"
+        changeStream player
 
 
 
@@ -312,7 +316,7 @@ module \streamSettings, do
             media = currentMedia.get \media
             if media
                 if database.settings.streamDisabled
-                    changeStream \off, "Stream: OFF"
+                    changeStream streamOff
                     return
 
                 @ignoreComplete = true; sleep 1_000ms, !~> @resetIgnoreComplete!
@@ -344,7 +348,7 @@ module \streamSettings, do
                 player := noDJ
 
             #= update player =
-            changeStream player.mode
+            changeStream player
 
             player.enable(media)
 
@@ -352,7 +356,7 @@ module \streamSettings, do
             player.disable!
         replace Playback::, \reset, (r_) !-> return !->
             if database.settings.streamDisabled
-                changeStream \off, "Stream: OFF"
+                changeStream streamOff
             player.disable!
             r_ ...
 
@@ -369,9 +373,9 @@ module \streamSettings, do
                 @$controls .show!
         replace Playback::, \onSnoozeClick, !-> return !->
             if not isSnoozed!
-                changeStream \off, "Snoozed"
+                changeStream snoozed
                 @reset!
-        window.snooze = !-> changeStream \off, "Snoozed"
+        #window.snooze = !-> changeStream snoozed
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do
@@ -414,6 +418,8 @@ module \streamSettings, do
                     playback.onRefreshClick!*/
 
         function changeStream mode, name
+            if typeof mode == \object
+                {mode, name} = mode
             console.log "[streamSettings] => stream-#mode"
             $label .text (name || player.name)
             $playback

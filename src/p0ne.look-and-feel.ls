@@ -84,12 +84,12 @@ module \fixHiRes, do
 ####################################*/
 # fix drag'n'drop styles for playlist icon view
 module \playlistIconView, do
-    displayName: "Playlist Icon View"
+    displayName: "Playlist Grid View"
     settings: \look&feel
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
-    optional: <[ PlaylistItemList app ]>
+    optional: <[ PlaylistItemList pl ]>
     setup: ({addListener, replace, replaceListener}, playlistIconView) !->
         $body .addClass \playlist-icon-view
 
@@ -128,36 +128,27 @@ module \playlistIconView, do
                     @$container.append(@$lastRow)
 
 
-        if (@pl = app?.footer.playlist.playlist.media.list)?.rows
+        if pl?.list?.rows
             # onResize hook
             Layout
-                .off \resize, @pl.resizeBind
-                .resize replace(@pl, \resizeBind, !~> return @pl~onResize)
+                .off \resize, pl.list.resizeBind
+                .resize replace(pl.list, \resizeBind, !~> return pl.list~onResize)
 
             # onScroll hook
-            @pl.$el
-                .off \jsp-scroll-y, @pl.scrollBind
-                .on \jsp-scroll-y, replace(@pl, \scrollBind, !~> return @pl~onScroll)
+            pl.list.$el
+                .off \jsp-scroll-y, pl.list.scrollBind
+                .on \jsp-scroll-y, replace(pl.list, \scrollBind, !~> return pl.list~onScroll)
 
             # opening playlist drawer animation fix
             replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return !~>
-                @pl.onResize! if @pl.$el
+                #pl.list.onResize! if pl.list.$el
 
             # to force rerender
-            delete @pl.currentRow
-            @pl.onResize Layout.getSize!
-            @pl.onScroll?!
+            delete pl.list.currentRow
+            pl.list.onResize Layout.getSize!
+            pl.list.onScroll?!
         else
             console.warn "no pl"
-
-        #= fix search =
-        replace searchManager, \_search, !-> return !->
-            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
-            console.log "[_search]", @lastQuery, @page, limit
-            if @lastFormat == 1
-                searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)
-            else if @lastFormat == 2
-                searchAux.scSearch(@lastQuery, @page, limit, @scBind)
 
         #= fix dragRowLine =
         # (The line that indicates when drag'n'dropping, where a song would be dropped)
@@ -206,12 +197,12 @@ module \playlistIconView, do
             o = @onCheckListScroll!
 
     disableLate: !->
-        # using disableLate so that `@pl.scrollBind` is already reset
+        # using disableLate so that `pl.scrollBind` is already reset
         console.info "#{getTime!} [playlistIconView] disabling"
         $body .removeClass \playlist-icon-view
-        @pl?.$el?
+        pl?.list?.$el?
             .off \jsp-scroll-y
-            .on \jsp-scroll-y, @pl.scrollBind
+            .on \jsp-scroll-y, pl.list.scrollBind
 
 
         /*
@@ -408,9 +399,9 @@ module \draggableDialog, do
             $dialog := $dialogContainer .find \.dialog
                 .css position: \static
             $dialogContainer .addClass \lightsout
-            pos = $dialog .position!
-            pos?.position = \absolute
-            $dialog .css pos
+            if pos = $dialog .position!
+                pos.position = \absolute
+                $dialog .css pos
             if not lightsout
                 $dialogContainer .removeClass \lightsout
 

@@ -12,7 +12,7 @@
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
-    setup: ({$create, addListener}, p0neSettings,, oldModule) !->
+    setup: ({$create, addListener}, p0neSettings, oldModule) !->
         @$create = $create
 
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
@@ -83,7 +83,8 @@ module \p0neSettings, do
         addListener $body, \p0ne:resize, \.p0ne-settings-group, (e) !->
             $this = $ this
             if p0neSettings._settings.groupToggles[$this.data \group]
-                $this .css height: @scrollHeight
+                $this .css height: 0 # reset scrollHeight
+                $this .css height: @scrollHeight # make group as large as content
             $this .scrollTop 0
 
         addListener $ppW, \click, \.checkbox, throttle 200ms, !->
@@ -98,6 +99,29 @@ module \p0neSettings, do
                 module.enable!
             else
                 module.disable!
+        addListener $ppW, \click, \.p0ne-settings-panel-icon, throttle 200ms, (e) !->
+            $this = $ this .closest \.p0ne-settings-item
+            module = $this .data \module
+            if not module._$settingsPanel
+                module._$settingsPanel =
+                    open: false
+                    wrapper: $ '<div class=p0ne-settings-panel-wrapper>' .appendTo $ppM
+                    $el: $ '<div class=p0ne-settings-panel>'
+                module._$settingsPanel.$el .appendTo module._$settingsPanel.wrapper
+                module.settingsPanel(module._$settingsPanel.$el, module)
+
+            offsetLeft = $ppW.width!
+            if module._$settingsPanel.open # close panel
+                module._$settingsPanel.wrapper
+                    .animate do
+                        left: offsetLeft - module._$settingsPanel.$el.width!
+                        -> module._$settingsPanel.wrapper.hide!
+            else # open panel
+                module._$settingsPanel.wrapper
+                    .show!
+                    .css left: offsetLeft - module._$settingsPanel.$el.width!
+                    .animate left: offsetLeft
+            e.preventPropagation!
 
         addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
             $this = $ this
@@ -125,7 +149,7 @@ module \p0neSettings, do
                 .css top: tt, left: l
                 .stop!.fadeIn!
             $ppP .find \.p0ne-settings-popup-triangle
-                .css top: t
+                .css top: 14px >? t
         addListener $ppW, \mouseout, \.p0ne-settings-has-more, !->
             $ppP .stop!.fadeOut!
         addListener $ppP, \mouseover, !->
@@ -216,6 +240,8 @@ module \p0neSettings, do
             icons = ""
             for k in <[ help screenshot ]> when module[k]
                 icons += "<div class=p0ne-settings-#k></div>"
+            if module.settingsPanel
+                icons += "<div class=p0ne-settings-panel-icon><i class='icon icon-settings-white'></i></div>"
             if icons.length
                 icons = "<div class=p0ne-settings-icons>#icons</div>"
                 itemClasses += ' p0ne-settings-has-more'
@@ -291,6 +317,8 @@ module \p0neSettings, do
                             module._$settingsExtra .trigger \p0ne:resize
                     if autofocus
                         module._$settingsExtra .find \input .focus!
+                    else
+                        module._$settings .parent! .scrollTop 0
         catch err
             console.error "[#{module.name}] error while processing settingsExtra", err.stack
             module._$settingsExtra?

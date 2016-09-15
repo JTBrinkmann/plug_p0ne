@@ -18,8 +18,11 @@ module \simpleFixes, do
         # add tab-index to chat-input
         replace $(\#chat-input-field).0, \tabIndex, !-> return 1
 
-        # why would plug such a horrible thing as cleaning the localStorage?! Q~Q
+        # why would plug do a horrible thing such as cleaning the localStorage?! Q~Q
         replace localStorage, \clear, !-> return $.noop
+
+        # clicking vote focuses the chat (again)
+        addListener $(\#vote), \click, !-> $ \#chat-input-field .focus!
 
         # close Connection Error dialog when reconnected
         # otherwise the dialog FORCES you to refresh the page
@@ -36,6 +39,19 @@ module \simpleFixes, do
                 return null
     disable: !->
         @scm? .insertAfter \#playlist-panel
+
+/*####################################
+#           USE P0 GAPI KEY          #
+####################################*/
+module \p0neGapiKey, do
+    setup: ({replace}) !->
+        gapi.client.key ||= \AIzaSyCXdCG_sDuHISSSFcbUmJatH70nS9NYnTs # plug.dj's key 2015-05-07
+        gapi.client.keyProvider ||= \plug.dj
+        replace gapi.client, \key, !-> return p0ne.YOUTUBE_V3_KEY
+        replace gapi.client, \keyProvider, !-> return \plug_p0ne
+        gapi.client.setApiKey(gapi.client.key)
+    disableLate: !->
+        gapi.client.setApiKey(gapi.client.key)
 
 # This fixes the current media reloading on socket reconnects, even if the song didn't change
 /* NOT WORKING
@@ -105,8 +121,7 @@ module \fixGhosting, do
         queue = []
 
         addListener API, \socket:userLeave, ({p}) !-> if p == userID
-            sleep 100ms, !->
-                # to avoid problems, like auto-rejoining when closing the tab
+            sleep 200ms, !-> # to avoid problems, like auto-rejoining when closing the tab
                 rejoinRoom 'you left the room'
 
         replace PlugAjax::, \onError, (oE_) !-> return (code, e) !->
@@ -210,8 +225,7 @@ module \fixStuckDJ, do
     '''
     _settings:
         verbose: true
-    setup: ({replace, addListener}) !->
-        fixStuckDJ = this
+    setup: ({replace, addListener}, fixStuckDJ) !->
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
         addListener API, \advance, (d) !~>
@@ -289,24 +303,25 @@ module \fixStuckDJButton, do
     displayName: 'Fix Stuck DJ Button'
     require: <[ _$context ]>
     setup: ({addListener}) !->
-        var fixTimeout
         $djbtn = $ \#dj-button
-        hasSpinner = $djbtn.find \.spinner .length != 0
-        addListener _$context, \djButton:update, !->
-            if $djbtn.find \.spinner .length == 0
-                hasSpinner := false
+        fixTimeout = false
+        do addListener _$context, \djButton:update, !->
+            spinning = $djbtn.find \.spinner .length == 0
+            console.log "[djButton:update]", spinning, fixTimeout
+            if fixTimeout and spinning
                 clearTimeout fixTimeout
-            else if not hasSpinner
-                hasSpinner := true
-                fixTimeout = sleep 10_000ms, !->
-                    getRoomState! .then (d) !->
-                        d = d.data.0
-                        if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
-                            if app?.room.djButton
-                                app.room.djButton.hideSpinner!
-                            else # pseudo djButton.hideSpinner()
-                                $djbtn .find \.spinner .remove!
-                                $djbtn .find \.icon .show!
+            else if not fixTimeout
+                fixTimeout := sleep 5_000ms, !->
+                    fixTimeout := false
+                    if $djbtn.find \.spinner .length != 0
+                        console.log "[djButton:update] force joining", true, fixTimeout
+                        ajax \GET, \rooms/state, (d) !->
+                            d = d.data.0
+                            if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
+                                chatWarn "fixing stuck the DJ button", "fixStuckDJButton"
+                                forceJoin!
+                    else
+                        console.log "[djButton:update] already fixed", false, fixTimeout
 
 
 module \zalgoFix, do
@@ -337,11 +352,11 @@ module \warnOnAdblockPopoutBlock, do
             if isOpen and not warningShown
                 chatWarn "Popout chat immediately closed again. This might be because of an adblocker. You'd have to make an exception for plug.dj or disable your adblocker. Specifically Adblock Plus is known for causing this problem", "p0ne"
                 warningShown := true
-                sleep 15.min !->
+                sleep 15.min, !->
                     warningShown := false
 
 
-module \chatEmojiPolyfill, do
+/*module \chatEmojiPolyfill, do
     require: <[ users ]>
     #optional: <[ chatPlugin socketEvents database ]> defined later
     _settings:
@@ -349,8 +364,8 @@ module \chatEmojiPolyfill, do
     fixedUsernames: {}
     originalNames: {}
     setup: ({addListener, replace}) !-> _.defer !~>
-        /*@security HTML injection should NOT be possible */
-        /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js */
+        /*@security HTML injection should NOT be possible * /
+        /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js * /
         try
             pixelRatio = window.devicePixelRatio || 1; offset = 12 * pixelRatio
             document.createElement \canvas .getContext \2d
@@ -445,14 +460,94 @@ module \chatEmojiPolyfill, do
             getUserInternal(uid)? .set \rawun, original
         if @originalNames[userID]
             user.rawun = @originalNames[userID]
+*/
+
+module \stopSubscriberSpam, do
+    displayName: "Stop Subscriber Spam"
+    settings: \fixes
+    require: <[ _$context ]>
+    setup: ({replace_$Listener}) ->
+        replace_$Listener \chat:nonsubimage, -> return $.noop
 
 
-module \disableIntercomTracking, do
-    require: <[ tracker ]>
-    disabled: true
-    settings: \dev
-    displayName: 'Disable Tracking'
+/*####################################
+#          YT PAGED SEARCH           #
+####################################*/
+/* The paginated search was removed on plug.dj on purpose, because searches use up quite a lot of
+ * the Youtube API quota that plug.dj has. Limiting the search results is to avoid running out of quota.
+ * This is not an issue with plug_p0ne, because plug_p0ne replaces the API key with plug_p0ne's own,
+ * so that the plug.dj quota won't be used up.
+ */
+module \ytPagedSearch, do
+    displayName: "Paged YT Search"
+    settings: \fixes
+    require: <[ searchManager searchAux SearchList YtSearchService ]>
+    optional: <[ pl ]>
     setup: ({replace}) !->
-        for k,v of tracker when typeof v == \function
-            replace tracker, k, !-> return !-> return $.noop
-        replace tracker, \event, !-> return !-> return this
+        replace SearchList::, \onScroll, !-> return !->
+            #console.log "[onScroll]", @searching, @scrollPane.getPercentScrolledY!, @collection
+            if not @searching and @collection.length < 200 and searchManager.lastCount > 0 and @scrollPane.getPercentScrolledY! > 0.97
+                @searching = !0
+                searchManager.collection = @collection
+                if searchManager.more!
+                    @showRowSpinner!
+                else
+                    @hideRowSpinner!
+
+        pl?.list?.scrollBind = pl~onScroll
+
+        replace searchManager, \more, !-> return !->
+            #console.log("load more", this)
+            if not @relatedSearch and @lastCount > 0 and @collection.length < 200
+                ++@page
+                if not @scFavoritesLookup and not @scTracksLookup
+                    @_search!
+                else if @scFavoritesLookup
+                    @loadSCFavorites @page
+                else if @scTracksLookup
+                    @loadSCTracks @page
+                return true
+            else
+                return false
+
+
+        replace searchManager, \_search, !-> return !->
+            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
+            console.log "[_search]", @lastQuery, @page, limit
+            if @lastFormat == 1
+                searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)
+            else if @lastFormat == 2
+                searchAux.scSearch(@lastQuery, @page, limit, @scBind)
+
+        replace searchAux, \ytSearch, !-> return (query, page, limit, callback) !->
+            #console.log("ytSearch", query, page, limit, callback)
+            @ytSearchService ||= new YtSearchService
+            @ytSearchService.load(query, page, limit, callback)
+
+        replace YtSearchService::, \load, !-> return (query, page, limit, callback) !->
+            @nextPage = page + 1; @lastQuery = query
+            @callback = callback
+            gapi.client.youtube.search.list do
+                q: query,
+                part: \snippet
+                fields: 'nextPageToken,items(id/videoId,snippet/title,snippet/thumbnails,snippet/channelTitle)',
+                maxResults: limit,
+                pageToken: if page != 1 and query == @lastQuery then @nextPageToken else null,
+                videoEmbeddable: not 0,
+                videoDuration: \any
+                type: \video
+                safeSearch: \none
+                videoSyndicated: "true"
+            .then do
+                (e) ~>
+                      #console.log("youtube loaded", e)
+                      @nextPageToken = e.result.nextPageToken
+                      @onList(e)
+                @errorBind
+            #window.ga and window.ga("send", "event", "Search")
+
+module \fixPopoutChatClose, do
+    require: <[ PopoutListener ]>
+    setup: ({addListener}) !->
+        addListener API, \popout:open, (window_) !->
+            window_.onbeforeunload = PopoutView~close

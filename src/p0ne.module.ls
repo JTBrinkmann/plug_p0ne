@@ -114,7 +114,7 @@ window.module = (name, data) !->
                     console.error "#{getTime!} [ERROR] unable to replace listener of type '#event' (no such event for event emitter specified)", emitter, ctx
                     return false
                 if callback
-                    for e in evts when e.ctx instanceof ctx
+                    for e in evts when e.ctx == ctx  or  typeof ctx == \function and e.ctx instanceof ctx
                         return @replace e, \callback, callback
                 else
                     callback = ctx
@@ -128,6 +128,9 @@ window.module = (name, data) !->
                 if not _$context?
                     console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#event'] (no _$context)"
                     return false
+                if arguments.length == 2
+                    callback = constructor
+                    constructor = _$context
                 helperFNs.replaceListener _$context, event, constructor, callback
 
             add: (target, callback, options) !->
@@ -136,6 +139,10 @@ window.module = (name, data) !->
                 d.index = target.length # not part of the Array, so arrEqual ignores it
                 target[d.index] = callback
                 cbs.[]adds[*] = d
+
+            addCommand: (commandName, data) !->
+                helperFNs.replace chatCommands.commands, commandName, !-> return data
+                chatCommands.updateCommands!
 
             $create: (html) !->
                 return cbs.[]$elements[*] = $ html
@@ -160,25 +167,30 @@ window.module = (name, data) !->
                 @disabled = false
                 disabledModules[name] = false if not module.modDisabled
                 try
-                    setup.call module, helperFNs, module, data, module
+                    setup.call module, helperFNs, module
                     trigger \moduleEnabled
                     console.info "#{getTime!} [#name] enabled", setup != null
                 catch err
-                    console.error "#{getTime!} [#name] error while re-enabling", err.stack
+                    console.error "#{getTime!} [#name] error while re-enabling", err.messageAndStack
                 return this
-            disable: (temp /*internal*/) !->
+
+            disable: (temp) !->
                 # if `temp` is true-ish, module will not be disabled in the settings
                 # `temp` can also be the new instance of the module, in case it gets updated
                 return if module.disabled
                 newModule = temp if temp and temp != true
                 try
                     module.disabled = true
-                    disable.call module, helperFNs, newModule, data if typeof disable == \function
+                    hasChatCommands = chatCommands?.commands?
+                    disable.call module, helperFNs, newModule if typeof disable == \function
                     for {target, args} in cbs.listeners ||[]
                         target.off .apply target, args
                     for [target, attr , replacement, orig] in cbs.replacements ||[]
                         if target[attr] == replacement
                             target[attr] = orig #target["#{attr}_"]
+                            if hasChatCommands and target == chatCommands.commands
+                                delete chatCommands.commands.roomsettings if not orig
+                                chatCommands.updateCommands!
                     for [target /*, callback, options*/]:d in cbs.adds ||[]
                         target .remove d.index
                         d.index = -1
@@ -199,9 +211,9 @@ window.module = (name, data) !->
                         console.info "#{getTime!} [#name] disabled"
                         dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
-                    disableLate.call module, helperFNs, newModule, data if typeof disableLate == \function
+                    disableLate.call module, helperFNs, newModule if typeof disableLate == \function
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
+                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
                     delete window[name]
                 delete p0ne.dependencies[name]
                 return this
@@ -234,7 +246,7 @@ window.module = (name, data) !->
                 try
                     module_.disable? module
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
+                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
 
 
         # checking dependencies (required modules)
@@ -324,7 +336,7 @@ window.module = (name, data) !->
 
 
     catch e
-        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.stack
+        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.messageAndStack
     return module
 
     function loadingDone
@@ -345,13 +357,12 @@ window.module = (name, data) !->
             else
                 wasDisabled = "%c"
                 try # run module's setup function
-                    setup?.call module, helperFNs, module, data, module_
+                    setup?.call module, helperFNs, module, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#{getTime!} [#name] error initializing", e.stack
+                    console.error "#{getTime!} [#name] error initializing", e.messageAndStack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
-                    delete window[name]
 
             # trigger events
             if module_

@@ -219,7 +219,6 @@ module \automute, do
         @songlist = @_settings.songlist
         media = API.getMedia!
         addListener API, \advance, (d) !~>
-            console.log "[automute test]", media, media?.cid, @songlist[media?.cid]
             if (media := d.media) and @songlist[media.cid]
                 console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
                 #muteonce!
@@ -240,7 +239,7 @@ module \automute, do
                         .append $box
                 if not media
                     # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
-                    console.warn "[automute] uw0tm8?"
+                    console.warn "[automute] uw0tm8? how did the stream mode change if there's no song playing? well this could happen if you changed the room or something…"
                 else if @songlist[media.cid] # btn "remove from automute"
                     console.log "[automute] change automute-btn to REMOVE"
                     $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
@@ -323,10 +322,15 @@ module \afkAutorespond, do
 
     DEFAULT_MSG: "I'm AFK at the moment"
     setup: ({addListener, $create}) !->
-        var timeout
+        timeout = true
+        sleep @_settings.timeout, !-> timeout := false
         addListener API, \chat, (msg) !~>
-            if msg.uid and msg.uid != userID and isMention(msg, true) and not timeout and not msg.message.has \!disable
+            if msg.uid and msg.uid != userID and not timeout and isMention(msg, true) and not msg.message.has \!disable
+                # it is neglected that a non-staff might send a @mentioning message with "!disable"
                 API.sendChat "[AFK] #{@_settings.message || @DEFAULT_MSG}"
+                timeout := true
+                sleep @_settings.timeout, !-> timeout := false
+            else if msg.uid == userID
                 timeout := true
                 sleep @_settings.timeout, !-> timeout := false
         $create '<div class=p0ne-afk-button>'
@@ -362,7 +366,7 @@ module \joinLeaveNotif, do
     '''
     _settings:
         mergeSameUser: true
-    setup: ({addListener, css}, joinLeaveNotif,,update) !->
+    setup: ({addListener, css}, joinLeaveNotif, update) !->
         if update
             lastMsg = $cm! .children! .last!
             if lastMsg .hasClass \p0ne-notif-joinleave
@@ -605,22 +609,22 @@ module \etaTimer, do
             .append $etaTime = $ '<span class=p0ne-eta-time></span>'
             .mouseover !->
                 if _$context?
+                    updateToolTip!
                     clearInterval tooltipIntervalID
                     tooltipIntervalID := repeat 1_000ms, updateToolTip
 
-                do function updateToolTip
+                function updateToolTip
                     # show ETA calc
                     p = API.getWaitListPosition!
                     p = API.getWaitList!.length if p == -1
                     avg = sum / l |> Math.round
                     rem = API.getTimeRemaining!
-                    if _$context?
-                        if p
-                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} avg. song duration", $etaText
-                        else if rem
-                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
-                        else
-                            _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
+                    if p
+                        _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} avg. song duration", $etaText
+                    else if rem
+                        _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
+                    else
+                        _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
             .mouseout !->
                 if _$context?
                     clearInterval tooltipIntervalID
@@ -641,6 +645,8 @@ module \etaTimer, do
                 sum += d.media.duration
                 lastSongDur := API.getHistory![l - 1].media.duration
             # note: we don't trigger updateETA() because each advance is accompanied with a waitListUpdate
+        if _$context?
+            addListener _$context, \room:joined, updateETA
 
         # initialize average song length
         # (this is AFTER the event listeners, because tinyhist() has to run after it)
@@ -655,7 +661,7 @@ module \etaTimer, do
                     if d.media
                         lastSongDur := 0
                         l++
-                    tinyhist! if l < 51
+                    tinyhist! if l < 50
         else
             l = 50
             lastSongDur = hist[l - 1].media.duration
@@ -666,8 +672,10 @@ module \etaTimer, do
         updateETA!
 
         addListener API, \p0ne:stylesLoaded, !-> requestAnimationFrame !->
+            console.info "[TEST stylesLoaded] $eta.width: #{$eta.width!}"
             $nextMediaLabel .css right: $eta.width! - 50px
 
+        var lastETA
         ~function updateETA
             # update what the ETA timer says
             #clearTimeout @timer
@@ -687,21 +695,23 @@ module \etaTimer, do
                         $etaTime .text "DJ instantly"
                         return
             # calculate average duration
-            avg_ = (API.getTimeRemaining!  +  sum * p / l)
-            avg = avg_ / 60 |> Math.round
+            eta_ = (API.getTimeRemaining!  +  sum * p / l)
+            eta = eta_ / 60 |> Math.round
 
-            #console.log "[ETA] updated to (#avg min)"
-            $etaText .text "ETA ca. "
-            if avg > 60min
-                $etaTime .text "#{~~(avg / 60min_to_h)}h #{avg % 60}min"
-            else
-                $etaTime .text "#avg min"
+            #console.log "[ETA] updated to (#eta min)"
+            if lastETA != eta
+                lastETA := eta
+                $etaText .text "ETA ca. "
+                if eta > 60min
+                    $etaTime .text "#{~~(eta / 60)}h #{eta % 60}min"
+                else
+                    $etaTime .text "#eta min"
+                $nextMediaLabel .css right: $eta.width! - 50px
 
-            $nextMediaLabel .css right: $eta.width! - 50px
-
-            # setup timer to update ETA
-            clearTimeout @timer
-            @timer = sleep ((avg_ % 60s)+31s).s, updateETA
+                # setup timer to update ETA
+                if eta_ > 0 # when disconnecting from the socket, it might be that API.getTimeRemaining! returns a negative number
+                    clearTimeout @timer
+                    @timer = sleep ((eta_ % 60s)+31s).s, updateETA
     disable: !->
         clearTimeout @timer
 
@@ -786,7 +796,7 @@ module \friendslistUserPopup, do
                 chat.getExternalUser id, data, (user) !->
                     chat.onShowChatUser user, data
         #replace friendsList, \drawBind, !-> return _.bind friendsList.drawRow, friendsList
-# adds a user-rollover to the FriendsList when clicking someone's name
+# adds a user-rollover to the WaitList when clicking someone's name
 module \waitlistUserPopup, do
     require: <[ WaitlistRow ]>
     setup: ({replace}) !->
@@ -808,7 +818,7 @@ module \boothAlert, do
     _settings:
         warnOnPrevPlay: true # takes precedence
         warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
-    setup: ({addListener}, {_settings},,module_) !->
+    setup: ({addListener}, {_settings}, module_) !->
         var warnTimeout
         @remainingStr = humanTime _settings.warnXMinBefore
         isNext = false
@@ -898,7 +908,7 @@ module \avoidHistoryPlay, do
             else
                 API.once \advance, checkOnNextAdv
 
-        function checkOnNextAdv d
+        !function checkOnNextAdv d
             # assuming that the playlist did not already advance
             console.info "[Avoid History Plays]", playlist.list?.rows?.0?.model, playlist.list?.rows?.1?.model
             return if not (nextSong = playlist.list?.rows?.1?.nextSong) or not getActivePlaylist?
@@ -909,3 +919,16 @@ module \avoidHistoryPlay, do
                         beforeID: -1
                         ids: [nextSong.id]
         do @checkOnNextAdv = checkOnNextAdv
+
+/*####################################
+#         WARN ON PAGE LEAVE         #
+####################################*/
+module \warnOnPageLeave, do
+    displayName: "Warn on Leaving plug.dj"
+    settings: \base
+    setup: ({addListener}) !->
+        addListener $window, \beforeunload, !~>
+            #return "[plug_p0ne] Are you sure you want to leave the page?"
+            # Chrome shows the text + "Are you sure you want to leave the page? [Leave this page] [Stay on this page]"
+            # Firefox always shows "This page is asking you to confirm that you want to leave - data you have entered may not be saved. [Leave Page] [Stay on Page]"
+            return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under #{@settings .toUpperCase!} > #{@displayName})"

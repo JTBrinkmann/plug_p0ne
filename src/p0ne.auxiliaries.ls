@@ -43,9 +43,8 @@ Array::define \unique, !->
         else
             res[l++] = el
     return res
-Array::define \joinWrapped, (pre, post, between) !->
+Array::define \joinWrapped, (pre='', post='', between='') !->
     return "" if @length == 0
-    pre ||= ''; post ||= ''; between ||= ''
     res = "#pre#{@0}#post"
     for i from 1 til @length
         res += "#between#pre#{@[i]}#post"
@@ -82,6 +81,13 @@ for Constr in [String, Array]
 Number::defineGetter \s,   !-> return this *     1_000s_to_ms
 Number::defineGetter \min, !-> return this *    60_000min_to_ms
 Number::defineGetter \h,   !-> return this * 3_600_000h_to_ms
+
+if window.chrome
+    Error::__defineGetter__ \messageAndStack !->
+        return @stack
+else
+    Error::__defineGetter__ \messageAndStack !->
+        return "#{@name}: #{@message}\n#{@stack}"
 
 
 jQuery.fn <<<<
@@ -224,6 +230,8 @@ window.dataUnload = (name) !->
         p0ne.autosave_num[name]--
     if p0ne.autosave_num[name] == 0
         delete p0ne.autosave[name]
+
+$window .off \beforeunload, window.dataSave if window.dataSave
 window.dataSave = !->
     err = ""
     for k,v of p0ne.autosave when v
@@ -289,7 +297,7 @@ export class DataEmitter extends {prototype: Backbone.Events}
             try
                 fn .call context||this, @_data
             catch e
-                console.error "[#{@_name}] Error while triggering #type [#{@_listeners[type].length - 1}]", this, args, e.stack
+                console.error "[#{@_name}] Error while triggering #type [#{@_listeners[type].length - 1}]", this, args, e.messageAndStack
         return this
     # shorthands
     data: (fn, context) !-> return @on \data, fn, context
@@ -444,23 +452,26 @@ window <<<<
         options = do
                 type: type
                 url: "https://plug.dj/_/#url"
-                contentType: \application/json
-                data: JSON.stringify(data)
                 success: ({data}) !->
                     console.info "[#url]", data if not silent
                     success? data
                 error: (err) !->
                     console.error "[#url]", data if not silent
                     error? data
+        data = JSON.stringify(data)
+        if data != "{}" and type not in <[ GET get ]>
+            options.contentType = \application/json
+            options.data = data
 
         def = $.Deferred!
         do delay = !->
-            if window.floodAPI_counter >= 15 /* 20 requests / 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
+            if window.floodAPI_counter >= 15 /* 20 requests in 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
                 sleep 1_000ms, delay
             else
                 window.floodAPI_counter++; sleep 10_000ms, !-> window.floodAPI_counter--
-                return $.ajax options
+                req = $.ajax options
                     .then def.resolve, def.reject, def.progress
+                def.abort = req.abort
         return def
 
     befriend: (userID, cb) !-> ajax \POST, "friends", id: userID, cb
@@ -499,12 +510,14 @@ window <<<<
     getUserData: (user, cb) !->
         if typeof user != \number
             user = getUser user
-        cb ||= (data) !-> console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
         return $.get "/_/users/#user"
             .then ({[data]:data}:arg) !->
-                return data
+                if cb
+                    return data
+                else
+                    console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
             .fail !->
-                console.warn "couldn't get slug for user with id '#{id}'"
+                console.warn "couldn't get userdata for user with id '#{id}'"
 
     $djButton: $ \#dj-button
     mute: !->
@@ -515,17 +528,17 @@ window <<<<
         API.once \advance, !->
             unmute! if API.getMedia!.id != muteonce.last
     unmute: !->
-        return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click! .length
+        return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once' .click! .length
     snooze: !->
         return $ '#playback .snooze' .click! .length
-    isSnoozed: !-> $ \#playback-container .children! .length == 0
+    isSnoozed: !-> return $ \#playback-container .children! .length == 0
     refresh: !->
         return $ '#playback .refresh' .click! .length
     stream: (val) !->
         if not currentMedia
             console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
         else
-            database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            return database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
     join: !->
         # for this, performance might be essential
         # return $ '#dj-button.is-wait' .click! .length != 0
@@ -534,6 +547,8 @@ window <<<<
             return true
         else
             return false
+    forceJoin: !->
+        ajax \POST, \booth
     leave: !->
         return $ '#dj-button.is-leave' .click! .length != 0
 
@@ -609,7 +624,8 @@ window <<<<
             cb API.getMedia!
         cb!
 
-    mediaLookup: ({format, id, cid}:url, cb) !->
+    mediaLookupCache: {}
+    mediaLookup: (songs, cb) !->
         if typeof cb == \function
             success = cb
         else
@@ -620,103 +636,174 @@ window <<<<
         def = $.Deferred()
         def.then(success, fail)
 
-        if typeof url == \string
-            if cid = YT_REGEX .exec(url)?.1
-                format = 1
-            else if parseURL url .hostname in <[ soundcloud.com  i1.sndcdn.com ]>
-                format = 2
-        else
-            cid ||= id
+        if not (isArray = $.isArray songs)
+            songs = [songs]
 
-        if window.mediaLookup.lastID == (cid || url) and window.mediaLookup.lastData
-            success window.mediaLookup.lastData
-        else
-            window.mediaLookup.lastID = cid || url
-            window.mediaLookup.lastData = null
-        if format == 1 # youtube
-            /*# Youtube API v2
-            $.getJSON "https://gdata.youtube.com/feeds/api/videos/#cid?v=2&alt=json"
-                .fail fail
-                .success (d) !->
-                    cid = d.entry.id.$t.substr(27)
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:       1
-                            data:         d
-                            cid:          cid
-                            uploader:
-                                name:     d.entry.author.0.name.$t
-                                id:       d.entry.media$group.yt$uploaderId.$t
-                                url:      "https://www.youtube.com/channel/#{d.entry.media$group.yt$uploaderId.$t}"
-                            image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                            title:        d.entry.title.$t
-                            uploadDate:   d.entry.published.$t
-                            url:          "https://youtube.com/watch?v=#cid"
-                            description:  d.entry.media$group.media$description.$t
-                            duration:     d.entry.media$group.yt$duration.seconds # in s
+        res = []; l=0
+        duplicates = {}
+        queries = 1: {}, 2: {}
+        for media, i in songs
+            format = false
+            # only CID is given
+            if +media # SoundCloud ID
+                #note: this could also be a plug.dj ID, which is bad, as we can't parse that
+                console.warn "[mediaLookup] warning, media only described by an ID, assuming SoundCloud ID. It is recommended to use {format: 2, cid: id} instead"
+                format = 2; cid = +media
+            else if typeof media == \string
+                if media.length == 11 # Youtube ID
+                    format = 1; cid = media
 
-                            restriction:  if d.data.entry.media$group.media$restriction
-                                blocked: that
-            */
-            # Youtube API v3
-            $.getJSON "https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&maxResults=1&id=#cid&key=#{p0ne.YOUTUBE_V3_KEY}"
-                .fail fail
-                .success ({items: [d]}) !->
-                    cid = d.id
-                    duration = 0
-                    if /PT(\d+)M(\d+)S/.exec d.contentDetails.duration
-                        duration = that.1 * 60 + that.2
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:       1
-                            data:         d
-                            cid:          cid
-                            uploader:
-                                name:     d.snippet.channelTitle
-                                id:       d.snippet.channelId
-                                url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
-                            image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                            title:        d.snippet.title
-                            uploadDate:   d.snippet.publishedAt
-                            url:          "https://youtube.com/watch?v=#cid"
-                            description:  d.snippet.description
-                            duration:     duration # in s
+                # URL is given
+                else if cid = YT_REGEX .exec(media)?.1 # Youtube URL
+                    format = 1 #; cid = cid
+                else if media.has \.com and parseURL media .hostname in <[ soundcloud.com  i1.sndcdn.com ]> # SoundCloud URL
+                    format = 2; cid = media
 
-                            restriction: d.contentDetails.regionRestriction
-        else if format == 2
-            if cid
+            # Media Object is given
+            else if typeof media == \object and media and media.cid
+                if media.format == 1 or media.format == 2 # Youtube or SoundCloud
+                    {format, cid} = media
+
+            if not format
+                console.warn "[mediaLookup] unknown format", media, "as ##i in", songs
+                l++
+                continue
+
+            if cid of queries[format] # if already in a query
+                console.log "[mediaLookup] #format : #cid appears multiple times in the same query"
+                duplicates[l++] = queries[format][cid]
+
+            else if window.mediaLookupCache[cid] # if already in cache
+                console.log "[mediaLookup] #format : #cid fetched from cache"
+                res[l] = window.mediaLookupCache[cid]
+                clearTimeout res[l]._timeoutID
+                res[l]._timeoutID = sleep 5.min, ->
+                    delete window.mediaLookupCache[cid]
+                l++
+
+            else # otherwise add to query
+                console.log "[mediaLookup] #format : #cid adding to query [#l]"
+                queries[format][cid] = l++
+
+        console.log "[mediaLookup] queries:", queries
+        remaining = 0
+        ytCids_ = Object.keys(queries.1)
+        if ytCids_.length # Youtube (API v3)
+            remaining += ytCids_.length
+            if ytCids_.length > 50
+                packs = []
+                for i from 0 to ~~(ytCids_.length/50)
+                    packs[i] = []
+                for id, i in ytCids_
+                    packs[~~(i / 50)][i % 50] = id
+            else
+                packs = [ytCids_]
+            for ytCids in packs
+                $.getJSON "https://www.googleapis.com/youtube/v3/videos
+                    ?part=contentDetails,snippet
+                    &fields=items(id,contentDetails/duration,contentDetails/regionRestriction,snippet/channelId,snippet/channelTitle,snippet/description,snippet/publishedAt,snippet/title)
+                    &id=#{ytCids .join(',')}
+                    &key=#{p0ne.YOUTUBE_V3_KEY}"
+                    .fail fail
+                    .success ({items}) !->
+                        for d in items
+                            duration = 0
+                            if /PT(\d+)M(\d+)S/.exec d.contentDetails.duration
+                                duration = +that.1 * 60 + +that.2
+                            addResult queries.1[d.id], d.id, do
+                                    format:       1
+                                    data:         d
+                                    cid:          d.id
+                                    uploader:
+                                        name:     d.snippet.channelTitle
+                                        id:       d.snippet.channelId
+                                        url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
+                                    image:        "https://i.ytimg.com/vi/#{d.id}/0.jpg"
+                                    title:        d.snippet.title
+                                    uploadDate:   d.snippet.publishedAt
+                                    url:          "https://youtube.com/watch?v=#{d.id}"
+                                    description:  d.snippet.description
+                                    duration:     duration # in s
+                                    restriction:  d.contentDetails.regionRestriction
+                                    _timeoutID: sleep 5.min, ->
+                                        delete window.mediaLookupCache[d.id]
+
+                        # add not-found results
+                        for cid, l of queries.1 when not res[l]
+                            console.warn "[mediaLookup] failed to look up Youtube video ##l", cid
+                            addResult l, cid, do
+                                _timeoutID: sleep 5.min, ->
+                                    delete window.mediaLookupCache[cid]
+                        doneLoading!
+
+
+        for let cid, pos of queries.2
+            remaining++
+            if +cid
                 req = $.getJSON "https://api.soundcloud.com/tracks/#cid.json", do
                     client_id: p0ne.SOUNDCLOUD_KEY
             else
                 req = $.getJSON "https://api.soundcloud.com/resolve/", do
-                    url: url
+                    url: cid
                     client_id: p0ne.SOUNDCLOUD_KEY
             req
-                .fail fail
+                .fail ->
+                    console.warn "[mediaLookup] failed to look up soundcloud song", cid
+                    addResult pos, cid, do
+                        _timeoutID: sleep 5.min, ->
+                            delete window.mediaLookupCache[cid]
+                    doneLoading!
                 .success (d) !->
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:         2
-                            data:           d
-                            cid:            cid
-                            uploader:
-                                id:         d.user.id
-                                name:       d.user.username
-                                image:      d.user.avatar_url
-                                url:        d.user.permalink_url
-                            image:          d.artwork_url
-                            title:          d.title
-                            uploadDate:     d.created_at
-                            url:            d.permalink_url
-                            description:    d.description
-                            duration:       d.duration / 1000ms_to_s # in s
+                    addResult pos, d.id, data =
+                        format:         2
+                        data:           d
+                        cid:            d.id
+                        uploader:
+                            id:         d.user.id
+                            name:       d.user.username
+                            image:      d.user.avatar_url
+                            url:        d.user.permalink_url
+                        image:          d.artwork_url
+                        title:          d.title
+                        uploadDate:     d.created_at
+                        url:            d.permalink_url
+                        description:    d.description
+                        duration:       d.duration / 1000ms_to_s # in s
 
-                            download:       if d.download_url then d.download_url + "?client_id=#{p0ne.SOUNDCLOUD_KEY}" else false
-                            downloadSize:   d.original_content_size
-                            downloadFormat: d.original_format
-        else
-            def .reject "unsupported format"
-        return def
+                        download:       if d.download_url then "#{d.download_url}?client_id=#{p0ne.SOUNDCLOUD_KEY}" else false
+                        downloadSize:   d.original_content_size
+                        downloadFormat: d.original_format
+
+                    if typeof cid == \number
+                        data._timeoutID = sleep 5.min, ->
+                            delete window.mediaLookupCache[cid]
+                    else
+                        window.mediaLookupCache[data.cid] = data
+                        data._timeoutID = sleep 5.min, ->
+                            delete window.mediaLookupCache[data.cid]
+                            delete window.mediaLookupCache[cid]
+                    doneLoading!
+
+        doneLoading!
+
+        function addResult pos, cid, data
+            console.log "[mediaLookup] looked up ##pos", cid, data
+            window.mediaLookupCache[cid] = data
+            res[pos] = data
+            remaining--
+
+        function doneLoading
+            if remaining <= 0
+                console.log "[mediaLookup] done, resolving…"
+                if not isArray
+                    res := res.0
+                else
+                    for k,v of duplicates
+                        res[k] = res[v]
+                def.resolve res
+
+        return def.promise!
+
     # https://www.youtube.com/annotations_invideo?video_id=gkp9ohUPIuo
     # AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,SS,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW
     mediaDownload: do !->
@@ -1016,6 +1103,16 @@ window <<<<
 
             return res.promise!
 
+    createPlaylist: (name, media) !->
+        if not window.playlists
+            throw new Error "createPlaylist(name, media) requires `window.playlists`"
+        ajax \POST, \playlists, {name, media}
+            .then (pl) !->
+                playlists.push new Backbone.Model(pl.data.0)
+                playlists.sort!
+                console.log "added playlist #name [#{pl.id}]"
+            .fail (err) !->
+                console.error "failed to add playlist #name", err
     proxify: (url) !->
         if url.startsWith?("http:")
             return p0ne.proxy url
@@ -1130,6 +1227,9 @@ window <<<<
         else
             return false
 
+    escapeRegExp: (str) ->
+        return "#str".replace /[\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:]/g, "\\$&"
+
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
     htmlEscape: (str) !->
@@ -1186,7 +1286,7 @@ window <<<<
         lvl = 0
         text .= replace /([\s\S]*?)($|(?:https?:|www\.)(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, (,pre,url,post) !->
             pre = pre
-                .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
+                .replace /(\s)(".*?")([\.,!\?\s])/g, "$1<i class='song-description-string'>$2</i>$3"
                 .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
                 .replace /(lyrics|download|original|re-?upload)/gi, "<b>$1</b>"
                 .replace /(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6"
@@ -1314,7 +1414,7 @@ window <<<<
         return language*/
     formatUser: (user, showModInfo) !->
         user .= toJSON! if user.toJSON
-        info = getRank(user)
+        info = getRank(user, true)
         if info == \regular
             info = ""
         else
@@ -1322,7 +1422,7 @@ window <<<<
 
         if showModInfo
             info += " lvl #{if user.gRole == 5 then '∞' else user.level}"
-            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+            if Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
                 info += " - created #{ago d}"
 
         return "#{user.username} (#{user.language}#info)"
@@ -1335,11 +1435,11 @@ window <<<<
 
         if showModInfo
             info = " (lvl #{if user.gRole == 5 then '∞' else user.level}"
-            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+            if Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
                 info += " - created #{ago d}"
             info += ")"
         if fromClass
-            fromClass = " #{getRank(user)}"
+            fromClass = " #{getRank(user, true)}"
         else
             fromClass = ""
 
@@ -1360,12 +1460,14 @@ window <<<<
         return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T.+/g, '')
     getISOTime: (t = new Date)!->
         return t.toISOString! .replace(/T|\..+/g, " ")
+    parseISOTime: (t) !->
+        return new Date(t) - timezoneOffset *60_000min_to_ms
 
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff, shortFormat) !->
         if diff < 0
             return "-#{humanTime -diff}"
-        else if not shortFormat and diff < 2_000ms
+        else if not shortFormat and diff < 2_000ms # keep in sync with ago()
             return "just now"
         b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
         diff /= 1000to_s
@@ -1388,7 +1490,11 @@ window <<<<
 
     # create string saying how long ago a given timestamp (in ms since epoche) is
     ago: (d) !->
-        return "#{humanTime (Date.now! - d)} ago"
+        d = Date.now! - d
+        if d < 2_000ms # keep in sync with humanTime()
+            return "just now"
+        else
+            return "#{humanTime(d)} ago"
 
     lssize: (sizeWhenDecompressed) !->
         size = 0mb
@@ -1400,19 +1506,22 @@ window <<<<
     formatMB: !->
         return "#{it.toFixed(2)}MB"
 
-    getRank: (user) !-> # returns the name of a rank of a user
+    getRank: (user, defaultToGhost) !-> # returns the name of a rank of a user
         user = getUser(user)
-        if not user or (role = user.role || user.get?(\role)) == -1
-            return \ghost
-        else if user.gRole || user.get?(\gRole)
+        if not user or user.role == -1
+            if defaultToGhost
+                return \ghost
+            else
+                return \regular
+        else if user.gRole
             if that == 5
                 return \admin
             else
                 return \ambassador
         else
-            return <[ regular dj bouncer manager cohost host ]>[role || 0]
+            return <[ regular dj bouncer manager cohost host ]>[user.role ||0]
     getRankIcon: (user) !->
-        rank = getRank(user)
+        rank = getRank(user, true)
         return rank != \regular && "<i class='icon icon-chat-#rank p0ne-icon-small'></i>" ||''
 
     parseURL: (href) !->
@@ -1423,19 +1532,25 @@ window <<<<
         #$dummy.0{hash, host, hostname, href, pathname, port, protocol, search}
 
     getIcon: do !->
-        # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
-        # if you plan to use it over and over again, use fn.enableCaching()
+        /* note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
+         * if you plan to use it over and over again, use getIcon.enableCaching() */
         $icon = $ "<i class=icon><!-- this is used by plug_p0ne's getIcon() --></i>"
                 .css visibility: \hidden
                 .appendTo \body
-        fn = (className) !->
+        fn = (className, parsed) !->
             $icon.addClass className
             res =
                 image:      $icon .css \background-image
                 position:   $icon .css \background-position
-            res.background = "#{res.image} #{res.position}"
-            $icon.removeClass className
-            return res
+            $icon.removeClass className if className
+            if parsed
+                res2 = x: 0, y: 0, url: res.image.substring(4, res.image.length - 1)
+                if /-?(\d+)px\s+-?(\d+)px/.exec(res.position)
+                    res2.x = +that.1; res2.y = +that.2
+                return res2
+            else
+                res.background = "#{res.image} #{res.position}"
+                return res
         fn.enableCaching = !-> res = _.memoize(fn); res.enableCaching = $.noop; window.getIcon = res
         return fn
 
@@ -1477,6 +1592,7 @@ console.info "[p0ne] main function body", p0ne.disabledModules.autojoin
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
+requireHelper \users, (.onRole)
 requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
 requireHelper \playlists, (.activeMedia)
 requireHelper \auxiliaries, (.deserializeMedia)
@@ -1500,6 +1616,8 @@ requireHelper \settings, (.settings)
 requireHelper \soundcloud, (.sc)
 requireHelper \searchAux, (.ytSearch)
 requireHelper \searchManager, (._search)
+requireHelper \SearchList, (.::?.listClass == \search)
+requireHelper \YtSearchService, (.::?.onVideos)
 requireHelper \AlertEvent, (._name == \AlertEvent)
 requireHelper \userRollover, (.id == \user-rollover)
 requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
@@ -1510,6 +1628,9 @@ requireHelper \RoomUserRow, (.::?.vote)
 requireHelper \WaitlistRow, (.::?.onAvatar)
 requireHelper \room, (.attributes?.hostID)
 requireHelper \RoomHistory, (it) !-> return it::?.listClass == \history and it::hasOwnProperty \listClass
+requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+requireHelper \Avatar, (.AUDIENCE)
+#requireHelper \AvatarList, (._byId?.admin01)
 
 if requireHelper \emoticons, (.emojify)
     emoticons.reversedMap = {[v, k] for k,v of emoticons.map}
@@ -1520,6 +1641,8 @@ if requireHelper \PlaylistItemList, (.::?.listClass == \playlist-media)
 if requireHelper \DialogAlert, (.::?.id == \dialog-alert)
     export Dialog = DialogAlert.__super__
 
+if requireHelper \InventoryAvatarPage, ((a) -> a::?.className == 'avatars' && a::eventName)
+    export InventoryDropdown = new InventoryAvatarPage().dropDown.constructor
 
 #= _$context =
 requireHelper \_$context, (._events?.\chat:receive), do
@@ -1538,14 +1661,19 @@ for context in [ Backbone.Events, _$context, API ] when context
 for cb in (room?._events?[\change:name] || _$context?._events?[\show:room] || Layout?._events?[\resize] ||[]) when cb.ctx.room
     export app = cb.ctx
     export friendsList = app.room.friends
+    export pl = app.footer.playlist.playlist.media
     break
+
 
 #= user_ =
 # the internal user-object
 if requireHelper \user_, (.canModChat) #(._events?.'change:username')
-    export users = user_.collection # it's the most reliable methode of getting `users`
     export user = user_.toJSON!
-if user || user = window.user
+    for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx.comparator == \id
+        export myAvatars = ev.ctx
+        break
+
+if user ||= window.user
     # API.getUser! will fail when used on the Dashboard if no room has been visited before
     export userID = user.id
     user.isStaff = user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate

@@ -15,7 +15,12 @@ module \chatCommands, do
     optional: <[ currentMedia ]>
     setup: ({addListener}) !->
         addListener API, \chatCommand, (c) !~>
-            @_commands[/^\/(\w+)/.exec(c)?.1]?(c)
+            if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1])
+                console.log "/chatCommand", cmd, cmd.moderation
+                if (not cmd.moderation or user.gRole or v.moderation == true and user.isStaff or user.role >= cmd.moderation)
+                    cmd.callback(c)
+                else
+                    chatWarn "You need to be #{if cmd.moderation === true then 'staff' else 'at least '+getRank(role: cmd.moderation)}", c
         @updateCommands!
 
     updateCommands: !->
@@ -24,35 +29,27 @@ module \chatCommands, do
         requestAnimationFrame ~>
             @updating = false
             @_commands = {}
-            for k,v of @commands
-                if  v.moderation
-                    let v=v, requiredRank = (if v.moderation == true then 2 else v.moderation)
-                        cb = (c) !->
-                            user = API.getUser!
-                            v.callback(c) if user.gRole or user.role >= requiredRank
-                else
-                    cb = v.callback
-                @_commands[k] = cb
+            for k,v of @commands when v
+                @_commands[k] = v
                 for k in v.aliases ||[]
-                    @_commands[k] = cb
+                    @_commands[k] = v
     parseUserArg: (str) !->
         if /[\s\d]+/.test str # list of user IDs
             return  [+id for id in str .split /\s+/ when +id]
         else
             return [user.id for user in getMentions str]
     commands:
-        help:
-            aliases: <[ commands ]>
+        commands:
             description: "show this list of commands"
             callback: !->
                 user = API.getUser!
                 res = "<div class='msg text'>"
-                for k,command of chatCommands.commands when not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
+                for k,command of chatCommands.commands when not command?.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
                     if command.aliases?.length
-                        aliases = "aliases: #{humanList command.aliases}"
+                        aliases = "title='aliases: #{humanList command.aliases}'"
                     else
                         aliases = ''
-                    res += "<div class='p0ne-help-command' alt='#aliases'><b>/#k</b> #{command.params ||''} - #{command.description}</div>"
+                    res += "<div class=p0ne-help-command #aliases><b>/#k</b> #{command.parameters ||''} - #{command.description}</div>"
                 res += "</div>"
                 appendChat($ "<div class='cm update p0ne-help'>" .html res)
 
@@ -70,7 +67,7 @@ module \chatCommands, do
             parameters: " (playlist)"
             description: "grab the current song into a playlist (default is current playlist)"
             callback: (c) !->
-                if c.replace(/^\/\w+\s+/, '')
+                if c.replace(/^\/\w+\s*/, '')
                     grabMedia(that)
                 else
                     grabMedia!
@@ -111,14 +108,52 @@ module \chatCommands, do
             description: "snoozes the current song"
             callback: snooze
         mute:
-            description: "mutes the audio"
-            callback: mute
+            aliases: <[ stfu silence ]>
+            parameters: "[[duration] @username(s)]"
+            description: "mutes the audio or the specified user(s)"
+            callback: (user) !->
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user
+                    mute!
+                else
+                    if durArg = /\w+/.exec user
+                        duration = {
+                            s: \s, short:  \s, 15: \s, \15min : \s,
+                            m: \m, middle: \m, 30: \m, \30min : \m
+                            l: \l, long:   \l, 45: \l, \45min : \l
+                        }[durArg.1]
+                        if duration
+                            user .= substr durArg.1.length
+                        else if getUser(durArg.1)
+                            duration = \s
+                    else
+                        duration = \s
+
+                    if not duration or user in <[ h -h help --help ? hlep ]>
+                        chatWarn '<div class=p0ne-help-command>
+                            possible durations are:<br>
+                            - <b>s</b> (<em>15min</em>, <em>short</em>)<br>
+                            - <b>m</b> (<em>30min</em>, <em>middle</em>)<br>
+                            - <b>l</b> (<em>45min</em>, <em>long</em>)<br>
+                            If left out, defaults to 15 minutes.<br>
+                            You can also use /mute to extend/reduce the mute time.
+                        </div>', '/mute [[duration] @username(s)]', true /*HTML*/
+                    else
+                        for id in chatCommands.parseUserArg user
+                            API.moderateMuteUser id, duration, 1 #ToDo check this
         unmute:
-            description: "unmutes the audio"
-            callback: unmute
+            parameters: "[@username(s)]"
+            description: "unmutes the audio or specified user(s)"
+            callback: (user) !->
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user
+                    unmute!
+                else
+                    for id in chatCommands.parseUserArg user
+                        API.moderateUnmuteUser id, duration, 1 #ToDo check this
 
         muteonce:
-            aliases: <[ muteonce ]>
+            aliases: <[ muteone ]>
             description: "mutes the current song"
             callback: muteonce
 
@@ -133,6 +168,13 @@ module \chatCommands, do
                 else
                     chatWarn "automute is not yet implemented"
 
+        volume:
+            parameters: " (0 - 100)"
+            description: "sets the volume to the specified percentage"
+            callback: (vol) !->
+                vol .= replace(/^\/\w+\s*|%/, '').trim!
+                API.setVolume +vol
+
         popout:
             aliases: <[ popup ]>
             description: "opens/closes the chat popout window"
@@ -146,28 +188,45 @@ module \chatCommands, do
                     chatWarn "sorry, the command currently doesn't work"
 
         reconnect:
-            aliases: <[ reconnectSocket ]>
+            aliases: <[ reconnectSocket forceReconnect ]>
             description: "forces the socket to reconnect. This might solve chat issues"
             callback: !->
                 _$context?.once \sjs:reconnected, !->
-                    chatWarn "socket reconnected"
+                    chatWarn "socket reconnected", '/reconnect'
                 reconnectSocket!
         rejoin:
             aliases: <[ rejoinRoom ]>
             description: "forces a rejoin to the room (to fix issues)"
             callback: !->
                 _$context?.once \room:joined, !->
-                    chatWarn "room rejoined"
+                    chatWarn "room rejoined", '/rejoin'
                 rejoinRoom!
+
+        intercom:
+            aliases: <[ messages ]>
+            description: "Show Intercom messages"
+            callback: !->
+                Intercom("showMessages")
 
         #== moderator commands ==
         #        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         ban:
-            parameters: " @username(s)"
-            description: "bans the specified user(s)"
+            aliases: <[ gtfo rekt abuse ]>
+            parameters: "[duration] @username(s)"
+            description: "bans the specified user(s). use `/ban help` for more info"
             moderation: true
             callback: (user) !->
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user or user in <[ h -h help --help ? hlep ]>
+                    chatWarn '<div class=p0ne-help-command>
+                        possible durations are:<br>
+                        - <b>s</b> (<em>15min</em>, <em>short</em>)<br>
+                        - <b>h</b> (<em>1h</em>, <em>hour</em>, <em>long</em>)<br>
+                        - <b>f</b> (<em>forever</em>, <em>p</em>, <em>perma</em>)<br>
+                        If left out, defaults to 15 minutes.<br>
+                        You can also use /ban to extend the ban time.
+                    </div>', '/ban [duration] @username(s)', true /*HTML*/
+                for id in chatCommands.parseUserArg user
                     API.modBan id, \s, 1 #ToDo check this
         unban:
             aliases: <[ pardon revive ]>
@@ -175,8 +234,10 @@ module \chatCommands, do
             description: "unbans the specified user(s)"
             moderation: true
             callback: (user) !->
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s*/, '')
                     API.moderateUnbanUser id
+                else
+                    chatWarn "couldn't find any user", '/unban'
 
         move:
             parameters: " @username position"
@@ -189,7 +250,7 @@ module \chatCommands, do
                     pos := +d
                     return ''
                 if 0 < pos < 51
-                    if users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))
+                    if users = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))
                         if not (id = users.0) or not getUser(id)
                             chatWarn "The user doesn't seem to be in the room"
                         else
@@ -206,10 +267,12 @@ module \chatCommands, do
             description: "moves the specified user(s) to the top of the waitlist"
             moderation: true
             callback: (c) !->
-                users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                users = chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
                 for i from users.length - 1 to 0
                     moveDJ i, 1
+                else
+                    chatWarn "couldn't find any user", '/moveTop'
         /*moveUp:
             aliases: <[  ]>
             parameters: " @username(s) (how much)"
@@ -219,7 +282,7 @@ module \chatCommands, do
                 res = []; djsToAdd = []; l=0
                 wl = API.getWaitList!
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s*(?:)/, '')
                     for u, pos in wl when u.id == id
                         if pos == 0
                             skipFirst = true
@@ -264,31 +327,44 @@ module \chatCommands, do
             description: "adds the specified user(s) to the waitlist"
             moderation: true
             callback: (c) !->
-                users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                users = chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                 i = 0
-                do helper = !->
-                    if users[i]
-                        addDJ users[i], helper
+                if users.length
+                    do helper = !->
+                        if users[i]
+                            addDJ users[i++], helper
+                else
+                    chatWarn "couldn't find any user", '/addDJ'
         removeDJ:
             aliases: <[ remove ]>
             parameters: " @username(s)"
             description: "removes the specified user(s) from the waitlist / DJ booth"
             moderation: true
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     API.moderateRemoveDJ id
+                else
+                    chatWarn "couldn't find any user", '/removeDJ'
         skip:
             aliases: <[ forceSkip s ]>
             description: "skips the current song"
             moderation: true
-            callback: API.moderateForceSkip
+            callback: ->
+                if API.getTimeElapsed! > 2s
+                    API.moderateForceSkip!
+                else
+                    chatWarn "
+                        The song just changed, are you sure you want to skip?<br>
+                        <button class=p0ne-btn onclick='API.moderateForceSkip()'>skip</button>\xa0
+                        <button class=p0ne-btn onclick='$(this).closest(\".cm\").remove()'>cancel</button>
+                    ", '/skip', true
 
         promote:
             parameters: " @username(s)"
             description: "promotes the specified user(s) to the next rank"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     if getUser(id)
                         API.moderateSetRole(id, that.role + 1)
         demote:
@@ -296,7 +372,7 @@ module \chatCommands, do
             description: "demotes the specified user(s) to the lower rank"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, user.role - 1)
@@ -305,7 +381,7 @@ module \chatCommands, do
             description: "removes the specified user(s) from the staff"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 0)
@@ -315,7 +391,7 @@ module \chatCommands, do
             description: "makes the specified user(s) resident DJ"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 1)
@@ -325,7 +401,7 @@ module \chatCommands, do
             description: "makes the specified user(s) bouncer"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 2)
@@ -334,7 +410,7 @@ module \chatCommands, do
             description: "makes the specified user(s) manager"
             moderation: 4
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 3)
@@ -344,7 +420,7 @@ module \chatCommands, do
             description: "makes the specified user(s) co-host"
             moderation: 5
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 4)
@@ -353,6 +429,6 @@ module \chatCommands, do
             description: "makes the specified user the communities's host (USE WITH CAUTION!)"
             moderation: 5
             callback: (c) !->
-                user = getUser(chatCommands.parseUserArg c.replace(/^\/\w+\s+/, ''))
+                user = getUser(chatCommands.parseUserArg c.replace(/^\/\w+\s*/, ''))
                 if user?.role > 0
                     API.moderateSetRole(id, 5)

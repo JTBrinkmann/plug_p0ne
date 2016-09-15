@@ -10,8 +10,16 @@
 #              RULESKIP              #
 ####################################*/
 module \forceSkipButtonRuleskip, do
-    require: <[ songNotif ]>
+    displayName: "Ruleskip Button"
+    settings: \pony
+    description: """
+        Makes the Skip button show a ruleskip list instead.
+        (you can still instaskip)
+    """
+    screenshot: 'https://i.imgur.com/jGwYsn3.png'
+    moderator: true
     setup: ({addListener, replace, $create, css}) !->
+        #TODO add this http://pastebin.com/hgmHKzYC
         css \forceSkipButtonRuleskip, '
             .p0ne-skip-ruleskip {
                 position: absolute;
@@ -34,7 +42,7 @@ module \forceSkipButtonRuleskip, do
         visible = false
         fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.name == \forceSkipButton
             $rulelist := $create '
-                <ul class="p0ne-skip-ruleskip">
+                <ul class=p0ne-skip-ruleskip>
                     <li data-rule=insta><b>insta skip</b></li>
                     <li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li>
                     <li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li>
@@ -42,7 +50,7 @@ module \forceSkipButtonRuleskip, do
                     <li data-rule=13><b>!ruleskip 13</b> (NSFW)</li>
                     <li  data-rule=5><b>!ruleskip  5</b> (too long)</li>
                     <li  data-rule=4><b>!ruleskip  4</b> (history)</li>
-                    <li  data-rule=3><b>!ruleskip  3</b> (low efford mix)</li>
+                    <li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li>
                     <li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li>
                     <li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li>
                 </ul>
@@ -65,7 +73,7 @@ module \forceSkipButtonRuleskip, do
 
             console.log "[forceSkipButton] 'fimplug !ruleskip list' patch applied"
 
-        addListener \early (window._$context || API), \advance, !-> if visible
+        addListener \early, (window._$context || API), \advance, !-> if visible
             # trying to attach the lister as early as possible to prevent accidental double-skips
             visible := false
             $rulelist .fadeOut!
@@ -84,7 +92,8 @@ module \fimstats, do
     disabled: true
     _settings:
         highlightUnplayed: false
-    setup: ({addListener, $create, replace}, lookup) !->
+    CACHE_DURATION: 1.h
+    setup: ({addListener, $create, replace}, fimstats) !->
         css \fimstats, '
             .p0ne-fimstats {
                 position: absolute;
@@ -158,9 +167,10 @@ module \fimstats, do
         '
         $el = $create '<span class=p0ne-fimstats>' .appendTo \#room
         addListener API, \advance, @updateStats = (d) !~>
-            d ||= media: API.getMedia!
+            if d?.lastPlay?.media
+                delete @cache[id = "#{d.lastPlay.media.format}:#{d.lastPlay.media.cid}"]
             if d.media
-                @currentSong = lookup d.media
+                fimstats d.media
                     .then (res) !->
                         $el .html res.html
                     .fail (err) !->
@@ -172,13 +182,13 @@ module \fimstats, do
             addListener _$context, \ShowDialogEvent:show, (d) !-> #\PreviewEvent:preview, (d) !->
                 _.defer !-> if d.dialog.options?.media
                     console.log "[fimstats]", d.dialog.options.media
-                    lookup d.dialog.options.media
+                    fimstats d.dialog.options.media
                         .then (d) !->
                             $ \#dialog-preview .after do
                                 $create '<div class=p0ne-fimstats>' .html d.html
         if app?.dialog?.dialog?.options?.media
             console.log "[fimstats]", that
-            lookup that.toJSON!
+            fimstats that.toJSON!
                 .then (d) !->
                     $ \#dialog-preview .after do
                         $create '<div class=p0ne-fimstats>' .html d.html
@@ -193,61 +203,79 @@ module \fimstats, do
             $yourNextMedia = $ \#your-next-media
 
             @checkUnplayed = !->
-                if playlists.activeMedia.length > 0
-                    #console.log "[fimstats] next song", playlists.activeMedia.0
-                    lookup playlists.activeMedia.0 .then (d) !->
+                $yourNextMedia .removeClass \p0ne-fimstats-unplayed
+                if fimstats._settings.highlightUnplayed and playlists.activeMedia.length > 0
+                    console.log "[fimstats] checking next song", playlists.activeMedia.0
+                    fimstats playlists.activeMedia.0 .then (d) !->
                         if d.unplayed
                             $yourNextMedia .addClass \p0ne-fimstats-unplayed
 
             replace app.footer.playlist, \updateMeta, (uM_) !-> return !->
                 if playlists.activeMedia.length > 0
-                    if fimstats._settings.highlightUnplayed
-                        fimstats.checkUnplayed!
+                    fimstats.checkUnplayed!
                     uM_ ...
                 else
                     clearTimeout @updateMetaBind
             replace app.footer.playlist, \updateMetaBind, !-> return app.footer.playlist~updateMeta
 
             # apply immediately
-            if @_settings.highlightUnplayed
-                @checkUnplayed!
+            @checkUnplayed!
+        else
+            console.warn "[fimstats] failed to load requirements for checking next song. next song check disabled."
 
         # show stats for current song
-        @updateStats!
+        @updateStats do
+            media: API.getMedia!
 
     checkUnplayed: !-> # Dummy function in case we cannot get `playlists` (which is required)
 
-    lastMedia: {}
+    cache: {}
     module: (media=API.getMedia!) !->
         $ \#p0ne-menu .css bottom: 54px
-        def = $.Deferred!
         if media.attributes and media.toJSON
             media .= toJSON!
-        if @lastMedia.cid == media.cid and @lastMedia.format == media.format
-            return @lastDeferred
+
+        # check if data is already cached
+        if @cache[id = "#{media.format}:#{media.cid}"]
+            clearTimeout @cache[id].timeoutID
+            @cache[id].timeoutID = sleep @CACHE_DURATION, ~>
+                delete @cache[id]
+            return @cache[id]
         else
-            @lastMedia = media
-            @lastDeferred = def
-        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
+            # if not yet cached, create a Deferred
+            def = $.Deferred!
+            @cache[id] = def.promise!
+            @cache[id].timeoutID = sleep @CACHE_DURATION, ~>
+                delete @cache[id]
+
+        # load data from fimstats
+        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}" #?key=#{p0ne.FIMSTATS_KEY}
             .then (d) !->
-                # note: `d.plays` (playcount) doesn't contain current play
                 d = d.data.0
-                # note: data is HTML escaped, but let's make sure
+                # note: `d.plays` (playcount) doesn't contain current play
+                # we need to sanitize everything to avoid HTML injection (some songtitles are actually not HTMl escaped)
+                for k,v of d
+                    if typeof v == \string
+                        d[k] = sanitize v
+                    else
+                        for k2,v2 of v when typeof v2 == \string
+                            v[k2] = sanitize v2
+
                 if d.firstPlay.time != d.lastPlay.time
-                    d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
+                    d.text = "last played by #{d.lastPlay.user.username} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user.username}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{sanitize d.lastPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{d.lastPlay.user.username}
                             <span class=p0ne-fimstats-last-time>#{ago d.lastPlay.time*1000s_to_ms}</span>
                         </span>
                         <span class='p0ne-fimstats-field p0ne-fimstats-plays'>#{d.plays}</span>
-                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{sanitize d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{d.firstPlay.user.username}
                             <span class=p0ne-fimstats-first-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>
                     "
                 else
-                    d.text = "once played by #{d.firstPlay.user}"
+                    d.text = "once played by #{d.firstPlay.user.username}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{sanitize d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{d.firstPlay.user.username}
                             <span class=p0ne-fimstats-once-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>"
                 def.resolve d
@@ -257,11 +285,10 @@ module \fimstats, do
                     d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>"
                     d.unplayed = true
                     def.resolve d
-                #else if status == \Unauthorized
                 else
                     d.text = d.html = "error loading fimstats"
                     def.reject d
-        return def.promise!
+        return @cache[id]
 
         function sanitize str
             return str .replace(/</g, '&lt;') .replace(/>/g, '&gt;')
@@ -288,3 +315,48 @@ module \fimstats, do
 
     disable: !->
         $ \#your-next-media .removeClass \p0ne-fimstats-unplayed
+
+
+module \ponifiedLang, do
+    require: <[ Lang ]>
+    disabled: true
+    displayName: "Ponified Text"
+    setup: ({replace}) !->
+        # roles
+        replace Lang.roles, \host, !-> return "Alicorn Princess"
+        replace Lang.roles, \cohost, !-> return "Alicorn"
+        replace Lang.roles, \dj, !-> return "Horse Famous"
+        replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
+        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies"
+        replace Lang.roles, \none, !-> return "Mudpony"
+        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
+
+        # ponies
+        replace Lang.messages, \minChatLevel, !-> return "This community restricts chat to ponies who are level %LEVEL% and above."
+        replace Lang.permissions, \ban, !-> return "Ban Ponies."
+        replace Lang.permissions, \unban, !-> return "Unban Ponies."
+        replace Lang.tooltips, \headersUsers, !-> return "Ponies"
+        replace Lang.tooltips, \usersRoom, !-> return "Ponies who are here right now"
+        replace Lang.tooltips, \usersBans, !-> return "Ponies who have been banned"
+        replace Lang.tooltips, \usersIgnored, !-> return "Ponies who you have ignored"
+        replace Lang.tooltips, \usersMutes, !-> return "Ponies who have been muted"
+        replace Lang.tooltips, \chatLevel, !-> return "Restrict chat to ponies who are this level or above"
+        replace Lang.userList, \roomTitle, !-> return "Ponies here now"
+
+        # Bot Commands
+        replace Lang.chat, \help, !-> return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
+            <strong>Bot Commands:</strong><br>
+            !randgame &nbsp; <em>Pony Adventure</em><br/>
+            !power &nbsp; <em>Random Power</em><br/>
+            !hug (@user) &nbsp; <em>hug somepony</em><br/>
+            !1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>
+            !rule <number> &nbsp; <em>List a Rule</em><br/>
+            !songinfo &nbsp; <em>Songstats</em><br/>
+            !dc &nbsp; <em>be put back if you dc'd</em><br/>
+            !eta &nbsp; <em>ETA til you dj</em><br/>
+            !weird &nbsp; <em>Is it weirdday?</em><br/>
+            "
+
+        # misc
+        replace Lang.search, \youtube, !-> return "Search YouTube for ponies"
+        replace Lang.search, \soundcloud, !-> return "Search SoundCloud for ponies"

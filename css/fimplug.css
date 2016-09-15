@@ -15,9 +15,14 @@
     background: url("https://i.imgur.com/b8M0n1c.png") fixed center center / cover !important;
 }
 /* blurred background */
-#history-panel, .popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions, #user-rollover, #footer-user .back,
-#dashboard, .pop-menu, .p0ne-song-info, #user-view {
+#history-panel, .popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions, #user-rollover, #footer-user .back, #dashboard, .pop-menu, .p0ne-song-info {
     background: url(https://i.imgur.com/cWuL5f4.png) fixed center center / cover !important;
+}
+
+/* background gradient */
+/* (this is used because of a WebKit bug causing problems when rendering background images of a moving element with background-position: fixed …) */
+#user-view, #room-settings {
+    background: linear-gradient(to bottom, hsl(255, 58%, 20%) 0, hsl(190, 90%, 15%) 100%) !important;
 }
 
 
@@ -36,25 +41,24 @@
 }
 
 /* slightly opaque background */
-#playlist-panel .playlist-media-item:hover, #playlist-panel .playlist-media-first-item:hover,
-#playlist-panel .playlist-media-last-item:hover, #search-bar, #filter-bar, .youtube-input,
+#search-bar, #filter-bar, .youtube-input,
 #chat .emote, #chat .message, #user-inventory>.avatars .top, #user-rollover .info,
 .user-content.profile .notifications .row, .dialog .dialog-body .divider, .experience .xp .bar,
 #user-settings .container button, .dropdown, #volume .slider, .input-background, .search,
 #user-friends .list .row, .app-right .group, .pop-menu li:hover, .user-content .grid .cell:hover>.top,
-#history-panel .history, .subscribe-button {
+#history-panel .history, .subscribe-button, #room-settings .general-settings {
     background: rgba(0,0,0,0.2) !important;
 }
 
 /* opaque background */
-#playlist-panel .row.selected, #search, #playlist-menu,
+#search, #playlist-menu,
 #room-info .welcome, .user-content.profile .meta .blurb .box,
 .user-content.profile .meta .blurb>input, #footer-user.open-status .image,
 #footer-user.open-user .info, #dj-button, #search-suggestion li:hover,
 #search-suggestion li.selected, #footer-user .back span, #app-menu .item:hover,
 #user-friends .list .row .buttons button, #friends-button .request-count,
 .pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio,
-#vote /*, #video-only-dj*/ {
+#vote /*, #video-only-dj*/, #room-settings-menu {
     background: rgba(0,0,0,0.4) !important;
 }
 
@@ -113,9 +117,6 @@
 }
 
 /*= small, unsorted adjustments */
-#user-view {
-    /* background: linear-gradient(to bottom, hsl(255, 58%, 20%) 0, hsl(190, 90%, 15%) 100%) !important; */
-}
 .communities .host {
     margin-top: -85px !important;
     text-align: center;
@@ -187,7 +188,7 @@
     margin: 0 !important;
     border-radius: 0 !important;
     transition: border-left-width 100ms linear, padding-left 100ms linear;
-    border-left: #FFF 0 solid;
+    /* border-left: #FFF 0 solid; */
     padding-left: 3px;
     box-sizing: border-box;
 }
@@ -652,6 +653,16 @@
     content: "."
 }
 
+/*== Room Settings ==*/
+#room-settings-menu .title,
+#room-settings .general-settings .option .title,
+#room-settings .general-settings .panel .title {
+    color: #bbb;
+}
+#room-settings .general-settings {
+    color: #fff;
+}
+
 /*== fixes for Popout Chat ==*/
 .popout .header {
     left: 70px !important;
@@ -737,16 +748,6 @@
     right: 352px;
 }
 
-/*== skip button ==*/
-.p0ne-skip-btn {
-    background: transparent;
-    transition: background .2s ease-out;
-}
-.p0ne-skip-btn:hover {
-    background: rgba(255,0,0, 0.2);
-    box-shadow: inset 0 0 6px rgba(255,0,0, 0.5);
-    border-radius: 5px;
-}
 
 
 /*= message hover =*/
