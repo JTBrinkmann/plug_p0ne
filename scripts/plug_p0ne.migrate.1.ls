@@ -753,9 +753,9 @@ window.define = window.requirejs.define
 /**/
 export localforage
 
-do migrate=->
+do migrate=!->
     var vArr
-    migrated = (v) ->
+    migrated = (v) !->
         API.trigger \p0ne_migrated, v
         localStorage.p0neVersion = v
 
@@ -830,7 +830,7 @@ do migrate=->
         console.info "[p0ne migrate] renamed a few modules and CSS classes"
         #= settings =
         # renamed modules
-        editLocalStorage \moduleSettings, (moduleSettings) ->
+        editLocalStorage \moduleSettings, (moduleSettings) !->
             renameMap =
                 _API_: \InternalAPI
                 p0neChatInput: \betterChatInput
@@ -842,7 +842,7 @@ do migrate=->
 
             # renamed settings.warnings => settings.verbose
             for module in <[ fixGhosting fixOthersGhosting fixNoPlaylistCycle ]>
-                editLocalStorage module, (settings) ->
+                editLocalStorage module, (settings) !->
                     settings.verbose = settings.warnings
                     delete settings.warnings
 
@@ -872,7 +872,7 @@ do migrate=->
         console.info "[p0ne migrate] added perCommunity settings, fixed a bunch of bugs"
         #= settings =
         perCommunityModules = <[ autojoin customAvatars fimstats ponify bpm ]>
-        editLocalStorage \moduleSettings, (moduleSettings) ->
+        editLocalStorage \moduleSettings, (moduleSettings) !->
             for module in perCommunityModules
                 localStorage["p0ne__friendshipismagic_#module"] = localStorage["p0ne_#module"]
                 delete moduleSettings[module].disabled if moduleSettings[module]
@@ -885,7 +885,7 @@ do migrate=->
     | compareVersions v, dest=\1.7.0 =>
         console.info "[p0ne migrate] moved from localStorage to localforage, moved automute list to moduleSettings"
         #= settings =
-        editLocalStorage \moduleSettings, (moduleSettings) ->
+        editLocalStorage \moduleSettings, (moduleSettings) !->
             # change disabledModules from `{disabled: false}` per module to just a boolean
             console.log "change disabledModules from `{disabled: false}` per module to just a boolean", moduleSettings
             for k,v of moduleSettings
@@ -901,7 +901,7 @@ do migrate=->
 
         # move automute.songlist to automute's module _settings
         noMutedSongs = true
-        editLocalStorage \automute, (songlist) ->
+        editLocalStorage \automute, (songlist) !->
             console.info "convert automute songlist", songlist
             res = {}
             for k of songlist
@@ -921,7 +921,7 @@ do migrate=->
 
         # migrate all module settings from localStorage to localForage
         remaining = 1
-        itemSet = ->
+        itemSet = !->
             if --remaining == 0
                 # we'll continue here, from converting the settings to localforage
 
@@ -957,14 +957,14 @@ do migrate=->
         else
             #= settings =
             console.log "updating afkTimer settings"
-            localforage .getItem \p0ne_afkTimer, (err, d) ->
+            localforage .getItem \p0ne_afkTimer, (err, d) !->
                 if err
                     console.warn "error loading afkTimer settings"
                     migrated dest
                     migrate!
                 else
                     d.lastActivity = {}
-                    localforage .setItem \p0ne_afkTimer, d, ->
+                    localforage .setItem \p0ne_afkTimer, d, !->
                         migrated dest
                         migrate!
     | compareVersions v, dest=\1.8.0 =>
@@ -981,7 +981,7 @@ do migrate=->
         else
             #= settings =
             console.log "updating customColors settings"
-            localforage .getItem \p0ne_customColors, (err, d) ->
+            localforage .getItem \p0ne_customColors, (err, d) !->
                 if err
                     console.warn "error loading customColors settings"
                     migrated dest
@@ -989,7 +989,37 @@ do migrate=->
                 else
                     d.global = {role: d.global, user: {}}
                     d.rolesOrder = <[ admin ambassador host cohost manager bouncer dj subscriber you friend regular ]>
-                    localforage .setItem \p0ne_customColors, d, ->
+                    localforage .setItem \p0ne_customColors, d, !->
+                        migrated dest
+                        migrate!
+
+    | compareVersions v, dest=\1.8.0 =>
+        #= runtime =
+        if window.customColors
+            #= runtime =
+            window.customColors._settings.roles = window.customColors._settings.role
+            window.customColors._settings.users = window.customColors._settings.user
+            delete window.customColors._settings.role
+            delete window.customColors._settings.user
+            migrated dest
+            migrate!
+        else
+            #= settings =
+            console.log "updating customColors settings"
+            localforage .getItem \p0ne_customColors, (err, d) !->
+                if err
+                    console.warn "error loading customColors settings"
+                    migrated dest
+                    migrate!
+                else if not d.global
+                    migrated dest
+                    migrate!
+                else
+                    d.global.roles = d.global.role
+                    d.global.users = d.global.user
+                    delete d.global.role
+                    delete d.global.user
+                    localforage .setItem \p0ne_customColors, d, !->
                         migrated dest
                         migrate!
 
@@ -1012,7 +1042,7 @@ function editLocalStorage moduleName, cb
         return false
 
 function editLocalforage moduleName, cb
-    localforage.getItem "p0ne_#moduleName", (err, data) ->
+    localforage.getItem "p0ne_#moduleName", (err, data) !->
         return console.error "failed to read '#moduleName' using localforage" if err
         try
             return false if not data
