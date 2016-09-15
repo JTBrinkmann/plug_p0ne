@@ -34,7 +34,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.0
+    version: \1.7.1
     lastCompatibleVersion: \1.7.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1220,11 +1220,14 @@ dataSave.interval = setInterval dataSave, 15.min
 # While its data is set, newly attached "data" handlers are immediately called with the data. (similar to resolved Promises)
 # Unlike Promises' state, the data is not immutable, it can be changed again (using `.set(newData)` again).
 # The data can be cleared (using `.clear()`), and if data was set before, all "cleared" event listeners are executed with `undefined`
-# `.always(fn, ctx?)` is a shorthand for `.on("all", fn, ctx?)`. "all" event listeners will be executed on all "data" and "cleared" events.
+# With event listeners attached with `.on("all", fn, ctx?)` will be executed on all "data" and "cleared" events.
 # Note:
 #   - The data can be set to another without clearing it first
 #   - "cleared" event listeners will NOT be immediately triggered
-#   - "always" events are internally called "all"
+#   - If you want to read the data from outside an event listener, use `._data`
+#     Remember that `.data` is a shorthand for `.on("data", fn, ctx?)`!
+#   - A DataEmitter can theoretically also have other events than "data" and "cleared".
+#     Please keep in mind, that other scripts might not expect "all" to be triggered by other events
 #
 # An example for a DataEmitter is the roomSettings module with the data being the room's p3-compatible room settings (if any).
 # The roomTheme module applies the room theme everytime the room's settings are loaded (e.g. after joining a room with them),
@@ -1245,7 +1248,6 @@ class DataEmitter extends {prototype: Backbone.Events}
         @_trigger \cleared
 
     on: (type, fn, context) ->
-        type = if type == \always then \all else type
         super ...
         # immediately execute "data" and "all" events
         if @_data and type in <[ data all ]>
@@ -1256,7 +1258,6 @@ class DataEmitter extends {prototype: Backbone.Events}
     # shorthands
     data: (fn, context) -> @on \data, fn, context
     cleared: (fn, context) -> @on \cleared, fn, context
-    always: (fn, context) -> @on \all, fn, context
 
 /*####################################
 #         GENERAL AUXILIARIES        #
@@ -2307,10 +2308,16 @@ window <<<<
 
 
     # formatting
-    getTime: (t = new Date) !->
-        return new Date(t - t.getTimezoneOffset! *60_000min_to_ms).toISOString! .replace(/.+?T|\..+/g, '')
+    timezoneOffset: new Date().getTimezoneOffset!
+    getTime: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/.+?T|\..+/g, '')
+    getDateTime: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T|\..+/g, ' ')
+    getDate: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T.+/g, '')
     getISOTime: (t = new Date)!->
         return t.toISOString! .replace(/T|\..+/g, " ")
+
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff, shortFormat) !->
         if diff < 0
@@ -3329,10 +3336,11 @@ module \login, do
  */
 module \jQueryPerf, do
     setup: ({replace}) !->
+        # improve performance by making $.fn.addClass, .removeClass and .hasClass
+        # use the element's classList instead of the className attribute
         core_rnotwhite = /\S+/g
         if \classList of document.body #ToDo is document.body.classList more performant?
             replace jQuery.fn, \addClass, !-> return (value) !->
-                /* performance improvements */
                 if jQuery.isFunction(value)
                     for j in this
                         jQuery(this).addClass value.call(this, j, this.className)
@@ -3341,21 +3349,20 @@ module \jQueryPerf, do
                     classes = value.match(core_rnotwhite) || []
 
                     i = 0
-                    while elem = this[i++] when (not elem && console.error(\missingElem, \addClass, this) || !0) and elem.nodeType == 1
+                    while elem = this[i++] when elem.nodeType == 1
                         j = 0
                         while clazz = classes[j++]
                             elem.classList.add clazz
                 return this
 
             replace jQuery.fn, \removeClass, !-> return (value) !->
-                /* performance improvements */
                 if jQuery.isFunction(value)
                     for j in this
                         jQuery(this).removeClass value.call(this, j, this.className)
 
                 else if value ~= null
                     i = 0
-                    while elem = this[i++] when (not elem && console.error(\missingElem, \removeClass, this) || !0) and elem.nodeType == 1
+                    while elem = this[i++] when elem.nodeType == 1
                         j = elem.classList .length
                         while clazz = elem.classList[--j]
                             elem.classList.remove clazz
@@ -3363,17 +3370,16 @@ module \jQueryPerf, do
                     classes = value.match(core_rnotwhite) || []
 
                     i = 0
-                    while elem = this[i++] when (not elem && console.error(\missingElem, \removeClass, this) || !0) and elem.nodeType == 1
+                    while elem = this[i++] when elem.nodeType == 1
                         j = 0
                         while clazz = classes[j++]
                             elem.classList.remove clazz
                 return this
 
             replace jQuery.fn, \hasClass, !-> return (className) !->
-                /* performance improvements */
                 i = 0
-                while elem = this[i++] when (not elem && console.error(\missingElem, \hasClass, this) || !0) and elem.nodeType == 1 and elem.classList.contains className
-                        return true
+                while elem = this[i++] when elem.classList.contains(className)
+                    return true
                 return false
 
 
@@ -3381,61 +3387,66 @@ module \perfEmojify, do
     require: <[ emoticons ]>
     setup: ({replace}) !->
         # new .emojify is ca. 100x faster https://i.imgur.com/iBNICkX.png
+        #= prepare replacement =
+
         escapeReg = (e) !->
             return e .replace /([\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:])/g, "\\$1"
 
-        autoEmoteMap =
+        # list of emotices that will be automatically converted
+        # (without being surrounded by colons)
+        # this is the original, unmodified map from plug.dj
+        emoticons.autoEmoteMap =
             /*NOTE: since plug_p0ne v1.6.3, emoticons are case-sensitive */
-            \>:( : \angry
-            \>XD : \astonished
-            \:DX : \bowtie
-            \</3 : \broken_heart
-            \:$ : \confused
-            X$: \confounded
-            \:~( : \cry
-            \:[ : \disappointed
-            \:~[ : \disappointed_relieved
-            XO: \dizzy_face
-            \:| : \expressionless
-            \8| : \flushed
-            \:( : \frowning
-            \:# : \grimacing
-            \:D : \grinning
-            \<3 : \heart
-            "<3)": \heart_eyes
-            "O:)": \innocent
-            ":~)": \joy
-            \:* : \kissing
-            \:<3 : \kissing_heart
-            \X<3 : \kissing_closed_eyes
-            XD: \laughing
-            \:O : \open_mouth
-            \Z:| : \sleeping
-            ":)": \smiley
-            \:/ : \smirk
-            T_T: \sob
-            \:P : \stuck_out_tongue
-            \X-P : \stuck_out_tongue_closed_eyes
-            \;P : \stuck_out_tongue_winking_eye
-            "B-)": \sunglasses
-            \~:( : \sweat
-            "~:)": \sweat_smile
-            XC: \tired_face
-            \>:/ : \unamused
-            ";)": \wink
-        autoEmoteMap <<<< emoticons.autoEmoteMap
-        emoticons.autoEmoteMap = autoEmoteMap
+            ">:(" : \angry
+            ">XD" : \astonished
+            ":DX" : \bowtie
+            "</3" : \broken_heart
+            ":$"  : \confused
+            "X$"  : \confounded
+            ":~(" : \cry
+            ":["  : \disappointed
+            ":~[" : \disappointed_relieved
+            "XO"  : \dizzy_face
+            ":|"  : \expressionless
+            "8|"  : \flushed
+            ":("  : \frowning
+            ":#"  : \grimacing
+            ":D"  : \grinning
+            "<3"  : \heart
+            "<3)" : \heart_eyes
+            "O:)" : \innocent
+            ":~)" : \joy
+            ":*"  : \kissing
+            ":<3" : \kissing_heart
+            "X<3" : \kissing_closed_eyes
+            "XD"  : \laughing
+            ":O"  : \open_mouth
+            "Z:|" : \sleeping
+            ":)"  : \smiley
+            ":/"  : \smirk
+            "T_T" : \sob
+            ":P"  : \stuck_out_tongue
+            "X-P" : \stuck_out_tongue_closed_eyes
+            ";P"  : \stuck_out_tongue_winking_eye
+            "B-)" : \sunglasses
+            "~:(" : \sweat
+            "~:)" : \sweat_smile
+            "XC"  : \tired_face
+            ">:/" : \unamused
+            ";)"  : \wink
 
+        # update function, to create caches and regexps for improved performance
+        # call this everytime the autoEmoteMap is updated
         emoticons.update = !->
             # create reverse emoticon map
             @reverseMap = {}
 
-            # create hashes (ternary tree)
-            @hashes = {}
+            # create trie (aka. prefix tree)
+            @trie = {}
             for k,v of @map
                 continue if @reverseMap[v]
                 @reverseMap[v] = k
-                h = @hashes
+                h = @trie
                 for letter, i in k
                     l = h[letter]
                     if typeof h[letter] == \string
@@ -3449,45 +3460,47 @@ module \perfEmojify, do
                     h[letter]._list = (h[letter]._list ++ k).sort!
                     h = h[letter]
 
-            # fix autoEmote
-            for k,v of @autoEmoteMap
-                tmp = k .replace "<", "&lt;" .replace ">", "&gt;"
-                if tmp != k
-                    @autoEmoteMap[tmp] = v
-                    delete @autoEmoteMap[k]
+            # fix autoEmote (so we don't have to replace it in the input text every time)
+            for k,v of @autoEmoteMap when k != (tmp = k .replace(/</g, "&lt;") .replace(/>/g, "&gt;"))
+                @autoEmoteMap[tmp] = v
+                delete @autoEmoteMap[k]
 
             # create regexp for autoEmote
-            @regAutoEmote = //(^|\s|&nbsp;)(#{Object.keys(@autoEmoteMap) .map escapeReg .join "|"})(?=\s|$)//g
+            @regAutoEmote = //(^|\s|&nbsp;)(#{Object.keys(@autoEmoteMap) .map(escapeReg) .join "|"})(?=\s|$)//g
 
         emoticons.update!
 
+        # replace plug.dj functions
         replace emoticons, \emojify, !-> return (str) !->
-            lastIndex = -1
+            lastWasEmote = false
             return str
-                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
-                .replace /:([\w\+\-]*)(.*?)(?=:)|:(.*)$/g, (_, emote, stuff, stuff2, index) !~>
-                    if index == lastIndex
-                        if typeof stuff2 == \string
-                            return stuff2
-                        else
-                            return emote+stuff
-                    else if not stuff and @map[emote]
-                        lastIndex := index + emote.length + 1
-                        return "<span class='emoji-glow'><span class='emoji emoji-#that'></span></span>"
+                .replace /:(.*?)(?=:)|:(.*)$/g, (_, emote, post) !~>
+                    if (p = typeof post != \string) and not lastWasEmote and @map[emote]
+                        lastWasEmote := true
+                        return "<span class='emoji-glow'><span class='emoji emoji-#{@map[emote]}'></span></span>"
                     else
-                        return _
+                        lastWasEmote_ = lastWasEmote
+                        lastWasEmote := false
+                        return "#{if lastWasEmote_ then '' else ':'}#{if p then emote else post}"
+                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
+
         replace emoticons, \lookup, !-> return (str) !->
-            h = @hashes
+            # walk through the trie, letter by letter of the input
+            h = @trie
             var res
             for letter, i in str
                 h = h[letter]
                 switch typeof h
                 | \undefined
+                    # no match was found
                     return []
                 | \string
+                    # if only one result is left, check if the input differs
                     for i from i+1 til str.length when str[i] != h[i]
                         return []
+                    # if it doesn't differ, return the only result
                     return [h]
+            # return the list of results
             return h._list
 
 /*@source p0ne.sjs.ls */
@@ -4927,10 +4940,10 @@ module \autojoin, do
     optional: <[ _$context booth ]>
     setup: ({addListener}) ->
         wlPos = API.getWaitListPosition!
-        if API.getDJ!?.id == userID or wlPos == -1
+        if wlPos == -1
             @autojoin!
-
-        @isTriggered = false
+        else if API.getDJ!?.id == userID
+            API.once \advance, @autojoin, this
 
         # regular autojoin
         addListener API, \advance, ~>
@@ -4958,8 +4971,8 @@ module \autojoin, do
         # compare if old logic would have autojoined
         addListener API, \advance, (d) ~>
             wlPos := API.getWaitListPosition!
-            if not @isTriggered and d and d.id != userID and wlPos == -1
-                sleep 5_000ms, ~> if not @isTriggered and API.getDJ!.id != userID and API.getWaitListPosition! == -1
+            if d and d.id != userID and wlPos == -1
+                sleep 5_000ms, ~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
                     chatWarn "old algorithm would have autojoined now. Please report about this in the beta tester Skype chat", "plug_p0ne autojoin"
 
     autojoin: ->
@@ -5397,8 +5410,6 @@ module \chatDblclick2Mention, do
 /*####################################
 #             ETA  TIMER             #
 ####################################*/
-# note: the avg. song duration seems to be off
-#ToDo: on advance, check if historyID is different from the last play's
 module \etaTimer, do
     displayName: 'ETA Timer'
     settings: \base
@@ -5421,9 +5432,9 @@ module \etaTimer, do
                 p = API.getWaitList!.length if p == -1
                 rem = API.getTimeRemaining!
                 if p
-                    $eta .attr \title, "#{mediaTime remaining} remaining + #p × #{mediaTime avg} ø song duration"
+                    $eta .attr \title, "#{mediaTime rem} remaining + #p × #{mediaTime avg} ø song duration"
                 else if rem
-                    $eta .attr \title, "#{mediaTime remaining} remaining, the waitlist is empty"
+                    $eta .attr \title, "#{mediaTime rem} remaining, the waitlist is empty"
                 else
                     $eta .attr \title, "Nobody is playing and the waitlist is empty"
             .mouseout ->
@@ -5506,24 +5517,6 @@ module \etaTimer, do
             @timer = sleep ((avg_ % 60s)+31s).s, updateETA
     disable: ->
         clearTimeout @timer
-    /*
-
-        lastSongDur = API.getHistory![*-1].media.duration
-        nextSong = API.getMedia!
-        # calculate average song duration
-        sum = 0
-        hist = API.getHistory!
-        for i from 1 til hist.length
-            sum += hist[i].media.duration
-        l = hist.length - 1
-
-
-
-
-
-
-                avg_ = API.getMedia!.duration + p * sum / l
-    */
 
 
 /*####################################
@@ -6337,7 +6330,7 @@ module \chatYoutubeThumbnails, do
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=40"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=41"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -6761,10 +6754,10 @@ module \roomSettings, do
         else if url = /@p3=(.*)/i .exec roomDescription
             console.log "[p0ne] p³ compatible Room Settings found", url.1
             $.getJSON proxify(url.1)
-                .then (@_data) ~>
+                .then (data) ~>
                     console.log "#{getTime!} [p0ne] loaded p³ compatible Room Settings"
                     @_room = roomslug
-                    @_trigger!
+                    @set data
                 .fail ->
                     chatWarn "cannot load Room Settings", "p0ne"
 
@@ -6786,10 +6779,8 @@ module \roomTheme, do
         @$playbackBackground = $ '#playback .background img'
         @playbackBackgroundVanilla = @$playbackBackground .attr(\src)
 
-        addListener roomSettings, \loaded, (d) ~>
+        addListener roomSettings, \data, (d) ~>
             console.log "#{getTime!} [roomTheme] loading theme"
-            return if not d or @currentRoom == (roomslug = getRoomSlug!)
-            @currentRoom = roomslug
             @clear!
             styles = ""
 
@@ -6877,6 +6868,8 @@ module \roomTheme, do
 
             css \roomTheme, styles
             @styles = styles
+
+        addListener roomSettings, \cleared, @clear, this
 
     clear: (skipDisables) ->
         console.log "#{getTime!} [roomTheme] clearing RoomTheme"
@@ -7311,7 +7304,7 @@ module \songInfo, do
             .text d.title
         $ \<br>                                         .appendTo $meta
         $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
-            .text getISOTime new Date(d.uploadDate)
+            .text getDateTime new Date(d.uploadDate)
         $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
             .text "duration: #{mediaTime +d.duration}"
         if media.format == 1 and d.restriction
@@ -9491,6 +9484,238 @@ module \fimstats, do
                 else
                     d.text = d.html = ""
                 return d
+
+/*@source p0ne.bpm.ls */
+/**
+ * BetterPonymotes - a script add ponymotes to the chat on plug.dj
+ * based on BetterPonymotes https://ponymotes.net/bpm/
+ * for a ponymote tutorial see:
+ * http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+ */
+
+
+/*####################################
+#          BETTER PONYMOTES          #
+####################################*/
+module \bpm, do
+    require: <[ chatPlugin ]>
+    displayName: 'Better Ponymotes'
+    settings: \pony
+    _settings:
+        showNSFW: false
+    module: (str) ->
+        if not str
+            console.error "bpm(null)"
+        return @bpm str 
+
+    setup: ({addListener, $create}, {_settings}) ->
+        host = window.p0ne?.host or "https://cdn.p0ne.com"
+
+        /*== external sources ==*/
+        if not window.emote_map
+            window.emote_map = {}
+            $.getScript "#host/scripts/bpm-resources.js" .then ->
+                API .trigger \p0ne_emotes_map
+        else
+            <- requestAnimationFrame
+            API .trigger \p0ne_emotes_map
+
+        $create "
+            <div id='bpm-resources'>
+                <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
+                #{if \webkitAnimation of document.body.style
+                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css' type='text/css'>"
+                else
+                    "<link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>"
+                }
+            </div>
+        "
+            .appendTo $body
+        /*
+                <style>
+                \#chat-suggestion-items .bpm-emote {
+                    max-width: 27px;
+                    max-height: 27px
+                }
+                </style>
+        */
+
+        /*== constants ==*/
+        _FLAG_NSFW = 1
+        _FLAG_REDIRECT = 2
+
+        /*
+         * As a note, this regexp is a little forgiving in some respects and strict in
+         * others. It will not permit text in the [] portion, but alt-text quotes don't
+         * have to match each other.
+         */
+        /*                 [](/  <   emote   >   <     alt-text    >  )*/
+        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g
+
+
+        /*== auxiliaries ==*/
+        /*
+         * Escapes an emote name (or similar) to match the CSS classes.
+         *
+         * Must be kept in sync with other copies, and the Python code.
+         */
+        sanitize_map =
+            \! : \_excl_
+            \: : \_colon_
+            \# : \_hash_
+            \/ : \_slash_
+        function sanitize_emote s
+            return s.toLowerCase!.replace /[!:#\/]/g, (c) -> return sanitize_map[c]
+
+        function lookup_core_emote name, altText
+            # Refer to bpgen.py:encode() for the details of this encoding
+            data = emote_map["/"+name]
+            return null if not data
+
+            nameWithSlash = name
+            parts = data.split ','
+            flag_data = parts.0
+            tag_data = parts.1
+
+            flags = parseInt(flag_data.slice(0, 1), 16)     # Hexadecimal
+            source_id = parseInt(flag_data.slice(1, 3), 16) # Hexadecimal
+            #size = parseInt(flag_data.slice(3, 7), 16)     # Hexadecimal
+            is_nsfw = (flags .&. _FLAG_NSFW)
+            is_redirect = (flags .&. _FLAG_REDIRECT)
+
+            /*tags = []
+            start = 0
+            while (str = tag_data.slice(start, start+2)) != ""
+                tags.push(parseInt(str, 16)) # Hexadecimal
+                start += 2
+
+            if is_redirect
+                base = parts.2
+            else
+                base = name*/
+
+            return
+                name: nameWithSlash,
+                is_nsfw: !!is_nsfw
+                source_id: source_id
+                source_name: sr_id2name[source_id]
+                #max_size: size
+
+                #tags: tags
+
+                css_class: "bpmote-#{sanitize_emote name}"
+                #base: base
+
+                altText: altText
+
+        function convert_emote_element info, parts, _
+            title = "#{info.name} from #{info.source_name}".replace /"/g, ''
+            flags = ""
+            for flag,i in parts when i>0
+                /* Normalize case, and forbid things that don't look exactly as we expect */
+                flag = sanitize_emote flag.toLowerCase!
+                flags += " bpflag-#flag" if not /\W/.test flag
+
+            if info.is_nsfw
+                if _settings.showNSFW
+                    title = "[NSFW] #title"
+                    flags += " bpm-nsfw"
+                else
+                    console.warn "[bpm] nsfw emote (disabled)", name
+                    return "<span class='bpm-nsfw' title='NSFW emote'>#_</span>"
+
+            return "<span class='bpflag-in bpm-emote #{info.css_class} #flags' title='#title'>#{info.altText || ''}</span>"
+            # data-bpm_emotename='#{info.name}'
+            # data-bpm_srname='#{info.source_name}'
+
+
+            /*
+            # in case it is required to avoid replacing in HTML tags
+            # usually though, there shouldn't be ponymotes in links / inline images / converted ponymotes
+            if str .has("[](/")
+                # avoid replacing emotes in HTML tags
+                return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) ~>
+                    nonHTML .= replace EMOTE_REGEXP, (_, parts, altText) ->
+                        parts .= split '-'
+                        name = parts.0
+                        info = lookup_core_emote name, altText
+                        if not info
+                            return _
+                        else
+                            return convert_emote_element info, parts
+                    return "#nonHTML#html"
+            else
+                return str
+            */
+
+        #== main BPM plugin ==
+        @bpm = (str) ->
+            console.error "bpm(null) [2]" if not str
+            str .replace EMOTE_REGEXP, (_, parts, altText) ->
+                parts .= split '-'
+                name = parts.0
+                info = lookup_core_emote name, altText
+                if not info
+                    return _
+                else
+                    return convert_emote_element info, parts, _
+
+        #== integration ==
+        addListener (window._$context || API), \chat:plugin, (msg) ->
+            msg.message = bpm(msg.message)
+
+        addListener \once, API, \p0ne_emotes_map, ->
+            console.info "[bpm] loaded"
+
+            #== ponify old messages ==
+            $cms! .find '.text' .html ->
+                return bpm @innerHTML
+
+            #== Autocomplete integration ==
+            /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
+            cb = ->
+                AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/
+                addAutocompletion? do
+                    name: "Ponymotes"
+                    data: Object.keys(emote_map)
+                    pre: "[]"
+                    check: (str, pos) ->
+                        if !str[pos+2] or str[pos+2] == "(" and (!str[pos+3] or str[pos+3] == "(/")
+                            temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos))
+                            if temp
+                                @data = temp.2 || ''
+                                return true
+                        return false
+                    display: (items) ->
+                        return [{value: "[](/#emote)", image: bpm("[](/#emote)")} for emote in items]
+                    insert: (suggestion) ->
+                        return "#{suggestion.substr(0, suggestion.length - 1)}#{@data})"
+            if window.addAutocompletion
+                cb!
+            else
+                addListener \once, API, \p0ne:autocomplete, cb
+
+
+    disable: (revertPonimotes) ->
+        if revertPonimotes
+            $cms! .find \.bpm-emote .replaceWith ->
+                flags = ""
+                for class_ in this.classList || this.className.split(/s+/)
+                    if class_.startsWith \bpmote-
+                        emote = class_.substr(7)
+                    else if class_.startsWith(\bpflag-) and class_ != \bpflag-in
+                        flags += class_.substr(6)
+                if emote
+                    return document.createTextNode "[](/#emote#flags)"
+                else
+                    console.warn "[bpm] cannot convert back", this
 
 /*@source p0ne.end.ls */
 _.defer ->
