@@ -37,56 +37,66 @@ module \fimstats, do
     disabled: true
     setup: ({addListener, $create}, lookup) ->
         css \fimstats, '
-            .p0ne-last-played {
+            .p0ne-fimstats {
                 position: absolute;
-                right: 140px;
-                top: 30px;
+                left: 0;
+                right: 345px;
+                bottom: 54px;
+                height: 1em;
+                padding: 5px 0;
                 font-size: .9em;
-                color: #ddd;
+                color: #12A9E0;
+                background: rgba(0,0,0, 0.4);
+                text-align: center;
+                z-index: 6;
                 transition: opacity .2s ease-out;
             }
-            #volume:hover ~ .p0ne-last-played {
-              opacity: 0;
-            }
-            #dialog-preview .p0ne-last-played {
-              right: 0;
-              top: 23px;
-              left: 0;
-            }
 
-            /*@media (min-width: 0px) {*/
-                .p0ne-fimstats-last { display: none; }
-                .p0ne-fimstats-first { display: none; }
-
-                .p0ne-fimstats-plays::before { content: " ("; }
-                .p0ne-fimstats-plays::after { content: "x) "; }
-                .p0ne-fimstats-first-notyet::before { content: "first play!"; }
-                .p0ne-fimstats-once::before { content: "once "; }
-            /*}*/
-            @media (min-width: 1600px) {
-                .p0ne-fimstats-last { display: inline; }
-                .p0ne-fimstats-first { display: inline; }
-
-                .p0ne-fimstats-plays::before { content: " …("; }
-                .p0ne-fimstats-plays::after { content: "x)… "; }
-
-                .p0ne-fimstats-first-notyet::before { content: "first played just now!"; }
-                .p0ne-fimstats-once::before { content: "once played by "; }
+            .p0ne-fimstats-field {
+                display: block;
+                position: absolute;
+                width: 100%;
+                padding: 0 5px;
+                box-sizing: border-box;
             }
-            @media (min-width: 1700px) {
-                .p0ne-fimstats-last::before { content: "last: "; }
-                .p0ne-fimstats-plays::before { content: " - (played "; }
-                .p0ne-fimstats-plays::after { content: "x)"; }
-                .p0ne-fimstats-first::before { content: " - first: "; }
+            .p0ne-fimstats-last { text-align: left; }
+            .p0ne-fimstats-plays, .p0ne-fimstats-once, .p0ne-fimstats-first-notyet { text-align: center; }
+            .p0ne-fimstats-first { text-align: right; }
+
+            .p0ne-fimstats-field::before, .p0ne-fimstats-field::after,
+            .p0ne-fimstats-first-time, .p0ne-fimstats-last-time, .p0ne-fimstats-once-time {
+                color: #ddd;
             }
-            @media (min-width: 1800px) {
-                .p0ne-fimstats-last::before { content: "last played by "; }
-                .p0ne-fimstats-plays::before { content: " \xa0 - (played "; }
-                .p0ne-fimstats-plays::after { content: "x)"; }
-                .p0ne-fimstats-first::before { content: " - \xa0 first played by "; }
+            #dialog-container .p0ne-fimstats {
+                bottom: 16px;
+                width: 100%;
+                background: rgba(0,0,0, 0.8);
+            }
+            #dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }
+
+            .p0ne-fimstats-first-notyet::before { content: "first played just now!"; color: #12A9E0 }
+            .p0ne-fimstats-once::before { content: "once played by: "; }
+            .p0ne-fimstats-last::before { content: "last played by: "; }
+            .p0ne-fimstats-last-time::before,
+            .p0ne-fimstats-first-time::before,
+            .p0ne-fimstats-once-time::before { content: "("; }
+            .p0ne-fimstats-last-time::after,
+            .p0ne-fimstats-first-time::after,
+            .p0ne-fimstats-once-time::after { content: ")"; }
+            .p0ne-fimstats-plays::before { content: "played: "; }
+            .p0ne-fimstats-plays::after { content: " times"; }
+            .p0ne-fimstats-first::before { content: "first played by: "; }
+
+            .p0ne-fimstats-first-time,
+            .p0ne-fimstats-last-time,
+            .p0ne-fimstats-once-time {
+                font-size: 0.8em;
+                display: inline;
+                position: static;
+                margin-left: 5px;
             }
         '
-        $el = $create '<span class=p0ne-last-played>' .appendTo \#now-playing-bar
+        $el = $create '<span class=p0ne-fimstats>' .appendTo \#room
         addListener API, \advance, @updateStats = (d) ->
             d ||= media: API.getMedia!
             if d.media
@@ -94,42 +104,69 @@ module \fimstats, do
                     .then (d) ->
                         $el
                             .html d.html
-                            .prop \title, d.text
                     .fail (err) ->
                         $el
                             .html err.html
-                            .prop \title, err.text
 
             else
                 $el.html ""
         if _$context?
             addListener _$context, \ShowDialogEvent:show, (d) -> #\PreviewEvent:preview, (d) ->
-                if d.dialog.options?.media
-                    console.log "[fimstats]", d.media
+                _.defer -> if d.dialog.options?.media
+                    console.log "[fimstats]", d.dialog.options.media
                     lookup d.dialog.options.media.toJSON!
                         .then (d) ->
-                            console.log "[fimstats] ->", d.media, d, $('#dialog-preview .message')
-                            $ '#dialog-preview .message' .after do
-                                $ '<div class=p0ne-last-played>' .html d.html
+                            $ \#dialog-preview .after do
+                                $ '<div class=p0ne-fimstats>' .html d.html
+        if app?.dialog?.dialog?.options?.media
+            console.log "[fimstats]", that
+            lookup that.toJSON!
+                .then (d) ->
+                    $ \#dialog-preview .after do
+                        $ '<div class=p0ne-fimstats>' .html d.html
+
+        # prevent the p0ne settings from overlaying the ETA
+        do addListener API, \p0ne:stylesLoaded, ->
+            $ \#p0ne-menu .css bottom: 54px + 21px
+        addListener API, \p0ne:moduleEnabled, (m) -> if m.name == \p0neSettings
+            $ \#p0ne-menu .css bottom: 54px + 21px
+
+        # show stats for current song
         @updateStats!
+
     module: (media) ->
-        return $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
+        $ \#p0ne-menu .css bottom: 54px
+        def = $.Deferred!
+        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
             .then (d) ->
-                d.firstPlay = d.data.0.firstPlay; d.lastPlay = d.data.0.lastPlay; d.plays = d.data.0.plays
-                first = "#{d.firstPlay.user} #{ago d.firstPlay.time*1000}"
-                last = "#{d.lastPlay.user} #{ago d.lastPlay.time*1000}"
-                if first != last
-                    #                       note: playcount doesn't contain current play
-                    d.text = "last played by #last \xa0 - (#{d.plays}x) - \xa0 first played by #first"
-                    d.html = "<span class=p0ne-fimstats-last>#last</span><span class=p0ne-fimstats-plays>#{d.plays}</span><span class=p0ne-fimstats-first>#first</span>"
+                # note: `d.plays` (playcount) doesn't contain current play
+                d = d.data.0
+
+                if d.firstPlay.time != d.lastPlay.time
+                    d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
+                    d.html = "
+                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{d.lastPlay.user}
+                            <span class=p0ne-fimstats-last-time>#{ago d.lastPlay.time*1000s_to_ms}</span>
+                        </span>
+                        <span class='p0ne-fimstats-field p0ne-fimstats-plays'>#{d.plays}</span>
+                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{d.firstPlay.user}
+                            <span class=p0ne-fimstats-first-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
+                        </span>
+                    "
                 else
-                    d.text = "once played by #first"
-                    d.html = "<span class=p0ne-fimstats-once>#first</span>"
-                return d
+                    d.text = "once played by #{d.firstPlay.user}"
+                    d.html = "
+                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{d.firstPlay.user}
+                            <span class=p0ne-fimstats-once-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
+                        </span>"
+                def.resolve d
             .fail (d,,status) ->
                 if status == "Not Found"
                     d.text = "first played just now!"
-                    d.html = "<span class=p0ne-fimstats-first-notyet></span>"
+                    d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>"
+                    def.resolve d
+                #else if status == \Unauthorized
                 else
-                    d.text = d.html = ""
-                return d
+                    d.text = d.html = "error loading fimstats"
+                    def.reject d
+        return def.promise!

@@ -121,7 +121,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replace @regexp, (_, prepre, pre, s, post, i) ~>
+        msg.message .= replace @regexp, (_, pronoun, s, possessive, htmltag, i) ~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -142,20 +142,20 @@ module \ponify, do
 
             r = "<abbr class=ponified title='#s'>#r</abbr>"
 
-            if pre
+            if pronoun
                 if "aeioujyh".has(w.0)
                     r = "an #r"
                 else
                     r = "a #r"
 
-            if post
+            if possessive
                 if "szx".has(w[*-1])
                     r += "' "
                 else
                     r += "'s "
 
             console.log "replaced '#s' with '#r'", msg.cid
-            return prepre+r
+            return r+htmltag
 
 
     /*== EMOTICONS ==*/
@@ -222,9 +222,9 @@ module \ponify, do
 
     setup: ({addListener, replace, css}) ->
         @regexp = //
-            ((?:^|<.+?>.+?</.+?>).*?) # avoid ponifying urls
-            (\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
-            //gi
+            \b(an?\s+)?(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
+            ((?:<.+?</.+?>|$).*?) # avoid ponifying urls
+        //gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
             aEM = {}<<<<emoticons.autoEmoteMap

@@ -130,6 +130,23 @@ module \grabMedia, do
 
 
 /*####################################
+#            ROOM  HELPER            #
+####################################*/
+module \p0neModuleRoomSettingsLoader, do
+    require: <[ _$context ]>
+    setup: ({addListener}) ->
+        addListener _$context, \room:joining, ->
+            for ,m of p0ne.modules when m.settingsPerCommunity
+                m._updateRoom!
+        addListener _$context, \room:joined, ->
+            for ,m of p0ne.modules when m.settingsPerCommunity and not m.disabled
+                if m.loading
+                    m.loading .then ->
+                        m.enable!
+                else
+                    m.enable!
+
+/*####################################
 #             CUSTOM CSS             #
 ####################################*/
 module \p0neCSS, do
@@ -165,7 +182,7 @@ module \p0neCSS, do
                     throttled := false
                     res = ""
                     for n,css of styles
-                        res += "/* #n */\n#css\n\n"
+                        res += "/*== #n ==*/\n#css\n\n"
                     $el       .first! .text res
                     $popoutEl .first! .text res
 
@@ -227,6 +244,7 @@ module \_$contextUpdateEvent, do
             replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
                 fn_ ...
                 _$context .trigger \context:update, type, cb, context
+                return this
 
 
 

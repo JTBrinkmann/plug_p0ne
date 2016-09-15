@@ -49,7 +49,7 @@ module \p0neSettings, do
             .appendTo $ppS
 
         #= add toggles for existing modules =
-        for ,module of p0ne.modules
+        for ,module of p0ne.modules when not module.loading
             @addModule module
 
 
@@ -132,15 +132,12 @@ module \p0neSettings, do
                 .stop!
                 .slideUp ->
                     $ this .remove!
-            console.log "[p0neSettings:disabledModule]", module_.name
         addListener API, \p0ne:moduleEnabled, (module) ~>
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
             @settingsExtra true, module
-            console.log "[p0neSettings:enabledModule]", module.name
         addListener API, \p0ne:moduleUpdated, (module, module_) ~>
-            console.log "[p0neSettings:updatedModule]", module.name, module_.name
             if module.settings
                 @addModule module, module_
                 if module.help != module_.help and module._$settings?.is \:hover
@@ -244,13 +241,14 @@ module \p0neSettings, do
             else
                 module._$settings .appendTo $s
 
+                # render extra settings element if module is enabled
+                if not module.disabled
+                    @settingsExtra false, module
+
             # (animatedly) open the settings group
             if @_settings.groupToggles[module.settings] and not module.settingsVip
                 $s .stop! .animate height: $s.children!.length * 44px, \slow
 
-            # render extra settings element if module is enabled
-            if not module.disabled
-                @settingsExtra false, module
 
     settingsExtra: (autofocus, module, module_) ->
         try

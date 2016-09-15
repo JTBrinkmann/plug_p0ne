@@ -270,7 +270,7 @@ module \streamSettings, do
             mode: \off
             enable: !->
                 playback.$noDJ.show!
-                @$controls.hide!
+                playback.$controls.hide!
             disable: !->
                 playback.$noDJ.hide!
             updateVolume: $.noop
@@ -368,11 +368,16 @@ module \streamSettings, do
             if currentMedia.get(\media)
                 @$controls .show!
         replace Playback::, \onSnoozeClick, (snooze) !->
-            export @~snooze
-            return !->
+            fn = !->
                 if not isSnoozed!
                     changeStream \off, "Snoozed"
                     @reset!
+            fn.vanilla = snooze.vanilla || snooze
+            if snooze.vanilla
+                window.snooze = snooze.vanilla
+            else
+                window.snooze = _.bind snooze, this
+            return fn
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do

@@ -492,6 +492,9 @@
     position: relative !important;
     width: auto;
 }
+.experience .xp .next-level {
+    right: 10px; /* fix scrollbar covering next level */
+}
 
 /* #user-view pages */
 #user-inventory div.avatars, #user-inventory div.badges, #user-inventory div.history,
@@ -574,7 +577,7 @@
     border-radius: 0 0 4px 4px;
 }
 .video-only #dj-button { width: 231px; height: 62px; }
-.video-only #vote { padding-top: 1px;}
+.video-only #vote { padding-top: 1px; left: 231px !important;}
 #vote .crowd-response { margin-right: 0; background: transparent }
 #woot.selected { background: #90ad2f !important; box-shadow: -3px 0 20px #90ad2f !important;}
 #meh.selected  { background: #c42e3b !important; box-shadow: +3px 0 20px #c42e3b !important;}
@@ -614,22 +617,6 @@
 
 
 
-/* playlist import icon */
-.playlist-icon-view .import-playlist-list .row::before {
-    content: " ";
-    display: block;
-    position: relative;
-    top: 50px;
-    left: 60px;
-    background: url('https://cdn.plug.dj/_/static/images/icons.587753be68926f7cf19ad9feb14752446cb87fd8.png');
-    background-position: -280px -105px;
-    width: 30px;
-    height: 30px;
-}
-.playlist-icon-view .import-playlist-list .row .meta {
-    text-align: center;
-}
-
 
 /*== Dashboard / Communities ==*/
 .communities .tab-menu {
@@ -653,7 +640,7 @@
 
 /*= Waitlist position number =*/
 #waitlist .user .position {
-    width: 22px;
+    width: 20px;
     text-align: right;
 }
 #waitlist .user .position::after {
@@ -760,10 +747,6 @@
 
 
 /*== fix FiMplug room theme ==*/
-#playback .background img {
-    background-position: top left, bottom right;
-}
-
 /*= mentions =*/
 #chat .mention.from-none, .mention.from-none:nth-child(2n+1) {
     background: rgba(88, 90, 28, 0.7) !important;

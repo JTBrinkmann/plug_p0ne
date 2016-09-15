@@ -19,14 +19,15 @@ module \roomSettings, do
     optional: <[ _$context ]>
     persistent: <[ _data _room ]>
     module: new DataEmitter(\roomSettings)
+
+    _room: \dashboard
     setup: ({addListener}) ->
         @_update!
         if _$context?
-            addListener _$context, \room:joining, @_clear, this
+            addListener _$context, \room:joining, @clear, this
             addListener _$context, \room:joined, @_update, this
-    _update: ->
-        @_listeners = []
 
+    _update: ->
         roomslug = getRoomSlug!
         return if @_data and roomslug == @_room
 
@@ -42,6 +43,182 @@ module \roomSettings, do
                 .fail ->
                     chatWarn "cannot load Room Settings", "p0ne"
 
+/*####################################
+#             YELLOW MOD             #
+####################################*/
+module \yellowMod, do
+    setup: ({@css}) ->
+        @update!
+    update: -> if not @disabled
+        @css \yellowMod, "
+            \#chat .fromID-#userID .un,
+            .user[data-uid='#userID'] .name > span {
+                color: #{customColors?.colors?.you || roomSettings?._data?.colors.chat.you || \#ffdd6f} !important;
+            }
+        "
+
+
+/*####################################
+#           CUSTOM  COLORS           #
+####################################*/
+window.ColorPicker = !!$.fn.ColorPicker
+module \customColors, do
+    displayName: "☢ Custom Colours"
+    settings: \look&feel
+    help: """
+        Change colours of usernames, depending on their role.
+
+        Note: some aggressive Room Themes might override custom colour settings from this module.
+    """
+    require: <[ yellowMod ColorPicker ]>
+    _settings:
+        global: {}
+        perRoom: {}
+    setup: ({@css, loadStyle}) ->
+        loadStyle "#{p0ne.host}/vendor/colorpicker/css/colorpicker.css"
+
+    roles:
+        * displayName: 'You',              name: \you,        default: 0xffdd6f, regular: true, noIcon: true
+        * displayName: 'Regular',          name: \regular,    default: 0xb0b0b0, regular: true, noIcon: true
+        * displayName: 'Friend',           name: \friend,     default: 0xb0b0b0, regular: true, noIcon: true
+        * displayName: 'Subscriber',       name: \subscriber, default: 0xc59840, regular: true
+        * displayName: 'Resident DJ',      name: \dj,         default: 0xac76ff, staff: true
+        * displayName: 'Bouncer',          name: \bouncer,    default: 0xac76ff, staff: true
+        * displayName: 'Manager',          name: \manager,    default: 0xac76ff, staff: true
+        #* displayName: 'Co-Host',          name: \co-host,    default: 0xac76ff, staff: true
+        * displayName: '(Co-) Host',       name: \host,       default: 0xac76ff, staff: true
+        * displayName: 'Brand Ambassador', name: \ambassador, default: 0x89be6c
+        * displayName: 'Admin',            name: \admin,      default: 0x42a5dc
+
+    settingsExtra: ($wrapper) ->
+        #ToDo add custom icons
+        #ToDo add icon colourizing (?)
+        #   possibly via:
+        #   - canvas + to BlobURI
+        #   - canvas + to Base64
+        #   - SVG
+        #   - PHP
+        #ToDo implement "Co-Host" class in ChatClasses
+        #ToDo add custom colours for custom users
+        cc = this
+        @colors = @_settings.global with @_settings.perRoom[getRoomSlug!]
+
+        visible = false
+        $wrapper .append do
+            $ \<button>
+                .text "change custom colours"
+                .click ~>
+                    if visible
+                        @$el.fadeOut!
+                        visible := false
+                    else
+                        @$el.fadeIn!
+                        visible := true
+
+        @$el = $ '<div class=p0ne-cc-settings>'
+            .hide!
+            #.css do
+            #    left: $ \.p0ne-settings .width!
+            .appendTo $body
+
+        # for simplicity, we only support setting global custom colours yet.
+        #ToDo add perRoom settings
+        scope = @_settings.global
+
+        @rolesHashmap = {}
+        for role in @roles
+            @rolesHashmap[role.name] = role
+            c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name] || "##{role.default.toString(16)}"
+            $ "
+                <div data-role=#{role.name} class='
+                        p0ne-cc-row from-#{role.name}
+                        #{if role.staff then ' from-staff' else ''}
+                        #{if scope[role.name] then '' else ' p0ne-cc-default'}'>
+                    #{if role.noIcon then '' else '<i class=\'icon icon-chat-'+role.name+'\'></i>'}
+                    <span class=name>#{role.displayName}</span>
+                    <i class='icon icon-clear-input'></i>
+                </div>
+            "
+                .css color: c
+                .appendTo @$el
+
+        var roleName, $row
+        @$cp = $cp = $ \<div>
+            .ColorPicker do
+                onChange: (hsb, hex, rgb) ->
+                    c = "##hex"
+                    scope[roleName] = c
+                    $row
+                        .css color: c
+                        .removeClass \p0ne-cc-default
+                    cc.updateCSS!
+        $cpDialog = $ "##{@$cp.data(\colorpickerId)}"
+
+        @$el
+            .on \click, \.icon-clear-input, ->
+                $row = $ this .parent!
+                name = $row .data \role
+                $row
+                    .css color: roomTheme._data?.colors?.chat?[name] || "##{cc.rolesHashmap[name].default.toString(16)}"
+                    .addClass \p0ne-cc-default
+                delete scope[name]
+                cc.updateCSS!
+            .on \click, \.p0ne-cc-row, ->
+                $row := $ this
+                roleName := $row .data \role
+                $cp
+                    .ColorPickerSetColor scope[roleName] || roomTheme._data?.colors?.chat?[roleName] || "##{cc.rolesHashmap[roleName].default.toString(16)}"
+                    .ColorPickerShow!
+                console.log "[colorpicker]", $cpDialog.0, $row.offset!
+                offset = $row.offset!
+                $cpDialog .css do
+                    left: offset.left
+                    top: offset.top + 24px;
+
+        $ '<label class=p0ne-css-override-you><input type=checkbox class=checkbox> "You" overrides other rules</label>'
+            .attr \checked, not yellowMod.disabled
+            .appendTo @$el
+            .find \input
+                .on \click, (e) ->
+                    console.log "[custom colors] force 'you' Override:", @checked
+                    if @checked
+                        yellowMod.enable!
+                    else
+                        yellowMod.disable!!
+        @updateCSS!
+
+    updateCSS: ->
+        styles = ""
+        scope = @_settings.global
+        for role in @roles when color = scope[role.name]
+            name = role.name
+            name = "regular.from-#name" if role.regularOnly
+            styles += "/* #{role.name} => #color */\n"
+            if not role.noIcon
+                styles += """
+                    \#app \#user-lists .icon-chat-#{role.name} + .name,
+                    \#app \#waitlist .icon-chat-#{role.name} + span,
+                    \#app \#user-rollover .icon-chat-#{role.name} + span,\n
+                """
+            styles += """
+                \#app \#chat .from-#name#{if role.regularOnly then '.from-regular' else ''} .un,
+                \#app .p0ne-name.#{role.name}#{if role.regularOnly then '.regular' else ''}
+                {
+                    color: #color !important;
+                }\n
+            """
+        @css \customColors, styles
+        yellowMod.update!
+        #if roomTheme? and not roomTheme.disabled
+        #    roomTheme.applyTheme roomSettings._data
+
+    disable: ->
+        if @$cp
+            @$cp .ColorPickerHide!
+            $ @$cp.data(\colorpickerId) .remove!
+            @$cp .remove!
+        @$el?.remove!
+
 
 /*####################################
 #             ROOM THEME             #
@@ -56,26 +233,32 @@ module \roomTheme, do
         Room Settings and thus a Room Theme can be added by (co-) hosts of the room.
     '''
     setup: ({addListener, replace, css, loadStyle}) ->
-        roles = <[ residentdj bouncer manager cohost host ambassador admin ]> #TODO
         @$playbackBackground = $ '#playback .background img'
-        @playbackBackgroundVanilla = @$playbackBackground .attr(\src)
+        @playbackBackgroundVanilla = @$playbackBackground .attr \src
 
-        addListener roomSettings, \data, (d) ~>
+        addListener roomSettings, \data, @applyTheme = (d) ~>
             console.log "#{getTime!} [roomTheme] loading theme"
-            @clear!
+            @clear d.images.background, false
+            @_data = d
+            cc = customColors?.colors ||{}
             styles = ""
 
             /*== colors ==*/
             if d.colors
                 styles += "\n/*== colors ==*/\n"
-                for role, color of d.colors.chat when /*role in roles and*/ isColor(color)
+                for role, color of d.colors.chat when isColor(color)
+                    if role in <[ rdj residentdj ]>
+                        role = \dj
+                        d.colors.chat.dj = color
                     styles += """
                     /* #role => #color */
-                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name,
-                    .cm.from-#role .from, \#waitlist .icon-chat-#role + span,
-                    \#user-rollover .icon-chat-cohost + span, .#role {
+                    \#user-lists .icon-chat-#role + .name,
+                    .from-#role .from, \#waitlist .icon-chat-#role + span,
+                    \#user-rollover .icon-chat-#role + span, .p0ne-name.#role {
                             color: #color !important;
                     }\n"""
+                    if role == \you
+                        yellowMod?.update!
                     #ToDo @mention other colours
                 colorMap =
                     background: \.room-background
@@ -134,12 +317,18 @@ module \roomTheme, do
                         \#avatars-container::before {
                             background-image: url(#{d.images.booth});
                         }\n"""
-                for role, url of d.images.icons when role in roles
+                for role, url of d.images.icons
                     styles += """
                         .icon-chat-#role {
                             background-image: url(#url);
                             background-position: 0 0;
                         }\n"""
+                    if role == \cohost
+                        styles += """
+                            .from-cohost .icon-chat-host { /* cohost icon fix */
+                                background-image: url(#url);
+                                background-position: 0 0;
+                            }\n"""
 
             /*== text ==*/
             if d.text
@@ -148,11 +337,12 @@ module \roomTheme, do
                         replace Lang[key], lang, -> return text
 
             css \roomTheme, styles
+            yellowMod.update!
             @styles = styles
 
         addListener roomSettings, \cleared, @clear, this
 
-    clear: (skipDisables) ->
+    clear: (resetBackground, skipDisables) ->
         console.log "#{getTime!} [roomTheme] clearing RoomTheme"
         if not skipDisables
             # copied from p0ne.module
@@ -165,9 +355,12 @@ module \roomTheme, do
             delete [@_cbs.replacements, @_cbs.css, @_cbs.loadedStyles]
 
         @currentRoom = null
-        @$playbackBackground?
-            .one \load ->
-                roomLoader?.onVideoResize Layout.getSize! if Layout?
-            .attr \src, @playbackBackgroundVanilla
+        if resetBackground and @$playbackBackground
+            @$playbackBackground
+                .one \load ->
+                    roomLoader?.onVideoResize Layout.getSize! if Layout?
+                .attr \src, @playbackBackgroundVanilla
 
-    disable: -> @clear true
+    disable: ->
+        @clear true, true
+        @_data = {}

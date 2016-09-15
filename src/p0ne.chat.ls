@@ -17,9 +17,7 @@
  */
 
 
-CHAT_WIDTH = 328px
 MAX_IMAGE_HEIGHT = 300px # should be kept in sync with p0ne.css
-roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
 
 
 
@@ -269,26 +267,42 @@ module \chatMessageClasses, do
                     $this = $ this
                     if fromUser = users.get uid
                         role = getRank(fromUser)
-                        if role != \ghost
-                            fromRole = "from-#role"
-                            fromRole += " from-staff" if role != \none
-                            /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
-                                fromRole += " from"
-                            */
-                    if not fromRole
+                        #if role != \ghost
+                        fromRole = "from-#role"
+                        if role == \regular
+                            fromRole = \from-you if uid == userID
+                        else
+                            fromRole += " from-staff"
+                        /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                            fromRole += " from"
+                        */
+                        fromRole += " from-friend" if fromUser.friend
+                    else
                         for r in ($this .find \.icon .prop(\className) ||"").split " " when r.startsWith \icon-chat-
                             fromRole = "from-#{r.substr 10}"
                         else
-                            fromRole = \from-none
+                            fromRole = \from-regular
+                    if $ this .find \.subscriber
+                        fromRole += " from-subscriber"
                     $this .addClass "fromID-#{uid} #fromRole"
         catch err
             console.error "[chatMessageClasses] couldn't convert old messages", err.stack
 
         addListener (window._$context || API), \chat:plugin, ({type, uid}:message) -> if uid
-            message.user = user = getUser(uid)
             message.addClass "fromID-#uid"
-            message.addClass "from-#{getRank user}"
-            message.addClass \from-staff if user and (user.role > 1 or user.gRole)
+
+
+            if message.user = getUser(uid)
+                rank = getRank message.user
+                if uid == userID
+                    message.addClass \from-you
+                    also = \-also
+                else
+                    message.addClass "from-#rank"
+                message.addClass \from-staff if message.user.role > 1 or message.user.gRole
+                if rank == \regular
+                    message.addClass \from-subscriber if message.user.sub
+                    message.addClass \from-friend if message.user.friend
 
 
 
@@ -536,11 +550,12 @@ module \imageLightbox, do
                 offset = $img.offset!
                 console.log "[lightbox] rendering" #, {w, h, oW: $el.css(\width), oH: $el.css(\height), ratio}
                 $el
+                    .removeClass \p0ne-img-large-open
                     .css do # copy position and size of inline image (note: the -10px are to make up for the margin)
-                        left:      "#{(offset.left + imgW/2 - PADDING) *100/contW}%"
-                        top:       "#{(offset.top  + imgH/2 - PADDING) *100/contH}%"
-                        maxWidth:  "#{                           imgW  *100/contW}%"
-                        maxHeight: "#{                           imgH  *100/contH}%"
+                        left:      "#{(offset.left + imgW/2) *100/contW}%"
+                        top:       "#{(offset.top  + imgH/2) *100/contH}%"
+                        maxWidth:  "#{               imgW    *100/contW}%"
+                        maxHeight: "#{               imgH    *100/contH}%"
                     .show!
                 $img.css visibility: \hidden # hide inline image
                 requestAnimationFrame ->
@@ -563,10 +578,10 @@ module \imageLightbox, do
                 offset = $img.offset!
                 $el
                     .css do
-                        left:      "#{(offset.left + imgW/2 - PADDING) *100/contW}%"
-                        top:       "#{(offset.top  + imgH/2 - PADDING) *100/contH}%"
-                        maxWidth:  "#{                           imgW  *100/contW}%"
-                        maxHeight: "#{                           imgH  *100/contH}%"
+                        left:      "#{(offset.left + imgW/2) *100/contW}%"
+                        top:       "#{(offset.top  + imgH/2) *100/contH}%"
+                        maxWidth:  "#{                 imgW  *100/contW}%"
+                        maxHeight: "#{                 imgH  *100/contH}%"
                 sleep 200ms, ~>
                     # let's hope this is somewhat sync with when the CSS transition ends
                     $el .removeClass \p0ne-img-large-open
