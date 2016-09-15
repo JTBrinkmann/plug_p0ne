@@ -948,6 +948,52 @@ do migrate=->
         itemSet!
 
 
+    | compareVersions v, dest=\1.7.10 =>
+        if window.afkTimer
+            #= runtime =
+            window.afkTimer._settings.lastActivity = window.afkTimer.lastActivity
+            migrated dest
+            migrate!
+        else
+            #= settings =
+            console.log "updating afkTimer settings"
+            localforage .getItem \p0ne_afkTimer, (err, d) ->
+                if err
+                    console.warn "error loading afkTimer settings"
+                    migrated dest
+                    migrate!
+                else
+                    d.lastActivity = {}
+                    localforage .setItem \p0ne_afkTimer, d, ->
+                        migrated dest
+                        migrate!
+    | compareVersions v, dest=\1.8.0 =>
+        #= runtime =
+        $ \.p0ne-cc-settings .remove!
+        if window.customColors
+            #= runtime =
+            window.customColors._settings =
+                global: {role: window.customColors._settings.global, user: {}}
+                perRoom: {}
+                rolesOrder: <[ admin ambassador host cohost manager bouncer dj subscriber you friend regular ]>
+            migrated dest
+            migrate!
+        else
+            #= settings =
+            console.log "updating customColors settings"
+            localforage .getItem \p0ne_customColors, (err, d) ->
+                if err
+                    console.warn "error loading customColors settings"
+                    migrated dest
+                    migrate!
+                else
+                    d.global = {role: d.global, user: {}}
+                    d.rolesOrder = <[ admin ambassador host cohost manager bouncer dj subscriber you friend regular ]>
+                    localforage .setItem \p0ne_customColors, d, ->
+                        migrated dest
+                        migrate!
+
+
     #| compareVersions v, dest=\1.6.0 =>
     #    ...
     #    migrated dest
