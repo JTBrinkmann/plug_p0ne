@@ -44,7 +44,7 @@ module \chatCommands, do
             callback: !->
                 user = API.getUser!
                 res = "<div class='msg text'>"
-                for k,command of chatCommands.commands when not command?.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
+                for k,command of chatCommands.commands when command and (not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation))
                     if command.aliases?.length
                         aliases = "title='aliases: #{humanList command.aliases}'"
                     else

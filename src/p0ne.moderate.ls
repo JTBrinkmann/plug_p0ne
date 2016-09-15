@@ -73,7 +73,7 @@ module \warnOnHistory, do
 #      DISABLE MESSAGE DELETE        #
 ####################################*/
 module \disableChatDelete, do
-    require: <[ _$context user_ ]>
+    require: <[ _$context user_ chat ]>
     optional: <[ socketListeners ]>
     moderator: true
     displayName: 'Show deleted messages'
@@ -102,7 +102,7 @@ module \disableChatDelete, do
             markAsDeleted(c, users.get(mi)?.get(\username) || mi)
             lastDeletedCid := c
         #addListener \early, _$context, \chat:delete, !-> return (cid) !->
-        replace_$Listener \chat:delete, !-> return (cid) !->
+        replace_$Listener \chat:delete, chat, !-> return (cid) !->
             markAsDeleted(cid) if cid != lastDeletedCid
 
         function markAsDeleted cid, moderator
@@ -123,6 +123,7 @@ module \disableChatDelete, do
                 d .text "deleted #{if moderator then 'by '+moderator else ''} #{d.text!}"
                 cm = $cm!
                 cm.scrollTop cm.scrollTop! + d.height!
+                $msg .find \.delete-button .remove! # remove delete button
 
                 if isLast
                     chat.lastType = \p0ne-deleted
@@ -294,7 +295,9 @@ module \afkTimer, do
         # set up event listeners to update the lastActivity time
         addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
         addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
-        addListener API, 'chat', (u) !-> if not /afk/i.test(u.message) then updateUser u.uid
+        addListener API, 'chat', (u) !->
+            if not /\[afk\]/i.test(u.message) and not u.uid == IDs.MadPacman
+                updateUser u.uid
         addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
@@ -308,13 +311,12 @@ module \afkTimer, do
 
         # regularly update the AFK list / count
         lastAfkCount = 0
-        var afkCount
-        @timer = repeat 60_000ms, fn=!->
+        @timer = repeat 60_000ms, updateAfkCount=!->
             if chatHidden
                 forceRerender!
             else
                 # update AFK user count
-                afkCount := 0
+                afkCount = 0
                 d = Date.now!
                 usersToCheck = API.getWaitList!
                 usersToCheck[*] = that if API.getDJ!
@@ -329,7 +331,7 @@ module \afkTimer, do
                         #$waitlistBtn .removeClass \p0ne-toolbar-highlight
                         $afkCount .clear!
                     lastAfkCount := afkCount
-        fn!
+        updateAfkCount!
 
         # UI
         d = 0
@@ -361,17 +363,13 @@ module \afkTimer, do
                         .appendTo @$el
                 @$afk .text time
                 @$afk .addClass \p0ne-last-activity-warn if ago > settings.highlightOver
-                if isUpdate
-                    @$afk .addClass \p0ne-last-activity-update
-                    <~! requestAnimationFrame
-                    @$afk .removeClass \p0ne-last-activity-update
+                @$afk .p0neFx \blink if isUpdate
 
 
 
         function updateUser uid
             if Date.now! - lastActivity[uid] > settings.highlightOver
-                afkCount--
-                $afkCount .text afkCount
+                updateAfkCount!
             lastActivity.0 = lastActivity[uid] = Date.now!
             # waitlist.rows defaults to [], so no need to ||[]
             for r in userList?.listView?.rows || app?.room.waitlist.rows when r.model.id == uid

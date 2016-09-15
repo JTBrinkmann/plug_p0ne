@@ -20,6 +20,7 @@
  *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
  *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
  *     - Stefan Petre's Color Picker http://www.eyecon.ro/colorpicker/ (Dual licensed under the MIT and GPL licenses)
+ *
  * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
  *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
  *
@@ -36,7 +37,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.0
+    version: \1.8.2
     lastCompatibleVersion: \1.8.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759

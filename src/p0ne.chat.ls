@@ -205,8 +205,9 @@ module \chatPlugin, do
         p0ne.chatLinkPlugins ||= []
         onerror = 'onerror="chatPlugin.imgError(this)"'
         addListener \early, _$context, \chat:receive, (msg) !-> # run plugins that modify chat msgs
-            msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
+            msg.wasAtBottom ?= chatIsAtBottom!
             msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
+            msg.originalMessage = msg.message
 
             _$context .trigger \chat:plugin, msg
             API .trigger \chat:plugin, msg
@@ -235,7 +236,8 @@ module \chatPlugin, do
                 return all
 
         addListener _$context, \chat:receive, (e) !->
-            getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
+            e.$el = getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
+            e.addClass e.$el~addClass; e.removeClass e.$el~removeClass
         addClassesCB = _$context._events[\chat:receive][*-1]
 
         addListener _$context, \popout:open, !->
@@ -431,6 +433,7 @@ module \chatInlineImages, do
     '''
     _settings:
         filterTags: <[ nsfw suggestive gore spoiler questionable no-inline noinline ]>
+    regexpCache: {}
     setup: ({addListener}) !->
         addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
@@ -439,7 +442,8 @@ module \chatInlineImages, do
                     msg.hasFilterWord = false
                     msgLC = msg.message.toLowerCase!
                     for tag in @_settings.filterTags when msgLC.has tag
-                        msg.hasFilterWord = true
+                        msg.hasFilterWord = tag
+                        msg.message .= replaceSansHTML (@regexpCache[tag] ||= //#{escapeRegExp tag}//ig), "<span class=p0ne-img-filterword>$&</span>"
                         console.warn "[inline-img] message contains \"#tag\", images will not be converted"
                         break
 
@@ -450,7 +454,7 @@ module \chatInlineImages, do
                             return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
                     else
                         pre = "class=p0ne-img-filtered #pre"
-                    return "<a #pre src='#img'>#completeURL</a>"
+                    return "<a #pre src='#img'>#{completeURL .replace(@regexpCache[msg.hasFilterWord], '<span class=p0ne-img-filterword>$&</span>')}</a>"
                 else
                     console.log "[inline-img]", "#completeURL ==> #img"
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
@@ -487,13 +491,13 @@ module \chatInlineImages, do
                 @_settings.filterTags = []; l=0; map={"":true}
                 for tag in $input.val!.split " "
                     tag = $.trim(tag)
-                    @_settings.filterTags[l++] = tag if not map[tag]
+                    @_settings.filterTags[l++] = htmlEscape(tag) if not map[tag]
             .appendTo $el
 
     forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
         \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
-        \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"]
+        \prntscr.com :     [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct", \https://]
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
         \pbs.twitter.com : [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/, "$1:small"]

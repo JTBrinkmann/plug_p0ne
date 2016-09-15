@@ -17,7 +17,7 @@ module \songNotif, do
     require: <[ chatDomEvents ]>
     optional: <[ _$context chat users database auxiliaries app popMenu ]>
     settings: \base
-    displayName: 'Song Notifications'
+    displayName: 'Chat Song Notifications'
     help: '''
         Shows notifications for playing songs in the chat.
         Besides the songs' name, it also features a thumbnail and some extra buttons.
@@ -28,7 +28,7 @@ module \songNotif, do
         You can click anywhere on it to close it again.
     '''
     persistent: <[ lastMedia $div ]>
-    setup: ({addListener, $create, @$createPersistent, css},, module_) !->
+    setup: ({addListener, $create, @$createPersistent, addCommand, css},, module_) !->
         @$lastNotif = $!
         @$div ||= $cms! .find \.p0ne-song-notif:last
 
@@ -196,6 +196,14 @@ module \songNotif, do
         @hideDescription = hideDescription
 
 
+        addCommand \songinfo, do
+            description: "forces a song notification to be shown, even if the module is disabled"
+            callback: !->
+                if window.songNotif?.callback and API.getMedia!
+                    that.image = httpsify that.image
+                    window.songNotif.callback media: that, dj: API.getDJ!
+
+
     callback: (d) !->
         media = d.media
         if media?.id != @lastMedia
@@ -239,7 +247,11 @@ module \songNotif, do
 
         image = httpsify media.image
         duration = mediaTime media.duration
-        console.logImg image, 120px, (if media.format == 1 then 90px else 120px)
+        (if media.format == 1
+            console.logImg image, 120px, 90px
+        else
+            console.logImg image, 100px, 100px
+        )
             .then !->
                 console.log "#{getTime!} [DJ_ADVANCE] #{d.dj.username} plays '#{author} - #{title}' (#duration)", d
         html += "
@@ -284,9 +296,39 @@ module \songNotif, do
     disable: !->
         @hideDescription?!
 
-chatCommands.commands.songinfo =
-    description: "forces a song notification to be shown, even if the module is disabled"
-    callback: !->
-        if window.songNotif?.callback and API.getMedia!
-            that.image = httpsify that.image
-            window.songNotif.callback media: that, dj: API.getDJ!
+
+
+
+window.Notification ||= window.webkitNotification
+module \songNotifPopup, do
+    displayName: 'Desktop Song Notifications'
+    help: '''
+        Shows a small popup notifications on song changes.
+    '''
+    screenshot: 'https://i.imgur.com/wCrDhvb.png'
+    settings: \base
+    disabled: true
+    require: <[ Notification ]>
+    setup: ({addListener}) !->
+        Notification.requestPermission!
+
+        lastNotif = { close: $.noop }
+        addListener API, \advance, (d) !->
+            lastNotif.close!
+            if d.media
+                if not document.hasFocus()
+                    lastNotif := new Notification do
+                        "#{d.media.author} - #{d.media.title}"
+                        icon: d.media.image
+                        body: "played by: #{d.dj.username}"
+                    lastNotif .onclick = closeNotif
+                else
+                    lastNotif.close!
+        addListener $window, \focus, closeNotif
+        # http://i.imgur.com/tGfZ4To.png mention_icon.png
+
+        !function closeNotif
+            lastNotif.close!
+
+    #settingsExtra: ($el) ->
+

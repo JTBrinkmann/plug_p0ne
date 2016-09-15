@@ -53,6 +53,18 @@ module \p0neGapiKey, do
     disableLate: !->
         gapi.client.setApiKey(gapi.client.key)
 
+/*####################################
+#        BULLETPROOF ANIMATION       #
+####################################*/
+module \sandboxAnimation, do
+    require: <[ app ]>
+    setup: ({replace}) !->
+        replace app, \animate, (a_) !-> return !->
+            try
+                a_ ...
+            catch err
+                console.error err.messageAndStack
+
 # This fixes the current media reloading on socket reconnects, even if the song didn't change
 /* NOT WORKING
 module \fixMediaReload, do
@@ -307,7 +319,6 @@ module \fixStuckDJButton, do
         fixTimeout = false
         do addListener _$context, \djButton:update, !->
             spinning = $djbtn.find \.spinner .length == 0
-            console.log "[djButton:update]", spinning, fixTimeout
             if fixTimeout and spinning
                 clearTimeout fixTimeout
             else if not fixTimeout
@@ -320,8 +331,6 @@ module \fixStuckDJButton, do
                             if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
                                 chatWarn "fixing stuck the DJ button", "fixStuckDJButton"
                                 forceJoin!
-                    else
-                        console.log "[djButton:update] already fixed", false, fixTimeout
 
 
 module \zalgoFix, do
@@ -479,10 +488,14 @@ module \stopSubscriberSpam, do
  * so that the plug.dj quota won't be used up.
  */
 module \ytPagedSearch, do
-    displayName: "Paged YT Search"
+    displayName: "More Search-Results"
     settings: \fixes
     require: <[ searchManager searchAux SearchList YtSearchService ]>
     optional: <[ pl ]>
+    help: "
+        Usually plug.dj only shows 50 results when doing a Youtube search.<br>
+        With this module, more results are loaded when you scroll to the bottom of the results.
+    "
     setup: ({replace}) !->
         replace SearchList::, \onScroll, !-> return !->
             #console.log "[onScroll]", @searching, @scrollPane.getPercentScrolledY!, @collection

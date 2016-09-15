@@ -50,7 +50,6 @@ if not window.SockJS
             sockjs: "#{p0ne.host}/scripts/sockjs"
 console.time("[p0ne custom avatars] loaded SockJS")
 require <[ sockjs ]>, (SockJS) !->
-    console.groupCollapsed "[p0ne custom avatars]"
     console.timeEnd "[p0ne custom avatars] loaded SockJS"
     # users
     if not window.p0ne
@@ -105,7 +104,7 @@ require <[ sockjs ]>, (SockJS) !->
             vanillaAvatarID: user.avatarID
             avatarID: user.avatarID
         DEFAULT_SERVER: 'https://ppcas.p0ne.com/_'
-        setup: ({addListener, @replace, revert, css}, customAvatars) !->
+        setup: ({addListener, @replace, revert, css, addCommand}, customAvatars) !->
             console.info "[p0ne custom avatars] initializing"
 
             p0ne._avatars = {}
@@ -128,10 +127,10 @@ require <[ sockjs ]>, (SockJS) !->
                 # d =~ {category, thumbOffsetTop, thumbOffsetLeft, base_url, anim, dj, b, permissions}
                 #   soon also {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn}
                 avatarID = d.avatarID
-                if p0ne._avatars[avatarID]
+                /*if p0ne._avatars[avatarID]
                     console.info "[p0ne custom avatars] updating '#avatarID'", d
                 else if not d.isVanilla
-                    console.info "[p0ne custom avatars] adding '#avatarID'", d
+                    console.info "[p0ne custom avatars] adding '#avatarID'", d*/
 
                 avatar =
                     inInventory: false
@@ -254,7 +253,7 @@ require <[ sockjs ]>, (SockJS) !->
                 myAvatars.models ++= vanilla
                 myAvatars.length = myAvatars.models.length
                 myAvatars.trigger \reset, false
-                console.log "[p0ne custom avatars] avatar inventory updated"
+                console.log "#{getTime!} [p0ne custom avatars] avatar inventory updated"
                 return true
 
             #== Event Listeners ==
@@ -309,7 +308,7 @@ require <[ sockjs ]>, (SockJS) !->
             for Cell in window.Cells
                 replace Cell::, \onClick, (oC_) !-> return !->
                     console.log "[p0ne custom avatars] Avatar Cell click", this
-                    avatarID = this.model.get("id")
+                    avatarID = @model.get("id")
                     if /*not this.$el.closest \.inventory .length or*/ not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
                         # if avatatar is in the Inventory or not bought, properly select it
                         oC_ ...
@@ -368,7 +367,7 @@ require <[ sockjs ]>, (SockJS) !->
             @blurbIsChanged = false
 
             urlParser = document.createElement \a
-            chatCommands.commands.ppcas = do
+            addCommand \ppcas, do
                 description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")'
                 callback: (str) !->
                     server = $.trim str.substr(6)
@@ -406,16 +405,19 @@ require <[ sockjs ]>, (SockJS) !->
                         return
                     else if server == \default
                         server = 'https://ppcas.p0ne.com/_'
+                    else if server == \reconnect
+                        server = @socket.url
+                        forceReconnect = true
                     else if server.length == 0
-                        chatWarn "Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again.", "p0ne avatars"
+                        chatWarn "Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again. or `/ppCAS reconnect` to force-reconnect to the current server", "p0ne avatars"
                         return
                     urlParser.href = server
                     if urlParser.host != location.host
-                        console.log "[p0ne custom avatars] connecting to", server
-                        @connect server
+                        console.log "#{getTime!} [p0ne custom avatars] connecting to", server
+                        @connect server, forceReconnect
                     else
-                        console.warn "[p0ne custom avatars] invalid ppCAS server"
-            chatCommands.updateCommands!
+                        console.warn "#{getTime!} [p0ne custom avatars] invalid ppCAS server"
+            # END /ppCAS command
 
             @connect(@DEFAULT_SERVER)
 
@@ -432,13 +434,15 @@ require <[ sockjs ]>, (SockJS) !->
                 sleep 10_000ms, !~> if @connectAttemps==0
                     chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
+            _$context.trigger \ppCAS:connecting
+            API.trigger \ppCAS:connecting
             @socket = new SockJS(url)
             @socket.url = url
             @socket.on = @socket.addEventListener
             @socket.off = @socket.removeEventListener
             @socket.once = (type, callback) !-> @on type, !-> @off(type, callback); callback ...
             @socket.emit = (type, ...data) !->
-                console.log "[ppCAS] > [#type]", data
+                console.log "#{getTime!} [ppCAS] > [#type]", data
                 @send JSON.stringify {type, data}
 
             @socket.trigger = (type, args) !->
@@ -448,14 +452,14 @@ require <[ sockjs ]>, (SockJS) !->
                     for fn in listeners
                         fn .apply this, args
                 else
-                    console.error "[ppCAS] unknown event '#type'"
+                    console.error "#{getTime!} [ppCAS] unknown event '#type'"
 
             @socket.onmessage = ({data: message}) !~>
                 try
                     {type, data} = JSON.parse(message)
-                    console.log "[ppCAS] < [#type]", data
+                    console.log "#{getTime!} [ppCAS] < [#type]", data
                 catch e
-                    console.warn "[ppCAS] invalid message received", message, e
+                    console.warn "#{getTime!} [ppCAS] invalid message received", message, e
                     return
 
                 @socket.trigger type, data
@@ -472,7 +476,7 @@ require <[ sockjs ]>, (SockJS) !->
             if oldBlurb != newBlurb
                 @changeBlurb newBlurb, do
                     success: !~>
-                        console.info "[ppCAS] removed old authToken from user blurb"
+                        console.info "#{getTime!} [ppCAS] removed old authToken from user blurb"
 
             @socket.on \authToken, (authToken) !~>
                 user = API.getUser!
@@ -490,9 +494,9 @@ require <[ sockjs ]>, (SockJS) !->
                         @blurbIsChanged = false
                         @socket.emit \auth, userID
                     error: !~>
-                        console.error "[ppCAS] failed to authenticate by changing the blurb."
+                        console.error "#{getTime!} [ppCAS] failed to authenticate by changing the blurb."
                         @changeBlurb @oldBlurb, success: !->
-                            console.info "[ppCAS] blurb reset."
+                            console.info "#{getTime!} [ppCAS] blurb reset."
 
             @socket.on \authAccepted, !~>
                 @connectAttemps := 0
@@ -503,28 +507,29 @@ require <[ sockjs ]>, (SockJS) !->
                     error: !~>
                         chatWarn "failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?", "p0ne avatars"
                         @changeBlurb @oldBlurb, error: !->
-                            console.error "[ppCAS] failed to reset the blurb."
+                            console.error "#{getTime!} [ppCAS] failed to reset the blurb."
             @socket.on \authDenied, !~>
-                console.warn "[ppCAS] authDenied"
+                console.warn "#{getTime!} [ppCAS] authDenied"
                 chatWarn "authentification failed", "p0ne avatars"
                 @changeBlurb @oldBlurb, do
                     success: !~>
                         @blurbIsChanged = false
                     error: !~>
                         @changeBlurb @oldBlurb, error: !->
-                            console.error "[ppCAS] failed to reset the blurb."
+                            console.error "#{getTime!} [ppCAS] failed to reset the blurb."
                 chatWarn "Failed to authenticate with user id '#userID'", "p0ne avatars"
 
             @socket.on \avatars, (avatars) !~>
                 user = API.getUser!
                 @socket.avatars = avatars
-                requestAnimationFrame initUsers if @socket.users
                 for avatarID, avatar of avatars
                     @addAvatar avatarID, avatar
+
                 if @_settings.avatarID of avatars
-                    @changeAvatar userID, @_settings.avatarID
-                else if user.avatarID of avatars
                     @socket.emit \changeAvatarID, user.avatarID
+                else
+                    @socket.emit \changeAvatarID, null
+                requestAnimationFrame initUsers if @socket.users
 
             @socket.on \users, (users) !~>
                 @socket.users = users
@@ -533,46 +538,41 @@ require <[ sockjs ]>, (SockJS) !->
             # initUsers() is used by @socket.on \users and @socket.on \avatars
             ~function initUsers avatarID
                 for userID, avatarID of @socket.users
-                    console.log "[ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
+                    console.log "#{getTime!} [ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
                     @changeAvatar userID, avatarID
-                #chatWarn "connected to ppCAS", "p0ne avatars"
                 if reconnecting
                     chatWarn "reconnected", "p0ne avatars"
                 _$context.trigger \ppCAS:connected
                 API.trigger \ppCAS:connected
-                #else
-                #    chatWarn "avatars loaded. Click on your name in the bottom right corner and then 'Avatars' to become a :horse: pony!", "p0ne avatars"
             @socket.on \changeAvatarID, (userID, avatarID) !->
-                console.log "[ppCAS] change other's avatar:", userID, avatarID
+                console.log "#{getTime!} [ppCAS] change other's avatar:", userID, avatarID
 
                 users.get userID ?.set \avatarID, avatarID
 
             @socket.on \disconnect, (userID) !~>
-                console.log "[ppCAS] user disconnected:", userID
+                console.log "#{getTime!} [ppCAS] user disconnected:", userID
                 @changeAvatarID userID, avatarID
 
             @socket.on \disconnected, (reason) !~>
                 @socket.trigger \close, reason
             @socket.on \close, (reason) !->
-                console.warn "[ppCAS] connection closed", reason
+                console.warn "#{getTime!} [ppCAS] connection closed", reason
                 reconnect := false
             @socket.onclose = (e) !~>
-                console.warn "[ppCAS] DISCONNECTED", e
+                console.warn "#{getTime!} [ppCAS] DISCONNECTED", e
                 _$context.trigger \ppCAS:disconnected
                 API.trigger \ppCAS:disconnected
-                if e.wasClean
+                /*if e.wasClean
                     reconnect := false
-                else if reconnect and not @disabled
+                else*/ if reconnect and not @disabled
                     timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps)
-                    console.info "[ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
+                    console.info "#{getTime!} [ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
                     @reconnectTimer = sleep timeout, !~>
-                        console.log "[ppCAS] reconnecting…"
+                        console.log "#{getTime!} [ppCAS] reconnecting…"
                         @connectAttemps++
                         @connect(url, true, @connectAttemps==1)
                         _$context.trigger \ppCAS:connecting
                         API.trigger \ppCAS:connecting
-            _$context.trigger \ppCAS:connecting
-            API.trigger \ppCAS:connecting
 
 
         changeBlurb: (newBlurb, options={}) !->
@@ -598,4 +598,19 @@ require <[ sockjs ]>, (SockJS) !->
                 user.set \avatarID, that
         #chatWarn "custom avatar script loaded. type '/ppCAS <url>' into chat to connect to an avatar server :horse:", "ppCAS"
 
-    console.groupEnd "[p0ne custom avatars]"
+module \ppCASStatusRing, do
+    settings: \dev
+    help: '''
+        shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).
+        green: connected
+        orange: connecting
+        red: disconnected
+    '''
+    setup: ({addListener}) !->
+        $footerAvi = $ '#footer-user .thumb'
+        addListener API, \ppCAS:connected, !->
+            $footerAvi .css borderColor: \limegreen
+        addListener API, \ppCAS:connecting, !->
+            $footerAvi .css borderColor: \orange
+        addListener API, \ppCAS:disconnected, !->
+            $footerAvi .css borderColor: \red

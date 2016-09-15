@@ -82,7 +82,7 @@ module \logEventsToConsole, do
             ctx = API
             chatEvnt = \chat
         addListener \early, ctx, chatEvnt, (data) !->
-            message = cleanMessage data.message
+            message = cleanMessage data.originalMessage || data.message
             if data.un
                 name = data.un .replace(/\u202e/g, '\\u202e') |> collapseWhitespace
                 name = " " * (24 - name.length) + name |> stripHTML
@@ -391,15 +391,34 @@ window <<<<
         else
             return d
 
+    play: (media) !->
+        /* force plug to play the provided song */
+        if not media
+            return
+        else if typeof media != \object
+            mediaLookup media .then play
+        else
+            if media.author
+                media = new Backbone.Model media
+            currentMedia.set \media, media
+
+    lssize: (sizeWhenDecompressed) !->
+        size = 0mb
+        for k,v of localStorage when k != \length
+            if sizeWhenDecompressed
+                try v = decompress v
+            size += (v ||'').length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
+        return size
+
 if not window.chrome
     # little fix for non-WebKit browsers to allow copying data to the clipboard
     # on WebKit browsers like Google Chrome, you can use `copy("string")` in the console
-    $.getScript "https://cdn.p0ne.com/script/zclip/jquery.zclip.min.js"
+    $.getScript "https://cdn.p0ne.com/scripts/zclip/jquery.zclip.min.js"
         .then !->
             window.copy = (str, title) !->
                 appendChat $ "<button class='cm p0ne-notif'> copy #{title ||''}</button>"
                     .zclip do
-                        path: "https://cdn.p0ne.com/script/zclip/ZeroClipboard.swf"
+                        path: "https://cdn.p0ne.com/scripts/zclip/ZeroClipboard.swf"
                         copy: str
                     #$ '<div class="cm p0ne-notif">'
                     #.append do

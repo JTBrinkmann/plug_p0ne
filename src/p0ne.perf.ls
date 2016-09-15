@@ -174,3 +174,12 @@ module \perfEmojify, do
                     return [h]
             # return the list of results
             return h._list
+
+module \perfChat, do
+    require: <[ chat plugUrls ]>
+    setup: ({replace}) !->
+        # avoid reloading the badoop.mp3 everytime it gets played
+        badoop = new Audio(plugUrls.sfx)
+        replace chat, \playSound, !-> return !->
+            badoop.currentTime = 0
+            badoop.play!

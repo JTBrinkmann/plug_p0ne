@@ -16,7 +16,7 @@ module \streamSettings, do
     #settings: \dev
     #displayName: 'Stream-Settings'
     require: <[ app Playback currentMedia database _$context ]>
-    optional: <[ database ]>
+    optional: <[ database plugUrls ]>
     audioOnly: false
     _settings:
         audioOnly: false
@@ -81,7 +81,7 @@ module \streamSettings, do
             refresh!
         $btn.find \.icon-stream-audio .on \click, !~> if not disabledBtns.audio
             database.settings.streamDisabled = false
-            @_settings.audioOnly = true if 2 != currentMedia.get \media ? .get \format
+            @_settings.audioOnly = true if 2 != currentMedia.get(\media)?.get(\format)
             changeStream \audio
             refresh!
         $btn.find \.icon-stream-off   .on \click, !~>
@@ -187,13 +187,13 @@ module \streamSettings, do
                     console.log "[YT Unblocker] got video URL", media.src
                     @start!
                 .fail !->
-                    if blocked == 1
+                    media.set \blocked, blocked++
+                    if blocked == 2
                         chatWarn "failed, trying again…", "YT Unblocker"
+                        refresh!
                     else
                         chatWarn "failed to unblock video :(", "YT Unblocker"
                         disableBtn \video
-                    media.set \blocked, blocked++
-                    refresh!
 
         #= Vanilla Youtube Player =
         youtube = Player with
@@ -230,14 +230,17 @@ module \streamSettings, do
                             .append "<iframe id=yt-frame frameborder=0 src='#{playback.visualizers.random!}'></iframe>"
                         b = setTimeout playback.scTimeoutBind, 5_000ms
                         soundcloud.sc.whenStreamingReady !->
-                            d.sc.stream do
-                                n.get \cid
+                            soundcloud.sc.stream do
+                                media .get \cid
                                 autoPlay: true
-                                !-> if media == currentMedia.get \media # SC DOUBLE PLAY FIX
+                                (e) !->
                                     clearTimeout(b)
+                                    if media != currentMedia.get \media # SC DOUBLE PLAY FIX
+                                        return e.stop!
                                     playback.player = e
-                                    e.seek(if startTime < 4_000ms then 0ms else startTime *1_000ms)
-                                    e.setVolume(currentMedia.get \volume / 100)
+                                    startTime = currentMedia.get \elapsed
+                                    e.seek(if startTime < 4s then 0ms else startTime *1_000s_to_ms)
+                                    e.setVolume(currentMedia.get(\volume) / 100)
                                     e._player.on \stateChange, playback.scStateBind
                     else
                         playback.$container.append do
@@ -260,7 +263,7 @@ module \streamSettings, do
                 $playbackContainer .empty!
             #seekTo: $.noop
             updateVolume: (vol) !->
-                playback.player.setVolume vol
+                playback.player.setVolume vol / 100
 
         # pseudo players
         DummyPlayer =
@@ -282,7 +285,7 @@ module \streamSettings, do
             mode: \off
             enable: !->
                 $playbackContainer
-                    .html "<iframe id=yt-frame frameborder=0 src='#{m.syncing}'></iframe>"
+                    .html "<iframe id=yt-frame frameborder=0 src='#{plugUrls?.syncing || '/_/visualizers/arcs'}'></iframe>"
             updateVolume: $.noop
 
         streamOff = DummyPlayer with
@@ -365,7 +368,7 @@ module \streamSettings, do
         replace Playback::, \onYTPlayerError, !-> return (e) !->
             console.log "[streamSettings] Youtube Playback Error", e
             if not database.settings.streamDisabled and not streamSettings._settings.audioOnly
-                @unblockYT!
+                streamSettings.unblockYT!
 
         #== force all buttons to be always shown ==
         replace Playback::, \onPlaybackEnter, !-> return !->
@@ -430,8 +433,10 @@ module \streamSettings, do
             API.trigger \p0ne:changeMode, mode, name
 
         @unblockYT = !->
-            currentMedia.get \media ? .blocked = true
-            refresh!
+            console.error "Cannot unblock blocked Youtube video"
+            return
+            #currentMedia.get \media ? .blocked = true
+            #refresh!
 
 
     disable: !->

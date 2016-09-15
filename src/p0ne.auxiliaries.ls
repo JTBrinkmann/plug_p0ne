@@ -38,9 +38,11 @@ Array::define \random, !-> return this[~~(Math.random! * @length)]
 Array::define \unique, !->
     res = []; l=0
     for el, i in this
-        for o til i
-            break if @[o] == el
-        else
+        isUnique = true
+        for o til i when @[o] == el
+            isUnique = false
+            break
+        if isUnique
             res[l++] = el
     return res
 Array::define \joinWrapped, (pre='', post='', between='') !->
@@ -122,7 +124,11 @@ jQuery.fn <<<<
                 if --remaining == 0
                     cb!
         return this
-    binaryGuess: (checkFn) !->
+    p0neFx: (effect) !->
+        @addClass "p0ne-fx-#effect"
+        <~! requestAnimationFrame
+        @removeClass "p0ne-fx-#effect"
+    /*binaryGuess: (checkFn) !->
         # returns element with index `n` for which:
         # if checkFn(element) for all elements in this from 0 to `n` all returns false,
         # and for all elements in this from `n` to the last one returns true
@@ -149,7 +155,7 @@ jQuery.fn <<<<
                 console.log "going up to #i (#step)"
         while step > 0
         i++ if goingUp
-        return @eq i
+        return @eq i*/
 
 $.easing <<<<
     easeInQuad: (p) !->
@@ -674,7 +680,7 @@ window <<<<
                 duplicates[l++] = queries[format][cid]
 
             else if window.mediaLookupCache[cid] # if already in cache
-                console.log "[mediaLookup] #format : #cid fetched from cache"
+                #console.log "[mediaLookup] #format : #cid fetched from cache"
                 res[l] = window.mediaLookupCache[cid]
                 clearTimeout res[l]._timeoutID
                 res[l]._timeoutID = sleep 5.min, ->
@@ -682,10 +688,9 @@ window <<<<
                 l++
 
             else # otherwise add to query
-                console.log "[mediaLookup] #format : #cid adding to query [#l]"
+                #console.log "[mediaLookup] #format : #cid adding to query [#l]"
                 queries[format][cid] = l++
 
-        console.log "[mediaLookup] queries:", queries
         remaining = 0
         ytCids_ = Object.keys(queries.1)
         if ytCids_.length # Youtube (API v3)
@@ -708,8 +713,12 @@ window <<<<
                     .success ({items}) !->
                         for d in items
                             duration = 0
-                            if /PT(\d+)M(\d+)S/.exec d.contentDetails.duration
-                                duration = +that.1 * 60 + +that.2
+                            if /PT(?:(\d+)H)(?:(\d+)M)(?:(\d+)S)/.exec d.contentDetails.duration
+                                duration = +that.3 || 0
+                                if that.1
+                                    duration += +that.1 * 3600
+                                if that.2
+                                    duration += +that.2 * 60
                             addResult queries.1[d.id], d.id, do
                                     format:       1
                                     data:         d
@@ -787,14 +796,12 @@ window <<<<
         doneLoading!
 
         function addResult pos, cid, data
-            console.log "[mediaLookup] looked up ##pos", cid, data
             window.mediaLookupCache[cid] = data
             res[pos] = data
             remaining--
 
         function doneLoading
             if remaining <= 0
-                console.log "[mediaLookup] done, resolving…"
                 if not isArray
                     res := res.0
                 else
@@ -1496,28 +1503,15 @@ window <<<<
         else
             return "#{humanTime(d)} ago"
 
-    lssize: (sizeWhenDecompressed) !->
-        size = 0mb
-        for k,v of localStorage when k != \length
-            if sizeWhenDecompressed
-                try v = decompress v
-            size += (v ||'').length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
-        return size
     formatMB: !->
         return "#{it.toFixed(2)}MB"
 
     getRank: (user, defaultToGhost) !-> # returns the name of a rank of a user
-        user = getUser(user)
+        user = getUser(user) if typeof user != \object
         if not user or user.role == -1
-            if defaultToGhost
-                return \ghost
-            else
-                return \regular
+            return if defaultToGhost then \ghost else \regular
         else if user.gRole
-            if that == 5
-                return \admin
-            else
-                return \ambassador
+            return if that == 5 then \admin else \ambassador
         else
             return <[ regular dj bouncer manager cohost host ]>[user.role ||0]
     getRankIcon: (user) !->
@@ -1585,7 +1579,6 @@ window.requireIDs = data.p0ne_requireIDs; p0ne.disabledModules = data.p0ne_disab
 if err
     console.warn "#{getTime!} [p0ne] the cached requireIDs seem to be corrupted" if err.p0ne_requireIDs
     console.warn "#{getTime!} [p0ne] the user's p0ne settings seem to be corrupted" if err.p0ne_disabledModules
-console.info "[p0ne] main function body", p0ne.disabledModules.autojoin
 
 
 /*####################################
@@ -1614,6 +1607,7 @@ requireHelper \tracker, (.identify)
 requireHelper \currentMedia, (.updateElapsedBind)
 requireHelper \settings, (.settings)
 requireHelper \soundcloud, (.sc)
+requireHelper \plugUrls, (.scThumbnail)
 requireHelper \searchAux, (.ytSearch)
 requireHelper \searchManager, (._search)
 requireHelper \SearchList, (.::?.listClass == \search)
@@ -1780,7 +1774,7 @@ replace jQuery, \Deferred, (Deferred_) !-> return !->
     promise_ = res.promise
     res.promise = !->
         res = promise_ ...
-        res.timeout = timeout; res.timeStarted = timeStarted
+        res.timeout = timeout; res.timeStarted = timeStarted if timeStarted
         return res
     return res
 

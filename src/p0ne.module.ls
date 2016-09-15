@@ -177,7 +177,7 @@ window.module = (name, data) !->
             disable: (temp) !->
                 # if `temp` is true-ish, module will not be disabled in the settings
                 # `temp` can also be the new instance of the module, in case it gets updated
-                return if module.disabled
+                return this if module.disabled
                 newModule = temp if temp and temp != true
                 try
                     module.disabled = true
@@ -202,6 +202,9 @@ window.module = (name, data) !->
                         $el .remove!
                     for m in p0ne.dependencies[name] ||[]
                         m.disable!
+
+                    @_$settingsPanel?.wrapper.remove!
+                    delete @_$settingsPanel
 
                     disabledModules[name] = true if not module.modDisabled and not temp
                     if not newModule
