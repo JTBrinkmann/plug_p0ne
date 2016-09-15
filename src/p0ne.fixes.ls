@@ -48,7 +48,21 @@ module \fixMediaReload, do
                 return this
             else
                 return s_.call this, a, b
+
+replaced with:
 */
+/*
+module \fixPseudoAdvance, do
+    require: <[ socketEvents ]>
+    setup: ({replace}) ->
+        var lastHistoryID
+        replace socketEvents, \advance, (a_) !-> return (data) !->
+            if lastHistoryID != data.h
+                # only trigger `advance()` if the historyID differs from the current one
+                lastHistoryID := data.h
+                return a_.call(this, data)
+*/
+
 
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
@@ -96,13 +110,13 @@ module \fixGhosting, do
                 # to avoid problems, like auto-rejoining when closing the tab
                 rejoinRoom 'you left the room'
 
-        replace PlugAjax::, \onError, (oE_) !-> return (status, data) !->
-            if status == \notInRoom
+        replace PlugAjax::, \onError, (oE_) !-> return (code, e) !->
+            if e.status == \notInRoom
                 #or status == \notFound # note: notFound is only returned for valid URLs, actually requesting not existing files returns a 404 error instead; update: TOO RISKY!
                 queue[*] = this
                 rejoinRoom "got 'notInRoom' error from plug", true
             else
-                oE_ ...
+                oE_.call(this, e)
 
         export rejoinRoom = (reason, throttled) !->
                 if rejoining and throttled

@@ -35,10 +35,10 @@ module \roomSettings, do
         else if url = /@p3=(.*)/i .exec roomDescription
             console.log "[p0ne] p³ compatible Room Settings found", url.1
             $.getJSON proxify(url.1)
-                .then (@_data) ~>
+                .then (data) ~>
                     console.log "#{getTime!} [p0ne] loaded p³ compatible Room Settings"
                     @_room = roomslug
-                    @_trigger!
+                    @set data
                 .fail ->
                     chatWarn "cannot load Room Settings", "p0ne"
 
@@ -60,10 +60,8 @@ module \roomTheme, do
         @$playbackBackground = $ '#playback .background img'
         @playbackBackgroundVanilla = @$playbackBackground .attr(\src)
 
-        addListener roomSettings, \loaded, (d) ~>
+        addListener roomSettings, \data, (d) ~>
             console.log "#{getTime!} [roomTheme] loading theme"
-            return if not d or @currentRoom == (roomslug = getRoomSlug!)
-            @currentRoom = roomslug
             @clear!
             styles = ""
 
@@ -151,6 +149,8 @@ module \roomTheme, do
 
             css \roomTheme, styles
             @styles = styles
+
+        addListener roomSettings, \cleared, @clear, this
 
     clear: (skipDisables) ->
         console.log "#{getTime!} [roomTheme] clearing RoomTheme"

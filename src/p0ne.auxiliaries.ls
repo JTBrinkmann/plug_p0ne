@@ -43,6 +43,14 @@ Array::define \unique, !->
         else
             res[l++] = el
     return res
+Array::define \joinWrapped, (pre, post, between) !->
+    return "" if @length == 0
+    pre ||= ''; post ||= ''; between ||= ''
+    res = "#pre#{@0}#post"
+    for i from 1 til @length
+        res += "#between#pre#{@[i]}#post"
+    return res
+
 String::define \reverse, !->
     res = ""
     i = @length
@@ -206,11 +214,14 @@ dataSave.interval = setInterval dataSave, 15.min
 # While its data is set, newly attached "data" handlers are immediately called with the data. (similar to resolved Promises)
 # Unlike Promises' state, the data is not immutable, it can be changed again (using `.set(newData)` again).
 # The data can be cleared (using `.clear()`), and if data was set before, all "cleared" event listeners are executed with `undefined`
-# `.always(fn, ctx?)` is a shorthand for `.on("all", fn, ctx?)`. "all" event listeners will be executed on all "data" and "cleared" events.
+# With event listeners attached with `.on("all", fn, ctx?)` will be executed on all "data" and "cleared" events.
 # Note:
 #   - The data can be set to another without clearing it first
 #   - "cleared" event listeners will NOT be immediately triggered
-#   - "always" events are internally called "all"
+#   - If you want to read the data from outside an event listener, use `._data`
+#     Remember that `.data` is a shorthand for `.on("data", fn, ctx?)`!
+#   - A DataEmitter can theoretically also have other events than "data" and "cleared".
+#     Please keep in mind, that other scripts might not expect "all" to be triggered by other events
 #
 # An example for a DataEmitter is the roomSettings module with the data being the room's p3-compatible room settings (if any).
 # The roomTheme module applies the room theme everytime the room's settings are loaded (e.g. after joining a room with them),
@@ -231,7 +242,6 @@ class DataEmitter extends {prototype: Backbone.Events}
         @_trigger \cleared
 
     on: (type, fn, context) ->
-        type = if type == \always then \all else type
         super ...
         # immediately execute "data" and "all" events
         if @_data and type in <[ data all ]>
@@ -242,7 +252,6 @@ class DataEmitter extends {prototype: Backbone.Events}
     # shorthands
     data: (fn, context) -> @on \data, fn, context
     cleared: (fn, context) -> @on \cleared, fn, context
-    always: (fn, context) -> @on \all, fn, context
 
 /*####################################
 #         GENERAL AUXILIARIES        #
@@ -1293,10 +1302,16 @@ window <<<<
 
 
     # formatting
-    getTime: (t = new Date) !->
-        return new Date(t - t.getTimezoneOffset! *60_000min_to_ms).toISOString! .replace(/.+?T|\..+/g, '')
+    timezoneOffset: new Date().getTimezoneOffset!
+    getTime: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/.+?T|\..+/g, '')
+    getDateTime: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T|\..+/g, ' ')
+    getDate: (t = Date.now!) !->
+        return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T.+/g, '')
     getISOTime: (t = new Date)!->
         return t.toISOString! .replace(/T|\..+/g, " ")
+
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff, shortFormat) !->
         if diff < 0

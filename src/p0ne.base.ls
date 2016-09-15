@@ -71,10 +71,10 @@ module \autojoin, do
     optional: <[ _$context booth ]>
     setup: ({addListener}) ->
         wlPos = API.getWaitListPosition!
-        if API.getDJ!?.id == userID or wlPos == -1
+        if wlPos == -1
             @autojoin!
-
-        @isTriggered = false
+        else if API.getDJ!?.id == userID
+            API.once \advance, @autojoin, this
 
         # regular autojoin
         addListener API, \advance, ~>
@@ -102,8 +102,8 @@ module \autojoin, do
         # compare if old logic would have autojoined
         addListener API, \advance, (d) ~>
             wlPos := API.getWaitListPosition!
-            if not @isTriggered and d and d.id != userID and wlPos == -1
-                sleep 5_000ms, ~> if not @isTriggered and API.getDJ!.id != userID and API.getWaitListPosition! == -1
+            if d and d.id != userID and wlPos == -1
+                sleep 5_000ms, ~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
                     chatWarn "old algorithm would have autojoined now. Please report about this in the beta tester Skype chat", "plug_p0ne autojoin"
 
     autojoin: ->
@@ -541,8 +541,6 @@ module \chatDblclick2Mention, do
 /*####################################
 #             ETA  TIMER             #
 ####################################*/
-# note: the avg. song duration seems to be off
-#ToDo: on advance, check if historyID is different from the last play's
 module \etaTimer, do
     displayName: 'ETA Timer'
     settings: \base
@@ -565,9 +563,9 @@ module \etaTimer, do
                 p = API.getWaitList!.length if p == -1
                 rem = API.getTimeRemaining!
                 if p
-                    $eta .attr \title, "#{mediaTime remaining} remaining + #p × #{mediaTime avg} ø song duration"
+                    $eta .attr \title, "#{mediaTime rem} remaining + #p × #{mediaTime avg} ø song duration"
                 else if rem
-                    $eta .attr \title, "#{mediaTime remaining} remaining, the waitlist is empty"
+                    $eta .attr \title, "#{mediaTime rem} remaining, the waitlist is empty"
                 else
                     $eta .attr \title, "Nobody is playing and the waitlist is empty"
             .mouseout ->
@@ -650,24 +648,6 @@ module \etaTimer, do
             @timer = sleep ((avg_ % 60s)+31s).s, updateETA
     disable: ->
         clearTimeout @timer
-    /*
-
-        lastSongDur = API.getHistory![*-1].media.duration
-        nextSong = API.getMedia!
-        # calculate average song duration
-        sum = 0
-        hist = API.getHistory!
-        for i from 1 til hist.length
-            sum += hist[i].media.duration
-        l = hist.length - 1
-
-
-
-
-
-
-                avg_ = API.getMedia!.duration + p * sum / l
-    */
 
 
 /*####################################

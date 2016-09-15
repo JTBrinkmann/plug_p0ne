@@ -107,7 +107,7 @@ module \songInfo, do
             .text d.title
         $ \<br>                                         .appendTo $meta
         $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
-            .text getISOTime new Date(d.uploadDate)
+            .text getDateTime new Date(d.uploadDate)
         $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
             .text "duration: #{mediaTime +d.duration}"
         if media.format == 1 and d.restriction

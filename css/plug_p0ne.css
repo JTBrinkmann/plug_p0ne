@@ -1171,16 +1171,15 @@
         margin-left: 82px;
     }
     .p0ne-votelist .icon {
-      top: 3px;
+        top: 3px;
     }
 
 /*== ETA Timer ==*/
     .p0ne-eta {
         position: absolute;
-        right: 355px;
+        right: 17px;
         font-size: 18px;
         padding-top: 15px;
-        padding-bottom: 15px;
     }
     .p0ne-eta-text   {
         color: #888;
