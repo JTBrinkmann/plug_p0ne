@@ -43,7 +43,7 @@ if (typeof console.time == 'function') {
 }
 p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.8.2',
+  version: '1.8.3',
   lastCompatibleVersion: '1.8.0',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
@@ -1270,10 +1270,15 @@ window.compareVersions = function(a, b){
     },
     p0neFx: function(effect){
       var this$ = this;
-      this.addClass("p0ne-fx-" + effect);
-      requestAnimationFrame(function(){
-        this$.removeClass("p0ne-fx-" + effect);
-      });
+      if (this.length) {
+        this.removeClass("p0ne-fx-off-" + effect);
+        this.addClass("p0ne-fx-" + effect);
+        requestAnimationFrame(function(){
+          this$.removeClass("p0ne-fx-" + effect);
+          this$.addClass("p0ne-fx-off-" + effect);
+        });
+      }
+      return this;
     }
     /*binaryGuess: (checkFn) !->
         # returns element with index `n` for which:
@@ -1509,6 +1514,13 @@ window.compareVersions = function(a, b){
           : num + "";
       }
     },
+    padHex: function(str, digits){
+      digits == null && (digits = 2);
+      while (str.length < digits) {
+        str = "0" + str;
+      }
+      return str;
+    },
     generateID: function(){
       return (~~(Math.random() * 0xFFFFFF)).toString(16).toUpperCase();
     },
@@ -1737,7 +1749,7 @@ window.compareVersions = function(a, b){
           sleep(1000, delay);
         } else {
           window.floodAPI_counter++;
-          sleep(10000, function(){
+          sleep(15000, function(){
             window.floodAPI_counter--;
           });
           req = $.ajax(options).then(def.resolve, def.reject, def.progress);
@@ -2105,18 +2117,19 @@ window.compareVersions = function(a, b){
         return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
       }
       function fn1$(arg$){
-        var items, i$, len$, d, duration, that, cid, ref$, l;
+        var items, multiplicators, i$, len$, d, duration, that, j$, len1$, i, t, cid, ref$, l;
         items = arg$.items;
+        multiplicators = [0, 31104000, 2592000, 604800, 86400, 3600, 60, 1];
         for (i$ = 0, len$ = items.length; i$ < len$; ++i$) {
           d = items[i$];
           duration = 0;
-          if (that = /PT(?:(\d+)H)(?:(\d+)M)(?:(\d+)S)/.exec(d.contentDetails.duration)) {
-            duration = +that[3] || 0;
-            if (that = that[1]) {
-              duration += +that[1] * 3600;
-            }
-            if (that = that[2]) {
-              duration += +that[2] * 60;
+          if (that = /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(d.contentDetails.duration)) {
+            for (j$ = 0, len1$ = that.length; j$ < len1$; ++j$) {
+              i = j$;
+              t = that[j$];
+              if (+t) {
+                duration += t * multiplicators[i];
+              }
             }
           }
           addResult(queries[1][d.id], d.id, {
@@ -3134,22 +3147,20 @@ window.compareVersions = function(a, b){
       }
     },
     mediaTime: function(dur){
-      var b, c, res;
-      dur = ~~dur;
+      var m, h;
       if (dur < 0) {
         return "-" + mediaTime(-dur);
       }
-      b = [60, 60, 24, 360.25];
-      c = 0;
-      res = pad(dur % 60);
-      while (dur = ~~(dur / b[c++])) {
-        res = pad(dur % b[c]) + ":" + res;
+      m = 0;
+      if (dur >= 60) {
+        m = ~~(dur / 60);
+        dur %= 60;
+        if (m >= 60) {
+          h = ~~(m / 60);
+          m %= 60;
+        }
       }
-      if (res.length === 2) {
-        return "00:" + res;
-      } else {
-        return res;
-      }
+      return (h ? pad(h) + ":" : '') + "" + pad(m) + ":" + pad(~~dur);
     },
     ago: function(d){
       d = Date.now() - d;
@@ -3164,7 +3175,11 @@ window.compareVersions = function(a, b){
     },
     getRank: function(user, defaultToGhost){
       var that;
-      if (typeof user !== 'object') {
+      if (user <= 5) {
+        user = {
+          role: user
+        };
+      } else if (typeof user !== 'object') {
         user = getUser(user);
       }
       if (!user || user.role === -1) {
@@ -3256,7 +3271,7 @@ window.compareVersions = function(a, b){
       _rooms: {}
     }
   }, function(err, data){
-    var res$, k, ref$, v, PlaylistItemRow, Dialog, InventoryDropdown, i$, len$, context, ref1$, ref2$, ref3$, cb, app, friendsList, pl, user, ref4$, ev, myAvatars, userID, _, ref5$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp, staff, colorPicker, cc;
+    var res$, k, ref$, v, PlaylistItemRow, Dialog, InventoryDropdown, i$, len$, context, ref1$, ref2$, ref3$, cb, app, friendsList, pl, user, ref4$, ev, myAvatars, userID, _, ref5$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp, staff;
     window.requireIDs = data.p0ne_requireIDs;
     p0ne.disabledModules = data.p0ne_disabledModules;
     if (err) {
@@ -4233,6 +4248,43 @@ window.compareVersions = function(a, b){
         return API.trigger("p0ne:" + type, module, module_);
       }
     };
+    window.loadModule = function(moduleName, url){
+      var def;
+      def = $.Deferred();
+      if (p0ne.modules[moduleName]) {
+        if (p0ne.modules[moduleName].loading) {
+          console.log("[loadModule] module loading", moduleName, url);
+          p0ne.modules[moduleName].loading.then(def.resolve);
+        } else {
+          console.log("[loadModule] module already loaded", moduleName, url);
+          return def.resolve(p0ne.modules[moduleName]);
+        }
+      }
+      window[moduleName] = p0ne.modules[moduleName] = {
+        loading: def,
+        disable: function(arg$, m){
+          _.defer(function(){
+            if (m != null && m.loading) {
+              console.log("[loadModule] module loading", moduleName, url);
+              p0ne.modules[moduleName].loading.then(def.resolve);
+            } else if (m) {
+              console.log("[loadModule] module initialized", moduleName, url);
+              def.resolve(m);
+            } else {
+              def.reject();
+            }
+          });
+        }
+      };
+      console.log("[loadModule] loading", moduleName, url);
+      $.getScript(url).then(function(){
+        console.log("[loadModule] script loaded", moduleName, url);
+      }).fail(function(){
+        console.warn("[loadModule] script failed to load", moduleName, url);
+        def.reject;
+      });
+      return def;
+    };
     /*@source p0ne.auxiliary-modules.ls */
     /**
      * Auxiliary plug_p0ne modules
@@ -4553,10 +4605,12 @@ window.compareVersions = function(a, b){
           loadingStyles++;
           s = $("<link rel='stylesheet' >").attr('href', url).on('load fail', function(){
             if (--loadingStyles === 0) {
-              if (typeof _$context != 'undefined' && _$context !== null) {
-                _$context.trigger('p0ne:stylesLoaded');
-              }
-              API.trigger('p0ne:stylesLoaded');
+              requestAnimationFrame(function(){
+                if (typeof _$context != 'undefined' && _$context !== null) {
+                  _$context.trigger('p0ne:stylesLoaded');
+                }
+                API.trigger('p0ne:stylesLoaded');
+              });
             }
           }).appendTo(document.head);
           $el.push(s[0]);
@@ -6150,15 +6204,22 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('chatCommands', {
       optional: ['currentMedia'],
-      setup: function(arg$){
-        var addListener, this$ = this;
+      setup: function(arg$, arg1$, cC_){
+        var addListener, k, ref$, v, this$ = this;
         addListener = arg$.addListener;
         addListener(API, 'chatCommand', function(c){
-          var cmd, ref$;
+          var cmd, ref$, err;
           if (cmd = this$._commands[(ref$ = /^\/(\w+)/.exec(c)) != null ? ref$[1] : void 8]) {
             console.log("/chatCommand", cmd, cmd.moderation);
-            if (!cmd.moderation || user.gRole || v.moderation === true && user.isStaff || user.role >= cmd.moderation) {
-              cmd.callback(c);
+            if (!cmd.moderation || user.gRole || cmd.moderation === true && user.isStaff || user.role >= cmd.moderation) {
+              try {
+                cmd.callback(c);
+              } catch (e$) {
+                err = e$;
+                chatWarn("<div>" + err.message + "</div>", "error while executing " + c);
+                console.error("[chatCommand] " + c);
+                throw err;
+              }
             } else {
               chatWarn("You need to be " + (deepEq$(cmd.moderation, true, '===')
                 ? 'staff'
@@ -6168,6 +6229,14 @@ window.compareVersions = function(a, b){
             }
           }
         });
+        if (cC_) {
+          for (k in ref$ = cC_.commands) {
+            v = ref$[k];
+            if (!(k in this.commands)) {
+              this.commands[k] = v;
+            }
+          }
+        }
         this.updateCommands();
       },
       updateCommands: function(){
@@ -6223,7 +6292,7 @@ window.compareVersions = function(a, b){
         commands: {
           description: "show this list of commands",
           callback: function(){
-            var user, res, k, ref$, command, ref1$, aliases;
+            var user, res, k, ref$, command, descr, title, ref1$;
             user = API.getUser();
             res = "<div class='msg text'>";
             for (k in ref$ = chatCommands.commands) {
@@ -6231,12 +6300,12 @@ window.compareVersions = function(a, b){
               if (command && (!command.moderation || user.gRole || (command.moderation === true
                 ? user.role > 2
                 : user.role >= command.moderation))) {
+                descr = (command.parameters || '') + " - " + command.description;
+                title = "/" + k + " " + descr;
                 if ((ref1$ = command.aliases) != null && ref1$.length) {
-                  aliases = "title='aliases: " + humanList(command.aliases) + "'";
-                } else {
-                  aliases = '';
+                  title += "\n" + plural(command.aliases.length, 'alias', 'aliases') + ": " + humanList(command.aliases);
                 }
-                res += "<div class=p0ne-help-command " + aliases + "><b>/" + k + "</b> " + (command.parameters || '') + " - " + command.description + "</div>";
+                res += "<div class=p0ne-help-command title='" + title + "'><b>/" + k + "</b> " + descr + "</div>";
               }
             }
             res += "</div>";
@@ -6305,7 +6374,7 @@ window.compareVersions = function(a, b){
         mute: {
           aliases: ['stfu', 'silence'],
           parameters: "[[duration] @username(s)]",
-          description: "mutes the audio or the specified user(s)",
+          description: "if no parameters then mute the audio, \notherwise mute the specified user(s)",
           callback: function(user){
             var durArg, duration, i$, ref$, len$, id;
             user = user.replace(/^\/\w+\s*/, '').trim();
@@ -6766,7 +6835,7 @@ window.compareVersions = function(a, b){
               response += "disabled " + humanList(enabledModules) + ".";
             }
             if (disabledModules.length) {
-              response += " " + humanList(disabledModules) + " " + (disabledModules.length === 1 ? 'was' : 'were') + " already disabled.";
+              response += " " + humanList(disabledModules) + " " + (disabledModules.length === 1 ? 'was' : 'were') + " weren't enabled.";
             }
             API.sendChat(response);
           }
@@ -7694,7 +7763,7 @@ window.compareVersions = function(a, b){
       settingsExtra: function($el){
         var boothAlert, resetTimer, $warning;
         boothAlert = this;
-        $("<form>Show notification<br><label><input type=radio name=booth-alert value=on " + (this._settings.warnOnPrevPlay ? 'checked' : '') + "> on preceding song</label><br><label><input type=radio name=booth-alert value=off " + (this._settings.warnOnPrevPlay ? '' : 'checked') + "> <input type=number value='" + ~~(this._settings.warnXMinBefore / 600) / 100 + "' class='p0ne-settings-input booth-alert'> minute(s)<br>before your play</label></form>").append($warning = $('<div class=warning>')).on('click', 'input:radio', function(){
+        $("<form>Show notification<br><label><input type=radio name=booth-alert value=on " + (this._settings.warnOnPrevPlay ? 'checked' : '') + "> on preceding song</label><br><label><input type=radio name=booth-alert value=off " + (this._settings.warnOnPrevPlay ? '' : 'checked') + "> <input type=number value='" + ~~(this._settings.warnXMinBefore / 600) / 100 + "' class='p0ne-settings-input booth-alert'> minute(s) before your play</label></form>").append($warning = $('<div class=warning>')).on('click', 'input:radio', function(){
           if (this.checked) {
             boothAlert._settings.warnOnPrevPlay = this.value === 'on';
             console.log(getTime() + " [boothAlert] updated warnOnPrevPlay to " + boothAlert._settings.warnOnPrevPlay);
@@ -7915,8 +7984,6 @@ window.compareVersions = function(a, b){
           msg.addClass = addClass;
           msg.removeClass = removeClass;
           msg.originalMessage = msg.message;
-          _$context.trigger('chat:plugin', msg);
-          API.trigger('chat:plugin', msg);
           if (msg.wasAtBottom) {
             onload = 'onload="chatScrollDown()"';
           } else {
@@ -7927,8 +7994,8 @@ window.compareVersions = function(a, b){
             domain = domain.toLowerCase();
             for (i$ = 0, len$ = (ref$ = [_$context, API]).length; i$ < len$; ++i$) {
               ctx = ref$[i$];
-              if (ctx._events['chat:image']) {
-                for (j$ = 0, len1$ = (ref1$ = ctx._events['chat:image']).length; j$ < len1$; ++j$) {
+              if (ctx._events['p0ne:chat:link']) {
+                for (j$ = 0, len1$ = (ref1$ = ctx._events['p0ne:chat:link']).length; j$ < len1$; ++j$) {
                   plugin = ref1$[j$];
                   try {
                     if (that = plugin.callback.call(plugin.ctx, {
@@ -7954,11 +8021,13 @@ window.compareVersions = function(a, b){
             }
             return all;
           });
+          _$context.trigger('p0ne:chat:plugin', msg);
+          API.trigger('p0ne:chat:plugin', msg);
         });
         addListener(_$context, 'chat:receive', function(e){
           e.$el = getChat(e).addClass(Object.keys(e.classes || {}).join(' '));
-          e.addClass(bind$(e.$el, 'addClass'));
-          e.removeClass(bind$(e.$el, 'removeClass'));
+          e.addClass = bind$(e.$el, 'addClass');
+          e.removeClass = bind$(e.$el, 'removeClass');
         });
         addClassesCB = (ref$ = _$context._events['chat:receive'])[ref$.length - 1];
         addListener(_$context, 'popout:open', function(){
@@ -8040,7 +8109,7 @@ window.compareVersions = function(a, b){
                   fromRole = 'from-regular';
                 }
               }
-              if ($(this).find('.subscriber')) {
+              if ($(this).find('.subscriber').length) {
                 fromRole += " from-subscriber";
               }
               $this.addClass("fromID-" + uid + " " + fromRole);
@@ -8050,7 +8119,7 @@ window.compareVersions = function(a, b){
           err = e$;
           console.error("[chatMessageClasses] couldn't convert old messages", err.stack);
         }
-        addListener(window._$context || API, 'chat:plugin', function(message){
+        addListener(window._$context || API, 'p0ne:chat:plugin', function(message){
           var type, uid, rank, also;
           type = message.type, uid = message.uid;
           if (uid) {
@@ -8093,7 +8162,7 @@ window.compareVersions = function(a, b){
         unreadCount = 0;
         $chatButton = $('#chat-button').append($unreadCount = $('<div class=p0ne-toolbar-count>'));
         this.bottomMsg = $cm().children().last();
-        addListener(_$context, 'chat:plugin', function(message){
+        addListener(_$context, 'p0ne:chat:plugin', function(message){
           message.wasAtBottom == null && (message.wasAtBottom = chatIsAtBottom());
           if (!$chatButton.hasClass('selected') && (typeof PopoutView != 'undefined' && PopoutView !== null ? PopoutView.chat : void 8) == null) {
             $chatButton.addClass('p0ne-toolbar-highlight');
@@ -8182,7 +8251,7 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var addListener;
         addListener = arg$.addListener;
-        addListener(_$context, 'chat:plugin', function(message){
+        addListener(_$context, 'p0ne:chat:plugin', function(message){
           var type, uid, res, lastI, i$, ref$, len$, mention;
           type = message.type, uid = message.uid;
           if (uid) {
@@ -8219,8 +8288,8 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var addListener, this$ = this;
         addListener = arg$.addListener;
-        addListener(API, 'chat:image', function(arg$){
-          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img, msgLC, i$, ref$, len$, tag, ref1$;
+        addListener(API, 'p0ne:chat:link', function(arg$){
+          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img, msgLC, i$, ref$, len$, tag;
           all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, onerror = arg$.onerror, msg = arg$.msg, offset = arg$.offset;
           if (img = this$.inlineify.apply(this$, arguments)) {
             if (msg.hasFilterWord == null) {
@@ -8230,7 +8299,6 @@ window.compareVersions = function(a, b){
                 tag = ref$[i$];
                 if (msgLC.has(tag)) {
                   msg.hasFilterWord = tag;
-                  msg.message = msg.message.replaceSansHTML((ref1$ = this$.regexpCache)[tag] || (ref1$[tag] = RegExp(escapeRegExp(tag) + '', 'ig')), "<span class=p0ne-img-filterword>$&</span>");
                   console.warn("[inline-img] message contains \"" + tag + "\", images will not be converted");
                   break;
                 }
@@ -8252,6 +8320,12 @@ window.compareVersions = function(a, b){
             }
           } else {
             return false;
+          }
+        });
+        addListener(API, 'p0ne:chat:plugin', function(msg){
+          var ref$, key$;
+          if (msg.hasFilterWord) {
+            msg.message = msg.message.replaceSansHTML((ref$ = this$.regexpCache)[key$ = msg.hasFilterWord] || (ref$[key$] = RegExp(escapeRegExp(msg.hasFilterWord) + '', 'ig')), "<span class=p0ne-img-filterword>$&</span>");
           }
         });
       },
@@ -8295,7 +8369,7 @@ window.compareVersions = function(a, b){
       },
       forceHTTPSDomains: ['i.imgur.com', 'deviantart.com'],
       plugins: {
-        'imgur.com': [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", 'https://'],
+        'imgur.com': [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv|webm))?$/, "i.imgur.com/$1.gif", 'https://'],
         'prntscr.com': [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct", 'https://'],
         'gyazo.com': [/^gyazo.com\/\w+/, "$&/raw"],
         'dropbox.com': [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"],
@@ -8523,7 +8597,7 @@ window.compareVersions = function(a, b){
                 console.log "[p0ne_yt_preview]", "stopped"
                 #ToDo hide YT-options
     
-            addListener API, \chat:image, ({pre, url, onload}) !->
+            addListener API, \p0ne:chat:link, ({pre, url, onload}) !->
             yt = YT_REGEX .exec(url)
             if yt and (yt = yt.1)
                 console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
@@ -8556,7 +8630,7 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var addListener, this$ = this;
         addListener = arg$.addListener;
-        this.test = addListener(_$context, 'chat:plugin', function(d){
+        this.test = addListener(_$context, 'p0ne:chat:plugin', function(d){
           var mentioned, mentions, x;
           if (d.cid && d.uid !== userID && this$._settings.triggerwords.length) {
             mentioned = false;
@@ -8691,8 +8765,10 @@ window.compareVersions = function(a, b){
         });
         replace(Dialog, 'close', function(close_){
           return function(){
-            var this$ = this;
-            this.$el.removeClass('opaque');
+            var ref$, this$ = this;
+            if ((ref$ = this.$el) != null) {
+              ref$.removeClass('opaque');
+            }
             this.animate = $.noop;
             sleep(200, function(){
               close_.call(this$);
@@ -9085,7 +9161,7 @@ window.compareVersions = function(a, b){
       displayName: '☢ Emoji Pack [Google]',
       settings: 'look&feel',
       disabled: true,
-      help: 'Replace all emojis with the one from Google (for Android Lollipop).\n\nEmojis are are the little images that show up e.g. when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>\n\n<small>\nNote: :yellow_heart: <span class="emoji emoji-1f49b"></span> and :green_heart: <span class="emoji emoji-1f49a"></span> look neither yellow nor green with this emoji pack.\n</small>',
+      help: 'Replace all emojis with the one from Google (for Android Lollipop).\n\nEmojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>',
       screenshot: 'https://i.imgur.com/Ef94Csn.png',
       _settings: {
         pack: 'google'
@@ -9094,6 +9170,57 @@ window.compareVersions = function(a, b){
         var loadStyle;
         loadStyle = arg$.loadStyle;
         loadStyle(p0ne.host + "/css/temp." + this._settings.pack + "-emoji.css");
+      }
+    });
+    /*####################################
+    #         CUSTOM BACKGROUND          #
+    ####################################*/
+    module('customBackground', {
+      displayName: 'Custom Background',
+      settings: 'look&feel',
+      help: 'This module lets you change the background image of plug.dj\n\ne.g. a nice collection of background images can be found here <a href="https://imgur.com/a/8RIiu" target=_blank>https://imgur.com/a/8RIiu</a>',
+      _settings: {
+        background: "https://i.imgur.com/k9zVa92.png",
+        booth: "https://i.imgur.com/tzlDl3L.png",
+        scalable: false
+      },
+      disabled: true,
+      setup: function(arg$){
+        this.css = arg$.css;
+        this.updateCSS();
+      },
+      updateCSS: function(){
+        if (isURL(this._settings.background)) {
+          if (this._settings.scalable) {
+            this.css('customBackground', "#app { background: url(" + this._settings.background + ") fixed center center / cover !important; }\n\n.room-background { display: none !important; }\n");
+          } else {
+            this.css('customBackground', "#app { background: transparent !important }\n\n#app .app-right { background: rgba(0,0,0, 0.8) !important; }\n#app #avatars-container::before { content: \"\" !important; }\n#app .room-background { background-image: url(" + this._settings.background + ") !important; display: block !important; }\n");
+          }
+        } else {
+          css('customBackground', "");
+        }
+      },
+      settingsExtra: function($el){
+        var customBackground, $input;
+        customBackground = this;
+        $input = $("<input class=p0ne-settings-input>").val(this._settings.background).on('input', function(){
+          customBackground._settings.background = this.value;
+          customBackground.updateCSS();
+        }).on('focus', function(){
+          var ref$;
+          if ((ref$ = p0ne.modules.p0neSettings) != null) {
+            ref$.$ppW.css({
+              opacity: 0.7
+            });
+          }
+        }).on('blur', function(){
+          var ref$;
+          if ((ref$ = p0ne.modules.p0neSettings) != null) {
+            ref$.$ppW.css({
+              opacity: ""
+            });
+          }
+        }).appendTo($el);
       }
     });
     /*####################################
@@ -9250,10 +9377,10 @@ window.compareVersions = function(a, b){
             styles += "\n/*== images ==*/\n";
             /* custom p0ne stuff */
             if (isURL(d.images.backgroundScalable)) {
-              styles += "#app { background-image: url(" + d.images.background + ") fixed center center / cover }\n";
+              styles += "#app { background: url(" + d.images.background + ") fixed center center / cover }\n.room-background { display: none }\n";
               /* original plug³ stuff */
             } else if (isURL(d.images.background)) {
-              styles += ".room-background { background-image: url(" + d.images.background + ") !important }\n";
+              styles += ".room-background { background-image: url(" + d.images.background + ") !important; }\n";
             }
             if (isURL(d.images.playback) && (typeof roomLoader != 'undefined' && roomLoader !== null) && (typeof Layout != 'undefined' && Layout !== null)) {
               x$ = new Image;
@@ -9345,7 +9472,7 @@ window.compareVersions = function(a, b){
         this._data = {};
       }
     });
-    /*@source customcolors.ls */
+    /*@source p0ne.customcolors.ls */
     window.clear = function(obj){
       var k;
       for (k in obj) {
@@ -9378,9 +9505,6 @@ window.compareVersions = function(a, b){
         }
         l.resolve();
       });
-    }
-    if (!window.colorPicker) {
-      colorPicker = {};
     }
     /*####################################
     #           CUSTOM  COLORS           #
@@ -9508,9 +9632,9 @@ window.compareVersions = function(a, b){
       scopeOrderRole: ['globalCustomRole', 'roomThemeRole', 'vanilla'],
       scopeOrderUser: ['globalCustomUser', 'roomThemeUser'],
       setup: function(arg$){
-        var loadStyle, role, ref$, style, uid, this$ = this;
-        this.css = arg$.css, loadStyle = arg$.loadStyle, this.addListener = arg$.addListener;
-        loadStyle(p0ne.host + "/playground/customcolors.css");
+        var role, ref$, style, uid, d, u, this$ = this;
+        this.css = arg$.css, this.addListener = arg$.addListener;
+        this.users = {};
         this.scopes.vanilla = this.roles;
         this.scopes.globalCustomRole = this._settings.global.roles;
         this.scopes.globalCustomUser = this._settings.global.users;
@@ -9528,23 +9652,42 @@ window.compareVersions = function(a, b){
           style = ref$[role];
           this.roles[role].css = this.calcCSSRole(role);
         }
-        for (uid in this.users) {
-          this.users[uid] = this.calcCSSUser(uid);
+        for (uid in this.scopes.globalCustomUser) {
+          this.users[uid] = {
+            css: this.calcCSSUser(uid)
+          };
         }
         this.updateCSS();
+        d = Date.now() - this.CLEAR_USER_CACHE;
+        for (uid in ref$ = this._settings.users) {
+          u = ref$[uid];
+          if (!this.users[uid] && u.lastUsed < d) {
+            console.log("[customColors] removing " + u.id + " (" + u.username + ") from cache");
+            delete this._settings.users[uid];
+          }
+        }
+      },
+      settingsPanel: function($wrapper){
+        var this$ = this;
+        $wrapper.text("loading…");
+        loadModule('customColorsPicker', p0ne.host + "/scripts/p0ne.customcolors.picker.js?r=1").then(function(ccp){
+          console.log("[ccp]", ccp);
+          ccp.disable().enable();
+        });
       },
       updateCSS: function(){
-        var styles, key, ref$, data;
+        var cpKey, styles, key, ref$, data;
+        cpKey = typeof colorPicker != 'undefined' && colorPicker !== null ? colorPicker.key : void 8;
         styles = "";
         for (key in ref$ = this.roles) {
           data = ref$[key];
-          if (key !== colorPicker.key) {
+          if (key !== cpKey) {
             styles += data.css;
           }
         }
         for (key in ref$ = this.users) {
           data = ref$[key];
-          if (key !== colorPicker.key) {
+          if (key !== cpKey) {
             styles += data.css;
           }
         }
@@ -9556,7 +9699,9 @@ window.compareVersions = function(a, b){
         styles = "/*= " + roleName + " =*/";
         role = this.roles[roleName];
         if (style.color || style.font) {
-          font = style.font || {};
+          font = style.font || {
+            b: true
+          };
           if (role.icon) {
             styles += "#app #user-lists ." + role.icon + " + .name,#app #waitlist ." + role.icon + " + span,#app #user-rollover ." + role.icon + " + span,";
           }
@@ -9639,4758 +9784,3801 @@ window.compareVersions = function(a, b){
           });
         }
         return res;
+      },
+      getRoles: function(uid, user){
+        var that, i$, ref$, len$, role, roomRole, ref1$, results$ = [];
+        if (that = getUser(uid)) {
+          for (i$ = 0, len$ = (ref$ = this._settings.rolesOrder).length; i$ < len$; ++i$) {
+            role = ref$[i$];
+            if (this.roles[role].test(that)) {
+              results$.push(role);
+            }
+          }
+          return results$;
+        } else if (this._settings.users[uid]) {
+          if (that = this.room.userRole[uid] || ((ref$ = staff[uid]) != null ? ref$.role : void 8)) {
+            roomRole = getRank({
+              role: that
+            }, true);
+          }
+          for (i$ = 0, len$ = (ref1$ = this._settings.rolesOrder).length; i$ < len$; ++i$) {
+            role = ref1$[i$];
+            if (in$(role, this._settings.users[uid].roles) || role === roomRole) {
+              results$.push(role);
+            }
+          }
+          return results$;
+        } else {
+          return [];
+        }
       }
     });
-    out$.cc = cc = customColors;
-    return function(fn){
-      if (cc.loading) {
-        return cc.loading.then(fn);
-      } else {
-        return fn();
-      }
-    }(function(){
-      if (typeof customColors_test != 'undefined' && customColors_test !== null) {
-        customColors_test.disable().enable();
-      }
-      /*@source customcolors-cp.ls */
-      $('.colorpicker').remove();
-      /*
-          user data format
-          user = {
-              uid: 00000000
-              color: "#AABBCC"
-              font: {b: true, i: false, u: null /*fallthrough* /}
-              icon: {
-                  url: ""
-                  x: 0px
-                  y: 0px
-              } <OR> "icon-chat-bouncer"
-              badge: {
-                  url: ""
-                  x: 0px
-                  y: 0px
-              } <OR> "bdg-raveb-s04"
-          }
-      
-       */
-      out$.padHex = function(str, digits){
-        digits == null && (digits = 2);
-        while (str.length < digits) {
-          str = "0" + str;
-        }
-        return str;
-      };
-      module('customColors_test', {
-        setup: function(arg$){
-          var addListener, css, $create, $cp, image, $css, tmpCSS, defaultIconURL, $cpp, $un, $contentName, $contentImage, $nameCustomToggles, $newColor, $currentColor, $crosshair, $huePointer, $hex, $rgb, $hsv, $font, currentColor, customColor, color, colorHSV, font, nameCustomMode, $imageCustomToggles, $snapToGrid, $badgeGroup, $imagePicker, $cloak, $image, icon, badge, scale, imageMode, snapToGrid, imageCustomMode, imagePicker, imageEl, urlUpdateTimeout, scope, key, uid, $row, loadData, updateCSSTimeout, updateCSS, test;
-          addListener = arg$.addListener, css = arg$.css, $create = arg$.$create;
-          cc.$el = $('.p0ne-cc-settings').css({
-            top: 270
-          });
-          cc.$el.append(this.$cp = $cp = $('<div class=colorpicker><div class="p0ne-ccp-tabbar"><div class="p0ne-ccp-tab-name">Name</div><div class="p0ne-ccp-tab-icon p0ne-ccp-tab-selected">Icon</div><div class="p0ne-ccp-tab-badge">Badge</div></div><div class="p0ne-ccp-content-name"><div class="p0ne-ccp-group p0ne-ccp-group-custom-toggle"><button class="p0ne-ccp-btn-toggle" data-mode=default>default</button><button class="p0ne-ccp-btn-toggle" data-mode=custom>custom</button></div><div class="p0ne-ccp-group p0ne-ccp-group-picker"><div class="p0ne-ccp-color"><div class="p0ne-cpp-color-overlay"><div class="p0ne-ccp-crosshair"></div></div></div><div class="p0ne-ccp-hue" style="background: url(https://dl.dropboxusercontent.com/u/4217628/plug_p0ne/vendor/colorpicker/images/slider.png); background-size: contain; background-repeat: no-repeat; background-position: center; "><div class="p0ne-ccp-hue-pointer"></div></div></div><div class="p0ne-ccp-group p0ne-ccp-group-hex"><div class="p0ne-ccp-new-color">new</div><div class="p0ne-ccp-current-color">previous</div><div class="p0ne-ccp-field p0ne-ccp-hex"><input type=text maxlength=6 /></div></div><div class="p0ne-ccp-group p0ne-ccp-group-rgb"><div class="p0ne-ccp-field p0ne-ccp-r"><input type=text maxlength=3 /></div><div class="p0ne-ccp-field p0ne-ccp-g"><input type=text maxlength=3 /></div><div class="p0ne-ccp-field p0ne-ccp-b"><input type=text maxlength=3 /></div></div><div class="p0ne-ccp-group p0ne-ccp-group-hsv"><div class="p0ne-ccp-field p0ne-ccp-h"><input type=text maxlength=3 /></div><div class="p0ne-ccp-field p0ne-ccp-s"><input type=text maxlength=3 /></div><div class="p0ne-ccp-field p0ne-ccp-v"><input type=text maxlength=3 /></div></div><div class="p0ne-ccp-group p0ne-ccp-group-btns"><button class="p0ne-ccp-btn-b">b</button><button class="p0ne-ccp-btn-i">i</button><button class="p0ne-ccp-btn-u">u</button><button class="p0ne-ccp-btn-reset">reset</button><button class="p0ne-ccp-btn-save">save</button></div></div><div class="p0ne-ccp-content-image"><div class="p0ne-ccp-group p0ne-ccp-group-custom-toggle"><button class="p0ne-ccp-btn-toggle" data-mode=none>none</button><button class="p0ne-ccp-btn-toggle" data-mode=default>default</button><button class="p0ne-ccp-btn-toggle" data-mode=custom>custom</button><br><label><input type=checkbox class="checkbox p0ne-ccp-snaptogrid" /> snap to grid</label></div><div class="p0ne-ccp-group p0ne-ccp-group-image-picker"><div class="p0ne-ccp-image-preview"><div class="p0ne-ccp-cloak-tl"></div><div class="p0ne-ccp-cloak-tr"></div><div class="p0ne-ccp-cloak-bl"></div><div class="p0ne-ccp-cloak-br"></div></div><div class="p0ne-ccp-image-overview"><div class="p0ne-ccp-image-rect"></div></div></div><div class="p0ne-ccp-group p0ne-ccp-group-image"><div class="p0ne-ccp-field p0ne-ccp-image-url"><input type=text placeholder="plug.dj default" /></div><button class="p0ne-ccp-btn-reset">reset</button><div class="p0ne-ccp-field p0ne-ccp-image-x"><input type=number /></div><div class="p0ne-ccp-field p0ne-ccp-image-y"><input type=number /></div></div><button class="p0ne-ccp-btn-save">save</button><div class="p0ne-ccp-group p0ne-ccp-group-badge"><div class="p0ne-ccp-field p0ne-ccp-image-w"><input type=number /></div><div class="p0ne-ccp-field p0ne-ccp-image-h"><input type=number /></div></div></div></div>'));
-          $css = $create('<style>').appendTo('head');
-          tmpCSS = true;
-          defaultIconURL = getIcon('', true).url;
-          $cp = $('.colorpicker');
-          $cpp = $cp.find('.p0ne-ccp-color');
-          $un = $('.p0ne-cc-user .name:last');
-          $contentName = $cp.find('.p0ne-ccp-content-name');
-          $contentImage = $cp.find('.p0ne-ccp-content-image');
-          addListener($cp, 'click', '.p0ne-ccp-tab-name, .p0ne-ccp-tab-icon, .p0ne-ccp-tab-badge', function(e){
-            var $this;
-            $this = $(this);
-            $this.addClass('p0ne-ccp-tab-selected').siblings().removeClass('p0ne-ccp-tab-selected');
-            if ($this.hasClass('p0ne-ccp-tab-name')) {
-              $contentName.show();
-              $contentImage.hide();
-            } else {
-              $contentName.hide();
-              $contentImage.show();
-              if ($this.hasClass('p0ne-ccp-tab-icon')) {
-                setImageMode('icon');
-              } else {
-                setImageMode('badge');
-              }
-            }
-            return e.preventDefault();
-          });
-          $nameCustomToggles = $contentName.find('.p0ne-ccp-btn-toggle');
-          $newColor = $cp.find('.p0ne-ccp-new-color');
-          $currentColor = $cp.find('.p0ne-ccp-current-color');
-          $crosshair = $cp.find('.p0ne-ccp-crosshair');
-          $huePointer = $cp.find('.p0ne-ccp-hue-pointer');
-          $hex = $cp.find(".p0ne-ccp-hex input");
-          $rgb = {
-            r: $cp.find(".p0ne-ccp-r input"),
-            g: $cp.find(".p0ne-ccp-g input"),
-            b: $cp.find(".p0ne-ccp-b input")
-          };
-          $hsv = {
-            h: $cp.find(".p0ne-ccp-h input"),
-            s: $cp.find(".p0ne-ccp-s input"),
-            v: $cp.find(".p0ne-ccp-v input")
-          };
-          $font = {
-            b: $cp.find('.p0ne-ccp-btn-b'),
-            i: $cp.find('.p0ne-ccp-btn-i'),
-            u: $cp.find('.p0ne-ccp-btn-u')
-          };
-          /*color =
-              r: 0 #+$rgb.r .val!
-              g: 0 #+$rgb.g .val!
-              b: 0 #+$rgb.b .val!
-          colorHSV =
-              h: 0 #+$hsv.h .val!
-              s: 0 #+$hsv.s .val!
-              v: 0 #+$hsv.v .val!
-          font =
-              b: false #$font.b .hasClass \p0ne-ccp-btn-selected
-              i: false #$font.i .hasClass \p0ne-ccp-btn-selected
-              u: false #$font.u .hasClass \p0ne-ccp-btn-selected
-          */
-          addListener($nameCustomToggles, 'click', function(){
-            var $this;
-            $this = $(this);
-            if (!$this.hasClass('selected')) {
-              $nameCustomToggles.removeClass('selected');
-              $this.addClass('selected');
-              switch ($(this).data('mode')) {
-              case 'default':
-                customColor = getHex();
-                $hex.val(currentColor).trigger('input');
-                nameCustomMode = 'default';
-                break;
-              case 'custom':
-                nameCustomMode = 'custom';
-                $hex.val(customColor).trigger('input');
-              }
-              return updateCSS();
-            }
-          });
-          cc.$el.off('mousedown', '.p0ne-ccp-color');
-          onDrag('.p0ne-ccp-color', function(x, y){
-            var ref$;
-            $hsv.s.val(Math.round(((ref$ = 0 > x ? 0 : x) < 150 ? ref$ : 150) * 100 / 150));
-            $hsv.v.val(100 - Math.round(((ref$ = 0 > y ? 0 : y) < 150 ? ref$ : 150) * 100 / 150));
-            return inputHSV();
-          });
-          cc.$el.off('mousedown', '.p0ne-ccp-hue');
-          onDrag('.p0ne-ccp-hue', function(arg$, y){
-            var ref$;
-            $hsv.h.val(colorHSV.h = 360 - Math.round(((ref$ = 0 > y ? 0 : y) < 150 ? ref$ : 150) * 360 / 150));
-            return inputHSV();
-          });
-          addListener($cp, 'input', '.p0ne-ccp-hex input', inputHex);
-          addListener($cp, 'blur', '.p0ne-ccp-hex input', updateUI);
-          addListener($cp, 'input', '.p0ne-ccp-group-rgb input', function(){
-            checkNameCustomMode();
-            color.r = +$rgb.r.val();
-            color.g = +$rgb.g.val();
-            color.b = +$rgb.b.val();
-            return inputRGB();
-          });
-          addListener($cp, 'input', '.p0ne-ccp-group-hsv input', function(){
-            colorHSV.h = +$hsv.h.val();
-            colorHSV.s = +$hsv.s.val();
-            colorHSV.v = +$hsv.v.val();
-            return inputHSV();
-          });
-          addListener($cp, 'click', '.p0ne-ccp-group-btns button', function(e){
-            var $this, btn;
-            $this = $(this);
-            btn = $this.hasClass('p0ne-ccp-btn-b')
-              ? 'b'
-              : $this.hasClass('p0ne-ccp-btn-i')
-                ? 'i'
-                : $this.hasClass('p0ne-ccp-btn-u') ? 'u' : void 8;
-            if (!btn) {
-              return;
-            }
-            if ($this.hasClass('p0ne-ccp-btn-selected')) {
-              font[btn] = false;
-              $this.removeClass('p0ne-ccp-btn-selected p0ne-ccp-btn-default p0ne-ccp-btn-default-selected');
-            } else if (font[btn] = !$this.hasClass('p0ne-ccp-btn-default')) {
-              delete font[btn];
-              $this.addClass('p0ne-ccp-btn-selected');
-              if (font[btn]) {
-                $this.addClass('p0ne-ccp-btn-default-selected');
-              }
-            } else {
-              font[btn] = true;
-              $this.addClass('p0ne-ccp-btn-selected');
-            }
-            updateUI();
-            return e.preventDefault();
-          });
-          addListener($cp, 'click', '.p0ne-ccp-content-name .p0ne-ccp-btn-reset', function(e){
-            var btn, ref$, state;
-            $hex.val(currentColor);
-            inputHex();
-            delete font.b, delete font.i, delete font.u;
-            for (btn in ref$ = font) {
-              state = ref$[btn];
-              if (state) {
-                $font[btn].addClass('p0ne-ccp-btn-selected');
-              } else {
-                $font[btn].removeClass('p0ne-ccp-btn-selected');
-              }
-            }
-            return e.preventDefault();
-          });
-          function inputHSV(){
-            checkNameCustomMode();
-            colorHSV = {
-              h: ~~$hsv.h.val(),
-              s: ~~$hsv.s.val(),
-              v: ~~$hsv.v.val()
-            };
-            color = hsvToRgb(colorHSV);
-            $rgb.r.val(color.r);
-            $rgb.g.val(color.g);
-            $rgb.b.val(color.b);
-            return updateUI(true);
-          }
-          function inputRGB(){
-            checkNameCustomMode();
-            color = {
-              r: ~~$rgb.r.val(),
-              g: ~~$rgb.g.val(),
-              b: ~~$rgb.b.val()
-            };
-            colorHSV = rgbToHsv(color);
-            $hsv.h.val(colorHSV.h);
-            $hsv.s.val(colorHSV.s);
-            $hsv.v.val(colorHSV.v);
-            return updateUI(true);
-          }
-          function inputHex(){
-            var val_, val, res$, i$, to$, char, r, g, b;
-            checkNameCustomMode();
-            val_ = $.trim($hex.val());
-            res$ = [];
-            for (i$ = val_[0] === '#' ? 1 : 0, to$ = val_.length; i$ < to$; ++i$) {
-              char = i$;
-              res$.push(parseInt(val_[char], 16));
-            }
-            val = res$;
-            switch (val.length) {
-            case 1:
-              r = g = b = 16 * val + +val;
-              break;
-            case 2:
-              r = g = b = val;
-              break;
-            case 3:
-              r = 16 * val[0] + +val[0];
-              g = 16 * val[1] + +val[1];
-              b = 16 * val[2] + +val[2];
-              break;
-            case 4:
-              r = 16 * val[0] + +val[1];
-              g = 16 * val[2] + +val[3];
-              b = 0;
-              break;
-            case 5:
-              r = 16 * val[0] + +val[1];
-              g = 16 * val[2] + +val[3];
-              b = 16 * val[4];
-              break;
-            default:
-              r = 16 * val[0] + +val[1];
-              g = 16 * val[2] + +val[3];
-              b = 16 * val[4] + +val[5];
-            }
-            color = {
-              r: r,
-              g: g,
-              b: b
-            };
-            $rgb.r.val(r);
-            $rgb.g.val(g);
-            $rgb.b.val(b);
-            colorHSV = rgbToHsv(color);
-            $hsv.h.val(colorHSV.h);
-            $hsv.s.val(colorHSV.s);
-            $hsv.v.val(colorHSV.v);
-            return updateUI(false);
-          }
-          function getHex(){
-            return "" + padHex(color.r.toString(16)) + "" + padHex(color.g.toString(16)) + "" + padHex(color.b.toString(16)) + "";
-          }
-          function updateUI(updateHex){
-            var hexVal;
-            hexVal = getHex();
-            if (updateHex) {
-              $hex.val(hexVal.toUpperCase());
-            }
-            hexVal = "#" + hexVal;
-            $crosshair.css({
-              left: colorHSV.s * 150 / 100,
-              top: 150 - colorHSV.v * 150 / 100
-            });
-            $huePointer.css({
-              top: 150 - colorHSV.h * 150 / 360
-            });
-            $cpp.css({
-              background: "hsl(" + colorHSV.h + ", 100%, 50%)"
-            });
-            $newColor.css({
-              background: hexVal
-            });
-            return updateCSS();
-          }
-          function checkNameCustomMode(){
-            if (nameCustomMode === 'default') {
-              nameCustomMode = 'custom';
-              return $nameCustomToggles.removeClass('selected').filter('[data-mode=custom]').addClass('selected');
-            }
-          }
-          $imageCustomToggles = $contentImage.find('.p0ne-ccp-btn-toggle');
-          $snapToGrid = $contentImage.find('.p0ne-ccp-snaptogrid');
-          $badgeGroup = $cp.find('.p0ne-ccp-group-badge');
-          $imagePicker = {
-            preview: $cp.find('.p0ne-ccp-image-preview'),
-            overview: $cp.find('.p0ne-ccp-image-overview'),
-            rect: $cp.find('.p0ne-ccp-image-rect')
-          };
-          $cloak = {
-            tl: $cp.find('.p0ne-ccp-cloak-tl'),
-            tr: $cp.find('.p0ne-ccp-cloak-tr'),
-            bl: $cp.find('.p0ne-ccp-cloak-bl'),
-            br: $cp.find('.p0ne-ccp-cloak-br')
-          };
-          $image = {
-            url: $cp.find(".p0ne-ccp-image-url input"),
-            x: $cp.find(".p0ne-ccp-image-x input"),
-            y: $cp.find(".p0ne-ccp-image-y input"),
-            w: $cp.find(".p0ne-ccp-image-w input"),
-            h: $cp.find(".p0ne-ccp-image-h input")
-          };
-          snapToGrid = {
-            w_2: 5,
-            h_2: 5
-          };
-          imageCustomMode = {};
-          imagePicker = {
-            marginLeft: 0,
-            marginTop: 0
-          };
-          imageEl = new Image;
-          imageEl.onload = updateImage;
-          imageEl.onerror = updateImageOnError;
-          addListener($imageCustomToggles, 'click', function(){
-            var $this;
-            $this = $(this);
-            if (!$this.hasClass('selected')) {
-              $imageCustomToggles.removeClass('selected');
-              $this.addClass('selected');
-              switch (imageCustomMode[imageMode] = $(this).data('mode')) {
-              case 'none':
-                $contentImage.addClass('disabled');
-                return $contentImage.find('input').attr('disabled', true);
-              case 'default':
-                $contentImage.removeClass('disabled');
-                $contentImage.find('input').attr('disabled', null);
-                return setImageMode('default');
-              case 'custom':
-                $contentImage.removeClass('disabled');
-                $contentImage.find('input').attr('disabled', null);
-                return setImageMode('custom');
-              }
-            }
-          });
-          addListener($snapToGrid, 'click', function(){
-            console.log("snapToGrid", this.checked);
-            snapToGrid = this.checked ? {
-              w_2: ~~(image.w / 2 / 5) * 5,
-              h_2: ~~(image.h / 2 / 5) * 5
-            } : false;
-          });
-          cc.$el.off('mousedown', '.p0ne-ccp-image-overview');
-          onDrag('.p0ne-ccp-image-overview', function(x, y, e){
-            if (checkImageCustomMode()) {
-              return;
-            }
-            x = ~~((x - imagePicker.marginLeft) / scale) - image.w / 2;
-            y = ~~((y - imagePicker.marginTop) / scale) - image.h / 2;
-            if (snapToGrid) {
-              x = Math.round(x / snapToGrid.w_2) * snapToGrid.w_2;
-              y = Math.round(y / snapToGrid.h_2) * snapToGrid.h_2;
-            }
-            updateImagePos(x, y);
-            return updateImageVal();
-          });
-          cc.$el.off('mousedown', '.p0ne-ccp-image-preview');
-          onDrag('.p0ne-ccp-image-preview', function(x, y, e){
-            if (checkImageCustomMode()) {
-              return;
-            }
-            if (snapToGrid) {
-              x = Math.round(x / snapToGrid.w_2) * snapToGrid.w_2;
-              y = Math.round(y / snapToGrid.h_2) * snapToGrid.h_2;
-            }
-            updateImagePos(-x, -y);
-            updateImageVal();
-          }, function(e, drag_pos){
-            drag_pos.left = e.pageX + image.x;
-            drag_pos.top = e.pageY + image.y;
-          });
-          addListener($cp, 'input', '.p0ne-ccp-group-image input', function(){
-            var x, y, this$ = this;
-            if (checkImageCustomMode()) {
-              return;
-            }
-            console.log("input", this, this.value);
-            if ($(this).parent().hasClass('p0ne-ccp-image-url')) {
-              clearTimeout(urlUpdateTimeout);
-              console.log(">", this.value);
-              return urlUpdateTimeout = sleep(500, function(){
-                console.log(">>", this$.value);
-                return loadImage(this$.value);
-              });
-            } else {
-              x = +$image.x.val();
-              y = +$image.y.val();
-              if (isFinite(x) && isFinite(y)) {
-                return updateImagePos(x, y);
-              }
-            }
-          });
-          addListener($cp, 'input', '.p0ne-ccp-group-badge input', function(){
-            var w, h;
-            if (checkImageCustomMode()) {
-              return;
-            }
-            w = ~~$image.w.val();
-            h = ~~$image.h.val();
-            if (w > 0 && h > 0) {
-              return updateImageSize(w, h);
-            }
-          });
-          addListener($cp, 'click', '.p0ne-ccp-content-image .p0ne-ccp-btn-reset', function(e){
-            var k;
-            if (imageCustomMode[imageMode] === 'custom') {
-              for (k in image) {
-                delete image[k];
-              }
-              if (image === icon) {
-                setImageMode('icon');
-              } else {
-                setImageMode('badge');
-              }
-            }
-            return e.preventDefault();
-          });
-          function updateImagePos(x, y){
-            var ref$, ref1$, ref2$, x2, y2;
-            if (image.srcW) {
-              x = (ref$ = 0 > (ref2$ = ~~x) ? 0 : ref2$) < (ref1$ = image.srcW - image.w) ? ref$ : ref1$;
-              y = (ref$ = 0 > (ref2$ = ~~y) ? 0 : ref2$) < (ref1$ = image.srcH - image.h) ? ref$ : ref1$;
-            }
-            x2 = x / imagePicker.scale - 50 + image.w / (2 * imagePicker.scale);
-            y2 = y / imagePicker.scale - 100 + image.h / (2 * imagePicker.scale);
-            $imagePicker.preview.css({
-              backgroundPosition: (-x2) + "px " + (-y2) + "px"
-            });
-            $imagePicker.rect.css({
-              left: (x2 * scale + imagePicker.marginLeft) * imagePicker.scale,
-              top: (y2 * scale + imagePicker.marginTop) * imagePicker.scale
-            });
-            image.x = x;
-            image.y = y;
-            return updateCSS();
-          }
-          function updateImageVal(){
-            $image.x.val(image.x);
-            $image.y.val(image.y);
-            if (image === badge) {
-              $image.w.val(image.w);
-              return $image.h.val(image.h);
-            }
-          }
-          function updateImageSize(w, h){
-            var w_2, h_2, w_px, h_px;
-            image.w = w;
-            image.h = h;
-            $image.w.val(w);
-            $image.h.val(h);
-            imagePicker.scale = Math.ceil((w > h ? w : h) / 100);
-            w_2 = ~~(image.w / (imagePicker.scale * 2));
-            h_2 = ~~(image.h / (imagePicker.scale * 2));
-            console.log("updating size", w, h, imagePicker.scale + "x");
-            imagePicker.rectW = 100 * scale * imagePicker.scale;
-            imagePicker.rectH = 200 * scale * imagePicker.scale;
-            if (snapToGrid) {
-              snapToGrid = {
-                w_2: ~~(w / 2 / 5) * 5,
-                h_2: ~~(h / 2 / 5) * 5
-              };
-            }
-            w_px = +(image.w / imagePicker.scale % 2 === 1);
-            h_px = +(image.h / imagePicker.scale % 2 === 1);
-            $cloak.tl.css({
-              width: 50 + w_2 + w_px,
-              height: 99 - h_2
-            });
-            $cloak.tr.css({
-              width: 49 - w_2,
-              height: 100 + h_2 + h_px,
-              left: 50 + w_2 + w_px
-            });
-            $cloak.bl.css({
-              width: 49 - w_2,
-              height: 100 + h_2,
-              top: 100 - h_2
-            });
-            $cloak.br.css({
-              width: 50 + w_2,
-              height: 99 - h_2,
-              top: 100 + h_2 + h_px,
-              left: 50 - w_2
-            });
-            if (image.srcW) {
-              updateImagePicker();
-            }
-            updateImagePos(image.x, image.y);
-            return updateCSS();
-          }
-          function updateImagePicker(){
-            console.log("[updateImagePicker]", imagePicker.rectW, imagePicker.rectH);
-            $imagePicker.preview.css({
-              backgroundSize: image.srcW / imagePicker.scale + "px " + image.srcH / imagePicker.scale + "px"
-            });
-            return $imagePicker.rect.css({
-              width: imagePicker.rectW,
-              height: imagePicker.rectH
-            });
-          }
-          function setImageMode(mode){
-            switch (mode) {
-            case 'icon':
-              imageMode = 'icon';
-              image = icon;
-              $badgeGroup.hide();
-              break;
-            case 'badge':
-              imageMode = 'badge';
-              image = badge;
-              $badgeGroup.show();
-              break;
-            case 'default':
-              if (image['default']) {
-                imageCustomMode[imageMode] = 'default';
-                image = image['default'];
-              }
-              break;
-            case 'custom':
-              if (image.custom) {
-                imageCustomMode[imageMode] = 'custom';
-                image = image.custom;
-              }
-            }
-            console.log("set image mode", mode, image);
-            if (imageCustomMode[imageMode] === 'none') {
-              $contentImage.addClass('disabled');
-            } else {
-              $contentImage.removeClass('disabled');
-            }
-            $imageCustomToggles.removeClass('selected').filter("[data-mode=" + imageCustomMode[imageMode] + "]").addClass('selected');
-            loadImage(image.url);
-            updateImageVal();
-            return updateCSS();
-          }
-          function loadImage(url){
-            if (!url) {
-              return console.error("invalid image URL: " + url);
-            } else {
-              console.log("loading image " + url);
-              image.url = url;
-              if (url !== imageEl.src) {
-                $image.url.val(image.url || defaultIconURL);
-                imageEl.isLoaded = false;
-                imageEl.src = url;
-                return true;
-              } else {
-                updateImage.call(imageEl);
-                return false;
-              }
-            }
-          }
-          function updateImage(){
-            var ref$, ref1$;
-            image.isLoaded = true;
-            image.src_ = image.src;
-            image.srcW = this.width;
-            image.srcH = this.height;
-            if (image.src === $image.url.val()) {
-              $image.url.removeClass('error');
-            }
-            scale = (ref$ = 100 / this.width) < (ref1$ = 200 / this.height) ? ref$ : ref1$;
-            imagePicker = {
-              rectW: 100 * scale,
-              rectH: 200 * scale,
-              marginLeft: 50 - this.width * scale / 2,
-              marginTop: 100 - this.height * scale / 2
-            };
-            updateImagePos(image.x, image.y);
-            updateImageSize(image.w, image.h);
-            $imagePicker.preview.css({
-              backgroundImage: "url(" + this.src + ")"
-            });
-            $imagePicker.overview.css({
-              backgroundImage: "url(" + this.src + ")"
-            });
-            return updateCSS();
-          }
-          function updateImageOnError(){
-            if (image.src !== '') {
-              $image.url.addClass('error');
-              return console.warn("error loading image", image.src);
-            }
-          }
-          function checkImageCustomMode(){
-            if (imageCustomMode[imageMode] === 'default') {
-              image = import$(image.custom, image);
-              imageCustomMode[imageMode] = 'custom';
-              return $imageCustomToggles.removeClass('selected').filter('[data-mode=custom]').addClass('selected');
-            } else if (imageCustomMode[imageMode] === 'none') {
-              return true;
-            }
-          }
-          this.loadData = loadData = function(scopeName, key_, $row_){
-            /* note: the reason we clone$ the variables (font, icon, badge)
-             * is so that the initial values are stored in the prototype of the
-             * variables, not the in variables themselves
-             * this way the reset button can delete the custom properties
-             * which will than default back to the initial values
-             */
-            var data, styleDefault, iconTemplate, badgeTemplate, ref$, err, btn, ref1$, state;
-            this.key = key = key_;
-            scope = cc.scopes[scopeName];
-            data = scope[key];
-            $row = $row_;
-            console.log("loading data", scopeName, key, data);
-            if (key in cc.roles) {
-              uid = 0;
-              $cp.addClass('p0ne-ccp-nobadge');
-              if (imageMode === 'badge') {
-                $cp.find('.p0ne-ccp-tab-icon').addClass('p0ne-ccp-tab-selected').siblings().removeClass('p0ne-ccp-tab-selected');
-              }
-            } else {
-              uid = key;
-              $cp.removeClass('p0ne-ccp-nobadge');
-            }
-            delete scope[key];
-            try {
-              if (uid) {
-                styleDefault = customColors.getUserStyle(key, true);
-              } else {
-                styleDefault = customColors.getRoleStyle(key, true);
-              }
-              console.log("styleDefault", styleDefault);
-              iconTemplate = function(){};
-              switch (typeof styleDefault.icon) {
-              case 'string':
-                imageCustomMode.icon = 'default';
-                iconTemplate.prototype['default'] = getIcon(styleDefault.icon, true);
-                break;
-              case 'object':
-                imageCustomMode.icon = 'default';
-                iconTemplate.prototype['default'] = styleDefault.icon;
-                break;
-              default:
-                imageCustomMode.icon = 'none';
-                iconTemplate.prototype['default'] = {
-                  url: defaultIconURL,
-                  x: 105,
-                  y: 350
-                };
-              }
-              badgeTemplate = function(){};
-              if (uid) {
-                switch (typeof styleDefault.badge) {
-                case 'string':
-                  imageCustomMode.badge = 'default';
-                  badgeTemplate.prototype['default'] = getIcon("bdg bdg-" + styleDefault.badge + " " + (ref$ = styleDefault.badge)[ref$.length - 1], true);
-                  badgeTemplate.prototype['default'].w = badgeTemplate.prototype['default'].h = 30;
-                  break;
-                case 'object':
-                  imageCustomMode.badge = 'default';
-                  badgeTemplate.prototype['default'] = styleDefault.badge;
-                  break;
-                default:
-                  imageCustomMode.badge = 'none';
-                  badgeTemplate.prototype['default'] = {
-                    'default': true,
-                    disabled: true,
-                    w: 30,
-                    h: 30
-                  };
-                }
-              } else {
-                imageCustomMode.badge = 'none';
-                badgeTemplate.prototype['default'] = {};
-              }
-            } catch (e$) {
-              err = e$;
-              console.error("failed to create icon or badge template", err.messageAndStack);
-            }
-            scope[key] = data;
-            if (data.color) {
-              nameCustomMode = 'custom';
-              $hex.val(currentColor = data.color.substr(1));
-            } else {
-              nameCustomMode = 'default';
-              $hex.val(currentColor = (ref$ = styleDefault.color) != null ? ref$.substr(1) : void 8);
-            }
-            customColor = currentColor;
-            font = {
-              b: true,
-              i: false,
-              u: false
-            };
-            for (btn in ref1$ = data.font) {
-              state = ref1$[btn];
-              if (font[btn] = state) {
-                $font[btn].addClass('p0ne-ccp-btn-selected');
-              } else {
-                $font[btn].removeClass('p0ne-ccp-btn-selected');
-              }
-            }
-            font = clone$(font);
-            console.log("typeof data.icon", typeof data.icon);
-            switch (typeof data.icon) {
-            case 'boolean':
-              imageCustomMode.icon = 'none';
-              // fallthrough
-            case 'undefined':
-              import$(iconTemplate.prototype, iconTemplate.prototype['default']);
-              break;
-            case 'string':
-              imageCustomMode.icon = 'custom';
-              import$(iconTemplate.prototype, getIcon(data.icon, true));
-              break;
-            case 'object':
-              imageCustomMode.icon = 'custom';
-              import$(iconTemplate.prototype, data.icon);
-            }
-            iconTemplate.prototype.w = iconTemplate.prototype.h = iconTemplate.prototype['default'].w = iconTemplate.prototype['default'].h = 15;
-            icon = iconTemplate.prototype['default'].custom = new iconTemplate;
-            if (imageCustomMode.icon !== 'custom') {
-              icon = icon['default'];
-            }
-            console.log("typeof data.badge", typeof data.badge);
-            switch (typeof data.badge) {
-            case 'boolean':
-              imageCustomMode.badge = 'custom';
-              // fallthrough
-            case 'undefined':
-              import$(badgeTemplate.prototype, badgeTemplate.prototype['default']);
-              /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
-              getUserData data.uid, (d) ->
-                  console.log "[customColors] loaded user data", data.uid, data.name, d
-                  badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
-                  badgeTemplate::default = true
-                  badgeTemplate::w = badgeTemplate::h = 30px*/
-              break;
-            case 'string':
-              imageCustomMode.badge = 'custom';
-              import$(badgeTemplate.prototype, getIcon("bdg bdg-" + data.badge + " " + (ref1$ = data.badge)[ref1$.length - 1], true));
-              badgeTemplate.prototype.w = badgeTemplate.prototype.h = 30;
-              break;
-            case 'object':
-              imageCustomMode.badge = 'custom';
-              import$(badgeTemplate.prototype, data.badge);
-            }
-            badge = badgeTemplate.prototype['default'].custom = new badgeTemplate;
-            if (imageCustomMode.badge !== 'custom') {
-              badge = badge['default'];
-            }
-            if (cc.$el.find('.p0ne-ccp-tab-icon').hasClass('p0ne-ccp-tab-selected')) {
-              setImageMode('icon');
-            } else if (cc.$el.find('.p0ne-ccp-tab-badge').hasClass('p0ne-ccp-tab-selected')) {
-              setImageMode('badge');
-            }
-            console.log("imageCustomMode", imageCustomMode.icon, imageCustomMode.badge);
-            $nameCustomToggles.removeClass('selected').filter("[data-mode=" + nameCustomMode + "]").addClass('selected');
-            inputHex();
-            $currentColor.css({
-              background: "#" + getHex()
-            });
-            $snapToGrid.attr('checked', false).click();
-            $cp.show();
-          };
-          function rgbToHsv(rgb){
-            var hsv, min, ref$, ref1$, ref2$, ref3$, max, delta;
-            hsv = {
-              h: 0,
-              s: 0,
-              v: 0
-            };
-            min = (ref$ = (ref2$ = rgb.r) < (ref3$ = rgb.g) ? ref2$ : ref3$) < (ref1$ = rgb.b) ? ref$ : ref1$;
-            max = (ref$ = (ref2$ = rgb.r) > (ref3$ = rgb.g) ? ref2$ : ref3$) > (ref1$ = rgb.b) ? ref$ : ref1$;
-            delta = max - min;
-            hsv.v = max;
-            hsv.s = max !== 0 ? 255 * delta / max : 0;
-            if (hsv.s !== 0) {
-              if (rgb.r === max) {
-                hsv.h = (rgb.g - rgb.b) / delta;
-              } else if (rgb.g === max) {
-                hsv.h = 2 + (rgb.b - rgb.r) / delta;
-              } else {
-                hsv.h = 4 + (rgb.r - rgb.g) / delta;
-              }
-            } else {
-              hsv.h = -1;
-            }
-            hsv.h = ~~(hsv.h * 60);
-            if (hsv.h < 0) {
-              hsv.h += 360;
-            }
-            hsv.s = ~~(hsv.s * 100 / 255);
-            hsv.v = ~~(hsv.v * 100 / 255);
-            return hsv;
-          }
-          /*
-          very boredom, such fancy code, wow
-          function rgbToHsvDoge(rgb) {
-              var hsv, min, max, delta
-              hsv = {h: 0- -0, s: 0*0+~~-0-~~+0*0, v: 0+ +0}
-              min = (min = rgb.r < rgb.g ? rgb.r : rgb.g) < rgb.b ? min : rgb.b
-              max = (max = rgb.r > rgb.g ? rgb.r : rgb.g) > rgb.b ? max : rgb.b
-              delta = max - min
-              hsv.v = max
-              hsv.s = max != 1- - -1 ? - -~-(2<<9>>2) * delta / max : 1+ - +1
-              if (0-~~-0 == hsv.s == 0<0>0) {
-                  if (rgb.r == max)
-                      hsv.h = ~-2 - -     (rgb.g -~~- - -~~- rgb.b) / delta - ~-2
-                  else if (rgb.g == max)
-                      hsv.h = ~-4 - - (rgb.b - -~~- - - - -~~- - rgb.r) / delta - ~-~-3
-                  else
-                      hsv.h = ~-5 - -     (rgb.r -~~- - -~~- rgb.g) / delta - ~-1
-              } else {
-                  hsv.h = 0 +-~~-~~-+1+-~~-~~-+ 0
-              }
-              hsv.h *= 0 +-~~-+ 60 +-~~-+ 0
-              if (hsv.h < 0+~~+0)
-                  hsv.h += (3<<10>>3) - (3<<6>>3)
-              hsv.s *= (0 -~100 + + ~ + + 001-~ 0) / - -~-(4<<10>>4)
-              hsv.v *= (0 -~100 - - ~ - - 001-~ 0) / - -~-(8>>3<<8)
-              return hsv
-          }
-           */
-          function hsvToRgb(hsv){
-            var rgb, h, s, v, t1, t2, t3;
-            rgb = {};
-            h = hsv.h;
-            s = hsv.s * 255 / 100;
-            v = hsv.v * 255 / 100;
-            if (s === 0) {
-              rgb.r = rgb.g = rgb.b = v;
-            } else {
-              t1 = v;
-              t2 = (255 - s) * v / 255;
-              t3 = (t1 - t2) * (h % 60) / 60;
-              if (h === 360) {
-                h = 0;
-              }
-              if (h < 60) {
-                rgb.r = ~~t1;
-                rgb.b = ~~t2;
-                rgb.g = ~~(t2 + t3);
-              } else if (h < 120) {
-                rgb.g = ~~t1;
-                rgb.b = ~~t2;
-                rgb.r = ~~(t1 - t3);
-              } else if (h < 180) {
-                rgb.g = ~~t1;
-                rgb.r = ~~t2;
-                rgb.b = ~~(t2 + t3);
-              } else if (h < 240) {
-                rgb.b = ~~t1;
-                rgb.r = ~~t2;
-                rgb.g = ~~(t1 - t3);
-              } else if (h < 300) {
-                rgb.b = ~~t1;
-                rgb.g = ~~t2;
-                rgb.r = ~~(t2 + t3);
-              } else if (h < 360) {
-                rgb.r = ~~t1;
-                rgb.g = ~~t2;
-                rgb.b = ~~(t1 - t3);
-              } else {
-                rgb.r = 0;
-                rgb.g = 0;
-                rgb.b = 0;
-              }
-            }
-            return rgb;
-          }
-          updateCSS = function(){
-            clearTimeout(updateCSSTimeout);
-            return updateCSSTimeout = sleep(200, function(){
-              var badge_, style;
-              badge_ = badge[imageCustomMode.badge] || badge;
-              if (!('srcW' in badge_)) {
-                badge_ = void 8;
-              }
-              style = cc[uid ? 'calcCSSUser' : 'calcCSSRole'](key, {
-                color: "#" + getHex(),
-                font: font,
-                icon: icon[imageCustomMode.icon] || icon,
-                badge: badge_
-              });
-              return $css.text(style);
-            });
-          };
-          this.close = function(){
-            $css.text("");
-            $cp.hide();
-          };
-          this.save = function(){
-            var style, hex, i$, ref$, len$, k, hasCustomFont, icon_, hasCustomIcon, badge_, hasCustomBadge, err;
-            if (key) {
-              try {
-                style = scope[key];
-                hex = getHex();
-                if (hex !== currentColor) {
-                  style.color = "#" + hex;
-                } else {
-                  delete style.color;
-                }
-                style.font = {
-                  b: true,
-                  i: false,
-                  u: false
-                };
-                for (i$ = 0, len$ = (ref$ = ['b', 'i', 'u']).length; i$ < len$; ++i$) {
-                  k = ref$[i$];
-                  if (font.hasOwnProperty(k)) {
-                    hasCustomFont = true;
-                    style.font[k] = font[k];
-                  }
-                }
-                if (!hasCustomFont) {
-                  delete style.font;
-                }
-                switch (imageCustomMode.icon) {
-                case 'custom':
-                  icon_ = icon[imageCustomMode.icon] || icon;
-                  for (i$ = 0, len$ = (ref$ = ['url', 'x', 'y']).length; i$ < len$; ++i$) {
-                    k = ref$[i$];
-                    if (icon_.hasOwnProperty(k)) {
-                      hasCustomIcon = true;
-                      style.icon = {
-                        url: icon_.url,
-                        x: icon_.x,
-                        y: icon_.y
-                      };
-                      break;
-                    }
-                  }
-                  if (!hasCustomIcon) {
-                    delete style.icon;
-                  }
-                  break;
-                case 'default':
-                  delete style.icon;
-                  break;
-                case 'none':
-                  if (uid || cc.roles[key].icon) {
-                    style.icon = false;
-                  }
-                }
-                switch (uid && imageCustomMode.badge) {
-                case 'custom':
-                  badge_ = badge[imageCustomMode.badge] || badge;
-                  for (i$ = 0, len$ = (ref$ = ['url', 'x', 'y', 'w', 'h']).length; i$ < len$; ++i$) {
-                    k = ref$[i$];
-                    if (badge_.hasOwnProperty(k)) {
-                      hasCustomBadge = true;
-                      style.badge = {
-                        url: badge_.url,
-                        x: badge_.x,
-                        y: badge_.y,
-                        w: badge_.w,
-                        h: badge_.h,
-                        srcW: badge_.srcW,
-                        srcH: badge_.srcH
-                      };
-                      break;
-                    }
-                  }
-                  if (!hasCustomBadge) {
-                    delete style.badge;
-                  }
-                  break;
-                case 'default':
-                  delete style.badge;
-                  break;
-                case 'none':
-                  style.badge = false;
-                }
-                /*$row .html "<div class=p0ne-cc-row>
-                        #{createBadge style.badge}
-                        <div class=p0ne-cc-name>
-                            #{createIcon style.icon}
-                            #{createName style, style.name}
-                            <i class='icon icon-clear-input p0ne-cc-clear-icon'></i>
-                            <div class=p0ne-cc-userid>#{style.uid}</div>
-                        </div>
-                    </div>"*/
-                $css.text("");
-                if (uid) {
-                  cc.users[uid].css = cc.calcCSSUser(uid);
-                } else {
-                  cc.roles[key].css = cc.calcCSSRole(key);
-                }
-                cc.updateCSS();
-                tmpCSS = true;
-                /*if not tmpCSS
-                    tmpCSS := true
-                    $css .text ""
-                    css \customColors_test, $css.text!*/
-              } catch (e$) {
-                err = e$;
-                console.error("Error while saving custom colors for " + key, err.messageAndStack);
-              }
-            }
-          };
-          out$.test = test = function(){
-            return {
-              image: image,
-              defaultIconURL: defaultIconURL,
-              currentColor: currentColor,
-              customColor: customColor,
-              color: color,
-              colorHSV: colorHSV,
-              font: font,
-              nameCustomMode: nameCustomMode,
-              icon: icon,
-              badge: badge,
-              scale: scale,
-              imageMode: imageMode,
-              imageCustomMode: imageCustomMode,
-              imagePicker: imagePicker,
-              imageEl: imageEl,
-              scope: scope,
-              key: key,
-              uid: uid,
-              snapToGrid: snapToGrid
-            };
-          };
-          /*
-          loadData {}, do
-              name: "MᗣD Pᗣᗧ•••MᗣN"
-              uid: 3947647 # MᗣD Pᗣᗧ•••MᗣN
-              #uid: 4103672 # The Sensational Stallion
-              roles: <[ manager ]>
-              badge:
-                  url: "http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png"
-                  x:  0px
-                  y:  0px
-                  w: 30px
-                  h: 30px
-                  srcW: 30px
-                  srcH: 30px
-              color: \#D35w
-              font: {+b, -i, +u}
-              icon:
-                  url: "https://cdn.plug.dj/_/static/images/icons.d8b5eb442b3acb5ccfbbe2541b9db0756e45beba.png" # DUMMY
-                  x:  15px
-                  y: 365px
-              badge:
-                  url: "https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png" # ponies
-                  x: 140px
-                  y: 210px
-                  w:  70px
-                  h:  70px
-                  srcW: 280px
-                  srcH: 700px
-              */
-          out$.loadData = loadData;
-        }
-      });
-      cc.$el.find('.p0ne-cc-row.selected').click();
-      /*@source p0ne.song-notif.ls */
-      /**
-       * get fancy song notifications in the chat (with preview thumbnail, description, buttons, …)
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #             SONG NOTIF             #
-      ####################################*/
-      module('songNotif', {
-        require: ['chatDomEvents'],
-        optional: ['_$context', 'chat', 'users', 'database', 'auxiliaries', 'app', 'popMenu'],
-        settings: 'base',
-        displayName: 'Chat Song Notifications',
-        help: 'Shows notifications for playing songs in the chat.\nBesides the songs\' name, it also features a thumbnail and some extra buttons.\n\nBy clicking on the song\'s or author\'s name, a search on plug.dj for that name will be started, to easily find similar tracks.\n\nBy hovering the notification and clicking "description" the songs description will be loaded.\nYou can click anywhere on it to close it again.',
-        persistent: ['lastMedia', '$div'],
-        setup: function(arg$, arg1$, module_){
-          var addListener, $create, addCommand, css, that, $description, this$ = this;
-          addListener = arg$.addListener, $create = arg$.$create, this.$createPersistent = arg$.$createPersistent, addCommand = arg$.addCommand, css = arg$.css;
-          this.$lastNotif = $();
-          this.$div || (this.$div = $cms().find('.p0ne-song-notif:last'));
-          addListener(API, 'advance', bind$(this, 'callback'));
-          if (_$context) {
-            addListener(_$context, 'room:joined', function(){
-              this$.callback({
-                media: API.getMedia(),
-                dj: API.getDJ()
-              });
-            });
-          }
-          addListener(API, 'modSkip', function(modUsername){
-            var that, modID;
-            console.info("[API.modSkip]", modUsername);
-            if (that = getUser(modUsername)) {
-              modID = "data-uid='" + that.id + "'";
-            } else {
-              modID = "";
-            }
-            this$.$lastNotif.find('.timestamp').after($("<div class='song-skipped un' " + modID + ">").text(modUsername));
-          });
-          loadStyle(p0ne.host + "/css/p0ne.notif.css?r=18");
-          if (that = API.getMedia()) {
-            that.image = httpsify(that.image);
-            this.callback({
-              media: that,
+    /*@source p0ne.song-notif.ls */
+    /**
+     * get fancy song notifications in the chat (with preview thumbnail, description, buttons, …)
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #             SONG NOTIF             #
+    ####################################*/
+    module('songNotif', {
+      require: ['chatDomEvents'],
+      optional: ['_$context', 'chat', 'users', 'database', 'auxiliaries', 'app', 'popMenu'],
+      settings: 'base',
+      displayName: 'Chat Song Notifications',
+      help: 'Shows notifications for playing songs in the chat.\nBesides the songs\' name, it also features a thumbnail and some extra buttons.\n\nBy clicking on the song\'s or author\'s name, a search on plug.dj for that name will be started, to easily find similar tracks.\n\nBy hovering the notification and clicking "description" the songs description will be loaded.\nYou can click anywhere on it to close it again.',
+      persistent: ['lastMedia', '$div'],
+      setup: function(arg$, arg1$, module_){
+        var addListener, $create, addCommand, css, that, $description, this$ = this;
+        addListener = arg$.addListener, $create = arg$.$create, this.$createPersistent = arg$.$createPersistent, addCommand = arg$.addCommand, css = arg$.css;
+        this.$lastNotif = $();
+        this.$div || (this.$div = $cms().find('.p0ne-song-notif:last'));
+        addListener(API, 'advance', bind$(this, 'callback'));
+        if (_$context) {
+          addListener(_$context, 'room:joined', function(){
+            this$.callback({
+              media: API.getMedia(),
               dj: API.getDJ()
             });
-          }
-          addListener(_$context, 'RestrictedSearchEvent:search', function(){
-            snooze();
           });
-          if (typeof popMenu != 'undefined' && popMenu !== null) {
-            addListener(chatDomEvents, 'click', '.song-add', function(){
-              var $el, $notif, id, format, msgOffset, obj;
-              $el = $(this);
-              $notif = $el.closest('.p0ne-song-notif');
-              id = $notif.data('id');
-              format = $notif.data('format');
-              console.log("[add from notif]", $notif, id, format);
-              msgOffset = $notif.offset();
-              $el.offset = function(){
-                return {
-                  left: msgOffset.left + 17,
-                  top: msgOffset.top + 18
-                };
-              };
-              obj = {
-                id: id,
-                format: 1
-              };
-              obj.get = function(name){
-                return this[name];
-              };
-              obj.media = obj;
-              popMenu.isShowing = false;
-              popMenu.show($el, [obj]);
-            });
+        }
+        addListener(API, 'modSkip', function(modUsername){
+          var that, modID;
+          console.info("[API.modSkip]", modUsername);
+          if (that = getUser(modUsername)) {
+            modID = "data-uid='" + that.id + "'";
           } else {
-            css('songNotificationsAdd', '.song-add {display:none}');
+            modID = "";
           }
-          addListener(chatDomEvents, 'click', '.song-author', function(){
-            mediaSearch(this.textContent);
+          this$.$lastNotif.find('.timestamp').after($("<div class='song-skipped un' " + modID + ">").text(modUsername));
+        });
+        loadStyle(p0ne.host + "/css/p0ne.notif.css?r=18");
+        if (that = API.getMedia()) {
+          that.image = httpsify(that.image);
+          this.callback({
+            media: that,
+            dj: API.getDJ()
           });
-          $description = $();
-          addListener(chatDomEvents, 'click', '.song-description-btn', function(e){
-            var $notif, cid, format, that;
-            try {
-              if ($description) {
-                hideDescription();
-              }
-              $description = $(this);
-              $notif = $description.closest('.p0ne-song-notif');
-              cid = $notif.data('cid');
-              format = $notif.data('format');
-              console.log("[song-notif] showing description", cid, $notif);
-              if (that = $description.data('description')) {
-                showDescription($notif, that);
-              } else {
-                console.log("looking up", {
-                  cid: cid,
-                  format: format
-                }, mediaLookup({
-                  cid: cid,
-                  format: format
-                }, {
-                  success: function(data){
-                    var text;
-                    text = formatPlainText(data.description);
-                    $description.data('description', text);
-                    showDescription($notif, text);
-                  },
-                  fail: function(){
-                    $description.text("Failed to load").addClass('.song-description-failed');
-                  }
-                }).timeout(200, function(){
-                  $description.text("Description loading…").addClass('loading');
-                }));
-              }
-            } catch (e$) {
-              e = e$;
-              console.error("[song-notif]", e);
-            }
+        }
+        addListener(_$context, 'RestrictedSearchEvent:search', function(){
+          snooze();
+        });
+        if (typeof popMenu != 'undefined' && popMenu !== null) {
+          addListener(chatDomEvents, 'click', '.song-add', function(){
+            var $el, $notif, id, format, msgOffset, obj;
+            $el = $(this);
+            $notif = $el.closest('.p0ne-song-notif');
+            id = $notif.data('id');
+            format = $notif.data('format');
+            console.log("[add from notif]", $notif, id, format);
+            msgOffset = $notif.offset();
+            $el.offset = function(){
+              return {
+                left: msgOffset.left + 17,
+                top: msgOffset.top + 18
+              };
+            };
+            obj = {
+              id: id,
+              format: 1
+            };
+            obj.get = function(name){
+              return this[name];
+            };
+            obj.media = obj;
+            popMenu.isShowing = false;
+            popMenu.show($el, [obj]);
           });
-          addListener(chatDomEvents, 'click', '.song-description', function(e){
-            if (!e.target.href) {
+        } else {
+          css('songNotificationsAdd', '.song-add {display:none}');
+        }
+        addListener(chatDomEvents, 'click', '.song-author', function(){
+          mediaSearch(this.textContent);
+        });
+        $description = $();
+        addListener(chatDomEvents, 'click', '.song-description-btn', function(e){
+          var $notif, cid, format, that;
+          try {
+            if ($description) {
               hideDescription();
             }
-          });
-          function showDescription($notif, text){
-            var h, cm, offsetTop, ref$, ch;
-            $notif.addClass('song-notif-with-description').append($description.removeClass('song-description-btn loading').css({
-              opacity: 0,
-              position: 'absolute'
-            }).addClass('song-description').html(text + " <i class='icon icon-clear-input'></i>"));
-            h = $description.height();
+            $description = $(this);
+            $notif = $description.closest('.p0ne-song-notif');
+            cid = $notif.data('cid');
+            format = $notif.data('format');
+            console.log("[song-notif] showing description", cid, $notif);
+            if (that = $description.data('description')) {
+              showDescription($notif, that);
+            } else {
+              console.log("looking up", {
+                cid: cid,
+                format: format
+              }, mediaLookup({
+                cid: cid,
+                format: format
+              }, {
+                success: function(data){
+                  var text;
+                  text = formatPlainText(data.description);
+                  $description.data('description', text);
+                  showDescription($notif, text);
+                },
+                fail: function(){
+                  $description.text("Failed to load").addClass('.song-description-failed');
+                }
+              }).timeout(200, function(){
+                $description.text("Description loading…").addClass('loading');
+              }));
+            }
+          } catch (e$) {
+            e = e$;
+            console.error("[song-notif]", e);
+          }
+        });
+        addListener(chatDomEvents, 'click', '.song-description', function(e){
+          if (!e.target.href) {
+            hideDescription();
+          }
+        });
+        function showDescription($notif, text){
+          var h, cm, offsetTop, ref$, ch;
+          $notif.addClass('song-notif-with-description').append($description.removeClass('song-description-btn loading').css({
+            opacity: 0,
+            position: 'absolute'
+          }).addClass('song-description').html(text + " <i class='icon icon-clear-input'></i>"));
+          h = $description.height();
+          $description.css({
+            height: 0,
+            position: 'static'
+          }).animate({
+            opacity: 1,
+            height: h
+          }, function(){
             $description.css({
-              height: 0,
-              position: 'static'
-            }).animate({
-              opacity: 1,
-              height: h
-            }, function(){
-              $description.css({
-                height: 'auto'
-              });
+              height: 'auto'
             });
-            cm = $cm();
-            offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
-            ch = cm.height();
-            if (offsetTop + h > ch) {
-              return cm.animate({
-                scrollTop: cm.scrollTop() + Math.min(offsetTop + h - ch + 100, offsetTop)
-              });
-            }
-          }
-          function hideDescription(){
-            var $notif, offsetTop, ref$, cm;
-            if (!$description) {
-              return;
-            }
-            console.log("[song-notif] closing description", $description);
-            $notif = $description.closest('.p0ne-song-notif').removeClass('song-notif-with-description');
-            $description.animate({
-              opacity: 0,
-              height: 0
-            }, function(){
-              $(this).css({
-                opacity: '',
-                height: 'auto'
-              }).removeClass('song-description text').addClass('song-description-btn').text("Description").appendTo($notif.find('.song-notif-next'));
-            });
-            $description = null;
-            offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
-            if (offsetTop < 0) {
-              cm = $cm();
-              return cm.animate({
-                scrollTop: cm.scrollTop() + offsetTop - 100
-              });
-            }
-          }
-          this.showDescription = showDescription;
-          this.hideDescription = hideDescription;
-          addCommand('songinfo', {
-            description: "forces a song notification to be shown, even if the module is disabled",
-            callback: function(){
-              var that, ref$;
-              if (that = ((ref$ = window.songNotif) != null ? ref$.callback : void 8) && API.getMedia()) {
-                that.image = httpsify(that.image);
-                window.songNotif.callback({
-                  media: that,
-                  dj: API.getDJ()
-                });
-              }
-            }
           });
-        },
-        callback: function(d){
-          var media, score, ref$, html, author, title, mediaURL, image, duration, this$ = this;
-          media = d.media;
-          if ((media != null ? media.id : void 8) !== this.lastMedia) {
-            if (this.$div && (score = (ref$ = d.lastPlay) != null ? ref$.score : void 8)) {
-              /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
-              this.$div.removeClass('song-current').find('.song-stats').html("<div class=score><div class='item positive'><i class='icon icon-history-positive'></i> " + score.positive + "</div><div class='item grabs'><i class='icon icon-history-grabs'></i> " + score.grabs + "</div><div class='item negative'><i class='icon icon-history-negative'></i> " + score.negative + "</div><div class='item listeners'><i class='icon icon-history-listeners'></i> " + ((typeof users != 'undefined' && users !== null ? users.length : void 8) || API.getUsers().length) + "</div></div>");
-              this.lastMedia = null;
-              this.$lastNotif = this.$div;
-            }
-          }
-          if (!media) {
-            return;
-          }
-          this.lastMedia = media.id;
-          if (typeof chat != 'undefined' && chat !== null) {
-            chat.lastType = 'p0ne-song-notif';
-          }
-          this.$div = this.$createPersistent("<div class='update p0ne-song-notif song-current' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
-          html = "";
-          author = htmlUnescape(media.author);
-          title = htmlUnescape(media.title);
-          if (media.format === 1) {
-            mediaURL = "http://youtube.com/watch?v=" + media.cid;
-          } else {
-            mediaURL = "https://soundcloud.com/search?q=" + encodeURIComponent(author + ' - ' + title);
-          }
-          image = httpsify(media.image);
-          duration = mediaTime(media.duration);
-          (media.format === 1
-            ? console.logImg(image, 120, 90)
-            : console.logImg(image, 100, 100)).then(function(){
-            console.log(getTime() + " [DJ_ADVANCE] " + d.dj.username + " plays '" + author + " - " + title + "' (" + duration + ")", d);
-          });
-          html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + getTimestamp() + "<div class='song-stats'></div><div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
-          this.$div.html(html);
-          this.$div.find('.song-title').text(title).prop('title', title);
-          this.$div.find('.song-author').text(author);
-          this.$div.find('.song-dj').text(d.dj.username).data('uid', d.dj.id);
-          appendChat(this.$div);
-          if (media.format === 2) {
-            this.$div.addClass('loading');
-            mediaLookup(media).then(function(d){
-              var that;
-              this$.$div.removeClass('loading').data('description', d.description).find('.song-open').attr('href', d.url);
-              if (d.download) {
-                this$.$div.addClass('downloadable').find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
-              }
+          cm = $cm();
+          offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
+          ch = cm.height();
+          if (offsetTop + h > ch) {
+            return cm.animate({
+              scrollTop: cm.scrollTop() + Math.min(offsetTop + h - ch + 100, offsetTop)
             });
-          }
-        },
-        disable: function(){
-          if (typeof this.hideDescription == 'function') {
-            this.hideDescription();
           }
         }
+        function hideDescription(){
+          var $notif, offsetTop, ref$, cm;
+          if (!$description) {
+            return;
+          }
+          console.log("[song-notif] closing description", $description);
+          $notif = $description.closest('.p0ne-song-notif').removeClass('song-notif-with-description');
+          $description.animate({
+            opacity: 0,
+            height: 0
+          }, function(){
+            $(this).css({
+              opacity: '',
+              height: 'auto'
+            }).removeClass('song-description text').addClass('song-description-btn').text("Description").appendTo($notif.find('.song-notif-next'));
+          });
+          $description = null;
+          offsetTop = ((ref$ = $notif.offset()) != null ? ref$.top : void 8) - 100;
+          if (offsetTop < 0) {
+            cm = $cm();
+            return cm.animate({
+              scrollTop: cm.scrollTop() + offsetTop - 100
+            });
+          }
+        }
+        this.showDescription = showDescription;
+        this.hideDescription = hideDescription;
+        addCommand('songinfo', {
+          description: "forces a song notification to be shown, even if the module is disabled",
+          callback: function(){
+            var that, ref$;
+            if (that = ((ref$ = window.songNotif) != null ? ref$.callback : void 8) && API.getMedia()) {
+              that.image = httpsify(that.image);
+              window.songNotif.callback({
+                media: that,
+                dj: API.getDJ()
+              });
+            }
+          }
+        });
+      },
+      callback: function(d){
+        var media, score, ref$, html, author, title, mediaURL, image, duration, this$ = this;
+        media = d.media;
+        if ((media != null ? media.id : void 8) !== this.lastMedia) {
+          if (this.$div && (score = (ref$ = d.lastPlay) != null ? ref$.score : void 8)) {
+            /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
+            this.$div.removeClass('song-current').find('.song-stats').html("<div class=score><div class='item positive'><i class='icon icon-history-positive'></i> " + score.positive + "</div><div class='item grabs'><i class='icon icon-history-grabs'></i> " + score.grabs + "</div><div class='item negative'><i class='icon icon-history-negative'></i> " + score.negative + "</div><div class='item listeners'><i class='icon icon-history-listeners'></i> " + ((typeof users != 'undefined' && users !== null ? users.length : void 8) || API.getUsers().length) + "</div></div>");
+            this.lastMedia = null;
+            this.$lastNotif = this.$div;
+          }
+        }
+        if (!media) {
+          return;
+        }
+        this.lastMedia = media.id;
+        if (typeof chat != 'undefined' && chat !== null) {
+          chat.lastType = 'p0ne-song-notif';
+        }
+        this.$div = this.$createPersistent("<div class='update p0ne-song-notif song-current' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
+        html = "";
+        author = htmlUnescape(media.author);
+        title = htmlUnescape(media.title);
+        if (media.format === 1) {
+          mediaURL = "http://youtube.com/watch?v=" + media.cid;
+        } else {
+          mediaURL = "https://soundcloud.com/search?q=" + encodeURIComponent(author + ' - ' + title);
+        }
+        image = httpsify(media.image);
+        duration = mediaTime(media.duration);
+        (media.format === 1
+          ? console.logImg(image, 120, 90)
+          : console.logImg(image, 100, 100)).then(function(){
+          console.log(getTime() + " [DJ_ADVANCE] " + d.dj.username + " plays '" + author + " - " + title + "' (" + duration + ")", d);
+        });
+        html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + getTimestamp() + "<div class='song-stats'></div><div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
+        this.$div.html(html);
+        this.$div.find('.song-title').text(title).prop('title', title);
+        this.$div.find('.song-author').text(author);
+        this.$div.find('.song-dj').text(d.dj.username).data('uid', d.dj.id);
+        appendChat(this.$div);
+        if (media.format === 2) {
+          this.$div.addClass('loading');
+          mediaLookup(media).then(function(d){
+            var that;
+            this$.$div.removeClass('loading').data('description', d.description).find('.song-open').attr('href', d.url);
+            if (d.download) {
+              this$.$div.addClass('downloadable').find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
+            }
+          });
+        }
+      },
+      disable: function(){
+        if (typeof this.hideDescription == 'function') {
+          this.hideDescription();
+        }
+      }
+    });
+    window.Notification || (window.Notification = window.webkitNotification);
+    module('songNotifPopup', {
+      displayName: 'Desktop Song Notifications',
+      help: 'Shows a small popup notifications on song changes.',
+      screenshot: 'https://i.imgur.com/wCrDhvb.png',
+      settings: 'base',
+      disabled: true,
+      require: ['Notification'],
+      setup: function(arg$){
+        var addListener, lastNotif;
+        addListener = arg$.addListener;
+        Notification.requestPermission();
+        lastNotif = {
+          close: $.noop
+        };
+        addListener(API, 'advance', function(d){
+          lastNotif.close();
+          if (d.media) {
+            if (!document.hasFocus()) {
+              lastNotif = new Notification(d.media.author + " - " + d.media.title, {
+                icon: d.media.image,
+                body: "played by: " + d.dj.username
+              });
+              lastNotif.onclick = closeNotif;
+            } else {
+              lastNotif.close();
+            }
+          }
+        });
+        addListener($window, 'focus', closeNotif);
+        function closeNotif(){
+          lastNotif.close();
+        }
+      }
+    });
+    /*@source p0ne.song-info.ls */
+    /**
+     * plug_p0ne songInfo
+     * adds a dropdown with the currently playing song's description when clicking on the now-playing-bar (in the top-center of the page)
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #              SONG INFO             #
+    ####################################*/
+    module('songInfo', {
+      optional: ['_$context'],
+      settings: 'base',
+      displayName: 'Song-Info Dropdown',
+      help: 'A panel with the song\'s description and links to the artist and song.\nClick on the now-playing-bar (in the top-center of the page) to open it.',
+      setup: function(arg$){
+        var addListener, $create, css, this$ = this;
+        addListener = arg$.addListener, $create = arg$.$create, css = arg$.css;
+        this.$create = $create;
+        css('songInfo', '#now-playing-bar {cursor: pointer;}');
+        this.$el = $create('<div>').addClass('p0ne-song-info').appendTo('body');
+        this.loadBind = bind$(this, 'load');
+        addListener($('#now-playing-bar'), 'click', function(e){
+          var $target, media;
+          $target = $(e.target);
+          if ($target.closest('#history-button').length || $target.closest('#volume').length) {
+            return;
+          }
+          if (!this$.visible) {
+            media = API.getMedia();
+            if (!media) {
+              this$.$el.html("Cannot load information if No song playing!");
+            } else if (this$.lastMediaID === media.id) {
+              API.once('advance', this$.loadBind);
+            } else {
+              this$.$el.html("loading…");
+              this$.load({
+                media: media
+              });
+            }
+            this$.$el.addClass('expanded');
+          } else {
+            this$.$el.removeClass('expanded');
+            API.off('advance', this$.loadBind);
+          }
+          this$.visible = !this$.visible;
+        });
+        if (!_$context) {
+          return;
+        }
+        addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
+          if (this$.visible) {
+            this$.visible = false;
+            this$.$el.removeClass('expanded');
+            API.off('advance', this$.loadBind);
+          }
+        });
+      },
+      load: function(arg$, isRetry){
+        var media, this$ = this;
+        media = arg$.media;
+        console.log("[song-info]", media);
+        if (this.lastMediaID === media.id) {
+          this.showInfo(media);
+        } else {
+          this.lastMediaID = media.id;
+          this.mediaData = null;
+          mediaLookup(media, {
+            fail: function(err){
+              console.error("[song-info]", err);
+              if (isRetry) {
+                this$.$el.html("error loading, retrying…");
+                load({
+                  media: media
+                }, true);
+              } else {
+                this$.$el.html("Couldn't load song info, sorry =(");
+              }
+            },
+            success: function(mediaData){
+              this$.mediaData = mediaData;
+              console.log("[song-info] got data", this$.mediaData);
+              this$.showInfo(media);
+            }
+          });
+          API.once('advance', this.loadBind);
+        }
+      },
+      showInfo: function(media){
+        var d, $meta, $parts;
+        if (this.lastMediaID !== media.id || this.disabled) {
+          return;
+        }
+        d = this.mediaData;
+        this.$el.html("");
+        $meta = this.$create('<div>').addClass('p0ne-song-info-meta').appendTo(this.$el);
+        $parts = {};
+        if (media.format === 1) {
+          $meta.addClass('youtube');
+        } else {
+          $meta.addClass('soundcloud');
+        }
+        $('<span>').addClass('p0ne-song-info-author').appendTo($meta).click(function(){
+          mediaSearch(media.author);
+        }).attr('title', "search for '" + media.author + "'").text(media.author);
+        $('<span>').addClass('p0ne-song-info-title').appendTo($meta).click(function(){
+          mediaSearch(media.title);
+        }).attr('title', "search for '" + media.title + "'").text(media.title);
+        $('<br>').appendTo($meta);
+        $('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', d.uploader.url).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
+        $('<a>').addClass('p0ne-song-info-upload-title').appendTo($meta).attr('href', d.url).attr('target', '_blank').attr('title', (media.format === 1 ? 'open video on YouTube' : 'open Song on SoundCloud') + "").text(d.title);
+        $('<br>').appendTo($meta);
+        $('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getDateTime(new Date(d.uploadDate)));
+        $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text("duration " + mediaTime(+d.duration));
+        if (media.format === 1 && d.restriction) {
+          if (d.restriction.allowed) {
+            $('<span>').addClass('p0ne-song-info-blocked').appendTo(this.$el).text("exclusively for " + humanList(d.restriction.allowed) + (d.restriction.allowed.length > 100 ? '(' + d.restriction.allowed.length + '/249)' : ''));
+          }
+          if (d.restriction.blocked) {
+            $('<span>').addClass('p0ne-song-info-blocked').appendTo(this.$el).text("blocked in " + humanList(d.restriction.blocked) + (d.restriction.blocked.length > 100 ? '(' + d.restriction.blocked.length + '/249)' : ''));
+          }
+        }
+        $('<div>').addClass('p0ne-song-info-description').appendTo(this.$el).html(formatPlainText(d.description));
+      },
+      disable: function(){
+        var ref$;
+        if ((ref$ = this.$el) != null) {
+          ref$.remove();
+        }
+      }
+    });
+    /*@source p0ne.avatars.ls */
+    /**
+     * plug_p0ne Custom Avatars
+     * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     *
+     * Developer's note: if you create your own custom avatar script or use a modified version of this,
+     * you are hereby granted permission connect to this one's default avatar server.
+     * However, please drop me an e-mail so I can keep an overview of things.
+     * I remain the right to revoke this right anytime.
+     */
+    /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
+    /* (this includes things mentioned in the "notes" section below) */
+    /*
+    Notes for Socket Servers:
+    - server-side:
+        - push avatars using something like `socket.trigger('addAvatar', …)`
+        - remember, you can offer specific avatars that are for moderators only
+        - for people without a role, please do NOT allow avatars that might be confused with staff avatars (e.g. the (old) admin avatars)
+            => to avoid confusion
+        - dynamically loading avatars is possible
+            - e.g. allow users customizing avatars and add them with addAvatar()
+                with unique IDs and a URL to a PHP site that generates the avatar
+            - WARNING: I HIGHLY discourage from allowing users to set their own images as avatars
+                There's ALWAYS "this one guy" who abuses it.
+                And most people don't want a bunch of dancing dicks on their screen
+    - client-side (custom scripts)
+        - when listening to userJoins, please use API.on(API.USER_JOIN, …) to avoid conflicts
+        - add avatars using addAvatar(…)
+        - do not access p0ne._avatars directly, do avoid conflicts and bugs!
+        - if you however STILL manually change something, you might need to do updateAvatarStore() to update it
+    */
+    if (!window.SockJS) {
+      window.Socket = window.WebSocket;
+      require.config({
+        paths: {
+          sockjs: p0ne.host + "/scripts/sockjs"
+        }
       });
-      window.Notification || (window.Notification = window.webkitNotification);
-      module('songNotifPopup', {
-        displayName: 'Desktop Song Notifications',
-        help: 'Shows a small popup notifications on song changes.',
-        screenshot: 'https://i.imgur.com/wCrDhvb.png',
+    }
+    console.time("[p0ne custom avatars] loaded SockJS");
+    require(['sockjs'], function(SockJS){
+      var i$, ref$, ref1$, len$, ev;
+      console.timeEnd("[p0ne custom avatars] loaded SockJS");
+      if (!window.p0ne) {
+        requireHelper('users', function(it){
+          var ref$, ref1$;
+          return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
+        });
+        window.userID || (window.userID = API.getUser().id);
+        if (typeof users != 'undefined' && users !== null) {
+          window.user_ || (window.user_ = users.get(userID));
+        }
+        window.sleep || (window.sleep = function(delay, fn){
+          return setTimeout(fn, delay);
+        });
+        requireHelper('InventoryDropdown', function(it){
+          return it.selected;
+        });
+        requireHelper('avatarAuxiliaries', function(it){
+          return it.getAvatarUrl;
+        });
+        requireHelper('Avatar', function(it){
+          return it.AUDIENCE;
+        });
+        for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref1$ = user_._events) != null ? ref1$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+          ev = ref$[i$];
+          if (ev.ctx.comparator === 'id') {
+            window.myAvatars = ev.ctx;
+            break;
+          }
+        }
+        if (requireHelper('InventoryAvatarPage', function(a){
+          var ref$;
+          return ((ref$ = a.prototype) != null ? ref$.className : void 8) === 'avatars' && a.prototype.eventName;
+        })) {
+          window.InventoryDropdown = new InventoryAvatarPage().dropDown.constructor;
+        }
+      }
+      window.Lang = require('lang/Lang');
+      window.Cells = requireAll(function(m){
+        var ref$;
+        return ((ref$ = m.prototype) != null ? ref$.className : void 8) === 'cell' && m.prototype.getBlinkFrame;
+      });
+      /*####################################
+      #           CUSTOM AVATARS           #
+      ####################################*/
+      user.avatarID = API.getUser().avatarID;
+      module('customAvatars', {
+        require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars', 'InventoryDropdown'],
+        optional: ['user_', '_$context'],
+        displayName: 'Custom Avatars',
         settings: 'base',
         disabled: true,
-        require: ['Notification'],
-        setup: function(arg$){
-          var addListener, lastNotif;
-          addListener = arg$.addListener;
-          Notification.requestPermission();
-          lastNotif = {
-            close: $.noop
+        help: 'This adds a few custom avatars to plug.dj\n\nYou can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".\nClick on the Dropdown field in the top-left to select another category.\n\nEveryone who uses plug_p0ne sees you with your custom avatar.',
+        persistent: ['socket'],
+        _settings: {
+          vanillaAvatarID: user.avatarID,
+          avatarID: user.avatarID
+        },
+        DEFAULT_SERVER: 'https://ppcas.p0ne.com/_',
+        setup: function(arg$, customAvatars){
+          var addListener, revert, css, addCommand, avatarID, hasNewAvatar, getAvatarUrl_, _internal_addAvatar, i$, ref$, len$, Cell, that, urlParser, this$ = this;
+          addListener = arg$.addListener, this.replace = arg$.replace, revert = arg$.revert, css = arg$.css, addCommand = arg$.addCommand;
+          console.info("[p0ne custom avatars] initializing");
+          p0ne._avatars = {};
+          avatarID = API.getUser().avatarID;
+          hasNewAvatar = this._settings.vanillaAvatarID === avatarID;
+          replace(avatarAuxiliaries, 'getAvatarUrl', function(gAU_){
+            return function(avatarID, type){
+              var ref$;
+              return ((ref$ = p0ne._avatars[avatarID]) != null ? ref$[type] : void 8) || gAU_(avatarID, type);
+            };
+          });
+          getAvatarUrl_ = avatarAuxiliaries.getAvatarUrl_;
+          _internal_addAvatar = function(d){
+            var avatarID, avatar, base_url;
+            avatarID = d.avatarID;
+            /*if p0ne._avatars[avatarID]
+                console.info "[p0ne custom avatars] updating '#avatarID'", d
+            else if not d.isVanilla
+                console.info "[p0ne custom avatars] adding '#avatarID'", d*/
+            avatar = {
+              inInventory: false,
+              category: d.category || 'p0ne',
+              thumbOffsetTop: d.thumbOffsetTop,
+              thumbOffsetLeft: d.thumbOffsetLeft,
+              isVanilla: !!d.isVanilla,
+              permissions: d.permissions || 0
+            };
+            if (d.isVanilla) {
+              avatar[""] = getAvatarUrl_(avatarID, "");
+              avatar.dj = getAvatarUrl_(avatarID, 'dj');
+              avatar.b = getAvatarUrl_(avatarID, 'b');
+            } else {
+              base_url = d.base_url || "";
+              avatar[""] = base_url + (d.anim || avatarID + '.png');
+              avatar.dj = base_url + (d.dj || avatarID + 'dj.png');
+              avatar.b = base_url + (d.b || avatarID + 'b.png');
+            }
+            p0ne._avatars[avatarID] = avatar;
+            if (!(avatar.category in Lang.userAvatars)) {
+              Lang.userAvatars[avatar.category] = avatar.category;
+            }
+            delete Avatar.IMAGES[avatarID + ""];
+            delete Avatar.IMAGES[avatarID + "dj"];
+            delete Avatar.IMAGES[avatarID + "b"];
+            if (!customAvatars.updateAvatarStore.loading) {
+              customAvatars.updateAvatarStore.loading = true;
+              requestAnimationFrame(function(){
+                customAvatars.updateAvatarStore();
+                customAvatars.updateAvatarStore.loading = false;
+              });
+            }
           };
-          addListener(API, 'advance', function(d){
-            lastNotif.close();
-            if (d.media) {
-              if (!document.hasFocus()) {
-                lastNotif = new Notification(d.media.author + " - " + d.media.title, {
-                  icon: d.media.image,
-                  body: "played by: " + d.dj.username
-                });
-                lastNotif.onclick = closeNotif;
-              } else {
-                lastNotif.close();
+          this.addAvatar = function(avatarID, d){
+            var avatar;
+            if (typeof d === 'object') {
+              avatar = d;
+              d.avatarID = avatarID;
+            } else if (typeof avatarID === 'object') {
+              avatar = avatarID;
+            } else {
+              throw new TypeError("invalid avatar data passed to addAvatar(avatarID*, data)");
+            }
+            d.isVanilla = false;
+            return _internal_addAvatar(d);
+          };
+          this.removeAvatar = function(avatarID, replace){
+            var i$, ref$, len$, u;
+            for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+              u = ref$[i$];
+              if (u.get('avatarID') === avatarID) {
+                u.set('avatarID', u.get('avatarID_'));
               }
             }
-          });
-          addListener($window, 'focus', closeNotif);
-          function closeNotif(){
-            lastNotif.close();
-          }
-        }
-      });
-      /*@source p0ne.song-info.ls */
-      /**
-       * plug_p0ne songInfo
-       * adds a dropdown with the currently playing song's description when clicking on the now-playing-bar (in the top-center of the page)
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #              SONG INFO             #
-      ####################################*/
-      module('songInfo', {
-        optional: ['_$context'],
-        settings: 'base',
-        displayName: 'Song-Info Dropdown',
-        help: 'A panel with the song\'s description and links to the artist and song.\nClick on the now-playing-bar (in the top-center of the page) to open it.',
-        setup: function(arg$){
-          var addListener, $create, css, this$ = this;
-          addListener = arg$.addListener, $create = arg$.$create, css = arg$.css;
-          this.$create = $create;
-          css('songInfo', '#now-playing-bar {cursor: pointer;}');
-          this.$el = $create('<div>').addClass('p0ne-song-info').appendTo('body');
-          this.loadBind = bind$(this, 'load');
-          addListener($('#now-playing-bar'), 'click', function(e){
-            var $target, media;
-            $target = $(e.target);
-            if ($target.closest('#history-button').length || $target.closest('#volume').length) {
+            delete p0ne._avatars[avatarID];
+          };
+          this.changeAvatar = function(userID, avatarID){
+            var u, avatar;
+            if (!(u = users.get(userID)) || !(avatar = p0ne._avatars[avatarID]) && !(avatarID = u.vanillaAvatarID)) {
+              console.warn("[p0ne custom avatars] can't load user or avatar: '" + userID + "', '" + avatarID + "'");
               return;
             }
-            if (!this$.visible) {
-              media = API.getMedia();
-              if (!media) {
-                this$.$el.html("Cannot load information if No song playing!");
-              } else if (this$.lastMediaID === media.id) {
-                API.once('advance', this$.loadBind);
-              } else {
-                this$.$el.html("loading…");
-                this$.load({
-                  media: media
-                });
+            if (!avatar.permissions || API.hasPermissions(userID, avatar.permissions)) {
+              if (!u.get('vanillaAvatarID')) {
+                u.set('vanillaAvatarID', u.get('avatarID'));
               }
-              this$.$el.addClass('expanded');
+              u.set('avatarID', avatarID);
             } else {
-              this$.$el.removeClass('expanded');
-              API.off('advance', this$.loadBind);
+              console.warn("user with ID " + userID + " doesn't have permissions for avatar '" + avatarID + "'");
             }
-            this$.visible = !this$.visible;
-          });
-          if (!_$context) {
-            return;
-          }
-          addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
-            if (this$.visible) {
-              this$.visible = false;
-              this$.$el.removeClass('expanded');
-              API.off('advance', this$.loadBind);
+            if (userID === userID) {
+              this$._settings.avatarID = avatarID;
             }
-          });
-        },
-        load: function(arg$, isRetry){
-          var media, this$ = this;
-          media = arg$.media;
-          console.log("[song-info]", media);
-          if (this.lastMediaID === media.id) {
-            this.showInfo(media);
-          } else {
-            this.lastMediaID = media.id;
-            this.mediaData = null;
-            mediaLookup(media, {
-              fail: function(err){
-                console.error("[song-info]", err);
-                if (isRetry) {
-                  this$.$el.html("error loading, retrying…");
-                  load({
-                    media: media
-                  }, true);
-                } else {
-                  this$.$el.html("Couldn't load song info, sorry =(");
-                }
-              },
-              success: function(mediaData){
-                this$.mediaData = mediaData;
-                console.log("[song-info] got data", this$.mediaData);
-                this$.showInfo(media);
+          };
+          this.updateAvatarStore = function(){
+            var styles, avatarIDs, l, avatarID, ref$, avi, vanilla, categories, ref1$, key$, category, avis, i$, len$;
+            styles = "";
+            avatarIDs = [];
+            l = 0;
+            for (avatarID in ref$ = p0ne._avatars) {
+              avi = ref$[avatarID];
+              if (!avi.isVanilla) {
+                avatarIDs[l++] = avatarID;
+                styles += ".avi-" + avatarID + " {background-image: url('" + avi[''] + "');background-position: " + (avi.thumbOffsetLeft || 0) + "px " + (avi.thumbOffsetTop || 0) + "px";
+                styles += "}\n";
               }
-            });
-            API.once('advance', this.loadBind);
-          }
-        },
-        showInfo: function(media){
-          var d, $meta, $parts;
-          if (this.lastMediaID !== media.id || this.disabled) {
-            return;
-          }
-          d = this.mediaData;
-          this.$el.html("");
-          $meta = this.$create('<div>').addClass('p0ne-song-info-meta').appendTo(this.$el);
-          $parts = {};
-          if (media.format === 1) {
-            $meta.addClass('youtube');
-          } else {
-            $meta.addClass('soundcloud');
-          }
-          $('<span>').addClass('p0ne-song-info-author').appendTo($meta).click(function(){
-            mediaSearch(media.author);
-          }).attr('title', "search for '" + media.author + "'").text(media.author);
-          $('<span>').addClass('p0ne-song-info-title').appendTo($meta).click(function(){
-            mediaSearch(media.title);
-          }).attr('title', "search for '" + media.title + "'").text(media.title);
-          $('<br>').appendTo($meta);
-          $('<a>').addClass('p0ne-song-info-uploader').appendTo($meta).attr('href', d.uploader.url).attr('target', '_blank').attr('title', "open channel of '" + d.uploader.name + "'").text(d.uploader.name);
-          $('<a>').addClass('p0ne-song-info-upload-title').appendTo($meta).attr('href', d.url).attr('target', '_blank').attr('title', (media.format === 1 ? 'open video on YouTube' : 'open Song on SoundCloud') + "").text(d.title);
-          $('<br>').appendTo($meta);
-          $('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getDateTime(new Date(d.uploadDate)));
-          $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text("duration " + mediaTime(+d.duration));
-          if (media.format === 1 && d.restriction) {
-            if (d.restriction.allowed) {
-              $('<span>').addClass('p0ne-song-info-blocked').appendTo(this.$el).text("exclusively for " + humanList(d.restriction.allowed) + (d.restriction.allowed.length > 100 ? '(' + d.restriction.allowed.length + '/249)' : ''));
             }
-            if (d.restriction.blocked) {
-              $('<span>').addClass('p0ne-song-info-blocked').appendTo(this.$el).text("blocked in " + humanList(d.restriction.blocked) + (d.restriction.blocked.length > 100 ? '(' + d.restriction.blocked.length + '/249)' : ''));
+            if (l) {
+              css('p0ne_avatars', ".avi {background-repeat: no-repeat;}\n.thumb.small .avi-" + avatarIDs.join(', .thumb.small .avi-') + " {background-size: 1393px; /* = 836/15*24 thumbsWidth / thumbsCount * animCount*/}\n.thumb.medium .avi-" + avatarIDs.join(', .thumb.medium .avi-') + " {background-size: 1784px; /* = 1115/15*24 thumbsWidth / thumbsCount * animCount*/}\n" + styles + "");
             }
-          }
-          $('<div>').addClass('p0ne-song-info-description').appendTo(this.$el).html(formatPlainText(d.description));
-        },
-        disable: function(){
-          var ref$;
-          if ((ref$ = this.$el) != null) {
-            ref$.remove();
-          }
-        }
-      });
-      /*@source p0ne.avatars.ls */
-      /**
-       * plug_p0ne Custom Avatars
-       * adds custom avatars to plug.dj when connected to a plug_p0ne Custom Avatar Server (ppCAS)
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       *
-       * Developer's note: if you create your own custom avatar script or use a modified version of this,
-       * you are hereby granted permission connect to this one's default avatar server.
-       * However, please drop me an e-mail so I can keep an overview of things.
-       * I remain the right to revoke this right anytime.
-       */
-      /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
-      /* (this includes things mentioned in the "notes" section below) */
-      /*
-      Notes for Socket Servers:
-      - server-side:
-          - push avatars using something like `socket.trigger('addAvatar', …)`
-          - remember, you can offer specific avatars that are for moderators only
-          - for people without a role, please do NOT allow avatars that might be confused with staff avatars (e.g. the (old) admin avatars)
-              => to avoid confusion
-          - dynamically loading avatars is possible
-              - e.g. allow users customizing avatars and add them with addAvatar()
-                  with unique IDs and a URL to a PHP site that generates the avatar
-              - WARNING: I HIGHLY discourage from allowing users to set their own images as avatars
-                  There's ALWAYS "this one guy" who abuses it.
-                  And most people don't want a bunch of dancing dicks on their screen
-      - client-side (custom scripts)
-          - when listening to userJoins, please use API.on(API.USER_JOIN, …) to avoid conflicts
-          - add avatars using addAvatar(…)
-          - do not access p0ne._avatars directly, do avoid conflicts and bugs!
-          - if you however STILL manually change something, you might need to do updateAvatarStore() to update it
-      */
-      if (!window.SockJS) {
-        window.Socket = window.WebSocket;
-        require.config({
-          paths: {
-            sockjs: p0ne.host + "/scripts/sockjs"
-          }
-        });
-      }
-      console.time("[p0ne custom avatars] loaded SockJS");
-      require(['sockjs'], function(SockJS){
-        var i$, ref$, ref1$, len$, ev;
-        console.timeEnd("[p0ne custom avatars] loaded SockJS");
-        if (!window.p0ne) {
-          requireHelper('users', function(it){
-            var ref$, ref1$;
-            return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
-          });
-          window.userID || (window.userID = API.getUser().id);
-          if (typeof users != 'undefined' && users !== null) {
-            window.user_ || (window.user_ = users.get(userID));
-          }
-          window.sleep || (window.sleep = function(delay, fn){
-            return setTimeout(fn, delay);
-          });
-          requireHelper('InventoryDropdown', function(it){
-            return it.selected;
-          });
-          requireHelper('avatarAuxiliaries', function(it){
-            return it.getAvatarUrl;
-          });
-          requireHelper('Avatar', function(it){
-            return it.AUDIENCE;
-          });
-          for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref1$ = user_._events) != null ? ref1$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
-            ev = ref$[i$];
-            if (ev.ctx.comparator === 'id') {
-              window.myAvatars = ev.ctx;
-              break;
-            }
-          }
-          if (requireHelper('InventoryAvatarPage', function(a){
-            var ref$;
-            return ((ref$ = a.prototype) != null ? ref$.className : void 8) === 'avatars' && a.prototype.eventName;
-          })) {
-            window.InventoryDropdown = new InventoryAvatarPage().dropDown.constructor;
-          }
-        }
-        window.Lang = require('lang/Lang');
-        window.Cells = requireAll(function(m){
-          var ref$;
-          return ((ref$ = m.prototype) != null ? ref$.className : void 8) === 'cell' && m.prototype.getBlinkFrame;
-        });
-        /*####################################
-        #           CUSTOM AVATARS           #
-        ####################################*/
-        user.avatarID = API.getUser().avatarID;
-        module('customAvatars', {
-          require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars', 'InventoryDropdown'],
-          optional: ['user_', '_$context'],
-          displayName: 'Custom Avatars',
-          settings: 'base',
-          disabled: true,
-          help: 'This adds a few custom avatars to plug.dj\n\nYou can select them like any other avatar, by clicking on your username (below the chat) and then clicking "My Stuff".\nClick on the Dropdown field in the top-left to select another category.\n\nEveryone who uses plug_p0ne sees you with your custom avatar.',
-          persistent: ['socket'],
-          _settings: {
-            vanillaAvatarID: user.avatarID,
-            avatarID: user.avatarID
-          },
-          DEFAULT_SERVER: 'https://ppcas.p0ne.com/_',
-          setup: function(arg$, customAvatars){
-            var addListener, revert, css, addCommand, avatarID, hasNewAvatar, getAvatarUrl_, _internal_addAvatar, i$, ref$, len$, Cell, that, urlParser, this$ = this;
-            addListener = arg$.addListener, this.replace = arg$.replace, revert = arg$.revert, css = arg$.css, addCommand = arg$.addCommand;
-            console.info("[p0ne custom avatars] initializing");
-            p0ne._avatars = {};
-            avatarID = API.getUser().avatarID;
-            hasNewAvatar = this._settings.vanillaAvatarID === avatarID;
-            replace(avatarAuxiliaries, 'getAvatarUrl', function(gAU_){
-              return function(avatarID, type){
-                var ref$;
-                return ((ref$ = p0ne._avatars[avatarID]) != null ? ref$[type] : void 8) || gAU_(avatarID, type);
-              };
-            });
-            getAvatarUrl_ = avatarAuxiliaries.getAvatarUrl_;
-            _internal_addAvatar = function(d){
-              var avatarID, avatar, base_url;
-              avatarID = d.avatarID;
-              /*if p0ne._avatars[avatarID]
-                  console.info "[p0ne custom avatars] updating '#avatarID'", d
-              else if not d.isVanilla
-                  console.info "[p0ne custom avatars] adding '#avatarID'", d*/
-              avatar = {
-                inInventory: false,
-                category: d.category || 'p0ne',
-                thumbOffsetTop: d.thumbOffsetTop,
-                thumbOffsetLeft: d.thumbOffsetLeft,
-                isVanilla: !!d.isVanilla,
-                permissions: d.permissions || 0
-              };
-              if (d.isVanilla) {
-                avatar[""] = getAvatarUrl_(avatarID, "");
-                avatar.dj = getAvatarUrl_(avatarID, 'dj');
-                avatar.b = getAvatarUrl_(avatarID, 'b');
-              } else {
-                base_url = d.base_url || "";
-                avatar[""] = base_url + (d.anim || avatarID + '.png');
-                avatar.dj = base_url + (d.dj || avatarID + 'dj.png');
-                avatar.b = base_url + (d.b || avatarID + 'b.png');
-              }
-              p0ne._avatars[avatarID] = avatar;
-              if (!(avatar.category in Lang.userAvatars)) {
-                Lang.userAvatars[avatar.category] = avatar.category;
-              }
-              delete Avatar.IMAGES[avatarID + ""];
-              delete Avatar.IMAGES[avatarID + "dj"];
-              delete Avatar.IMAGES[avatarID + "b"];
-              if (!customAvatars.updateAvatarStore.loading) {
-                customAvatars.updateAvatarStore.loading = true;
-                requestAnimationFrame(function(){
-                  customAvatars.updateAvatarStore();
-                  customAvatars.updateAvatarStore.loading = false;
-                });
-              }
-            };
-            this.addAvatar = function(avatarID, d){
-              var avatar;
-              if (typeof d === 'object') {
-                avatar = d;
-                d.avatarID = avatarID;
-              } else if (typeof avatarID === 'object') {
-                avatar = avatarID;
-              } else {
-                throw new TypeError("invalid avatar data passed to addAvatar(avatarID*, data)");
-              }
-              d.isVanilla = false;
-              return _internal_addAvatar(d);
-            };
-            this.removeAvatar = function(avatarID, replace){
-              var i$, ref$, len$, u;
-              for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
-                u = ref$[i$];
-                if (u.get('avatarID') === avatarID) {
-                  u.set('avatarID', u.get('avatarID_'));
-                }
-              }
-              delete p0ne._avatars[avatarID];
-            };
-            this.changeAvatar = function(userID, avatarID){
-              var avatar, user, ref$;
-              avatar = p0ne._avatars[avatarID];
-              if (!avatar) {
-                console.warn("[p0ne custom avatars] can't load avatar: '" + avatarID + "'");
-                return;
-              }
-              if (!(user = users.get(userID))) {
-                return;
-              }
-              if (!avatar.permissions || API.hasPermissions(userID, avatar.permissions)) {
-                (ref$ = user.attributes).avatarID_ || (ref$.avatarID_ = user.get('avatarID'));
-                user.set('avatarID', avatarID);
-              } else {
-                console.warn("user with ID " + userID + " doesn't have permissions for avatar '" + avatarID + "'");
-              }
-              if (userID === user_.id) {
-                this$._settings.avatarID = avatarID;
-              }
-            };
-            this.updateAvatarStore = function(){
-              var styles, avatarIDs, l, avatarID, ref$, avi, vanilla, categories, ref1$, key$, category, avis, i$, len$;
-              styles = "";
-              avatarIDs = [];
-              l = 0;
-              for (avatarID in ref$ = p0ne._avatars) {
-                avi = ref$[avatarID];
-                if (!avi.isVanilla) {
-                  avatarIDs[l++] = avatarID;
-                  styles += ".avi-" + avatarID + " {background-image: url('" + avi[''] + "');background-position: " + (avi.thumbOffsetLeft || 0) + "px " + (avi.thumbOffsetTop || 0) + "px";
-                  styles += "}\n";
-                }
-              }
-              if (l) {
-                css('p0ne_avatars', ".avi {background-repeat: no-repeat;}\n.thumb.small .avi-" + avatarIDs.join(', .thumb.small .avi-') + " {background-size: 1393px; /* = 836/15*24 thumbsWidth / thumbsCount * animCount*/}\n.thumb.medium .avi-" + avatarIDs.join(', .thumb.medium .avi-') + " {background-size: 1784px; /* = 1115/15*24 thumbsWidth / thumbsCount * animCount*/}\n" + styles + "");
-              }
-              vanilla = [];
-              l = 0;
-              categories = {};
-              for (avatarID in ref$ = p0ne._avatars) {
-                avi = ref$[avatarID];
-                if (avi.inInventory || !avi.isVanilla) {
-                  if (avi.isVanilla) {
-                    vanilla[l++] = new Avatar({
-                      id: avatarID,
-                      category: avi.category,
-                      type: 'avatar'
-                    });
-                  } else {
-                    (ref1$ = categories[key$ = avi.category] || (categories[key$] = []))[ref1$.length] = avatarID;
-                  }
-                }
-              }
-              myAvatars.models = [];
-              l = 0;
-              for (category in categories) {
-                avis = categories[category];
-                for (i$ = 0, len$ = avis.length; i$ < len$; ++i$) {
-                  avatarID = avis[i$];
-                  myAvatars.models[l++] = new Avatar({
+            vanilla = [];
+            l = 0;
+            categories = {};
+            for (avatarID in ref$ = p0ne._avatars) {
+              avi = ref$[avatarID];
+              if (avi.inInventory || !avi.isVanilla) {
+                if (avi.isVanilla) {
+                  vanilla[l++] = new Avatar({
                     id: avatarID,
-                    category: category,
+                    category: avi.category,
                     type: 'avatar'
                   });
+                } else {
+                  (ref1$ = categories[key$ = avi.category] || (categories[key$] = []))[ref1$.length] = avatarID;
                 }
               }
-              myAvatars.models = myAvatars.models.concat(vanilla);
-              myAvatars.length = myAvatars.models.length;
-              myAvatars.trigger('reset', false);
-              console.log(getTime() + " [p0ne custom avatars] avatar inventory updated");
-              return true;
-            };
-            addListener(myAvatars, 'reset', function(vanillaTrigger){
-              if (vanillaTrigger) {
-                this$.updateAvatarStore();
-              }
-            });
-            replace(InventoryDropdown.prototype, 'draw', function(d_){
-              return function(){
-                var html, categories, curAvatarID, i$, ref$, len$, avi, curCategory, category;
-                html = "";
-                categories = {};
-                curAvatarID = API.getUser().avatarID;
-                for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
-                  avi = ref$[i$];
-                  categories[avi.get('category')] = true;
-                  if (avi.id === curAvatarID) {
-                    curCategory = avi.get('category');
-                  }
-                }
-                curCategory || (curCategory = (ref$ = myAvatars.models[0]) != null ? ref$.get('category') : void 8);
-                for (category in categories) {
-                  html += "<div class=row data-value='" + category + "'><span>" + Lang.userAvatars[category] + "</span></div>";
-                }
-                this.$el.html("<dl class=dropdown><dt><span></span><i class='icon icon-arrow-down-grey'></i><i class='icon icon-arrow-up-grey'></i></dt><dd>" + html + "</dd></dl>").on('click', 'dt', bind$(this, 'onBaseClick')).on('click', '.row', bind$(this, 'onRowClick'));
-                if (!categories[InventoryDropdown.selected]) {
-                  InventoryDropdown.selected = curCategory;
-                }
-                this.select(InventoryDropdown.selected);
-                this.$el.show();
-              };
-            });
-            Lang.userAvatars.p0ne = "Custom Avatars";
-            /*for {id:avatarID, attributes:{category}} in AvatarList.models
-                _internal_addAvatar do
-                    avatarID: avatarID
-                    isVanilla: true
-                    category: category
-                    #category: avatarID.replace /\d+$/, ''
-                    #category: avatarID.substr(0,avatarID.length-2) damn you "tastycat"
-            console.log "[p0ne custom avatars] added internal avatars", p0ne._avatars
-            */
-            for (i$ = 0, len$ = (ref$ = window.Cells).length; i$ < len$; ++i$) {
-              Cell = ref$[i$];
-              replace(Cell.prototype, 'onClick', fn$);
             }
-            $.ajax({
-              url: '/_/store/inventory/avatars',
-              success: function(d){
-                var avatarIDs, l, i$, ref$, len$, avatar;
-                avatarIDs = [];
-                l = 0;
-                for (i$ = 0, len$ = (ref$ = d.data).length; i$ < len$; ++i$) {
-                  avatar = ref$[i$];
-                  avatarIDs[l++] = avatar.id;
-                  if (!p0ne._avatars[avatar.id]) {
-                    _internal_addAvatar({
-                      avatarID: avatar.id,
-                      isVanilla: true,
-                      category: avatar.category
-                    });
-                  }
-                  p0ne._avatars[avatar.id].inInventory = true;
-                }
-                this$.updateAvatarStore();
-                /*requireAll (m) !->
-                    return if not m._models or not m._events?.reset
-                    m_avatarIDs = ""
-                    for el, i in m._models
-                        return if avatarIDs[i] != el
-                */
-              }
-            });
-            if (that = !hasNewAvatar && this._settings.avatarID) {
-              this.changeAvatar(userID, that);
-            }
-            if ((typeof _$context != 'undefined' && _$context !== null) && (typeof user_ != 'undefined' && user_ !== null)) {
-              addListener(_$context, 'ack', function(){
-                replace(user_, 'set', function(s_){
-                  return function(obj, val){
-                    if (obj.avatarID && obj.avatarID === this.get('avatarID_')) {
-                      delete obj.avatarID;
-                    }
-                    return s_.call(this, obj, val);
-                  };
+            myAvatars.models = [];
+            l = 0;
+            for (category in categories) {
+              avis = categories[category];
+              for (i$ = 0, len$ = avis.length; i$ < len$; ++i$) {
+                avatarID = avis[i$];
+                myAvatars.models[l++] = new Avatar({
+                  id: avatarID,
+                  category: category,
+                  type: 'avatar'
                 });
-              });
-              addListener(_$context, 'UserEvent:friends', function(){
-                revert(user_, 'set');
-              });
+              }
             }
-            /*####################################
-            #         ppCAS Integration          #
-            ####################################*/
-            this.oldBlurb = API.getUser().blurb;
-            this.blurbIsChanged = false;
-            urlParser = document.createElement('a');
-            addCommand('ppcas', {
-              description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")',
-              callback: function(str){
-                var server, base_url, helper, forceReconnect;
-                server = $.trim(str.substr(6));
-                if (server === "<url>") {
-                  chatWarn("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars");
-                  return;
-                } else if (server === ".") {
-                  base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/";
-                  helper = function(fn){
-                    var i$, ref$, len$, avatarID;
-                    fn = customAvatars[fn];
-                    for (i$ = 0, len$ = (ref$ = ['su01', 'su02', 'space03', 'space04', 'space05', 'space06']).length; i$ < len$; ++i$) {
-                      avatarID = ref$[i$];
-                      fn(avatarID, {
-                        category: 'Veteran',
-                        base_url: base_url,
-                        thumbOffsetTop: -5
-                      });
-                    }
-                    fn('animal12', {
+            myAvatars.models = myAvatars.models.concat(vanilla);
+            myAvatars.length = myAvatars.models.length;
+            myAvatars.trigger('reset', false);
+            console.log(getTime() + " [p0ne custom avatars] avatar inventory updated");
+            return true;
+          };
+          addListener(myAvatars, 'reset', function(vanillaTrigger){
+            if (vanillaTrigger) {
+              this$.updateAvatarStore();
+            }
+          });
+          replace(InventoryDropdown.prototype, 'draw', function(d_){
+            return function(){
+              var html, categories, curAvatarID, i$, ref$, len$, avi, curCategory, category;
+              html = "";
+              categories = {};
+              curAvatarID = API.getUser().avatarID;
+              for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
+                avi = ref$[i$];
+                categories[avi.get('category')] = true;
+                if (avi.id === curAvatarID) {
+                  curCategory = avi.get('category');
+                }
+              }
+              curCategory || (curCategory = (ref$ = myAvatars.models[0]) != null ? ref$.get('category') : void 8);
+              for (category in categories) {
+                html += "<div class=row data-value='" + category + "'><span>" + Lang.userAvatars[category] + "</span></div>";
+              }
+              this.$el.html("<dl class=dropdown><dt><span></span><i class='icon icon-arrow-down-grey'></i><i class='icon icon-arrow-up-grey'></i></dt><dd>" + html + "</dd></dl>").on('click', 'dt', bind$(this, 'onBaseClick')).on('click', '.row', bind$(this, 'onRowClick'));
+              if (!categories[InventoryDropdown.selected]) {
+                InventoryDropdown.selected = curCategory;
+              }
+              this.select(InventoryDropdown.selected);
+              this.$el.show();
+            };
+          });
+          Lang.userAvatars.p0ne = "Custom Avatars";
+          /*for {id:avatarID, attributes:{category}} in AvatarList.models
+              _internal_addAvatar do
+                  avatarID: avatarID
+                  isVanilla: true
+                  category: category
+                  #category: avatarID.replace /\d+$/, ''
+                  #category: avatarID.substr(0,avatarID.length-2) damn you "tastycat"
+          console.log "[p0ne custom avatars] added internal avatars", p0ne._avatars
+          */
+          for (i$ = 0, len$ = (ref$ = window.Cells).length; i$ < len$; ++i$) {
+            Cell = ref$[i$];
+            replace(Cell.prototype, 'onClick', fn$);
+          }
+          $.ajax({
+            url: '/_/store/inventory/avatars',
+            success: function(d){
+              var avatarIDs, l, i$, ref$, len$, avatar;
+              avatarIDs = [];
+              l = 0;
+              for (i$ = 0, len$ = (ref$ = d.data).length; i$ < len$; ++i$) {
+                avatar = ref$[i$];
+                avatarIDs[l++] = avatar.id;
+                if (!p0ne._avatars[avatar.id]) {
+                  _internal_addAvatar({
+                    avatarID: avatar.id,
+                    isVanilla: true,
+                    category: avatar.category
+                  });
+                }
+                p0ne._avatars[avatar.id].inInventory = true;
+              }
+              this$.updateAvatarStore();
+              /*requireAll (m) !->
+                  return if not m._models or not m._events?.reset
+                  m_avatarIDs = ""
+                  for el, i in m._models
+                      return if avatarIDs[i] != el
+              */
+            }
+          });
+          if (that = !hasNewAvatar && this._settings.avatarID) {
+            this.changeAvatar(userID, that);
+          }
+          if ((typeof _$context != 'undefined' && _$context !== null) && (typeof user_ != 'undefined' && user_ !== null)) {
+            addListener(_$context, 'ack', function(){
+              replace(user_, 'set', function(s_){
+                return function(obj, val){
+                  if (obj.avatarID && obj.avatarID === this.get('avatarID_')) {
+                    delete obj.avatarID;
+                  }
+                  return s_.call(this, obj, val);
+                };
+              });
+            });
+            addListener(_$context, 'UserEvent:friends', function(){
+              revert(user_, 'set');
+            });
+          }
+          /*####################################
+          #         ppCAS Integration          #
+          ####################################*/
+          this.oldBlurb = API.getUser().blurb;
+          this.blurbIsChanged = false;
+          urlParser = document.createElement('a');
+          addCommand('ppcas', {
+            description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")',
+            callback: function(str){
+              var server, base_url, helper, forceReconnect;
+              server = $.trim(str.substr(6));
+              if (server === "<url>") {
+                chatWarn("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars");
+                return;
+              } else if (server === ".") {
+                base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/";
+                helper = function(fn){
+                  var i$, ref$, len$, avatarID;
+                  fn = customAvatars[fn];
+                  for (i$ = 0, len$ = (ref$ = ['su01', 'su02', 'space03', 'space04', 'space05', 'space06']).length; i$ < len$; ++i$) {
+                    avatarID = ref$[i$];
+                    fn(avatarID, {
                       category: 'Veteran',
                       base_url: base_url,
-                      thumbOffsetTop: -19,
-                      thumbOffsetLeft: -16
+                      thumbOffsetTop: -5
                     });
-                    for (i$ = 0, len$ = (ref$ = ['animal01', 'animal02', 'animal03', 'animal04', 'animal05', 'animal06', 'animal07', 'animal08', 'animal09', 'animal10', 'animal11', 'animal12', 'animal13', 'animal14', 'lucha01', 'lucha02', 'lucha03', 'lucha04', 'lucha05', 'lucha06', 'lucha07', 'lucha08', 'monster01', 'monster02', 'monster03', 'monster04', 'monster05', '_tastycat', '_tastycat02', 'warrior01', 'warrior02', 'warrior03', 'warrior04']).length; i$ < len$; ++i$) {
-                      avatarID = ref$[i$];
-                      fn(avatarID, {
-                        category: 'Veteran',
-                        base_url: base_url,
-                        thumbOffsetTop: -10
-                      });
-                    }
-                  };
-                  this.socket = {
-                    close: function(){
-                      helper('removeAvatar');
-                      delete this.socket;
-                    }
-                  };
-                  helper('addAvatar');
-                  return;
-                } else if (server === 'default') {
-                  server = 'https://ppcas.p0ne.com/_';
-                } else if (server === 'reconnect') {
-                  server = this.socket.url;
-                  forceReconnect = true;
-                } else if (server.length === 0) {
-                  chatWarn("Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again. or `/ppCAS reconnect` to force-reconnect to the current server", "p0ne avatars");
-                  return;
-                }
-                urlParser.href = server;
-                if (urlParser.host !== location.host) {
-                  console.log(getTime() + " [p0ne custom avatars] connecting to", server);
-                  this.connect(server, forceReconnect);
-                } else {
-                  console.warn(getTime() + " [p0ne custom avatars] invalid ppCAS server");
-                }
-              }
-            });
-            this.connect(this.DEFAULT_SERVER);
-            function fn$(oC_){
-              return function(){
-                var avatarID, ref$, ref1$;
-                console.log("[p0ne custom avatars] Avatar Cell click", this);
-                avatarID = this.model.get("id");
-                if (!p0ne._avatars[avatarID] || p0ne._avatars[avatarID].inInventory) {
-                  oC_.apply(this, arguments);
-                  if ((ref$ = customAvatars.socket) != null) {
-                    ref$.emit('changeAvatarID', null);
                   }
-                } else {
-                  if ((ref1$ = customAvatars.socket) != null) {
-                    ref1$.emit('changeAvatarID', avatarID);
+                  fn('animal12', {
+                    category: 'Veteran',
+                    base_url: base_url,
+                    thumbOffsetTop: -19,
+                    thumbOffsetLeft: -16
+                  });
+                  for (i$ = 0, len$ = (ref$ = ['animal01', 'animal02', 'animal03', 'animal04', 'animal05', 'animal06', 'animal07', 'animal08', 'animal09', 'animal10', 'animal11', 'animal12', 'animal13', 'animal14', 'lucha01', 'lucha02', 'lucha03', 'lucha04', 'lucha05', 'lucha06', 'lucha07', 'lucha08', 'monster01', 'monster02', 'monster03', 'monster04', 'monster05', '_tastycat', '_tastycat02', 'warrior01', 'warrior02', 'warrior03', 'warrior04']).length; i$ < len$; ++i$) {
+                    avatarID = ref$[i$];
+                    fn(avatarID, {
+                      category: 'Veteran',
+                      base_url: base_url,
+                      thumbOffsetTop: -10
+                    });
                   }
-                  customAvatars.changeAvatar(userID, avatarID);
-                  this.onSelected();
-                }
-              };
-            }
-          },
-          connectAttemps: 1,
-          connect: function(url, reconnecting, reconnectWarning){
-            var reconnect, close_, user, oldBlurb, newBlurb, this$ = this;
-            if (!reconnecting && this.socket) {
-              if (url === this.socket.url && this.socket.readyState === 1) {
+                };
+                this.socket = {
+                  close: function(){
+                    helper('removeAvatar');
+                    delete this.socket;
+                  }
+                };
+                helper('addAvatar');
+                return;
+              } else if (server === 'default') {
+                server = 'https://ppcas.p0ne.com/_';
+              } else if (server === 'reconnect') {
+                server = this.socket.url;
+                forceReconnect = true;
+              } else if (server.length === 0) {
+                chatWarn("Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again. or `/ppCAS reconnect` to force-reconnect to the current server", "p0ne avatars");
                 return;
               }
-              this.socket.close();
-            }
-            console.log("[p0ne custom avatars] using socket as ppCAS avatar server");
-            reconnect = true;
-            if (reconnectWarning) {
-              sleep(10000, function(){
-                if (this$.connectAttemps === 0) {
-                  chatWarn("lost connection to avatar server \xa0 =(", "p0ne avatars");
-                }
-              });
-            }
-            _$context.trigger('ppCAS:connecting');
-            API.trigger('ppCAS:connecting');
-            this.socket = new SockJS(url);
-            this.socket.url = url;
-            this.socket.on = this.socket.addEventListener;
-            this.socket.off = this.socket.removeEventListener;
-            this.socket.once = function(type, callback){
-              this.on(type, function(){
-                this.off(type, callback);
-                callback.apply(this, arguments);
-              });
-            };
-            this.socket.emit = function(type){
-              var data;
-              data = slice$.call(arguments, 1);
-              console.log(getTime() + " [ppCAS] > [" + type + "]", data);
-              this.send(JSON.stringify({
-                type: type,
-                data: data
-              }));
-            };
-            this.socket.trigger = function(type, args){
-              var listeners, i$, len$, fn;
-              if (typeof args !== 'object' || !(args != null && args.length)) {
-                args = [args];
+              urlParser.href = server;
+              if (urlParser.host !== location.host) {
+                console.log(getTime() + " [p0ne custom avatars] connecting to", server);
+                this.connect(server, forceReconnect);
+              } else {
+                console.warn(getTime() + " [p0ne custom avatars] invalid ppCAS server");
               }
-              listeners = this._listeners[type];
-              if (listeners) {
-                for (i$ = 0, len$ = listeners.length; i$ < len$; ++i$) {
-                  fn = listeners[i$];
-                  fn.apply(this, args);
+            }
+          });
+          this.connect(this.DEFAULT_SERVER);
+          function fn$(oC_){
+            return function(){
+              var avatarID, ref$, ref1$;
+              console.log("[p0ne custom avatars] Avatar Cell click", this);
+              avatarID = this.model.get("id");
+              if (!p0ne._avatars[avatarID] || p0ne._avatars[avatarID].inInventory) {
+                oC_.apply(this, arguments);
+                if ((ref$ = customAvatars.socket) != null) {
+                  ref$.emit('changeAvatarID', null);
                 }
               } else {
-                console.error(getTime() + " [ppCAS] unknown event '" + type + "'");
+                if ((ref1$ = customAvatars.socket) != null) {
+                  ref1$.emit('changeAvatarID', avatarID);
+                }
+                customAvatars.changeAvatar(userID, avatarID);
+                this.onSelected();
               }
             };
-            this.socket.onmessage = function(arg$){
-              var message, ref$, type, data, e;
-              message = arg$.data;
-              try {
-                ref$ = JSON.parse(message), type = ref$.type, data = ref$.data;
-                console.log(getTime() + " [ppCAS] < [" + type + "]", data);
-              } catch (e$) {
-                e = e$;
-                console.warn(getTime() + " [ppCAS] invalid message received", message, e);
-                return;
-              }
-              this$.socket.trigger(type, data);
-            };
-            close_ = this.socket.close;
-            this.socket.close = function(){
-              this.trigger('close');
-              close_.apply(this, arguments);
-            };
-            user = API.getUser();
-            oldBlurb = user.blurb || "";
-            newBlurb = oldBlurb.replace(/🐎\w{6}/g, '');
-            if (oldBlurb !== newBlurb) {
-              this.changeBlurb(newBlurb, {
-                success: function(){
-                  console.info(getTime() + " [ppCAS] removed old authToken from user blurb");
-                }
-              });
-            }
-            this.socket.on('authToken', function(authToken){
-              var user, newBlurb;
-              user = API.getUser();
-              this$.oldBlurb = user.blurb || "";
-              if (!user.blurb) {
-                newBlurb = authToken;
-              } else if (user.blurb.length >= 72) {
-                newBlurb = user.blurb.substr(0, 71) + "… 🐎" + authToken;
-              } else {
-                newBlurb = user.blurb + " 🐎" + authToken;
-              }
-              this$.blurbIsChanged = true;
-              this$.changeBlurb(newBlurb, {
-                success: function(){
-                  this$.blurbIsChanged = false;
-                  this$.socket.emit('auth', userID);
-                },
-                error: function(){
-                  console.error(getTime() + " [ppCAS] failed to authenticate by changing the blurb.");
-                  this$.changeBlurb(this$.oldBlurb, {
-                    success: function(){
-                      console.info(getTime() + " [ppCAS] blurb reset.");
-                    }
-                  });
-                }
-              });
-            });
-            this.socket.on('authAccepted', function(){
-              this$.connectAttemps = 0;
-              reconnecting = false;
-              this$.changeBlurb(this$.oldBlurb, {
-                success: function(){
-                  this$.blurbIsChanged = false;
-                },
-                error: function(){
-                  chatWarn("failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?", "p0ne avatars");
-                  this$.changeBlurb(this$.oldBlurb, {
-                    error: function(){
-                      console.error(getTime() + " [ppCAS] failed to reset the blurb.");
-                    }
-                  });
-                }
-              });
-            });
-            this.socket.on('authDenied', function(){
-              console.warn(getTime() + " [ppCAS] authDenied");
-              chatWarn("authentification failed", "p0ne avatars");
-              this$.changeBlurb(this$.oldBlurb, {
-                success: function(){
-                  this$.blurbIsChanged = false;
-                },
-                error: function(){
-                  this$.changeBlurb(this$.oldBlurb, {
-                    error: function(){
-                      console.error(getTime() + " [ppCAS] failed to reset the blurb.");
-                    }
-                  });
-                }
-              });
-              chatWarn("Failed to authenticate with user id '" + userID + "'", "p0ne avatars");
-            });
-            this.socket.on('avatars', function(avatars){
-              var user, avatarID, avatar;
-              user = API.getUser();
-              this$.socket.avatars = avatars;
-              for (avatarID in avatars) {
-                avatar = avatars[avatarID];
-                this$.addAvatar(avatarID, avatar);
-              }
-              if (this$._settings.avatarID in avatars) {
-                this$.socket.emit('changeAvatarID', user.avatarID);
-              } else {
-                this$.socket.emit('changeAvatarID', null);
-              }
-              if (this$.socket.users) {
-                requestAnimationFrame(initUsers);
-              }
-            });
-            this.socket.on('users', function(users){
-              this$.socket.users = users;
-              if (this$.socket.avatars) {
-                requestAnimationFrame(initUsers);
-              }
-            });
-            function initUsers(avatarID){
-              var userID, ref$, ref1$;
-              for (userID in ref$ = this$.socket.users) {
-                avatarID = ref$[userID];
-                console.log(getTime() + " [ppCAS] change other's avatar", userID, "(" + ((ref1$ = users.get(userID)) != null ? ref1$.get('username') : void 8) + ")", avatarID);
-                this$.changeAvatar(userID, avatarID);
-              }
-              if (reconnecting) {
-                chatWarn("reconnected", "p0ne avatars");
-              }
-              _$context.trigger('ppCAS:connected');
-              return API.trigger('ppCAS:connected');
-            }
-            this.socket.on('changeAvatarID', function(userID, avatarID){
-              var ref$;
-              console.log(getTime() + " [ppCAS] change other's avatar:", userID, avatarID);
-              if ((ref$ = users.get(userID)) != null) {
-                ref$.set('avatarID', avatarID);
-              }
-            });
-            this.socket.on('disconnect', function(userID){
-              console.log(getTime() + " [ppCAS] user disconnected:", userID);
-              this$.changeAvatarID(userID, avatarID);
-            });
-            this.socket.on('disconnected', function(reason){
-              this$.socket.trigger('close', reason);
-            });
-            this.socket.on('close', function(reason){
-              console.warn(getTime() + " [ppCAS] connection closed", reason);
-              reconnect = false;
-            });
-            this.socket.onclose = function(e){
-              var timeout;
-              console.warn(getTime() + " [ppCAS] DISCONNECTED", e);
-              _$context.trigger('ppCAS:disconnected');
-              API.trigger('ppCAS:disconnected');
-              /*if e.wasClean
-                  reconnect := false
-              else*/
-              if (reconnect && !this$.disabled) {
-                timeout = ~~((5000 + Math.random() * 5000) * this$.connectAttemps);
-                console.info(getTime() + " [ppCAS] reconnecting in " + humanTime(timeout) + " (" + xth(this$.connectAttemps) + " attempt)");
-                this$.reconnectTimer = sleep(timeout, function(){
-                  console.log(getTime() + " [ppCAS] reconnecting…");
-                  this$.connectAttemps++;
-                  this$.connect(url, true, this$.connectAttemps === 1);
-                  _$context.trigger('ppCAS:connecting');
-                  API.trigger('ppCAS:connecting');
-                });
-              }
-            };
-          },
-          changeBlurb: function(newBlurb, options){
-            options == null && (options = {});
-            $.ajax({
-              method: 'PUT',
-              url: '/_/profile/blurb',
-              contentType: 'application/json',
-              data: JSON.stringify({
-                blurb: newBlurb
-              }),
-              success: options.success,
-              error: options.error
-            });
-          },
-          disable: function(){
-            var ref$, avatarID, ref1$, avi, i$, user, that;
-            if (this.blurbIsChanged) {
-              this.changeBlurb(this.oldBlurb);
-            }
-            if ((ref$ = this.socket) != null) {
-              ref$.close();
-            }
-            clearTimeout(this.reconnectTimer);
-            for (avatarID in ref1$ = p0ne._avatars) {
-              avi = ref1$[avatarID];
-              avi.inInventory = false;
-            }
-            this.updateAvatarStore();
-            for (i$ in ref1$ = users.models) {
-              user = ref1$[i$];
-              if (that = user.attributes.avatarID_) {
-                user.set('avatarID', that);
-              }
-            }
-          }
-        });
-      });
-      module('ppCASStatusRing', {
-        settings: 'dev',
-        help: 'shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).\ngreen: connected\norange: connecting\nred: disconnected',
-        setup: function(arg$){
-          var addListener, $footerAvi;
-          addListener = arg$.addListener;
-          $footerAvi = $('#footer-user .thumb');
-          addListener(API, 'ppCAS:connected', function(){
-            $footerAvi.css({
-              borderColor: 'limegreen'
-            });
-          });
-          addListener(API, 'ppCAS:connecting', function(){
-            $footerAvi.css({
-              borderColor: 'orange'
-            });
-          });
-          addListener(API, 'ppCAS:disconnected', function(){
-            $footerAvi.css({
-              borderColor: 'red'
-            });
-          });
-        }
-      });
-      /*@source p0ne.settings.ls */
-      /**
-       * Settings pane for plug_p0ne
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #              SETTINGS              #
-      ####################################*/
-      module('p0neSettings', {
-        _settings: {
-          groupToggles: {
-            p0neSettings: true,
-            base: true
           }
         },
-        setup: function(arg$, p0neSettings, oldModule){
-          var $create, addListener, groupToggles, ref$, $ppM, $ppI, $ppW, $ppS, $ppP, i$, module, ref1$, panelIconTimeout, this$ = this;
-          $create = arg$.$create, addListener = arg$.addListener;
-          groupToggles = this.groupToggles = (ref$ = this._settings).groupToggles || (ref$.groupToggles = {
-            p0neSettings: true,
-            base: true
-          });
-          $ppM = $create("<div id=p0ne-menu>").insertAfter('#app-menu');
-          $ppI = $("<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>").appendTo($ppM);
-          $ppW = this.$ppW = $("<div class=p0ne-settings-wrapper>").appendTo($ppM);
-          $ppS = $("<div class='p0ne-settings noselect'>").appendTo($ppW);
-          $ppP = $("<div class=p0ne-settings-popup>").appendTo($ppM).fadeOut(0);
-          $ppS.addClass('p0ne-settings-showall');
-          this.$vip = $("<div class=p0ne-settings-vip>").appendTo($ppS);
-          this.toggleMenu(groupToggles.p0neSettings);
-          this.$ppInfo = $("<div class=p0ne-settings-footer><div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div><div class=p0ne-settings-version>v" + p0ne.version + "</div><div class=p0ne-settings-help-btn>help</div><div class=p0ne-settings-expert-toggle>show all options</div></div>").appendTo($ppS);
-          for (i$ in ref$ = p0ne.modules) {
-            module = ref$[i$];
-            if (!module.loading) {
-              this.addModule(module);
-              if ((ref1$ = module._$settingsPanel) != null) {
-                ref1$.wrapper.appendTo($ppM);
+        connectAttemps: 1,
+        connect: function(url, reconnecting, reconnectWarning){
+          var reconnect, close_, user, oldBlurb, newBlurb, this$ = this;
+          if (!reconnecting && this.socket) {
+            if (url === this.socket.url && this.socket.readyState === 1) {
+              return;
+            }
+            this.socket.close();
+          }
+          console.log("[p0ne custom avatars] using socket as ppCAS avatar server");
+          reconnect = true;
+          _$context.trigger('ppCAS:connecting');
+          API.trigger('ppCAS:connecting');
+          this.socket = new SockJS(url);
+          this.socket.url = url;
+          this.socket.on = this.socket.addEventListener;
+          this.socket.off = this.socket.removeEventListener;
+          this.socket.once = function(type, callback){
+            this.on(type, function(){
+              this.off(type, callback);
+              callback.apply(this, arguments);
+            });
+          };
+          this.socket.emit = function(type){
+            var data;
+            data = slice$.call(arguments, 1);
+            console.log(getTime() + " [ppCAS] > [" + type + "]", data);
+            this.send(JSON.stringify({
+              type: type,
+              data: data
+            }));
+          };
+          this.socket.trigger = function(type, args){
+            var listeners, i$, len$, fn;
+            if (typeof args !== 'object' || !(args != null && args.length)) {
+              args = [args];
+            }
+            listeners = this._listeners[type];
+            if (listeners) {
+              for (i$ = 0, len$ = listeners.length; i$ < len$; ++i$) {
+                fn = listeners[i$];
+                fn.apply(this, args);
               }
+            } else {
+              console.error(getTime() + " [ppCAS] unknown event '" + type + "'");
+            }
+          };
+          this.socket.onmessage = function(arg$){
+            var message, ref$, type, data, e;
+            message = arg$.data;
+            try {
+              ref$ = JSON.parse(message), type = ref$.type, data = ref$.data;
+              console.log(getTime() + " [ppCAS] < [" + type + "]", data);
+            } catch (e$) {
+              e = e$;
+              console.warn(getTime() + " [ppCAS] invalid message received", message, e);
+              return;
+            }
+            this$.socket.trigger(type, data);
+          };
+          close_ = this.socket.close;
+          this.socket.close = function(){
+            this.trigger('close');
+            close_.apply(this, arguments);
+          };
+          user = API.getUser();
+          oldBlurb = user.blurb || "";
+          newBlurb = oldBlurb.replace(/🐎\w{6}/g, '');
+          if (oldBlurb !== newBlurb) {
+            this.changeBlurb(newBlurb, {
+              success: function(){
+                console.info(getTime() + " [ppCAS] removed old authToken from user blurb");
+              }
+            });
+          }
+          this.socket.on('authToken', function(authToken){
+            var user, newBlurb;
+            user = API.getUser();
+            this$.oldBlurb = user.blurb || "";
+            if (!user.blurb) {
+              newBlurb = authToken;
+            } else if (user.blurb.length >= 72) {
+              newBlurb = user.blurb.substr(0, 71) + "… 🐎" + authToken;
+            } else {
+              newBlurb = user.blurb + " 🐎" + authToken;
+            }
+            this$.blurbIsChanged = true;
+            this$.changeBlurb(newBlurb, {
+              success: function(){
+                this$.blurbIsChanged = false;
+                this$.socket.emit('auth', userID);
+              },
+              error: function(){
+                console.error(getTime() + " [ppCAS] failed to authenticate by changing the blurb.");
+                this$.changeBlurb(this$.oldBlurb, {
+                  success: function(){
+                    console.info(getTime() + " [ppCAS] blurb reset.");
+                  }
+                });
+              }
+            });
+          });
+          this.socket.on('authAccepted', function(){
+            this$.connectAttemps = 0;
+            reconnecting = false;
+            this$.changeBlurb(this$.oldBlurb, {
+              success: function(){
+                this$.blurbIsChanged = false;
+              },
+              error: function(){
+                chatWarn("failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?", "p0ne avatars");
+                this$.changeBlurb(this$.oldBlurb, {
+                  error: function(){
+                    console.error(getTime() + " [ppCAS] failed to reset the blurb.");
+                  }
+                });
+              }
+            });
+          });
+          this.socket.on('authDenied', function(){
+            console.warn(getTime() + " [ppCAS] authDenied");
+            chatWarn("authentification failed", "p0ne avatars");
+            this$.changeBlurb(this$.oldBlurb, {
+              success: function(){
+                this$.blurbIsChanged = false;
+              },
+              error: function(){
+                this$.changeBlurb(this$.oldBlurb, {
+                  error: function(){
+                    console.error(getTime() + " [ppCAS] failed to reset the blurb.");
+                  }
+                });
+              }
+            });
+            chatWarn("Failed to authenticate with user id '" + userID + "'", "p0ne avatars");
+          });
+          this.socket.on('avatars', function(avatars){
+            var user, avatarID, avatar;
+            user = API.getUser();
+            this$.socket.avatars = avatars;
+            for (avatarID in avatars) {
+              avatar = avatars[avatarID];
+              this$.addAvatar(avatarID, avatar);
+            }
+            if (this$._settings.avatarID in avatars) {
+              this$.socket.emit('changeAvatarID', user.avatarID);
+            } else {
+              this$.socket.emit('changeAvatarID', null);
+            }
+            if (this$.socket.users) {
+              requestAnimationFrame(initUsers);
+            }
+          });
+          this.socket.on('users', function(users){
+            this$.socket.users = users;
+            if (this$.socket.avatars) {
+              requestAnimationFrame(initUsers);
+            }
+          });
+          function initUsers(avatarID){
+            var userID, ref$;
+            for (userID in ref$ = this$.socket.users) {
+              avatarID = ref$[userID];
+              this$.changeAvatar(userID, avatarID);
+            }
+            if (reconnecting) {
+              chatWarn("reconnected", "p0ne avatars");
+            }
+            _$context.trigger('ppCAS:connected');
+            return API.trigger('ppCAS:connected');
+          }
+          this.socket.on('changeAvatarID', function(userID, avatarID){
+            console.log(getTime() + " [ppCAS] change other's avatar:", userID, avatarID);
+            this$.changeAvatar(userID, avatarID);
+          });
+          this.socket.on('disconnect', function(userID){
+            console.log(getTime() + " [ppCAS] user disconnected:", userID);
+            this$.changeAvatarID(userID, avatarID);
+          });
+          this.socket.on('disconnected', function(reason){
+            this$.socket.trigger('close', reason);
+          });
+          this.socket.on('close', function(reason){
+            console.warn(getTime() + " [ppCAS] connection closed", reason);
+            reconnect = false;
+          });
+          this.socket.onclose = function(e){
+            var timeout;
+            console.warn(getTime() + " [ppCAS] DISCONNECTED", e);
+            _$context.trigger('ppCAS:disconnected');
+            API.trigger('ppCAS:disconnected');
+            /*if e.wasClean
+                reconnect := false
+            else*/
+            if (reconnect && !this$.disabled) {
+              timeout = ~~((5000 + Math.random() * 5000) * this$.connectAttemps);
+              console.info(getTime() + " [ppCAS] reconnecting in " + humanTime(timeout) + " (" + xth(this$.connectAttemps) + " attempt)");
+              this$.reconnectTimer = sleep(timeout, function(){
+                console.log(getTime() + " [ppCAS] reconnecting…");
+                this$.connectAttemps++;
+                this$.connect(url, true, this$.connectAttemps === 1);
+                _$context.trigger('ppCAS:connecting');
+                API.trigger('ppCAS:connecting');
+              });
+            }
+          };
+        },
+        changeBlurb: function(newBlurb, options){
+          options == null && (options = {});
+          $.ajax({
+            method: 'PUT',
+            url: '/_/profile/blurb',
+            contentType: 'application/json',
+            data: JSON.stringify({
+              blurb: newBlurb
+            }),
+            success: options.success,
+            error: options.error
+          });
+        },
+        disable: function(){
+          var ref$, avatarID, ref1$, avi, i$, user, that;
+          if (this.blurbIsChanged) {
+            this.changeBlurb(this.oldBlurb);
+          }
+          if ((ref$ = this.socket) != null) {
+            ref$.close();
+          }
+          clearTimeout(this.reconnectTimer);
+          for (avatarID in ref1$ = p0ne._avatars) {
+            avi = ref1$[avatarID];
+            avi.inInventory = false;
+          }
+          this.updateAvatarStore();
+          for (i$ in ref1$ = users.models) {
+            user = ref1$[i$];
+            if (that = user.attributes.avatarID_) {
+              user.set('avatarID', that);
             }
           }
-          addListener(API, 'p0ne:stylesLoaded', function(){
-            requestAnimationFrame(function(){
+        }
+      });
+    });
+    module('ppCASStatusRing', {
+      settings: 'dev',
+      help: 'shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).\ngreen: connected\norange: connecting\nred: disconnected',
+      setup: function(arg$){
+        var addListener, $footerAvi;
+        addListener = arg$.addListener;
+        $footerAvi = $('#footer-user .thumb');
+        addListener(API, 'ppCAS:connected', function(){
+          $footerAvi.css({
+            borderColor: 'limegreen'
+          });
+        });
+        addListener(API, 'ppCAS:connecting', function(){
+          $footerAvi.css({
+            borderColor: 'orange'
+          });
+        });
+        addListener(API, 'ppCAS:disconnected', function(){
+          $footerAvi.css({
+            borderColor: 'red'
+          });
+        });
+      }
+    });
+    /*@source p0ne.settings.ls */
+    /**
+     * Settings pane for plug_p0ne
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #              SETTINGS              #
+    ####################################*/
+    module('p0neSettings', {
+      _settings: {
+        groupToggles: {
+          p0neSettings: true,
+          base: true
+        }
+      },
+      setup: function(arg$, p0neSettings, oldModule){
+        var $create, addListener, groupToggles, ref$, $ppM, $ppI, $ppW, $ppS, $ppP, i$, module, ref1$, debugMode, debugClosingDur, panelIconTimeout, this$ = this;
+        $create = arg$.$create, addListener = arg$.addListener;
+        groupToggles = this.groupToggles = (ref$ = this._settings).groupToggles || (ref$.groupToggles = {
+          p0neSettings: true,
+          base: true
+        });
+        $ppM = $create("<div id=p0ne-menu>").insertAfter('#app-menu');
+        $ppI = $("<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>").appendTo($ppM);
+        $ppW = this.$ppW = $("<div class=p0ne-settings-wrapper>").appendTo($ppM);
+        $ppS = $("<div class='p0ne-settings noselect'>").appendTo($ppW);
+        $ppP = $("<div class=p0ne-settings-popup>").appendTo($ppM).fadeOut(0);
+        $ppS.addClass('p0ne-settings-showall');
+        this.$vip = $("<div class=p0ne-settings-vip>").appendTo($ppS);
+        this.$vip.items = this.$vip;
+        this.toggleMenu(groupToggles.p0neSettings);
+        this.$ppInfo = $("<div class=p0ne-settings-footer><div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div><div class=p0ne-settings-version>v" + p0ne.version + "</div><div class=p0ne-settings-help-btn>help</div><div class=p0ne-settings-expert-toggle>show all options</div></div>").appendTo($ppS);
+        for (i$ in ref$ = p0ne.modules) {
+          module = ref$[i$];
+          if (!module.loading) {
+            this.addModule(module);
+            if ((ref1$ = module._$settingsPanel) != null) {
+              ref1$.wrapper.appendTo($ppM);
+            }
+          }
+        }
+        addListener(API, 'p0ne:stylesLoaded', function(){
+          requestAnimationFrame(function(){
+            var group, ref$, $el;
+            for (group in ref$ = this$.groups) {
+              $el = ref$[group];
+              $el.trigger('p0ne:resize');
+            }
+          });
+        })();
+        debugMode = 0;
+        debugClosingDur = 500;
+        $ppI.click(function(){
+          var group, ref$, $el, keepOpen;
+          if (this$.toggleMenu()) {
+            $ppW.removeClass("p0ne-settings-debug-" + debugMode);
+            debugMode = (debugMode + 1) % 3;
+            $ppI.children().text(debugMode);
+            $ppW.addClass("p0ne-settings-debug-" + debugMode);
+            if (debugMode === 2) {
+              debugClosingDur = 0;
+              this$.$vip.hide();
+              $ppP.appendTo($ppW);
+            } else {
+              debugClosingDur = 500;
+              this$.$vip.show();
+              $ppP.appendTo($ppM);
+            }
+            for (group in ref$ = this$.groups) {
+              $el = ref$[group];
+              if (this$._settings.groupToggles[group]) {
+                if (!keepOpen) {
+                  $el.removeClass('open').css({
+                    height: 30
+                  });
+                } else {
+                  keepOpen = group;
+                }
+              }
+            }
+            if (!keepOpen) {
+              keepOpen = 'base';
+              this$.groupToggles.base = true;
+              this$.groups.base.find('.p0ne-settings-summary').click();
+            }
+            sleep(debugClosingDur, function(){
               var group, ref$, $el;
               for (group in ref$ = this$.groups) {
                 $el = ref$[group];
                 if (this$._settings.groupToggles[group]) {
-                  $el.trigger('p0ne:resize');
-                }
-              }
-            });
-          })();
-          $ppI.click(function(){
-            this$.toggleMenu();
-          });
-          addListener($body, 'click', '.p0ne-settings-summary', throttle(200, function(e){
-            var $s;
-            $s = $(this).parent();
-            if ($s.hasClass('open')) {
-              groupToggles[$s.data('group')] = false;
-              $s.removeClass('open').css({
-                height: 30
-              });
-            } else {
-              groupToggles[$s.data('group')] = true;
-              $s.addClass('open').trigger('p0ne:resize');
-            }
-            e.preventDefault();
-          }));
-          addListener($ppW, 'p0ne:resize', '.p0ne-settings-group', function(e){
-            var $this;
-            $this = $(this);
-            if (p0neSettings._settings.groupToggles[$this.data('group')]) {
-              $this.css({
-                height: 0
-              });
-              $this.css({
-                height: this.scrollHeight
-              });
-            }
-            $this.scrollTop(0);
-          });
-          addListener($ppW, 'click', '.checkbox', throttle(200, function(){
-            var $this, enable, $el, module;
-            $this = $(this);
-            enable = this.checked;
-            $el = $this.closest('.p0ne-settings-item');
-            module = $el.data('module');
-            if (typeof module === 'string') {
-              module = window[module] || {};
-            }
-            if (enable) {
-              module.enable();
-            } else {
-              module.disable();
-            }
-          }));
-          panelIconTimeout = 0;
-          addListener($ppW, 'click', '.p0ne-settings-panel-icon', function(e){
-            var $this, module, ref$, ref1$, offsetLeft;
-            e.stopImmediatePropagation();
-            e.preventDefault();
-            if (panelIconTimeout) {
-              return;
-            }
-            panelIconTimeout = sleep(200, function(){
-              return panelIconTimeout = 0;
-            });
-            $this = $(this).closest('.p0ne-settings-item');
-            module = $this.data('module');
-            console.log("[p0ne-settings-panel-icon] clicked", panelIconTimeout, !!module._$settingsPanel, (ref$ = module._$settingsPanel) != null ? ref$.open : void 8, (ref1$ = module._$settingsPanel) != null ? ref1$.wrapper : void 8);
-            if (!module._$settingsPanel) {
-              module._$settingsPanel = {
-                open: false,
-                wrapper: $('<div class=p0ne-settings-panel-wrapper>').appendTo($ppM),
-                $el: $("<div class='p0ne-settings-panel p0ne-settings-panel-" + module.name.toLowerCase() + "'>")
-              };
-              module._$settingsPanel.$el.appendTo(module._$settingsPanel.wrapper);
-              module.settingsPanel(module._$settingsPanel.$el, module);
-            }
-            offsetLeft = $ppW.width();
-            if (module._$settingsPanel.open) {
-              module._$settingsPanel.wrapper.animate({
-                left: offsetLeft - module._$settingsPanel.$el.width()
-              }, function(){
-                return $(this).hide();
-              });
-              module._$settingsPanel.open = false;
-            } else {
-              module._$settingsPanel.wrapper.show().css({
-                left: offsetLeft - module._$settingsPanel.$el.width()
-              }).animate({
-                left: offsetLeft
-              });
-              module._$settingsPanel.open = true;
-            }
-          });
-          addListener($ppW, 'mouseover', '.p0ne-settings-has-more', function(){
-            var $this, module, l, maxT, h, t, tt, ref$, diff;
-            $this = $(this);
-            module = $this.data('module');
-            $ppP.html("<div class=p0ne-settings-popup-triangle></div><h3>" + module.displayName + "</h3>" + module.help + "" + (!module.screenshot
-              ? ''
-              : '<img src=' + module.screenshot + '>') + "");
-            l = $ppW.width();
-            maxT = $ppM.height();
-            h = $ppP.height();
-            t = $this.offset().top - 50;
-            tt = (ref$ = t - h / 2) > 0 ? ref$ : 0;
-            diff = tt - (maxT - h - 30);
-            if (diff > 0) {
-              t += diff + 10 - tt;
-              tt -= diff;
-            } else if (tt !== 0) {
-              t = '50%';
-            }
-            $ppP.css({
-              top: tt,
-              left: l
-            }).stop().fadeIn();
-            $ppP.find('.p0ne-settings-popup-triangle').css({
-              top: 14 > t ? 14 : t
-            });
-          });
-          addListener($ppW, 'mouseout', '.p0ne-settings-has-more', function(){
-            $ppP.stop().fadeOut();
-          });
-          addListener($ppP, 'mouseover', function(){
-            $ppP.stop().fadeIn();
-          });
-          addListener($ppP, 'mouseout', function(){
-            $ppP.stop().fadeOut();
-          });
-          addListener(API, 'p0ne:moduleLoaded', function(module){
-            this$.addModule(module);
-          });
-          addListener(API, 'p0ne:moduleEnabled', function(module){
-            var ref$;
-            if ((ref$ = module._$settings) != null) {
-              ref$.addClass('p0ne-settings-item-enabled').find('.checkbox')[0].checked = true;
-            }
-            this$.loadSettingsExtra(true, module);
-            if (this$._settings.groupToggles[module.settings]) {
-              requestAnimationFrame(function(){
-                this$.groups[module.settings].trigger('p0ne:resize');
-              });
-            }
-          });
-          addListener(API, 'p0ne:moduleUpdated', function(module, module_){
-            var ref$;
-            if (module.settings) {
-              this$.addModule(module, module_);
-              if (module.help !== module_.help && ((ref$ = module._$settings) != null && ref$.is(':hover'))) {
-                module._$settings.mouseover();
-              }
-            }
-          });
-          addListener(API, 'p0ne:moduleDisabled', function(module_){
-            var ref$, ref1$;
-            if ((ref$ = module_._$settings) != null) {
-              ref$.removeClass('p0ne-settings-item-enabled').find('.checkbox').attr('checked', false);
-            }
-            if ((ref1$ = module_._$settingsExtra) != null) {
-              ref1$.stop().slideUp(function(){
-                $(this).trigger('p0ne:resize').remove();
-              });
-            }
-          });
-          addListener($body, 'click', '#app-menu', function(){
-            this$.toggleMenu(false);
-          });
-          if (typeof _$context != 'undefined' && _$context !== null) {
-            addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
-              this$.toggleMenu(false);
-            });
-          }
-          addListener($body, 'click', '#plugcubed', function(){
-            this$.toggleMenu(false);
-          });
-          _.defer(function(){
-            var d, scrollLeftMax;
-            d = $('<div>').css({
-              height: 100,
-              width: 100,
-              overflow: 'auto'
-            }).append($('<div>').css({
-              height: 102,
-              width: 100
-            })).appendTo('body');
-            if ('scrollLeftMax' in d[0]) {
-              scrollLeftMax = d[0].scrollLeftMax;
-            } else {
-              d[0].scrollLeft = Number.POSITIVE_INFINITY;
-              scrollLeftMax = d[0].scrollLeft;
-            }
-            if (scrollLeftMax !== 0) {
-              $ppW.css({
-                paddingRight: scrollLeftMax
-              });
-            }
-            d.remove();
-          });
-        },
-        toggleMenu: function(state){
-          var i$, ref$, module, ref1$;
-          if (state != null
-            ? state
-            : state = !this.groupToggles.p0neSettings) {
-            this.$ppW.slideDown();
-          } else {
-            this.$ppW.slideUp();
-            for (i$ in ref$ = p0ne.modules) {
-              module = ref$[i$];
-              if ((ref1$ = module._$settingsPanel) != null && ref1$.open) {
-                module._$settingsPanel.wrapper.animate({
-                  left: this.$ppW.width() - module._$settingsPanel.$el.width()
-                }, fn$);
-                module._$settingsPanel.open = false;
-              }
-            }
-          }
-          this.groupToggles.p0neSettings = state;
-          function fn$(){
-            return $(this).hide();
-          }
-        },
-        groups: {},
-        moderationGroup: $(),
-        addModule: function(module, module_){
-          var itemClasses, icons, i$, ref$, len$, k, $s;
-          if (module.settings) {
-            itemClasses = 'p0ne-settings-item';
-            icons = "";
-            for (i$ = 0, len$ = (ref$ = ['help', 'screenshot']).length; i$ < len$; ++i$) {
-              k = ref$[i$];
-              if (module[k]) {
-                icons += "<div class=p0ne-settings-" + k + "></div>";
-              }
-            }
-            if (module.settingsPanel) {
-              icons += "<div class=p0ne-settings-panel-icon><i class='icon icon-settings-white'></i></div>";
-            }
-            if (icons.length) {
-              icons = "<div class=p0ne-settings-icons>" + icons + "</div>";
-              itemClasses += ' p0ne-settings-has-more';
-            }
-            if (module.settingsExtra) {
-              itemClasses += ' p0ne-settings-has-extra';
-            }
-            if (!module.disabled) {
-              itemClasses += ' p0ne-settings-item-enabled';
-            }
-            if (module.settingsVip) {
-              $s = this.$vip;
-              itemClasses += ' p0ne-settings-is-vip';
-            } else if (!($s = this.groups[module.settings])) {
-              $s = this.groups[module.settings] = $('<div class=p0ne-settings-group>').data('group', module.settings).append($('<div class=p0ne-settings-summary>').text(module.settings.toUpperCase())).insertBefore(this.$ppInfo);
-              if (this._settings.groupToggles[module.settings]) {
-                $s.addClass('open');
-              } else {
-                $s.css({
-                  height: 30
-                });
-              }
-              if (module.settings === 'moderation') {
-                $s.addClass('p0ne-settings-group-moderation');
-              }
-              if (this._settings.groupToggles[module.settings]) {
-                $s.find('.p0ne-settings-summary').click();
-              }
-            }
-            module._$settings = $("<label class='" + itemClasses + "'><input type=checkbox class=checkbox " + (module.disabled ? '' : 'checked') + " /><div class=togglebox><div class=knob></div></div>" + module.displayName + "" + icons + "</label>").data('module', module);
-            if (module_ != null && ((ref$ = module_._$settings) != null && ref$.parent().is($s))) {
-              module_._$settings.after(module._$settings.addClass('updated')).remove();
-              sleep(2000, function(){
-                module._$settings.removeClass('updated');
-              });
-              if (!module.disabled) {
-                this.loadSettingsExtra(false, module, module_);
-              }
-            } else {
-              module._$settings.appendTo($s);
-              if (!module.disabled) {
-                this.loadSettingsExtra(false, module);
-              }
-            }
-          }
-        },
-        loadSettingsExtra: function(autofocus, module, module_){
-          var ref$, err, ref1$, this$ = this;
-          try {
-            if (module_ != null) {
-              if ((ref$ = module_._$settingsExtra) != null) {
-                ref$.remove();
-              }
-            }
-            if (module.settingsExtra) {
-              module.settingsExtra(module._$settingsExtra = $("<div class=p0ne-settings-extra>").hide().insertAfter(module._$settings));
-              requestAnimationFrame(function(){
-                module._$settingsExtra.slideDown(function(){
-                  return module._$settingsExtra.trigger('p0ne:resize');
-                });
-                if (autofocus) {
-                  module._$settingsExtra.find('input').focus();
-                } else {
-                  module._$settings.parent().scrollTop(0);
-                }
-              });
-            }
-          } catch (e$) {
-            err = e$;
-            console.error("[" + module.name + "] error while processing settingsExtra", err.stack);
-            if ((ref1$ = module._$settingsExtra) != null) {
-              ref1$.remove();
-            }
-            this.groups[module.settings].trigger('p0ne:resize');
-          }
-        }
-      });
-      /*@source p0ne.moderate.ls */
-      /**
-       * plug_p0ne modules to help moderators do their job
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #       BASE MODERATION MODULE       #
-      ####################################*/
-      module('enableModeratorModules', {
-        require: ['user_'],
-        setup: function(arg$){
-          var addListener, prevRole;
-          addListener = arg$.addListener;
-          prevRole = user_.get('role');
-          if (user.isStaff) {
-            $body.addClass('user-is-staff');
-          }
-          addListener(user_, 'change:role', function(user_, newRole){
-            var i$, ref$, m;
-            console.log("[p0ne] change:role from " + prevRole + " to " + newRole);
-            if (newRole > 1 && prevRole < 2) {
-              console.info("[p0ne] enabling moderator modules");
-              for (i$ in ref$ = p0ne.modules) {
-                m = ref$[i$];
-                if (m.modDisabled) {
-                  console.log("[p0ne moderator] enabling", m.name);
-                  m.enable();
-                  m.modDisabled = false;
-                }
-              }
-              $body.addClass('user-is-staff');
-              user_.isStaff = true;
-            } else if (newRole < 2 && prevRole > 1) {
-              console.info("[p0ne] disabling moderator modules");
-              for (i$ in ref$ = p0ne.modules) {
-                m = ref$[i$];
-                if (m.moderator && !m.disabled) {
-                  console.log("[p0ne moderator] disabling", m.name);
-                  m.modDisabled = true;
-                  m.disable();
-                }
-              }
-              $body.removeClass('user-is-staff');
-              user_.isStaff = false;
-            }
-            prevRole = newRole;
-          });
-        },
-        disable: function(){
-          $body.removeClass('user-is-staff');
-        }
-      });
-      /*####################################
-      #       WARN ON HISTORY PLAYS        #
-      ####################################*/
-      module('warnOnHistory', {
-        displayName: 'Warn on History',
-        moderator: true,
-        settings: 'moderation',
-        setup: function(arg$){
-          var addListener, this$ = this;
-          addListener = arg$.addListener;
-          addListener(API, 'advance', function(d){
-            var hist, inHistory, skipped, i$, len$, i, m, lastPlayI, lastPlay, msg;
-            if (d.media) {
-              hist = API.getHistory();
-              inHistory = 0;
-              skipped = 0;
-              for (i$ = 0, len$ = hist.length; i$ < len$; ++i$) {
-                i = i$;
-                m = hist[i$];
-                if (m.media.cid === d.media.cid && i !== 0) {
-                  lastPlayI || (lastPlayI = i);
-                  lastPlay || (lastPlay = m);
-                  inHistory++;
-                  if (m.skipped) {
-                    skipped++;
+                  if (!groupToggles[group] && group !== keepOpen) {
+                    groupToggles[group] = false;
+                    $el.addClass('closed');
                   }
                 }
               }
-              if (inHistory) {
-                msg = "";
-                if (inHistory > 1) {
-                  msg += inHistory + "x ";
-                }
-                msg += "(" + (lastPlayI + 1) + "/" + (hist.length - 1) + ") ";
-                if (skipped === inHistory) {
-                  msg += "but was skipped last time ";
-                }
-                if (skipped > 1) {
-                  msg += "it was skipped " + skipped + "/" + inHistory + " times ";
-                }
-                chatWarn(msg, 'Song is in History');
-                API.trigger('p0ne:songInHistory');
+            });
+          }
+        });
+        addListener($body, 'click', '.p0ne-settings-summary', throttle(200, function(e){
+          var $s, group;
+          $s = $(this).parent();
+          group = $s.data('group');
+          if ($s.hasClass('open') && debugMode !== 2) {
+            groupToggles[group] = false;
+            $s.removeClass('open').css({
+              height: 30
+            });
+            sleep(500, function(){
+              if (!groupToggles[group]) {
+                $s.addClass('closed');
               }
+            });
+          } else {
+            groupToggles[group] = true;
+            $s.addClass('open').removeClass('closed').trigger('p0ne:resize');
+            if (debugMode !== 0) {
+              $s = $s.siblings('.open').removeClass('open').css({
+                height: 30
+              });
+              sleep(debugClosingDur, function(){
+                $s.each(function(){
+                  var $this, group;
+                  $this = $(this);
+                  group = $this.data('group');
+                  groupToggles[group] = false;
+                  $this.addClass('closed');
+                });
+              });
             }
+          }
+          e.preventDefault();
+        }));
+        addListener($ppW, 'p0ne:resize', '.p0ne-settings-group', function(e){
+          var $this;
+          $this = $(this);
+          if (p0neSettings._settings.groupToggles[$this.data('group')]) {
+            $this.css({
+              height: 0
+            });
+            $this.css({
+              height: this.scrollHeight
+            });
+          }
+        });
+        addListener($ppW, 'click', '.checkbox', throttle(200, function(){
+          var $this, enable, $el, module;
+          $this = $(this);
+          enable = this.checked;
+          $el = $this.closest('.p0ne-settings-item');
+          module = $el.data('module');
+          if (typeof module === 'string') {
+            module = window[module] || {};
+          }
+          if (enable) {
+            module.enable();
+          } else {
+            module.disable();
+          }
+        }));
+        panelIconTimeout = 0;
+        addListener($ppW, 'click', '.p0ne-settings-panel-icon', function(e){
+          var $this, module, ref$, ref1$, offsetLeft;
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          if (panelIconTimeout) {
+            return;
+          }
+          panelIconTimeout = sleep(200, function(){
+            return panelIconTimeout = 0;
           });
-        }
-      });
-      /*####################################
-      #      DISABLE MESSAGE DELETE        #
-      ####################################*/
-      module('disableChatDelete', {
-        require: ['_$context', 'user_', 'chat'],
-        optional: ['socketListeners'],
-        moderator: true,
-        displayName: 'Show deleted messages',
-        settings: 'moderation',
-        setup: function(arg$){
-          var replace_$Listener, addListener, $createPersistent, css, lastDeletedCid;
-          replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $createPersistent = arg$.$createPersistent, css = arg$.css;
-          css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne-showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
-          $body.addClass('p0ne-showDeletedMessages');
-          lastDeletedCid = null;
-          addListener(_$context, 'socket:chatDelete', function(arg$){
-            var p, c, mi, ref$;
-            p = arg$.p, c = p.c, mi = p.mi;
-            markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
-            lastDeletedCid = c;
-          });
-          replace_$Listener('chat:delete', chat, function(){
-            return function(cid){
-              if (cid !== lastDeletedCid) {
-                markAsDeleted(cid);
-              }
+          $this = $(this).closest('.p0ne-settings-item');
+          module = $this.data('module');
+          console.log("[p0ne-settings-panel-icon] clicked", panelIconTimeout, !!module._$settingsPanel, (ref$ = module._$settingsPanel) != null ? ref$.open : void 8, (ref1$ = module._$settingsPanel) != null ? ref1$.wrapper : void 8);
+          if (!module._$settingsPanel) {
+            module._$settingsPanel = {
+              open: false,
+              wrapper: $('<div class=p0ne-settings-panel-wrapper>').appendTo($ppM),
+              $el: $("<div class='p0ne-settings-panel p0ne-settings-panel-" + module.name.toLowerCase() + "'>")
             };
+            module._$settingsPanel.$el.appendTo(module._$settingsPanel.wrapper);
+            module.settingsPanel(module._$settingsPanel.$el, module);
+          }
+          offsetLeft = $ppW.width();
+          if (module._$settingsPanel.open) {
+            module._$settingsPanel.wrapper.animate({
+              left: offsetLeft - module._$settingsPanel.$el.width()
+            }, function(){
+              return $(this).hide();
+            });
+            module._$settingsPanel.open = false;
+          } else {
+            module._$settingsPanel.wrapper.show().css({
+              left: offsetLeft - module._$settingsPanel.$el.width()
+            }).animate({
+              left: offsetLeft
+            });
+            module._$settingsPanel.open = true;
+          }
+        });
+        addListener($ppW, 'mouseover', '.p0ne-settings-has-more', function(){
+          var $this, module, l, maxT, h, t, tt, ref$, diff;
+          $this = $(this);
+          module = $this.data('module');
+          $ppP.html("<div class=p0ne-settings-popup-triangle></div><h3>" + module.displayName + "</h3>" + module.help + "" + (!module.screenshot
+            ? ''
+            : '<img src=' + module.screenshot + '>') + "");
+          l = $ppW.width();
+          maxT = $ppM.height();
+          h = $ppP.height();
+          t = $this.offset().top - 50;
+          tt = (ref$ = t - h / 2) > 0 ? ref$ : 0;
+          diff = tt - (maxT - h - 30);
+          if (diff > 0) {
+            t += diff + 10 - tt;
+            tt -= diff;
+          } else if (tt !== 0) {
+            t = '50%';
+          }
+          $ppP.css({
+            top: tt,
+            left: l
+          }).stop().fadeIn();
+          $ppP.find('.p0ne-settings-popup-triangle').css({
+            top: 14 > t ? 14 : t
           });
-          function markAsDeleted(cid, moderator){
-            var ref$, $msg, isLast, t, uid, ref1$, ref2$, d, cm;
-            if ((typeof chat != 'undefined' && chat !== null) && ((ref$ = chat.lastText) != null && ref$.hasClass("cid-" + cid))) {
-              $msg = chat.lastText.parent().parent();
-              isLast = true;
+        });
+        addListener($ppW, 'mouseout', '.p0ne-settings-has-more', function(){
+          $ppP.stop().fadeOut();
+        });
+        addListener($ppP, 'mouseover', function(){
+          $ppP.stop().fadeIn();
+        });
+        addListener($ppP, 'mouseout', function(){
+          $ppP.stop().fadeOut();
+        });
+        addListener(API, 'p0ne:moduleLoaded', function(module){
+          this$.addModule(module);
+        });
+        addListener(API, 'p0ne:moduleEnabled', function(module){
+          var ref$;
+          if ((ref$ = module._$settings) != null) {
+            ref$.addClass('p0ne-settings-item-enabled').find('.checkbox')[0].checked = true;
+          }
+          this$.loadSettingsExtra(true, module);
+          if (this$._settings.groupToggles[module.settings]) {
+            requestAnimationFrame(function(){
+              this$.groups[module.settings].trigger('p0ne:resize');
+            });
+          }
+        });
+        addListener(API, 'p0ne:moduleUpdated', function(module, module_){
+          var ref$;
+          if (module.settings) {
+            this$.addModule(module, module_);
+            if (module.help !== module_.help && ((ref$ = module._$settings) != null && ref$.is(':hover'))) {
+              module._$settings.mouseover();
+            }
+          }
+        });
+        addListener(API, 'p0ne:moduleDisabled', function(module_){
+          var ref$, ref1$;
+          if ((ref$ = module_._$settings) != null) {
+            ref$.removeClass('p0ne-settings-item-enabled').find('.checkbox').attr('checked', false);
+          }
+          if ((ref1$ = module_._$settingsExtra) != null) {
+            ref1$.stop().slideUp(function(){
+              $(this).trigger('p0ne:resize').remove();
+            });
+          }
+        });
+        addListener($body, 'click', '#app-menu', function(){
+          this$.toggleMenu(false);
+        });
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          addListener(_$context, 'show:user show:history show:dashboard dashboard:disable', function(){
+            this$.toggleMenu(false);
+          });
+        }
+        addListener($body, 'click', '#plugcubed', function(){
+          this$.toggleMenu(false);
+        });
+        _.defer(function(){
+          var d, scrollLeftMax;
+          d = $('<div>').css({
+            height: 100,
+            width: 100,
+            overflow: 'auto'
+          }).append($('<div>').css({
+            height: 102,
+            width: 100
+          })).appendTo('body');
+          if ('scrollLeftMax' in d[0]) {
+            scrollLeftMax = d[0].scrollLeftMax;
+          } else {
+            d[0].scrollLeft = Number.POSITIVE_INFINITY;
+            scrollLeftMax = d[0].scrollLeft;
+          }
+          if (scrollLeftMax !== 0) {
+            $ppW.css({
+              paddingRight: scrollLeftMax
+            });
+          }
+          d.remove();
+        });
+      },
+      toggleMenu: function(state){
+        var i$, ref$, module, ref1$;
+        if (state != null
+          ? state
+          : state = !this.groupToggles.p0neSettings) {
+          this.$ppW.slideDown();
+        } else {
+          this.$ppW.slideUp();
+          for (i$ in ref$ = p0ne.modules) {
+            module = ref$[i$];
+            if ((ref1$ = module._$settingsPanel) != null && ref1$.open) {
+              module._$settingsPanel.wrapper.animate({
+                left: this.$ppW.width() - module._$settingsPanel.$el.width()
+              }, fn$);
+              module._$settingsPanel.open = false;
+            }
+          }
+        }
+        return this.groupToggles.p0neSettings = state;
+        function fn$(){
+          return $(this).hide();
+        }
+      },
+      groups: {},
+      moderationGroup: $(),
+      addModule: function(module, module_){
+        var itemClasses, icons, i$, ref$, len$, k, $s;
+        if (module.settings) {
+          itemClasses = 'p0ne-settings-item';
+          icons = "";
+          for (i$ = 0, len$ = (ref$ = ['help', 'screenshot']).length; i$ < len$; ++i$) {
+            k = ref$[i$];
+            if (module[k]) {
+              icons += "<div class=p0ne-settings-" + k + "></div>";
+            }
+          }
+          if (module.settingsPanel) {
+            icons += "<div class=p0ne-settings-panel-icon><i class='icon icon-settings-white'></i></div>";
+          }
+          if (icons.length) {
+            icons = "<div class=p0ne-settings-icons>" + icons + "</div>";
+            itemClasses += ' p0ne-settings-has-more';
+          }
+          if (module.settingsExtra) {
+            itemClasses += ' p0ne-settings-has-extra';
+          }
+          if (!module.disabled) {
+            itemClasses += ' p0ne-settings-item-enabled';
+          }
+          if (module.settingsVip) {
+            $s = this.$vip;
+            itemClasses += ' p0ne-settings-is-vip';
+          } else if (!($s = this.groups[module.settings])) {
+            $s = this.groups[module.settings] = $('<div class=p0ne-settings-group>').data('group', module.settings).append($('<div class=p0ne-settings-summary>').text(module.settings)).insertBefore(this.$ppInfo);
+            $s.items = $('<div class=p0ne-settings-items>').appendTo($s);
+            if (this._settings.groupToggles[module.settings]) {
+              $s.addClass('open');
             } else {
-              $msg = getChat(cid);
+              $s.addClass('closed').css({
+                height: 30
+              });
             }
-            console.log("[Chat Delete]", cid, $msg.text());
-            t = getISOTime();
-            try {
-              uid = (ref1$ = cid.split('-')) != null ? ref1$[0] : void 8;
-              if (cid === uid || !((ref2$ = getUser(uid)) != null && ref2$.gRole)) {
-                $msg.addClass('deleted');
-              }
-              d = $createPersistent(getTimestamp()).addClass('delete-timestamp').removeClass('timestamp').appendTo($msg);
-              d.text("deleted " + (moderator ? 'by ' + moderator : '') + " " + d.text());
-              cm = $cm();
-              cm.scrollTop(cm.scrollTop() + d.height());
-              $msg.find('.delete-button').remove();
-              if (isLast) {
-                return chat.lastType = 'p0ne-deleted';
-              }
-            } catch (e$) {}
+            if (module.settings === 'moderation') {
+              $s.addClass('p0ne-settings-group-moderation');
+            }
+            if (this._settings.groupToggles[module.settings]) {
+              $s.find('.p0ne-settings-summary').click();
+            }
           }
-        },
-        disable: function(){
-          $body.removeClass('p0ne-showDeletedMessages');
-        }
-      });
-      /*####################################
-      #         DELETE OWN MESSAGES        #
-      ####################################*/
-      module('chatDeleteOwnMessages', {
-        moderator: true,
-        setup: function(arg$){
-          var addListener;
-          addListener = arg$.addListener;
-          $cm().find("fromID-" + userID).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
-          addListener(API, 'chat', function(message){
-            var cid, uid;
-            cid = message.cid, uid = message.uid;
-            if (uid === userID) {
-              getChat(cid).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
+          module._$settings = $("<label class='" + itemClasses + "'><input type=checkbox class=checkbox " + (module.disabled ? '' : 'checked') + " /><div class=togglebox><div class=knob></div></div>" + module.displayName + "" + icons + "</label>").data('module', module);
+          if (module_ != null && ((ref$ = module_._$settings) != null && ref$.parent().parent().is($s))) {
+            module_._$settings.after(module._$settings.addClass('updated')).remove();
+            sleep(2000, function(){
+              module._$settings.removeClass('updated');
+            });
+            if (!module.disabled) {
+              this.loadSettingsExtra(false, module, module_);
             }
-          });
-          function delCb(){
-            return API.moderateDeleteChat(
-            $(this).closest('.cm').data('cid'));
+          } else {
+            module._$settings.appendTo($s.items);
+            if (!module.disabled) {
+              this.loadSettingsExtra(false, module);
+            }
           }
         }
-      });
-      /*####################################
-      #            WARN ON MEHER           #
-      ####################################*/
-      module('warnOnMehers', {
-        users: {},
-        moderator: true,
-        displayName: 'Warn on Mehers',
-        settings: 'moderation',
-        _settings: {
-          instantWarn: false,
-          maxMehs: 3
-        },
-        setup: function(arg$, arg1$, m_){
-          var addListener, users, current, lastAdvance, this$ = this;
-          addListener = arg$.addListener;
-          if (m_) {
-            this.users = m_.users;
+      },
+      loadSettingsExtra: function(autofocus, module, module_){
+        var ref$, err, ref1$, this$ = this;
+        try {
+          if (module_ != null) {
+            if ((ref$ = module_._$settingsExtra) != null) {
+              ref$.remove();
+            }
           }
-          users = this.users;
-          current = {};
-          addListener(API, 'voteUpdate', function(d){
-            current[d.user.id] = d.vote;
-            if (d.vote === -1 && d.user.uid !== userID) {
-              console.error(formatUser(d.user, true) + " meh'd this song");
-              if (this$._settings.instantWarn) {
-                appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(d.user, true) + " meh'd this song!</div></div>"));
+          if (module.settingsExtra) {
+            module.settingsExtra(module._$settingsExtra = $("<div class=p0ne-settings-extra>").hide().insertAfter(module._$settings));
+            requestAnimationFrame(function(){
+              module._$settingsExtra.slideDown(function(){
+                return module._$settingsExtra.trigger('p0ne:resize');
+              });
+              if (autofocus) {
+                module._$settingsExtra.find('input').focus();
+              } else {
+                module._$settings.parent().scrollTop(0);
+              }
+            });
+          }
+        } catch (e$) {
+          err = e$;
+          console.error("[" + module.name + "] error while processing settingsExtra", err.stack);
+          if ((ref1$ = module._$settingsExtra) != null) {
+            ref1$.remove();
+          }
+          this.groups[module.settings].trigger('p0ne:resize');
+        }
+      }
+    });
+    /*@source p0ne.moderate.ls */
+    /**
+     * plug_p0ne modules to help moderators do their job
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #       BASE MODERATION MODULE       #
+    ####################################*/
+    module('enableModeratorModules', {
+      require: ['user_'],
+      setup: function(arg$){
+        var addListener, prevRole;
+        addListener = arg$.addListener;
+        prevRole = user_.get('role');
+        if (user.isStaff) {
+          $body.addClass('user-is-staff');
+        }
+        addListener(user_, 'change:role', function(user_, newRole){
+          var i$, ref$, m;
+          console.log("[p0ne] change:role from " + prevRole + " to " + newRole);
+          if (newRole > 1 && prevRole < 2) {
+            console.info("[p0ne] enabling moderator modules");
+            for (i$ in ref$ = p0ne.modules) {
+              m = ref$[i$];
+              if (m.modDisabled) {
+                console.log("[p0ne moderator] enabling", m.name);
+                m.enable();
+                m.modDisabled = false;
               }
             }
-          });
-          lastAdvance = 0;
-          addListener(API, 'advance', function(d){
-            var cid, ref$, v, troll, i$, len$, ref1$;
-            d = Date.now();
-            for (cid in ref$ = current) {
-              v = ref$[cid];
-              if (v === -1) {
-                users[cid] || (users[cid] = 0);
-                if (++users[cid] > this$._settings.maxMehs && (troll = getUser(cid))) {
-                  appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll) + " meh'd the past " + plural(users[cid], 'song') + "!</div></div>"));
+            $body.addClass('user-is-staff');
+            user_.isStaff = true;
+          } else if (newRole < 2 && prevRole > 1) {
+            console.info("[p0ne] disabling moderator modules");
+            for (i$ in ref$ = p0ne.modules) {
+              m = ref$[i$];
+              if (m.moderator && !m.disabled) {
+                console.log("[p0ne moderator] disabling", m.name);
+                m.modDisabled = true;
+                m.disable();
+              }
+            }
+            $body.removeClass('user-is-staff');
+            user_.isStaff = false;
+          }
+          prevRole = newRole;
+        });
+      },
+      disable: function(){
+        $body.removeClass('user-is-staff');
+      }
+    });
+    /*####################################
+    #       WARN ON HISTORY PLAYS        #
+    ####################################*/
+    module('warnOnHistory', {
+      displayName: 'Warn on History',
+      moderator: true,
+      settings: 'moderation',
+      setup: function(arg$){
+        var addListener, this$ = this;
+        addListener = arg$.addListener;
+        addListener(API, 'advance', function(d){
+          var hist, inHistory, skipped, i$, len$, i, m, lastPlayI, lastPlay, msg;
+          if (d.media) {
+            hist = API.getHistory();
+            inHistory = 0;
+            skipped = 0;
+            for (i$ = 0, len$ = hist.length; i$ < len$; ++i$) {
+              i = i$;
+              m = hist[i$];
+              if (m.media.cid === d.media.cid && i !== 0) {
+                lastPlayI || (lastPlayI = i);
+                lastPlay || (lastPlay = m);
+                inHistory++;
+                if (m.skipped) {
+                  skipped++;
                 }
-              } else if (d > lastAdvance + 10000) {
+              }
+            }
+            if (inHistory) {
+              msg = "";
+              if (inHistory > 1) {
+                msg += inHistory + "x ";
+              }
+              msg += "(" + (lastPlayI + 1) + "/" + (hist.length - 1) + ") ";
+              if (skipped === inHistory) {
+                msg += "but was skipped last time ";
+              }
+              if (skipped > 1) {
+                msg += "it was skipped " + skipped + "/" + inHistory + " times ";
+              }
+              chatWarn(msg, 'Song is in History');
+              API.trigger('p0ne:songInHistory');
+            }
+          }
+        });
+      }
+    });
+    /*####################################
+    #      DISABLE MESSAGE DELETE        #
+    ####################################*/
+    module('disableChatDelete', {
+      require: ['_$context', 'user_', 'chat'],
+      optional: ['socketListeners'],
+      moderator: true,
+      displayName: 'Show deleted messages',
+      settings: 'moderation',
+      setup: function(arg$){
+        var replace_$Listener, addListener, $createPersistent, css, lastDeletedCid;
+        replace_$Listener = arg$.replace_$Listener, addListener = arg$.addListener, $createPersistent = arg$.$createPersistent, css = arg$.css;
+        css('disableChatDelete', '.deleted {border-left: 2px solid red;display: none;}.p0ne-showDeletedMessages .deleted {display: block;}.deleted-message {display: block;text-align: right;color: red;font-family: monospace;}');
+        $body.addClass('p0ne-showDeletedMessages');
+        lastDeletedCid = null;
+        addListener(_$context, 'socket:chatDelete', function(arg$){
+          var p, c, mi, ref$;
+          p = arg$.p, c = p.c, mi = p.mi;
+          markAsDeleted(c, ((ref$ = users.get(mi)) != null ? ref$.get('username') : void 8) || mi);
+          lastDeletedCid = c;
+        });
+        replace_$Listener('chat:delete', chat, function(){
+          return function(cid){
+            if (cid !== lastDeletedCid) {
+              markAsDeleted(cid);
+            }
+          };
+        });
+        function markAsDeleted(cid, moderator){
+          var ref$, $msg, isLast, t, uid, ref1$, ref2$, d, cm;
+          if ((typeof chat != 'undefined' && chat !== null) && ((ref$ = chat.lastText) != null && ref$.hasClass("cid-" + cid))) {
+            $msg = chat.lastText.parent().parent();
+            isLast = true;
+          } else {
+            $msg = getChat(cid);
+          }
+          console.log("[Chat Delete]", cid, $msg.text());
+          t = getISOTime();
+          try {
+            uid = (ref1$ = cid.split('-')) != null ? ref1$[0] : void 8;
+            if (cid === uid || !((ref2$ = getUser(uid)) != null && ref2$.gRole)) {
+              $msg.addClass('deleted');
+            }
+            d = $createPersistent(getTimestamp()).addClass('delete-timestamp').removeClass('timestamp').appendTo($msg);
+            d.text("deleted " + (moderator ? 'by ' + moderator : '') + " " + d.text());
+            cm = $cm();
+            cm.scrollTop(cm.scrollTop() + d.height());
+            $msg.find('.delete-button').remove();
+            if (isLast) {
+              return chat.lastType = 'p0ne-deleted';
+            }
+          } catch (e$) {}
+        }
+      },
+      disable: function(){
+        $body.removeClass('p0ne-showDeletedMessages');
+      }
+    });
+    /*####################################
+    #         DELETE OWN MESSAGES        #
+    ####################################*/
+    module('chatDeleteOwnMessages', {
+      moderator: true,
+      setup: function(arg$){
+        var addListener;
+        addListener = arg$.addListener;
+        $cm().find("fromID-" + userID).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
+        addListener(API, 'chat', function(message){
+          var cid, uid;
+          cid = message.cid, uid = message.uid;
+          if (uid === userID) {
+            getChat(cid).addClass('deletable').append($('<div class="delete-button">Delete</div>').click(delCb));
+          }
+        });
+        function delCb(){
+          return API.moderateDeleteChat(
+          $(this).closest('.cm').data('cid'));
+        }
+      }
+    });
+    /*####################################
+    #            WARN ON MEHER           #
+    ####################################*/
+    module('warnOnMehers', {
+      users: {},
+      moderator: true,
+      displayName: 'Warn on Mehers',
+      settings: 'moderation',
+      _settings: {
+        instantWarn: false,
+        maxMehs: 3
+      },
+      setup: function(arg$, arg1$, m_){
+        var addListener, users, current, lastAdvance, this$ = this;
+        addListener = arg$.addListener;
+        if (m_) {
+          this.users = m_.users;
+        }
+        users = this.users;
+        current = {};
+        addListener(API, 'voteUpdate', function(d){
+          current[d.user.id] = d.vote;
+          if (d.vote === -1 && d.user.uid !== userID) {
+            console.log("%c" + formatUser(d.user, true) + " meh'd this song", 'color: #ff5a5a');
+            if (this$._settings.instantWarn) {
+              appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(d.user, true) + " meh'd this song!</div></div>"));
+            }
+          }
+        });
+        lastAdvance = 0;
+        addListener(API, 'advance', function(d){
+          var cid, ref$, v, troll, i$, len$, ref1$;
+          d = Date.now();
+          for (cid in ref$ = current) {
+            v = ref$[cid];
+            if (v === -1) {
+              users[cid] || (users[cid] = 0);
+              if (++users[cid] > this$._settings.maxMehs && (troll = getUser(cid))) {
+                appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll) + " meh'd the past " + plural(users[cid], 'song') + "!</div></div>"));
+              }
+            } else if (d > lastAdvance + 10000) {
+              delete users[cid];
+            }
+          }
+          if (d > lastAdvance + 10000) {
+            for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
+              cid = ref$[i$].cid;
+              if (!current[cid] && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== cid) {
                 delete users[cid];
               }
             }
-            if (d > lastAdvance + 10000) {
-              for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-                cid = ref$[i$].cid;
-                if (!current[cid] && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== cid) {
-                  delete users[cid];
-                }
-              }
+          }
+          current = {};
+          lastAdvance = d;
+        });
+      },
+      settingsExtra: function($el){
+        var warnOnMehers, resetTimer, $warning;
+        warnOnMehers = this;
+        $("<form><label><input type=radio name=max-mehs value=on " + (this._settings.instantWarn ? 'checked' : '') + "> alert instantly</label><br><label><input type=radio name=max-mehs value=off " + (this._settings.instantWarn ? '' : 'checked') + "> alert after <input type=number value='" + this._settings.maxMehs + "' class='p0ne-settings-input max-mehs'> consequitive mehs</label></form>").append($warning = $('<div class=warning>')).on('click', 'input:radio', function(){
+          if (this.checked) {
+            warnOnMehers._settings.instantWarn = this.value === 'on';
+            console.log(getTime() + " [warnOnMehers] updated instantWarn to " + warnOnMehers._settings.instantWarn);
+          }
+        }).on('input', '.max-mehs', function(){
+          var val, this$ = this;
+          val = ~~this.value;
+          if (val > 1) {
+            warnOnMehers._settings.maxMehs = val;
+            if (resetTimer) {
+              $warning.fadeOut();
+              clearTimeout(resetTimer);
+              resetTimer = 0;
             }
-            current = {};
-            lastAdvance = d;
-          });
-        },
-        settingsExtra: function($el){
-          var warnOnMehers, resetTimer, $warning;
-          warnOnMehers = this;
-          $("<form><label><input type=radio name=max-mehs value=on " + (this._settings.instantWarn ? 'checked' : '') + "> alert instantly</label><br><label><input type=radio name=max-mehs value=off " + (this._settings.instantWarn ? '' : 'checked') + "> alert after <input type=number value='" + this._settings.maxMehs + "' class='p0ne-settings-input max-mehs'> consequitive mehs</label></form>").append($warning = $('<div class=warning>')).on('click', 'input:radio', function(){
-            if (this.checked) {
-              warnOnMehers._settings.instantWarn = this.value === 'on';
-              console.log(getTime() + " [warnOnMehers] updated instantWarn to " + warnOnMehers._settings.instantWarn);
+            if (warnOnMehers._settings.instantWarn) {
+              $(this).parent().click();
             }
-          }).on('input', '.max-mehs', function(){
-            var val, this$ = this;
-            val = ~~this.value;
-            if (val > 1) {
-              warnOnMehers._settings.maxMehs = val;
-              if (resetTimer) {
-                $warning.fadeOut();
-                clearTimeout(resetTimer);
-                resetTimer = 0;
-              }
-              if (warnOnMehers._settings.instantWarn) {
-                $(this).parent().click();
-              }
-              console.log(getTime() + " [warnOnMehers] updated maxMehs to " + val);
-            } else {
-              $warning.fadeIn().text("please enter a valid number >1");
-              resetTimer = sleep(2 .min, function(){
-                this$.value = warnOnMehers._settings.maxMehs;
-                resetTimer = 0;
-              });
-              console.warn(getTime() + " [warnOnMehers] invalid input for maxMehs", this.value);
-            }
-          }).appendTo($el);
-          $el.css({
-            paddingLeft: 15
-          });
-        }
-      });
-      /*####################################
-      #              AFK TIMER             #
-      ####################################*/
-      module('afkTimer', {
-        require: ['RoomUserRow', 'WaitlistRow'],
-        optional: ['socketListeners', 'app', 'userList', '_$context'],
-        moderator: true,
-        settings: 'moderation',
-        displayName: "Show Idle Time",
-        help: 'This module shows how long users have been inactive in the User- and Waitlist-Panel.\n"Being active"',
-        _settings: {
-          lastActivity: {},
-          highlightOver: 43 .min
-        },
-        setup: function(arg$, arg1$, m_){
-          var addListener, $create, replace, settings, start, lastActivity, ref$, i$, ref1$, len$, user, key$, $waitlistBtn, $afkCount, chatHidden, lastAfkCount, updateAfkCount, d, noActivityYet, fn, Constr;
-          addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
-          settings = this._settings;
-          start = Date.now();
-          if (m_) {
-            console.log("m_ =", m_);
-            this.start = m_.start;
-            lastActivity = m_._settings.lastActivity || {};
+            console.log(getTime() + " [warnOnMehers] updated maxMehs to " + val);
           } else {
-            console.log("args", arguments);
-            this.start = start;
-            if (((ref$ = this._settings.lastActivity) != null ? ref$[0] : void 8) + 60000 > Date.now()) {
-              lastActivity = this._settings.lastActivity;
-            } else {
-              lastActivity = {};
-            }
-          }
-          this.lastActivity = lastActivity;
-          for (i$ = 0, len$ = (ref1$ = API.getUsers()).length; i$ < len$; ++i$) {
-            user = ref1$[i$];
-            lastActivity[key$ = user.id] || (lastActivity[key$] = start);
-          }
-          start = this.start;
-          $waitlistBtn = $('#waitlist-button').append($afkCount = $create('<div class=p0ne-toolbar-count>'));
-          addListener(API, 'socket:skip socket:grab', function(id){
-            updateUser(id);
-          });
-          addListener(API, 'userJoin socket:nameChanged', function(u){
-            updateUser(u.id);
-          });
-          addListener(API, 'chat', function(u){
-            if (!/\[afk\]/i.test(u.message) && !u.uid === IDs.MadPacman) {
-              updateUser(u.uid);
-            }
-          });
-          addListener(API, 'socket:gifted', function(e){
-            updateUser(e.s);
-          });
-          addListener(API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', function(u){
-            updateUser(u.mi);
-          });
-          addListener(API, 'userLeave', function(u){
-            delete lastActivity[u.id];
-          });
-          chatHidden = $cm().parent().css('display') === 'none';
-          if ((typeof _$context != 'undefined' && _$context !== null) && (app != null || (typeof userList != 'undefined' && userList !== null))) {
-            addListener(_$context, 'show:users show:waitlist', function(){
-              chatHidden = true;
+            $warning.fadeIn().text("please enter a valid number >1");
+            resetTimer = sleep(2 .min, function(){
+              this$.value = warnOnMehers._settings.maxMehs;
+              resetTimer = 0;
             });
-            addListener(_$context, 'show:chat', function(){
-              chatHidden = false;
-            });
+            console.warn(getTime() + " [warnOnMehers] invalid input for maxMehs", this.value);
           }
-          lastAfkCount = 0;
-          this.timer = repeat(60000, updateAfkCount = function(){
-            var afkCount, d, usersToCheck, that, i$, len$, u;
-            if (chatHidden) {
-              forceRerender();
-            } else {
-              afkCount = 0;
-              d = Date.now();
-              usersToCheck = API.getWaitList();
-              if (that = API.getDJ()) {
-                usersToCheck[usersToCheck.length] = that;
-              }
-              for (i$ = 0, len$ = usersToCheck.length; i$ < len$; ++i$) {
-                u = usersToCheck[i$];
-                if (d - lastActivity[u.id] > settings.highlightOver) {
-                  afkCount++;
-                }
-              }
-              if (afkCount !== lastAfkCount) {
-                if (afkCount) {
-                  $afkCount.text(afkCount);
-                } else {
-                  $afkCount.clear();
-                }
-                lastAfkCount = afkCount;
-              }
-            }
-          });
-          updateAfkCount();
-          d = 0;
-          for (i$ = 0, len$ = (ref1$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
-            fn = i$;
-            Constr = ref1$[i$];
-            replace(Constr.prototype, 'render', fn$);
-          }
-          function updateUser(uid){
-            var i$, ref$, ref1$, len$, r, results$ = [];
-            if (Date.now() - lastActivity[uid] > settings.highlightOver) {
-              updateAfkCount();
-            }
-            lastActivity[0] = lastActivity[uid] = Date.now();
-            for (i$ = 0, len$ = (ref$ = (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || (app != null ? app.room.waitlist.rows : void 8)).length; i$ < len$; ++i$) {
-              r = ref$[i$];
-              if (r.model.id === uid) {
-                results$.push(r.render(true));
-              }
-            }
-            return results$;
-          }
-          function forceRerender(){
-            var i$, ref$, ref1$, len$, r, results$ = [];
-            for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
-              r = ref$[i$];
-              results$.push(r.render(false));
-            }
-            return results$;
-          }
-          forceRerender();
-          function fn$(r_){
-            return function(isUpdate){
-              var ago, time, noActivityYet;
-              r_.apply(this, arguments);
-              if (!d) {
-                d = Date.now();
-                requestAnimationFrame(function(){
-                  d = 0;
-                  noActivityYet = null;
-                });
-              }
-              ago = d - lastActivity[this.model.id];
-              if (lastActivity[this.model.id] <= start) {
-                if (ago < 120000) {
-                  time = noActivityYet || (noActivityYet = "? ");
-                } else {
-                  time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
-                }
-              } else if (ago < 60000) {
-                time = "<1m";
-              } else if (ago < 120000) {
-                time = "<2m";
-              } else {
-                time = humanTime(ago, true);
-              }
-              if (this.$afk) {
-                this.$afk.removeClass('p0ne-last-activity-warn');
-              } else {
-                this.$afk = $('<span class=p0ne-last-activity>').appendTo(this.$el);
-              }
-              this.$afk.text(time);
-              if (ago > settings.highlightOver) {
-                this.$afk.addClass('p0ne-last-activity-warn');
-              }
-              if (isUpdate) {
-                this.$afk.p0neFx('blink');
-              }
-            };
-          }
-        },
-        disable: function(){
-          clearInterval(this.timer);
-          $('#waitlist-button').removeClass('p0ne-toolbar-highlight');
-        },
-        disableLate: function(){
-          var i$, ref$, ref1$, len$, r;
-          for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
-            r = ref$[i$];
-            r.render();
-          }
-        }
-      });
-      /*####################################
-      #           FORCE SKIP BTN           #
-      ####################################*/
-      module('forceSkipButton', {
-        moderator: true,
-        setup: function(arg$, m){
-          var $create;
-          $create = arg$.$create;
-          this.$btn = $create('<div class=p0ne-skip-btn><i class="icon icon-skip"></i></div>').insertAfter('#playlist-panel').click(bind$(this, 'onClick'));
-        },
-        onClick: API.moderateForceSkip
-      });
-      /*@source p0ne.userHistory.ls */
-      /**
-       * small module to show a user's song history on plug.dj
-       * fetches the song history from the user's /@/profile page
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-      */
-      /*####################################
-      #            USER HISTORY            #
-      ####################################*/
-      module('userHistory', {
-        require: ['userRollover', 'RoomHistory', 'backbone'],
-        help: 'Shows another user\'s song history when clicking on their username in the user-rollover.\n\nDue to technical restrictions, only Youtube songs can be shown.',
-        setup: function(arg$){
-          var addListener, replace, css;
-          addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
-          css('userHistory', '#user-rollover .username { cursor: pointer }');
-          addListener($('body'), 'click', '#user-rollover .username', function(){
-            var user, userID, username, userlevel, userslug;
-            $('#history-button.selected').click();
-            user = userRollover.user;
-            userID = user.id;
-            username = user.get('username');
-            userlevel = user.get('level');
-            userslug = user.get('slug');
-            if (userlevel < 5) {
-              userRollover.$level.text(userlevel + " (user-history requires >4!)");
-              return;
-            }
-            console.log(getTime() + " [userHistory] loading " + username + "'s history");
-            if (!userslug) {
-              getUserData(userID).then(function(d){
-                user.set('slug', d.slug);
-                loadUserHistory(user);
-              });
-            } else {
-              loadUserHistory(user);
-            }
-          });
-          function loadUserHistory(user){
-            return $.get("https://plug.dj/@/" + user.get('slug')).fail(function(){
-              console.error("! couldn't load user's history");
-            }).then(function(d){
-              var songs;
-              userRollover.cleanup();
-              songs = new backbone.Collection();
-              d.replace(/<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, function(arg$, img, author, roomName, positive, grabs, negative, listeners){
-                var cid, ref$, title;
-                if (cid = /\/vi\/(.{11})\//.exec(img)) {
-                  cid = cid[1];
-                  ref$ = author.split(" - "), title = ref$[0], author = ref$[1];
-                  songs.add(new backbone.Model({
-                    user: {
-                      id: user.id,
-                      username: "in " + roomName
-                    },
-                    room: {
-                      name: roomName
-                    },
-                    score: {
-                      positive: positive,
-                      grabs: grabs,
-                      negative: negative,
-                      listeners: listeners,
-                      skipped: 0
-                    },
-                    media: new backbone.Model({
-                      format: 1,
-                      cid: cid,
-                      author: author,
-                      title: title,
-                      image: httpsify(img)
-                    })
-                  }));
-                }
-              });
-              console.info(getTime() + " [userHistory] loaded history for " + user.get('username'), songs);
-              out$.songs = songs;
-              out$.d = d;
-              replace(RoomHistory.prototype, 'collection', function(){
-                return songs;
-              });
-              _$context.trigger('show:history');
-              requestAnimationFrame(function(){
-                RoomHistory.prototype.collection = RoomHistory.prototype.collection_;
-                console.log(getTime() + " [userHistory] restoring room's proper history");
-              });
-            });
-          }
-        }
-      });
-      /*@source p0ne.dev.ls */
-      /**
-       * plug_p0ne dev
-       * a set of plug_p0ne modules for usage in the console
-       * They are not used by any other module
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #        FIX CONSOLE SPAMMING        #
-      ####################################*/
-      module('fixConsoleSpamming', {
-        setup: function(arg$){
-          /* this fixes a bug in plug.dj. Version 1.2.6.6390 (2015-02-15)
-           * which spams the console with console.info(undefined)
-           * everytime the socket receives a message.
-           * On WebKit browsers it's ignored, on others (e.g. Firefox)
-           * it will create many empty messages in the console
-           * (https://i.imgur.com/VBzw2ek.png screenshot from Firefox' Web Console)
-          */
-          var replace;
-          replace = arg$.replace;
-          replace(console, 'info', function(info_){
-            return function(){
-              if (arguments.length) {
-                info_.apply(this, arguments);
-              }
-            };
-          });
-        }
-      });
-      /*####################################
-      #      SANDBOX BACKBONE EVENTS       #
-      ####################################*/
-      module('sandboxBackboneEvents', {
-        optional: ['_$context'],
-        setup: function(arg$){
-          var replace, slice;
-          replace = arg$.replace;
-          slice = Array.prototype.slice;
-          replace(Backbone.Events, 'trigger', function(){
-            return function(type){
-              var args, a, b, c, events, l, i, ev, e;
-              if (this._events) {
-                args = slice.call(arguments, 1);
-                a = args[0], b = args[1], c = args[2];
-                for (;;) {
-                  if ((events = this._events[type]) && (l = events.length)) {
-                    i = -1;
-                    while (i < l) {
-                      try {
-                        switch (args.length) {
-                        case 0:
-                          while (++i < l) {
-                            (ev = events[i]).callback.call(ev.ctx);
-                          }
-                          break;
-                        case 1:
-                          while (++i < l) {
-                            (ev = events[i]).callback.call(ev.ctx, a);
-                          }
-                          break;
-                        case 2:
-                          while (++i < l) {
-                            (ev = events[i]).callback.call(ev.ctx, a, b);
-                          }
-                          break;
-                        case 3:
-                          while (++i < l) {
-                            (ev = events[i]).callback.call(ev.ctx, a, b, c);
-                          }
-                          break;
-                        default:
-                          while (++i < l) {
-                            (ev = events[i]).callback.apply(ev.ctx, args);
-                          }
-                        }
-                      } catch (e$) {
-                        e = e$;
-                        console.error("[" + (this._name || 'unnamed EventEmitter') + "] Error while triggering '" + type + "' [" + i + "]", this, args, e.stack);
-                      }
-                    }
-                  }
-                  if (type === 'all') {
-                    return this;
-                  }
-                  args.unshift(type);
-                  a = args[0], b = args[1], c = args[2];
-                  type = 'all';
-                }
-              }
-            };
-          });
-          replace(API, '_name', function(){
-            return 'API';
-          });
-          replace(API, 'trigger', function(){
-            return Backbone.Events.trigger;
-          });
-          if (typeof _$context != 'undefined' && _$context !== null) {
-            replace(_$context, '_name', function(){
-              return '_$context';
-            });
-            replace(_$context, 'trigger', function(){
-              return Backbone.Events.trigger;
-            });
-          }
-        }
-      });
-      /*####################################
-      #           LOG EVERYTHING           #
-      ####################################*/
-      module('logEventsToConsole', {
-        optional: ['_$context', 'socketListeners'],
-        displayName: "Log Events to Console",
-        settings: 'dev',
-        help: 'This will log events to the JavaScript console.\nThis is mainly for programmers. If you are none, keep this disabled for better performance.\n\nBy default this will leave out some events to avoid completly spamming the console.\nYou can force-enable logging ALL events by running `logEventsToConsole.logAll = true`',
-        disabledByDefault: true,
-        logAll: false,
-        setup: function(arg$){
-          var addListener, logEventsToConsole, ctx, chatEvnt;
-          addListener = arg$.addListener;
-          logEventsToConsole = this;
-          if (typeof _$context != 'undefined' && _$context !== null) {
-            ctx = _$context;
-            chatEvnt = 'chat:receive';
-          } else {
-            ctx = API;
-            chatEvnt = 'chat';
-          }
-          addListener('early', ctx, chatEvnt, function(data){
-            var message, name;
-            message = cleanMessage(data.originalMessage || data.message);
-            if (data.un) {
-              name = collapseWhitespace(
-              data.un.replace(/\u202e/g, '\\u202e'));
-              name = stripHTML(
-              repeatString$(" ", 24 - name.length) + name);
-              if (data.type === 'emote') {
-                console.log(getTime() + " [CHAT] %c" + name + ": %c" + message, "font-weight: bold", "font-style: italic");
-              } else {
-                console.log(getTime() + " [CHAT] %c" + name + ": %c" + message, "font-weight: bold", "");
-              }
-            } else if (data.type.has('system')) {
-              console.info(getTime() + " [CHAT] [system] %c" + message, "font-size: 1.2em; color: red; font-weight: bold");
-            } else {
-              console.log(getTime() + " [CHAT] %c" + message, 'color: #36F');
-            }
-          });
-          addListener(API, 'userJoin', function(user){
-            console.log(getTime() + " + [JOIN]", user.id, formatUser(user, true), user);
-          });
-          addListener(API, 'userLeave', function(user){
-            var name;
-            name = htmlUnescape(user.username).replace(/\u202e/g, '\\u202e');
-            console.log(getTime() + " - [LEAVE]", user.id, formatUser(user, true), user);
-          });
-          if (!window._$context) {
-            return;
-          }
-          addListener(_$context, 'all', function(){
-            return function(type, args){
-              var group;
-              group = type.substr(0, type.indexOf(":"));
-              if ((group !== 'socket' && group !== 'tooltip' && group !== 'djButton' && group !== 'chat' && group !== 'sio' && group !== 'playback' && group !== 'playlist' && group !== 'notify' && group !== 'drag' && group !== 'audience' && group !== 'anim' && group !== 'HistorySyncEvent' && group !== 'user' && group !== 'ShowUserRolloverEvent') && (type !== 'ChatFacadeEvent:muteUpdate' && type !== 'PlayMediaEvent:play' && type !== 'userPlaying:update' && type !== 'context:update') || logEventsToConsole.logAll) {
-                console.log(getTime() + " [" + type + "]", args);
-              } else if (group === 'socket' && (type !== 'socket:chat' && type !== 'socket:vote' && type !== 'socket:grab' && type !== 'socket:earn')) {
-                console.log(getTime() + " [" + type + "]", args);
-              }
-            };
-          });
-          addListener(_$context, 'PlayMediaEvent:play', function(data){
-            console.log(getTime() + " [SongInfo]", "playlist: " + data.playlistID, "historyID: " + data.historyID);
-          });
-        }
-      });
-      /*####################################
-      #            LOG GRABBERS            #
-      ####################################*/
-      module('logGrabbers', {
-        require: ['votes'],
-        setup: function(arg$){
-          var addListener, replace, grabbers, hasGrabber;
-          addListener = arg$.addListener, replace = arg$.replace;
-          grabbers = {};
-          hasGrabber = false;
-          replace(votes, 'grab', function(g_){
-            return function(uid){
-              var u;
-              u = getUser(uid);
-              console.info(getTime() + " [logGrabbers] " + formatUser(u, user.isStaff) + " grabbed this song");
-              grabbers[uid] = u.username;
-              hasGrabber = true;
-              return g_.call(this, uid);
-            };
-          });
-          addListener(API, 'advance', function(){
-            var name;
-            if (grabbers) {
-              console.log("[logGrabbers] the last song was grabbed by " + humanList((function(){
-                var i$, ref$, results$ = [];
-                for (i$ in ref$ = grabbers) {
-                  name = ref$[i$];
-                  results$.push(name);
-                }
-                return results$;
-              }())));
-              grabbers = {};
-            } else {
-              hasGrabber = false;
-            }
-          });
-        }
-      });
-      /*####################################
-      #             DEV TOOLS              #
-      ####################################*/
-      module('InternalAPI', {
-        optional: ['users', 'playlists', 'user_', 'app'],
-        setup: function(){
-          var k, ref$, v;
-          for (k in ref$ = API) {
-            v = ref$[k];
-            if (!this[k]) {
-              this[k] = v;
-            } else if (this[k] === 'user') {
-              (fn$.call(this, k));
-            }
-          }
-          importAll$(this, Backbone.Events);
-          function fn$(k){
-            this[k] = function(){
-              var ref$;
-              getUserInternal((ref$ = API[k]()) != null ? ref$.id : void 8);
-            };
-          }
-        },
-        chatLog: API.chatLog,
-        getAdmins: function(){
-          return typeof users != 'undefined' && users !== null ? users.filter(function(it){
-            return it.get('gRole') === 5;
-          }) : void 8;
-        },
-        getAmbassadors: function(){
-          return typeof users != 'undefined' && users !== null ? users.filter(function(u){
-            var ref$;
-            0 < (ref$ = u.get('gRole')) && ref$ < 5;
-          }) : void 8;
-        },
-        getAudience: typeof users != 'undefined' && users !== null ? users.getAudience : void 8,
-        getBannedUsers: function(){
-          throw Error('unimplemented');
-        },
-        getDJ: function(){
-          var ref$;
-          return getUserInternal((ref$ = API.getDJ()) != null ? ref$.id : void 8);
-        },
-        getHistory: function(){
-          return roomHistory;
-        },
-        getHost: function(){
-          var ref$;
-          return getUserInternal((ref$ = API.getHost()) != null ? ref$.id : void 8);
-        },
-        getMedia: function(){
-          return typeof currentMedia != 'undefined' && currentMedia !== null ? currentMedia.get('media') : void 8;
-        },
-        getNextMedia: function(){
-          return typeof playlists != 'undefined' && playlists !== null ? playlists.activeMedia[0] : void 8;
-        },
-        getUser: function(){
-          return user_;
-        },
-        getUsers: function(){
-          return users;
-        },
-        getPlaylist: window.getActivePlaylist,
-        getPlaylists: function(){
-          return playlists;
-        },
-        getStaff: function(){
-          return typeof users != 'undefined' && users !== null ? users.filter(function(u){
-            return u.get('role');
-          }) : void 8;
-        },
-        getWaitList: function(){
-          return app != null ? app.room.waitlist : void 8;
-        }
-      });
-      /*####################################
-      #           DOWNLOAD LINK            #
-      ####################################*/
-      module('downloadLink', {
-        setup: function(arg$){
-          var css, icon;
-          css = arg$.css;
-          icon = getIcon('icon-arrow-down');
-          css('downloadLink', ".p0ne-downloadlink::before {content: ' ';position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: " + icon.position + ";background-image: " + icon.image + ";}");
-        },
-        module: function(name, filename, dataOrURL){
-          if (!dataOrURL) {
-            dataOrURL = filename;
-            filename = name;
-          }
-          if (dataOrURL && !isURL(dataOrURL)) {
-            if (typeof dataOrURL !== 'string') {
-              dataOrURL = JSON.stringify(dataOrURL);
-            }
-            dataOrURL = URL.createObjectURL(new Blob([dataOrURL], {
-              type: 'text/plain'
-            }));
-          }
-          filename = filename.replace(/[\/\\\?%\*\:\|\"\<\>\.]/g, '');
-          return appendChat("<div class='message p0ne-downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
-        }
-      });
-      /*####################################
-      #            AUXILIARIES             #
-      ####################################*/
-      importAll$(window, {
-        roomState: function(){
-          ajax('GET', 'rooms/state');
-        },
-        export_: function(name){
-          return function(data){
-            console.log("[export] " + name + " =", data);
-            window[name] = data;
-          };
-        },
-        searchEvents: function(regx){
-          var k;
-          if (!(regx instanceof RegExp)) {
-            regx = new RegExp(regx, 'i');
-          }
-          return (function(){
-            var results$ = [];
-            for (k in typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
-              if (regx.test(k)) {
-                results$.push(k);
-              }
-            }
-            return results$;
-          }());
-        },
-        listUsers: function(){
-          var res, i$, ref$, len$, u;
-          res = "";
-          for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-            u = ref$[i$];
-            res += u.id + "\t" + u.username + "\n";
-          }
-          console.log(res);
-        },
-        listUsersByAge: function(){
-          var a, res, i$, len$, u;
-          a = API.getUsers().sort(function(a, b){
-            a = +a.joined.replace(/\D/g, '');
-            b = +b.joined.replace(/\D/g, '');
-            return (a > b && 1) || (a === b && 0) || -1;
-          });
-          res = "";
-          for (i$ = 0, len$ = a.length; i$ < len$; ++i$) {
-            u = a[i$];
-            res += u.joined.replace(/T|\..+/g, ' ') + "\t" + u.username + "\n";
-          }
-          console.log(res);
-        },
-        findModule: function(test){
-          var res, id, ref$, module;
-          if (typeof test === 'string' && window.l) {
-            test = l(test);
-          }
-          res = [];
-          for (id in ref$ = require.s.contexts._.defined) {
-            module = ref$[id];
-            if (module) {
-              if (test(module, id)) {
-                module.requireID || (module.requireID = id);
-                console.log("[findModule]", id, module);
-                res[res.length] = module;
-              }
-            }
-          }
-          return res;
-        },
-        requireHelperHelper: function(module){
-          /* this function will try to find a nice requireHelper rule for the given plug.dj module
-           * the output is a function shorthand in LiveScript */
-          var k, v, keys, keysExact, isNotObj, ref$, id, m2, ref1$, ref2$;
-          if (typeof module === 'string') {
-            module = require(module);
-          }
-          if (!module) {
-            return false;
-          }
-          for (k in module) {
-            v = module[k];
-            keys = 0;
-            keysExact = 0;
-            isNotObj = (ref$ = typeof v) !== 'object' && ref$ !== 'function';
-            for (id in ref$ = require.s.contexts._.defined) {
-              m2 = ref$[id];
-              if (m2 && m2[k] && (k !== 'requireID' && k !== 'cid' && k !== 'id' && k !== 'length')) {
-                keys++;
-                if (isNotObj && m2[k] === v) {
-                  keysExact++;
-                }
-              }
-            }
-            if (keys === 1) {
-              return "(." + k + ")";
-            } else if (keysExact === 1) {
-              return "(." + k + " == " + JSON.stringify(v) + ")";
-            }
-          }
-          for (k in ref$ = module.prototype) {
-            v = ref$[k];
-            keys = 0;
-            keysExact = 0;
-            isNotObj = typeof v !== 'object';
-            for (id in ref1$ = require.s.contexts._.defined) {
-              m2 = ref1$[id];
-              if (m2 && ((ref2$ = m2.prototype) != null && ref2$[k])) {
-                keys++;
-                if (isNotObj && m2[k] === v) {
-                  keysExact++;
-                }
-              }
-            }
-            if (keys === 1) {
-              return "(.::?." + k + ")";
-            } else if (keysExact === 1) {
-              return "(.::?." + k + " == " + JSON.stringify(v) + ")";
-            }
-          }
-          return false;
-        },
-        validateUsername: function(username, ignoreWarnings, cb){
-          if (typeof ignoreWarnings === 'function') {
-            cb = ignoreWarnings;
-            ignoreWarnings = false;
-          } else if (!cb) {
-            cb = function(slug, err){
-              console[err && 'error' || 'log']("username '" + username + "': ", err || slug);
-            };
-          }
-          if (!ignoreWarnings) {
-            if (username.length < 2) {
-              cb(false, "too short");
-            } else if (username.length >= 25) {
-              cb(false, "too long");
-            } else if (username.has("/")) {
-              cb(false, "forward slashes are not allowed");
-            } else if (username.has("\n")) {
-              cb(false, "line breaks are not allowed");
-            } else {
-              ignoreWarnings = true;
-            }
-          }
-          if (ignoreWarnings) {
-            return $.getJSON("https://plug.dj/_/users/validate/" + encodeURIComponent(username), function(d){
-              var ref$;
-              cb(d && ((ref$ = d.data[0]) != null ? ref$.slug : void 8));
-            });
-          }
-        },
-        getRequireArg: function(haystack, needle){
-          /* this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
-           * e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
-          */
-          var ref$, a, b, that;
-          ref$ = haystack.split("], function("), a = ref$[0], b = ref$[1];
-          a = a.substr(a.indexOf('"')).split('", "');
-          b = b.substr(0, b.indexOf(')')).split(', ');
-          if (that = b[a.indexOf(needle)]) {
-            try {
-              window[that] = require(needle);
-            } catch (e$) {}
-            return that;
-          } else if (that = a[b.indexOf(needle)]) {
-            try {
-              window[needle] = require(that);
-            } catch (e$) {}
-            return that;
-          }
-        },
-        logOnce: function(base, event){
-          if (!event) {
-            event = base;
-            if (-1 !== event.indexOf(':')) {
-              base = _$context;
-            } else {
-              base = API;
-            }
-          }
-          base.once('event', logger(event));
-        },
-        usernameToSlug: function(un){
-          /* note: this is NOT really accurate! */
-          var lastCharWasLetter, res, i$, ref$, len$, c, lc;
-          lastCharWasLetter = false;
-          res = "";
-          for (i$ = 0, len$ = (ref$ = htmlEscape(un)).length; i$ < len$; ++i$) {
-            c = ref$[i$];
-            if ((lc = c.toLowerCase()) !== c.toUpperCase()) {
-              if (/\w/.test(lc)) {
-                res += c.toLowerCase();
-              } else {
-                res += "\\u" + pad(lc.charCodeAt(0), 4);
-              }
-              lastCharWasLetter = true;
-            } else if (lastCharWasLetter) {
-              res += "-";
-              lastCharWasLetter = false;
-            }
-          }
-          if (!lastCharWasLetter) {
-            res = res.substr(0, res.length - 1);
-          }
-          return res;
-        },
-        reconnectSocket: function(){
-          _$context.trigger('force:reconnect');
-        },
-        ghost: function(){
-          return $.get('/');
-        },
-        getAvatars: function(){
-          API.once('p0ne:avatarsloaded', logger('AVATARS'));
-          $.get($("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr('src')).then(function(d){
-            var that;
-            if (that = d.match(/manifest.*/)) {
-              API.trigger('p0ne:avatarsloaded', JSON.parse(that[0].substr(11, that[0].length - 12)));
-            }
-          });
-        },
-        parseYTGetVideoInfo: function(d, onlyStripHTML){
-          var k, v, ref$, res, i$, ref1$, len$, a, ref2$;
-          if (typeof d === 'object') {
-            for (k in d) {
-              v = d[k];
-              d[k] = parseYTGetVideoInfo(v);
-            }
-            return d;
-          } else if (typeof d !== 'string' || d.startsWith("http")) {
-            return d;
-          } else if (d.startsWith("<!DOCTYPE html>")) {
-            d = JSON.parse(((ref$ = d.match(/ytplayer\.config = (\{[\s\S]*?\});/)) != null ? ref$[1] : void 8) || null);
-            if (onlyStripHTML) {
-              return d;
-            } else {
-              return parseYTGetVideoInfo(d);
-            }
-          } else if (d.has(",")) {
-            return d.split(",").map(parseYTGetVideoInfo);
-          } else if (d.has("&")) {
-            res = {};
-            for (i$ = 0, len$ = (ref1$ = d.split("&")).length; i$ < len$; ++i$) {
-              a = ref1$[i$];
-              a = a.split("=");
-              if (res[a[0]]) {
-                if (!$.isArray(res[a[0]])) {
-                  res[a[0]] = [res[a[0]]];
-                }
-                (ref2$ = res[a[0]])[ref2$.length] = parseYTGetVideoInfo(unescape(a[1]));
-              } else {
-                res[a[0]] = parseYTGetVideoInfo(unescape(a[1]));
-              }
-            }
-            return res;
-          } else if (!isNaN(d)) {
-            return +d;
-          } else if (d === 'True' || d === 'False') {
-            return d === 'True';
-          } else {
-            return d;
-          }
-        },
-        play: function(media){
-          /* force plug to play the provided song */
-          if (!media) {
-            return;
-          } else if (typeof media !== 'object') {
-            mediaLookup(media).then(play);
-          } else {
-            if (media.author) {
-              media = new Backbone.Model(media);
-            }
-            currentMedia.set('media', media);
-          }
-        },
-        lssize: function(sizeWhenDecompressed){
-          var size, k, ref$, v;
-          size = 0;
-          for (k in ref$ = localStorage) {
-            v = ref$[k];
-            if (k !== 'length') {
-              if (sizeWhenDecompressed) {
-                try {
-                  v = decompress(v);
-                } catch (e$) {}
-              }
-              size += (v || '').length / 524288;
-            }
-          }
-          return size;
-        }
-      });
-      if (!window.chrome) {
-        $.getScript("https://cdn.p0ne.com/scripts/zclip/jquery.zclip.min.js").then(function(){
-          window.copy = function(str, title){
-            appendChat($("<button class='cm p0ne-notif'> copy " + (title || '') + "</button>")).zclip({
-              path: "https://cdn.p0ne.com/scripts/zclip/ZeroClipboard.swf",
-              copy: str
-            });
-          };
-          console.info("[copy polyfill] loaded polyfill for copy() with zclip");
-        }).fail(function(){
-          console.warn("[copy polyfill] failed to load zclip!");
+        }).appendTo($el);
+        $el.css({
+          paddingLeft: 15
         });
       }
-      /*####################################
-      #            RENAME USER             #
-      ####################################*/
-      module('renameUser', {
-        require: ['users'],
-        module: function(idOrName, newName){
-          var u, i$, ref$, len$, user, id, rup;
-          u = users.get(idOrName);
-          if (!u) {
-            idOrName = idOrName.toLowerCase();
-            for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
-              user = ref$[i$];
-              if (user.attributes.username.toLowerCase() === idOrName) {
-                u = user;
-                break;
-              }
-            }
-          }
-          if (!u) {
-            return console.error("[rename user] can't find user with ID or name '" + idOrName + "'");
-          }
-          u.set('username', newName);
-          id = u.id;
-          if (!(rup = window.p0ne.renameUserPlugin)) {
-            rup = window.p0ne.renameUserPlugin = function(d){
-              d.un = rup[d.fid] || d.un;
-            };
-            if ((ref$ = window.p0ne.chatPlugins) != null) {
-              ref$[ref$.length] = rup;
-            }
-          }
-          rup[id] = newName;
-        }
-      });
-      (function(){
-        window._$events = {
-          _update: function(){
-            var k, ref$, v;
-            for (k in ref$ = typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
-              v = ref$[k];
-              this[k.replace(/:/g, '_')] = v;
-            }
-          }
-        };
-        _$events._update();
-      })();
-      /*####################################
-      #            EXPORT DATA             #
-      ####################################*/
-      module('export_', {
-        require: ['downloadLink'],
-        exportPlaylists: function(){
-          var i$, ref$, len$;
-          for (i$ = 0, len$ = (ref$ = playlists).length; i$ < len$; ++i$) {
-            (fn$.call(this, ref$[i$]));
-          }
-          function fn$(pl){
-            $.get("/_/playlists/" + pl.id + "/media").then(function(data){
-              downloadLink("playlist '" + pl.name + "'", pl.name + ".txt", data);
-            });
+    });
+    /*####################################
+    #              AFK TIMER             #
+    ####################################*/
+    module('afkTimer', {
+      require: ['RoomUserRow', 'WaitlistRow'],
+      optional: ['socketListeners', 'app', 'userList', '_$context'],
+      moderator: true,
+      settings: 'moderation',
+      displayName: "Show Idle Time",
+      help: 'This module shows how long users have been inactive in the User- and Waitlist-Panel.\n"Being active"',
+      _settings: {
+        lastActivity: {},
+        highlightOver: 43 .min
+      },
+      setup: function(arg$, arg1$, m_){
+        var addListener, $create, replace, settings, start, lastActivity, ref$, i$, ref1$, len$, user, key$, $waitlistBtn, $afkCount, chatHidden, lastAfkCount, updateAfkCount, d, noActivityYet, fn, Constr;
+        addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
+        settings = this._settings;
+        start = Date.now();
+        if (m_) {
+          console.log("m_ =", m_);
+          this.start = m_.start;
+          lastActivity = m_._settings.lastActivity || {};
+        } else {
+          console.log("args", arguments);
+          this.start = start;
+          if (((ref$ = this._settings.lastActivity) != null ? ref$[0] : void 8) + 60000 > Date.now()) {
+            lastActivity = this._settings.lastActivity;
+          } else {
+            lastActivity = {};
           }
         }
-      });
-      /*####################################
-      #              COPY CHAT             #
-      ####################################*/
-      window.copyChat = function(copy){
-        var host, res;
-        $('#chat-messages img').fixSize();
-        host = p0ne.host;
-        res = "<!DOCTYPE HTML>\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>plug.dj Chatlog " + getTime() + " - " + getRoomSlug() + " (" + API.getUser().rawun + ")</title>\n<!-- basic chat styling -->\n" + $("head link[href^='https://cdn.plug.dj/_/static/css/app']")[0].outerHTML + "\n<link href='https://dl.dropboxusercontent.com/u/4217628/css/fimplugChatlog.css' rel='stylesheet' type='text/css'>";
-        res += getCustomCSS(true);
-        /*
-        res += """\n
-            <!-- p0ne song notifications -->
-            <link rel='stylesheet' href='#host/css/p0ne.notif.css' type='text/css'>
-        """ if window.songNotifications
-        
-        res += """\n
-            <!-- better ponymotes -->
-            <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
-            <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
-            <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
-            <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
-            <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
-        """ if window.bpm or $cm! .find \.bpm-emote .length
-        
-        res += """\n
-            <style>
-            #{css \yellowMod}
-            </style>
-        """ if window.yellowMod
-        */
-        res += "\n\n</head>\n<body id=\"chatlog\">\n" + $('.app-right').html().replace(/https:\/\/api\.plugCubed\.net\/proxy\//g, '').replace(/src="\/\//g, 'src="https://') + "\n</body>";
-        copy(res);
-      };
-      /*
-      module \_$contextUpdateEvent, do
-          require: <[ _$context ]>
-          setup: ({replace}) !->
-              for fn in <[ on off onEarly ]>
-                  replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
-                      fn_ ...
-                      _$context .trigger \context:update, type, cb, context
-                      return this
-      */
-      /*@source p0ne.ponify.ls */
-      /**
-       * ponify chat - a script to ponify some words in the chat on plug.dj
-       * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #            PONIFY CHAT             #
-      ####################################*/
-      module('ponify', {
-        optional: ['emoticons'],
-        displayName: 'Ponify Chat',
-        settings: 'pony',
-        help: 'Ponify the chat! (replace words like "anyone" with "anypony")\nReplaced words will be underlined. Move your cursor over the word to see it\'s original.\n\nIt also replaces some of the emoticons with pony emoticons.',
-        disabled: true
-        /*== TEXT ==*/,
-        map: {
-          "anybody": "anypony",
-          "anyone": "anypony",
-          "ass": "flank",
-          "asses": "flanks",
-          "boner": "wingboner",
-          "boy": "colt",
-          "boyfriend": "coltfriend",
-          "boyfriends": "coltfriends",
-          "boys": "colts",
-          "bro fist": "brohoof",
-          "bro-fist": "brohoof",
-          "butt": "flank",
-          "butthurt": "saddle-sore",
-          "butts": "flanks",
-          "child": "foal",
-          "children": "foals",
-          "cowboy": "cowpony",
-          "cowboys": "cowponies",
-          "cowgirl": "cowpony",
-          "cowgirls": "cowponies",
-          "disappoint": "disappony",
-          "disappointed": "disappony",
-          "disappointment": "disapponyment",
-          "doctor who": "doctor whooves",
-          "dr who": "dr whooves",
-          "dr. who": "dr. whooves",
-          "everybody": "everypony",
-          "everyone": "everypony",
-          "fap": "clop",
-          "faps": "clops",
-          "foot": "hoof",
-          "feet": "hooves",
-          "folks": "foalks",
-          "fool": "foal",
-          "foolish": "foalish",
-          "germany": "germaneigh",
-          "gentleman": "gentlecolt",
-          "gentlemen": "gentlecolts",
-          "girl": "filly",
-          "girls": "fillies",
-          "girlfriend": "fillyfriend",
-          "girlfriends": "fillyfriends",
-          "halloween": "nightmare night",
-          "hand": "hoof",
-          "hands": "hooves",
-          "handed": "hoofed",
-          "handedly": "hoofedly",
-          "handers": "hoofers",
-          "handmade": "hoofmade",
-          "hey": "hay",
-          "high-five": "hoof-five",
-          "highfive": "hoof-five",
-          "ladies": "fillies",
-          "main": "mane",
-          "man": "stallion",
-          "men": "stallions",
-          "manhattan": "manehattan",
-          "marathon": "mareathon",
-          "miracle": "mareacle",
-          "miracles": "mareacles",
-          "money": "bits",
-          "naysayer": "neighsayer",
-          "no one else": "nopony else",
-          "no-one else": "nopony else",
-          "noone else": "nopony else",
-          "nobody": "nopony",
-          "nottingham": "trottingham",
-          "null": "nullpony",
-          "old-timer": "old-trotter",
-          "people": "ponies",
-          "person": "pony",
-          "persons": "ponies",
-          "philadelphia": "fillydelphia",
-          "somebody": "somepony",
-          "someone": "somepony",
-          "stalingrad": "stalliongrad",
-          "sure as hell": "sure as hay",
-          "tattoo": "cutie mark",
-          "tattoos": "cutie mark",
-          "da heck": "da hay",
-          "the heck": "the hay",
-          "the hell": "the hay",
-          "troll": "parasprite",
-          "trolls": "parasprites",
-          "trolled": "parasprited",
-          "trolling": "paraspriting",
-          "trollable": "paraspritable",
-          "woman": "mare",
-          "women": "mares",
-          "confound those dover boys": "confound these ponies"
-        },
-        ponifyMsg: function(msg){
-          var this$ = this;
-          msg.message = msg.message.replaceSansHTML(this.regexp, function(_, pronoun, s, possessive, i){
-            var w, r, lastUpperCaseLetters, l, ref$, ref1$, i$, o;
-            w = this$.map[s.toLowerCase()];
-            r = "";
-            /*preserve upper/lower case*/
-            lastUpperCaseLetters = 0;
-            l = (ref$ = s.length) < (ref1$ = w.length) ? ref$ : ref1$;
-            for (i$ = 0; i$ < l; ++i$) {
-              o = i$;
-              if (s[o].toLowerCase() !== s[o]) {
-                r += w[o].toUpperCase();
-                lastUpperCaseLetters++;
-              } else {
-                r += w[o];
-                lastUpperCaseLetters = 0;
-              }
-            }
-            if (w.length >= s.length && lastUpperCaseLetters >= 3) {
-              r += w.substr(l).toUpperCase();
-            } else {
-              r += w.substr(l);
-            }
-            r = "<abbr class=ponified title='" + s + "'>" + r + "</abbr>";
-            if (pronoun) {
-              if ("aeioujyh".has(w[0])) {
-                r = "an " + r;
-              } else {
-                r = "a " + r;
-              }
-            }
-            if (possessive) {
-              if ("szx".has(w[w.length - 1])) {
-                r += "' ";
-              } else {
-                r += "'s ";
-              }
-            }
-            console.log("replaced '" + s + "' with '" + r + "'", msg.cid);
-            return r;
+        this.lastActivity = lastActivity;
+        for (i$ = 0, len$ = (ref1$ = API.getUsers()).length; i$ < len$; ++i$) {
+          user = ref1$[i$];
+          lastActivity[key$ = user.id] || (lastActivity[key$] = start);
+        }
+        start = this.start;
+        $waitlistBtn = $('#waitlist-button').append($afkCount = $create('<div class=p0ne-toolbar-count>'));
+        addListener(API, 'socket:skip socket:grab', function(id){
+          updateUser(id);
+        });
+        addListener(API, 'userJoin socket:nameChanged', function(u){
+          updateUser(u.id);
+        });
+        addListener(API, 'chat', function(u){
+          if (!/\[afk\]/i.test(u.message)) {
+            updateUser(u.uid);
+          }
+        });
+        addListener(API, 'socket:gifted', function(e){
+          updateUser(e.s);
+        });
+        addListener(API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', function(u){
+          updateUser(u.mi);
+        });
+        addListener(API, 'userLeave', function(u){
+          delete lastActivity[u.id];
+        });
+        chatHidden = $cm().parent().css('display') === 'none';
+        if ((typeof _$context != 'undefined' && _$context !== null) && (app != null || (typeof userList != 'undefined' && userList !== null))) {
+          addListener(_$context, 'show:users show:waitlist', function(){
+            chatHidden = true;
+          });
+          addListener(_$context, 'show:chat', function(){
+            chatHidden = false;
           });
         }
-        /*== EMOTICONS ==*/
-        /* images from bronyland.com (reuploaded to imgur to not spam the console with warnings, because bronyland.com doesn't support HTTPS) */,
-        autoEmotiponies: {
-          '8)': {
-            name: 'rainbowdetermined2',
-            url: "https://i.imgur.com/WFa3vKA.png"
-          },
-          ':(': {
-            name: 'fluttershysad',
-            url: "https://i.imgur.com/6L0bpWd.png"
-          },
-          ':)': {
-            name: 'twilightsmile',
-            url: "https://i.imgur.com/LDoxwfg.png"
-          },
-          ':?': {
-            name: 'rainbowhuh',
-            url: "https://i.imgur.com/te0Mnih.png"
-          },
-          ':B': {
-            name: 'twistnerd',
-            url: "https://i.imgur.com/57VFd38.png"
-          },
-          ':D': {
-            name: 'pinkiehappy',
-            url: "https://i.imgur.com/uFwZib6.png"
-          },
-          ':S': {
-            name: 'unsuresweetie',
-            url: "https://i.imgur.com/EATu0iu.png"
-          },
-          ':O': {
-            name: 'pinkiegasp',
-            url: "https://i.imgur.com/b9G2kaz.png"
-          },
-          ':X': {
-            name: 'fluttershybad',
-            url: "https://i.imgur.com/mnJHnsv.png"
-          },
-          ':|': {
-            name: 'ajbemused',
-            url: "https://i.imgur.com/8SLymiw.png"
-          },
-          ';)': {
-            name: 'raritywink',
-            url: "https://i.imgur.com/9fo7ZW3.png"
-          },
-          '<3': {
-            name: 'heart',
-            url: "https://i.imgur.com/aPBXLob.png"
-          },
-          'B)': {
-            name: 'coolphoto',
-            url: "https://i.imgur.com/QDgMyIZ.png"
-          },
-          'D:': {
-            name: 'raritydespair',
-            url: "https://i.imgur.com/og1FoWN.png"
-          }
-        },
-        emotiponies: {
-          aj: "https://i.imgur.com/nnYMw87.png",
-          applebloom: "https://i.imgur.com/vAdPBJj.png",
-          applejack: "https://i.imgur.com/nnYMw87.png",
-          blush: "https://i.imgur.com/IpxwJ5c.png",
-          cool: "https://i.imgur.com/WFa3vKA.png",
-          cry: "https://i.imgur.com/fkYW4BG.png",
-          derp: "https://i.imgur.com/Y00vqcH.png",
-          derpy: "https://i.imgur.com/h6GdxHo.png",
-          eek: "https://i.imgur.com/mnJHnsv.png",
-          evil: "https://i.imgur.com/I8CNeRx.png",
-          fluttershy: "https://i.imgur.com/6L0bpWd.png",
-          fs: "https://i.imgur.com/6L0bpWd.png",
-          idea: "https://i.imgur.com/aitjp1R.png",
-          lol: "https://i.imgur.com/XVy41jX.png",
-          loveme: "https://i.imgur.com/H81S9x0.png",
-          mad: "https://i.imgur.com/taFXcWV.png",
-          mrgreen: "https://i.imgur.com/IkInelN.png",
-          oops: "https://i.imgur.com/IpxwJ5c.png",
-          photofinish: "https://i.imgur.com/QDgMyIZ.png",
-          pinkie: "https://i.imgur.com/tpQZaW4.png",
-          pinkiepie: "https://i.imgur.com/tpQZaW4.png",
-          rage: "https://i.imgur.com/H81S9x0.png",
-          rainbowdash: "https://i.imgur.com/xglySrD.png",
-          rarity: "https://i.imgur.com/9fo7ZW3.png",
-          razz: "https://i.imgur.com/f8SgNBw.png",
-          rd: "https://i.imgur.com/xglySrD.png",
-          roll: "https://i.imgur.com/JogpKQo.png",
-          sad: "https://i.imgur.com/6L0bpWd.png",
-          scootaloo: "https://i.imgur.com/9zVXkyg.png",
-          shock: "https://i.imgur.com/b9G2kaz.png",
-          sweetie: "https://i.imgur.com/EATu0iu.png",
-          sweetiebelle: "https://i.imgur.com/EATu0iu.png",
-          trixie: "https://i.imgur.com/2QEmT8y.png",
-          trixie2: "https://i.imgur.com/HWW2D6b.png",
-          trixieleft: "https://i.imgur.com/HWW2D6b.png",
-          twi: "https://i.imgur.com/LDoxwfg.png",
-          twilight: "https://i.imgur.com/LDoxwfg.png",
-          twist: "https://i.imgur.com/57VFd38.png",
-          twisted: "https://i.imgur.com/I8CNeRx.png",
-          wink: "https://i.imgur.com/9fo7ZW3.png"
-        },
-        setup: function(arg$){
-          var addListener, replace, css, aEM, emote, ref$, ref1$, name, url, m, ponyCSS, reversedMap;
-          addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
-          this.regexp = RegExp('\\b(an?\\s+)?(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
-          addListener(API, 'chat:plugin', bind$(this, 'ponifyMsg'));
-          if (typeof emoticons != 'undefined' && emoticons !== null) {
-            aEM = importAll$({}, emoticons.autoEmoteMap);
-            for (emote in ref$ = this.autoEmotiponies) {
-              ref1$ = ref$[emote], name = ref1$.name, url = ref1$.url;
-              aEM[emote] = name;
-              this.emotiponies[name] = url;
+        lastAfkCount = 0;
+        this.timer = repeat(60000, updateAfkCount = function(){
+          var afkCount, d, usersToCheck, that, i$, len$, u;
+          if (chatHidden) {
+            forceRerender();
+          } else {
+            afkCount = 0;
+            d = Date.now();
+            usersToCheck = API.getWaitList();
+            if (that = API.getDJ()) {
+              usersToCheck[usersToCheck.length] = that;
             }
-            replace(emoticons, 'autoEmoteMap', function(){
-              return aEM;
-            });
-            m = clone$(emoticons.map);
-            ponyCSS = ".ponimoticon { width: 27px; height: 27px }\n.chat-suggestion-item .ponimoticon { margin-left: -5px }\n.emoji-glow { width: auto; height: auto }\n.emoji { position: static; display: inline-block }\n";
-            reversedMap = {};
-            for (emote in ref$ = this.emotiponies) {
-              url = ref$[emote];
-              if (reversedMap[url]) {
-                m[emote] = reversedMap[url] + " ponimoticon";
-              } else {
-                reversedMap[url] = emote;
-                m[emote] = emote + " ponimoticon";
+            for (i$ = 0, len$ = usersToCheck.length; i$ < len$; ++i$) {
+              u = usersToCheck[i$];
+              if (d - lastActivity[u.id] > settings.highlightOver) {
+                afkCount++;
               }
-              ponyCSS += ".emoji-" + emote + " { background: url(" + url + ") }\n";
             }
-            css('ponify', ponyCSS);
-            replace(emoticons, 'map', function(){
-              return m;
-            });
-            if (typeof emoticons.update == 'function') {
-              emoticons.update();
+            if (afkCount !== lastAfkCount) {
+              if (afkCount) {
+                $afkCount.text(afkCount);
+              } else {
+                $afkCount.clear();
+              }
+              lastAfkCount = afkCount;
             }
           }
+        });
+        updateAfkCount();
+        d = 0;
+        for (i$ = 0, len$ = (ref1$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
+          fn = i$;
+          Constr = ref1$[i$];
+          replace(Constr.prototype, 'render', fn$);
+        }
+        function updateUser(uid){
+          var i$, ref$, ref1$, len$, r, results$ = [];
+          if (Date.now() - lastActivity[uid] > settings.highlightOver) {
+            updateAfkCount();
+          }
+          lastActivity[0] = lastActivity[uid] = Date.now();
+          for (i$ = 0, len$ = (ref$ = (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || (app != null ? app.room.waitlist.rows : void 8)).length; i$ < len$; ++i$) {
+            r = ref$[i$];
+            if (r.model.id === uid) {
+              results$.push(r.render(true));
+            }
+          }
+          return results$;
+        }
+        function forceRerender(){
+          var i$, ref$, ref1$, len$, r, results$ = [];
+          for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+            r = ref$[i$];
+            results$.push(r.render(false));
+          }
+          return results$;
+        }
+        forceRerender();
+        function fn$(r_){
+          return function(isUpdate){
+            var ago, time, noActivityYet;
+            r_.apply(this, arguments);
+            if (!d) {
+              d = Date.now();
+              requestAnimationFrame(function(){
+                d = 0;
+                noActivityYet = null;
+              });
+            }
+            ago = d - lastActivity[this.model.id];
+            if (lastActivity[this.model.id] <= start) {
+              if (ago < 120000) {
+                time = noActivityYet || (noActivityYet = "? ");
+              } else {
+                time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
+              }
+            } else if (ago < 60000) {
+              time = "<1m";
+            } else if (ago < 120000) {
+              time = "<2m";
+            } else {
+              time = humanTime(ago, true);
+            }
+            if (this.$afk) {
+              this.$afk.removeClass('p0ne-last-activity-warn');
+            } else {
+              this.$afk = $('<span class=p0ne-last-activity>').appendTo(this.$el);
+            }
+            this.$afk.text(time);
+            if (ago > settings.highlightOver) {
+              this.$afk.addClass('p0ne-last-activity-warn');
+            }
+            if (isUpdate) {
+              this.$afk.p0neFx('blink');
+            }
+          };
+        }
+      },
+      disable: function(){
+        clearInterval(this.timer);
+        $('#waitlist-button').removeClass('p0ne-toolbar-highlight');
+      },
+      disableLate: function(){
+        var i$, ref$, ref1$, len$, r;
+        for (i$ = 0, len$ = (ref$ = (app != null ? app.room.waitlist.rows : void 8) || (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+          r = ref$[i$];
+          r.render();
+        }
+      }
+    });
+    /*####################################
+    #           FORCE SKIP BTN           #
+    ####################################*/
+    module('forceSkipButton', {
+      moderator: true,
+      setup: function(arg$, m){
+        var $create;
+        $create = arg$.$create;
+        this.$btn = $create('<div class=p0ne-skip-btn><i class="icon icon-skip"></i></div>').insertAfter('#playlist-panel').click(bind$(this, 'onClick'));
+      },
+      onClick: API.moderateForceSkip
+    });
+    /*@source p0ne.userHistory.ls */
+    /**
+     * small module to show a user's song history on plug.dj
+     * fetches the song history from the user's /@/profile page
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+    */
+    /*####################################
+    #            USER HISTORY            #
+    ####################################*/
+    module('userHistory', {
+      require: ['userRollover', 'RoomHistory', 'backbone'],
+      help: 'Shows another user\'s song history when clicking on their username in the user-rollover.\n\nDue to technical restrictions, only Youtube songs can be shown.',
+      setup: function(arg$){
+        var addListener, replace, css;
+        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
+        css('userHistory', '#user-rollover .username { cursor: pointer }');
+        addListener($('body'), 'click', '#user-rollover .username', function(){
+          var user, userID, username, userlevel, userslug;
+          $('#history-button.selected').click();
+          user = userRollover.user;
+          userID = user.id;
+          username = user.get('username');
+          userlevel = user.get('level');
+          userslug = user.get('slug');
+          if (userlevel < 5) {
+            userRollover.$level.text(userlevel + " (user-history requires >4!)");
+            return;
+          }
+          console.log(getTime() + " [userHistory] loading " + username + "'s history");
+          if (!userslug) {
+            getUserData(userID).then(function(d){
+              user.set('slug', d.slug);
+              loadUserHistory(user);
+            });
+          } else {
+            loadUserHistory(user);
+          }
+        });
+        function loadUserHistory(user){
+          return $.get("https://plug.dj/@/" + user.get('slug')).fail(function(){
+            console.error("! couldn't load user's history");
+          }).then(function(d){
+            var songs;
+            userRollover.cleanup();
+            songs = new backbone.Collection();
+            d.replace(/<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, function(arg$, img, author, roomName, positive, grabs, negative, listeners){
+              var cid, ref$, title;
+              if (cid = /\/vi\/(.{11})\//.exec(img)) {
+                cid = cid[1];
+                ref$ = author.split(" - "), title = ref$[0], author = ref$[1];
+                songs.add(new backbone.Model({
+                  user: {
+                    id: user.id,
+                    username: "in " + roomName
+                  },
+                  room: {
+                    name: roomName
+                  },
+                  score: {
+                    positive: positive,
+                    grabs: grabs,
+                    negative: negative,
+                    listeners: listeners,
+                    skipped: 0
+                  },
+                  media: new backbone.Model({
+                    format: 1,
+                    cid: cid,
+                    author: author,
+                    title: title,
+                    image: httpsify(img)
+                  })
+                }));
+              }
+            });
+            console.info(getTime() + " [userHistory] loaded history for " + user.get('username'), songs);
+            out$.songs = songs;
+            out$.d = d;
+            replace(RoomHistory.prototype, 'collection', function(){
+              return songs;
+            });
+            _$context.trigger('show:history');
+            requestAnimationFrame(function(){
+              RoomHistory.prototype.collection = RoomHistory.prototype.collection_;
+              console.log(getTime() + " [userHistory] restoring room's proper history");
+            });
+          });
+        }
+      }
+    });
+    /*@source p0ne.dev.ls */
+    /**
+     * plug_p0ne dev
+     * a set of plug_p0ne modules for usage in the console
+     * They are not used by any other module
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #        FIX CONSOLE SPAMMING        #
+    ####################################*/
+    module('fixConsoleSpamming', {
+      setup: function(arg$){
+        /* this fixes a bug in plug.dj. Version 1.2.6.6390 (2015-02-15)
+         * which spams the console with console.info(undefined)
+         * everytime the socket receives a message.
+         * On WebKit browsers it's ignored, on others (e.g. Firefox)
+         * it will create many empty messages in the console
+         * (https://i.imgur.com/VBzw2ek.png screenshot from Firefox' Web Console)
+        */
+        var replace;
+        replace = arg$.replace;
+        replace(console, 'info', function(info_){
+          return function(){
+            if (arguments.length) {
+              info_.apply(this, arguments);
+            }
+          };
+        });
+      }
+    });
+    /*####################################
+    #      SANDBOX BACKBONE EVENTS       #
+    ####################################*/
+    module('sandboxBackboneEvents', {
+      optional: ['_$context'],
+      setup: function(arg$){
+        var replace, slice;
+        replace = arg$.replace;
+        slice = Array.prototype.slice;
+        replace(Backbone.Events, 'trigger', function(){
+          return function(type){
+            var args, a, b, c, events, l, i, ev, e;
+            if (this._events) {
+              args = slice.call(arguments, 1);
+              a = args[0], b = args[1], c = args[2];
+              for (;;) {
+                if ((events = this._events[type]) && (l = events.length)) {
+                  i = -1;
+                  while (i < l) {
+                    try {
+                      switch (args.length) {
+                      case 0:
+                        while (++i < l) {
+                          (ev = events[i]).callback.call(ev.ctx);
+                        }
+                        break;
+                      case 1:
+                        while (++i < l) {
+                          (ev = events[i]).callback.call(ev.ctx, a);
+                        }
+                        break;
+                      case 2:
+                        while (++i < l) {
+                          (ev = events[i]).callback.call(ev.ctx, a, b);
+                        }
+                        break;
+                      case 3:
+                        while (++i < l) {
+                          (ev = events[i]).callback.call(ev.ctx, a, b, c);
+                        }
+                        break;
+                      default:
+                        while (++i < l) {
+                          (ev = events[i]).callback.apply(ev.ctx, args);
+                        }
+                      }
+                    } catch (e$) {
+                      e = e$;
+                      console.error("[" + (this._name || 'unnamed EventEmitter') + "] Error while triggering '" + type + "' [" + i + "]", this, args, e.stack);
+                    }
+                  }
+                }
+                if (type === 'all') {
+                  return this;
+                }
+                args.unshift(type);
+                a = args[0], b = args[1], c = args[2];
+                type = 'all';
+              }
+            }
+          };
+        });
+        replace(API, '_name', function(){
+          return 'API';
+        });
+        replace(API, 'trigger', function(){
+          return Backbone.Events.trigger;
+        });
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          replace(_$context, '_name', function(){
+            return '_$context';
+          });
+          replace(_$context, 'trigger', function(){
+            return Backbone.Events.trigger;
+          });
+        }
+      }
+    });
+    /*####################################
+    #           LOG EVERYTHING           #
+    ####################################*/
+    module('logEventsToConsole', {
+      optional: ['_$context', 'socketListeners'],
+      displayName: "Log Events to Console",
+      settings: 'dev',
+      help: 'This will log events to the JavaScript console.\nThis is mainly for programmers. If you are none, keep this disabled for better performance.\n\nBy default this will leave out some events to avoid completly spamming the console.\nYou can force-enable logging ALL events by running `logEventsToConsole.logAll = true`',
+      disabledByDefault: true,
+      logAll: false,
+      setup: function(arg$){
+        var addListener, logEventsToConsole, ctx, chatEvnt;
+        addListener = arg$.addListener;
+        logEventsToConsole = this;
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          ctx = _$context;
+          chatEvnt = 'chat:receive';
+        } else {
+          ctx = API;
+          chatEvnt = 'chat';
+        }
+        addListener('early', ctx, chatEvnt, function(data){
+          var message, name;
+          message = cleanMessage(data.originalMessage || data.message);
+          if (data.un) {
+            name = collapseWhitespace(
+            data.un.replace(/\u202e/g, '\\u202e'));
+            name = stripHTML(
+            repeatString$(" ", 24 - name.length) + name);
+            if (data.type === 'emote') {
+              console.log(getTime() + " [CHAT] %c" + name + ": %c" + message, "font-weight: bold", "font-style: italic");
+            } else {
+              console.log(getTime() + " [CHAT] %c" + name + ": %c" + message, "font-weight: bold", "");
+            }
+          } else if (data.type.has('system')) {
+            console.info(getTime() + " [CHAT] [system] %c" + message, "font-size: 1.2em; color: red; font-weight: bold");
+          } else {
+            console.log(getTime() + " [CHAT] %c" + message, 'color: #36F');
+          }
+        });
+        addListener(API, 'userJoin', function(user){
+          console.log(getTime() + " + [JOIN]", user.id, formatUser(user, true), user);
+        });
+        addListener(API, 'userLeave', function(user){
+          var name;
+          name = htmlUnescape(user.username).replace(/\u202e/g, '\\u202e');
+          console.log(getTime() + " - [LEAVE]", user.id, formatUser(user, true), user);
+        });
+        if (!window._$context) {
+          return;
+        }
+        addListener(_$context, 'all', function(){
+          return function(type, args){
+            var group;
+            group = type.substr(0, type.indexOf(":"));
+            if ((group !== 'socket' && group !== 'tooltip' && group !== 'djButton' && group !== 'chat' && group !== 'sio' && group !== 'playback' && group !== 'playlist' && group !== 'notify' && group !== 'drag' && group !== 'audience' && group !== 'anim' && group !== 'HistorySyncEvent' && group !== 'user' && group !== 'ShowUserRolloverEvent') && (type !== 'ChatFacadeEvent:muteUpdate' && type !== 'PlayMediaEvent:play' && type !== 'userPlaying:update' && type !== 'context:update') || logEventsToConsole.logAll) {
+              console.log(getTime() + " [" + type + "]", args);
+            } else if (group === 'socket' && (type !== 'socket:chat' && type !== 'socket:vote' && type !== 'socket:grab' && type !== 'socket:earn')) {
+              console.log(getTime() + " [" + type + "]", args);
+            }
+          };
+        });
+        addListener(_$context, 'PlayMediaEvent:play', function(data){
+          console.log(getTime() + " [SongInfo]", "playlist: " + data.playlistID, "historyID: " + data.historyID);
+        });
+      }
+    });
+    /*####################################
+    #            LOG GRABBERS            #
+    ####################################*/
+    module('logGrabbers', {
+      require: ['votes'],
+      setup: function(arg$){
+        var addListener, replace, grabbers, hasGrabber;
+        addListener = arg$.addListener, replace = arg$.replace;
+        grabbers = {};
+        hasGrabber = false;
+        replace(votes, 'grab', function(g_){
+          return function(uid){
+            var u;
+            u = getUser(uid);
+            console.info(getTime() + " [logGrabbers] " + formatUser(u, user.isStaff) + " grabbed this song");
+            grabbers[uid] = u.username;
+            hasGrabber = true;
+            return g_.call(this, uid);
+          };
+        });
+        addListener(API, 'advance', function(){
+          var name;
+          if (grabbers) {
+            console.log("[logGrabbers] the last song was grabbed by " + humanList((function(){
+              var i$, ref$, results$ = [];
+              for (i$ in ref$ = grabbers) {
+                name = ref$[i$];
+                results$.push(name);
+              }
+              return results$;
+            }())));
+            grabbers = {};
+          } else {
+            hasGrabber = false;
+          }
+        });
+      }
+    });
+    /*####################################
+    #             DEV TOOLS              #
+    ####################################*/
+    module('InternalAPI', {
+      optional: ['users', 'playlists', 'user_', 'app'],
+      setup: function(){
+        var k, ref$, v;
+        for (k in ref$ = API) {
+          v = ref$[k];
+          if (!this[k]) {
+            this[k] = v;
+          } else if (this[k] === 'user') {
+            (fn$.call(this, k));
+          }
+        }
+        importAll$(this, Backbone.Events);
+        function fn$(k){
+          this[k] = function(){
+            var ref$;
+            getUserInternal((ref$ = API[k]()) != null ? ref$.id : void 8);
+          };
+        }
+      },
+      chatLog: API.chatLog,
+      getAdmins: function(){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(it){
+          return it.get('gRole') === 5;
+        }) : void 8;
+      },
+      getAmbassadors: function(){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(u){
+          var ref$;
+          0 < (ref$ = u.get('gRole')) && ref$ < 5;
+        }) : void 8;
+      },
+      getAudience: typeof users != 'undefined' && users !== null ? users.getAudience : void 8,
+      getBannedUsers: function(){
+        throw Error('unimplemented');
+      },
+      getDJ: function(){
+        var ref$;
+        return getUserInternal((ref$ = API.getDJ()) != null ? ref$.id : void 8);
+      },
+      getHistory: function(){
+        return roomHistory;
+      },
+      getHost: function(){
+        var ref$;
+        return getUserInternal((ref$ = API.getHost()) != null ? ref$.id : void 8);
+      },
+      getMedia: function(){
+        return typeof currentMedia != 'undefined' && currentMedia !== null ? currentMedia.get('media') : void 8;
+      },
+      getNextMedia: function(){
+        return typeof playlists != 'undefined' && playlists !== null ? playlists.activeMedia[0] : void 8;
+      },
+      getUser: function(){
+        return user_;
+      },
+      getUsers: function(){
+        return users;
+      },
+      getPlaylist: window.getActivePlaylist,
+      getPlaylists: function(){
+        return playlists;
+      },
+      getStaff: function(){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(u){
+          return u.get('role');
+        }) : void 8;
+      },
+      getWaitList: function(){
+        return app != null ? app.room.waitlist : void 8;
+      }
+    });
+    /*####################################
+    #           DOWNLOAD LINK            #
+    ####################################*/
+    module('downloadLink', {
+      setup: function(arg$){
+        var css, icon;
+        css = arg$.css;
+        icon = getIcon('icon-arrow-down');
+        css('downloadLink', ".p0ne-downloadlink::before {content: ' ';position: absolute;margin-top: -6px;margin-left: -27px;width: 30px;height: 30px;background-position: " + icon.position + ";background-image: " + icon.image + ";}");
+      },
+      module: function(name, filename, dataOrURL){
+        if (!dataOrURL) {
+          dataOrURL = filename;
+          filename = name;
+        }
+        if (dataOrURL && !isURL(dataOrURL)) {
+          if (typeof dataOrURL !== 'string') {
+            dataOrURL = JSON.stringify(dataOrURL);
+          }
+          dataOrURL = URL.createObjectURL(new Blob([dataOrURL], {
+            type: 'text/plain'
+          }));
+        }
+        filename = filename.replace(/[\/\\\?%\*\:\|\"\<\>\.]/g, '');
+        return appendChat("<div class='message p0ne-downloadlink'><i class='icon'></i><span class='text'><a href='" + dataOrURL + "' download='" + filename + "'>" + name + "</a></span></div>");
+      }
+    });
+    /*####################################
+    #            AUXILIARIES             #
+    ####################################*/
+    importAll$(window, {
+      roomState: function(){
+        ajax('GET', 'rooms/state');
+      },
+      export_: function(name){
+        return function(data){
+          console.log("[export] " + name + " =", data);
+          window[name] = data;
+        };
+      },
+      searchEvents: function(regx){
+        var k;
+        if (!(regx instanceof RegExp)) {
+          regx = new RegExp(regx, 'i');
+        }
+        return (function(){
+          var results$ = [];
+          for (k in typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
+            if (regx.test(k)) {
+              results$.push(k);
+            }
+          }
+          return results$;
+        }());
+      },
+      listUsers: function(){
+        var res, i$, ref$, len$, u;
+        res = "";
+        for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
+          u = ref$[i$];
+          res += u.id + "\t" + u.username + "\n";
+        }
+        console.log(res);
+      },
+      listUsersByAge: function(){
+        var a, res, i$, len$, u;
+        a = API.getUsers().sort(function(a, b){
+          a = +a.joined.replace(/\D/g, '');
+          b = +b.joined.replace(/\D/g, '');
+          return (a > b && 1) || (a === b && 0) || -1;
+        });
+        res = "";
+        for (i$ = 0, len$ = a.length; i$ < len$; ++i$) {
+          u = a[i$];
+          res += u.joined.replace(/T|\..+/g, ' ') + "\t" + u.username + "\n";
+        }
+        console.log(res);
+      },
+      findModule: function(test){
+        var res, id, ref$, module;
+        if (typeof test === 'string' && window.l) {
+          test = l(test);
+        }
+        res = [];
+        for (id in ref$ = require.s.contexts._.defined) {
+          module = ref$[id];
+          if (module) {
+            if (test(module, id)) {
+              module.requireID || (module.requireID = id);
+              console.log("[findModule]", id, module);
+              res[res.length] = module;
+            }
+          }
+        }
+        return res;
+      },
+      requireHelperHelper: function(module){
+        /* this function will try to find a nice requireHelper rule for the given plug.dj module
+         * the output is a function shorthand in LiveScript */
+        var k, v, keys, keysExact, isNotObj, ref$, id, m2, ref1$, ref2$;
+        if (typeof module === 'string') {
+          module = require(module);
+        }
+        if (!module) {
+          return false;
+        }
+        for (k in module) {
+          v = module[k];
+          keys = 0;
+          keysExact = 0;
+          isNotObj = (ref$ = typeof v) !== 'object' && ref$ !== 'function';
+          for (id in ref$ = require.s.contexts._.defined) {
+            m2 = ref$[id];
+            if (m2 && m2[k] && (k !== 'requireID' && k !== 'cid' && k !== 'id' && k !== 'length')) {
+              keys++;
+              if (isNotObj && m2[k] === v) {
+                keysExact++;
+              }
+            }
+          }
+          if (keys === 1) {
+            return "(." + k + ")";
+          } else if (keysExact === 1) {
+            return "(." + k + " == " + JSON.stringify(v) + ")";
+          }
+        }
+        for (k in ref$ = module.prototype) {
+          v = ref$[k];
+          keys = 0;
+          keysExact = 0;
+          isNotObj = typeof v !== 'object';
+          for (id in ref1$ = require.s.contexts._.defined) {
+            m2 = ref1$[id];
+            if (m2 && ((ref2$ = m2.prototype) != null && ref2$[k])) {
+              keys++;
+              if (isNotObj && m2[k] === v) {
+                keysExact++;
+              }
+            }
+          }
+          if (keys === 1) {
+            return "(.::?." + k + ")";
+          } else if (keysExact === 1) {
+            return "(.::?." + k + " == " + JSON.stringify(v) + ")";
+          }
+        }
+        return false;
+      },
+      validateUsername: function(username, ignoreWarnings, cb){
+        if (typeof ignoreWarnings === 'function') {
+          cb = ignoreWarnings;
+          ignoreWarnings = false;
+        } else if (!cb) {
+          cb = function(slug, err){
+            console[err && 'error' || 'log']("username '" + username + "': ", err || slug);
+          };
+        }
+        if (!ignoreWarnings) {
+          if (username.length < 2) {
+            cb(false, "too short");
+          } else if (username.length >= 25) {
+            cb(false, "too long");
+          } else if (username.has("/")) {
+            cb(false, "forward slashes are not allowed");
+          } else if (username.has("\n")) {
+            cb(false, "line breaks are not allowed");
+          } else {
+            ignoreWarnings = true;
+          }
+        }
+        if (ignoreWarnings) {
+          return $.getJSON("https://plug.dj/_/users/validate/" + encodeURIComponent(username), function(d){
+            var ref$;
+            cb(d && ((ref$ = d.data[0]) != null ? ref$.slug : void 8));
+          });
+        }
+      },
+      getRequireArg: function(haystack, needle){
+        /* this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
+         * e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
+        */
+        var ref$, a, b, that;
+        ref$ = haystack.split("], function("), a = ref$[0], b = ref$[1];
+        a = a.substr(a.indexOf('"')).split('", "');
+        b = b.substr(0, b.indexOf(')')).split(', ');
+        if (that = b[a.indexOf(needle)]) {
+          try {
+            window[that] = require(needle);
+          } catch (e$) {}
+          return that;
+        } else if (that = a[b.indexOf(needle)]) {
+          try {
+            window[needle] = require(that);
+          } catch (e$) {}
+          return that;
+        }
+      },
+      logOnce: function(base, event){
+        if (!event) {
+          event = base;
+          if (-1 !== event.indexOf(':')) {
+            base = _$context;
+          } else {
+            base = API;
+          }
+        }
+        base.once('event', logger(event));
+      },
+      usernameToSlug: function(un){
+        /* note: this is NOT really accurate! */
+        var lastCharWasLetter, res, i$, ref$, len$, c, lc;
+        lastCharWasLetter = false;
+        res = "";
+        for (i$ = 0, len$ = (ref$ = htmlEscape(un)).length; i$ < len$; ++i$) {
+          c = ref$[i$];
+          if ((lc = c.toLowerCase()) !== c.toUpperCase()) {
+            if (/\w/.test(lc)) {
+              res += c.toLowerCase();
+            } else {
+              res += "\\u" + pad(lc.charCodeAt(0), 4);
+            }
+            lastCharWasLetter = true;
+          } else if (lastCharWasLetter) {
+            res += "-";
+            lastCharWasLetter = false;
+          }
+        }
+        if (!lastCharWasLetter) {
+          res = res.substr(0, res.length - 1);
+        }
+        return res;
+      },
+      reconnectSocket: function(){
+        _$context.trigger('force:reconnect');
+      },
+      ghost: function(){
+        return $.get('/');
+      },
+      getAvatars: function(){
+        API.once('p0ne:avatarsloaded', logger('AVATARS'));
+        $.get($("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr('src')).then(function(d){
+          var that;
+          if (that = d.match(/manifest.*/)) {
+            API.trigger('p0ne:avatarsloaded', JSON.parse(that[0].substr(11, that[0].length - 12)));
+          }
+        });
+      },
+      parseYTGetVideoInfo: function(d, onlyStripHTML){
+        var k, v, ref$, res, i$, ref1$, len$, a, ref2$;
+        if (typeof d === 'object') {
+          for (k in d) {
+            v = d[k];
+            d[k] = parseYTGetVideoInfo(v);
+          }
+          return d;
+        } else if (typeof d !== 'string' || d.startsWith("http")) {
+          return d;
+        } else if (d.startsWith("<!DOCTYPE html>")) {
+          d = JSON.parse(((ref$ = d.match(/ytplayer\.config = (\{[\s\S]*?\});/)) != null ? ref$[1] : void 8) || null);
+          if (onlyStripHTML) {
+            return d;
+          } else {
+            return parseYTGetVideoInfo(d);
+          }
+        } else if (d.has(",")) {
+          return d.split(",").map(parseYTGetVideoInfo);
+        } else if (d.has("&")) {
+          res = {};
+          for (i$ = 0, len$ = (ref1$ = d.split("&")).length; i$ < len$; ++i$) {
+            a = ref1$[i$];
+            a = a.split("=");
+            if (res[a[0]]) {
+              if (!$.isArray(res[a[0]])) {
+                res[a[0]] = [res[a[0]]];
+              }
+              (ref2$ = res[a[0]])[ref2$.length] = parseYTGetVideoInfo(unescape(a[1]));
+            } else {
+              res[a[0]] = parseYTGetVideoInfo(unescape(a[1]));
+            }
+          }
+          return res;
+        } else if (!isNaN(d)) {
+          return +d;
+        } else if (d === 'True' || d === 'False') {
+          return d === 'True';
+        } else {
+          return d;
+        }
+      },
+      play: function(media){
+        /* force plug to play the provided song */
+        if (!media) {
+          return;
+        } else if (typeof media !== 'object') {
+          mediaLookup(media).then(play);
+        } else {
+          if (media.author) {
+            media = new Backbone.Model(media);
+          }
+          currentMedia.set('media', media);
+        }
+      },
+      lssize: function(sizeWhenDecompressed){
+        var size, k, ref$, v;
+        size = 0;
+        for (k in ref$ = localStorage) {
+          v = ref$[k];
+          if (k !== 'length') {
+            if (sizeWhenDecompressed) {
+              try {
+                v = decompress(v);
+              } catch (e$) {}
+            }
+            size += (v || '').length / 524288;
+          }
+        }
+        return size;
+      }
+    });
+    if (!window.chrome) {
+      $.getScript("https://cdn.p0ne.com/scripts/zclip/jquery.zclip.min.js").then(function(){
+        window.copy = function(str, title){
+          appendChat($("<button class='cm p0ne-notif'> copy " + (title || '') + "</button>")).zclip({
+            path: "https://cdn.p0ne.com/scripts/zclip/ZeroClipboard.swf",
+            copy: str
+          });
+        };
+        console.info("[copy polyfill] loaded polyfill for copy() with zclip");
+      }).fail(function(){
+        console.warn("[copy polyfill] failed to load zclip!");
+      });
+    }
+    /*####################################
+    #            RENAME USER             #
+    ####################################*/
+    module('renameUser', {
+      require: ['users'],
+      module: function(idOrName, newName){
+        var u, i$, ref$, len$, user, id, rup;
+        u = users.get(idOrName);
+        if (!u) {
+          idOrName = idOrName.toLowerCase();
+          for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+            user = ref$[i$];
+            if (user.attributes.username.toLowerCase() === idOrName) {
+              u = user;
+              break;
+            }
+          }
+        }
+        if (!u) {
+          return console.error("[rename user] can't find user with ID or name '" + idOrName + "'");
+        }
+        u.set('username', newName);
+        id = u.id;
+        if (!(rup = window.p0ne.renameUserPlugin)) {
+          rup = window.p0ne.renameUserPlugin = function(d){
+            d.un = rup[d.fid] || d.un;
+          };
+          if ((ref$ = window.p0ne.chatPlugins) != null) {
+            ref$[ref$.length] = rup;
+          }
+        }
+        rup[id] = newName;
+      }
+    });
+    (function(){
+      window._$events = {
+        _update: function(){
+          var k, ref$, v;
+          for (k in ref$ = typeof _$context != 'undefined' && _$context !== null ? _$context._events : void 8) {
+            v = ref$[k];
+            this[k.replace(/:/g, '_')] = v;
+          }
+        }
+      };
+      _$events._update();
+    })();
+    /*####################################
+    #            EXPORT DATA             #
+    ####################################*/
+    module('export_', {
+      require: ['downloadLink'],
+      exportPlaylists: function(){
+        var i$, ref$, len$;
+        for (i$ = 0, len$ = (ref$ = playlists).length; i$ < len$; ++i$) {
+          (fn$.call(this, ref$[i$]));
+        }
+        function fn$(pl){
+          $.get("/_/playlists/" + pl.id + "/media").then(function(data){
+            downloadLink("playlist '" + pl.name + "'", pl.name + ".txt", data);
+          });
+        }
+      }
+    });
+    /*####################################
+    #              COPY CHAT             #
+    ####################################*/
+    window.copyChat = function(copy){
+      var host, res;
+      $('#chat-messages img').fixSize();
+      host = p0ne.host;
+      res = "<!DOCTYPE HTML>\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>plug.dj Chatlog " + getTime() + " - " + getRoomSlug() + " (" + API.getUser().rawun + ")</title>\n<!-- basic chat styling -->\n" + $("head link[href^='https://cdn.plug.dj/_/static/css/app']")[0].outerHTML + "\n<link href='https://dl.dropboxusercontent.com/u/4217628/css/fimplugChatlog.css' rel='stylesheet' type='text/css'>";
+      res += getCustomCSS(true);
+      /*
+      res += """\n
+          <!-- p0ne song notifications -->
+          <link rel='stylesheet' href='#host/css/p0ne.notif.css' type='text/css'>
+      """ if window.songNotifications
+      
+      res += """\n
+          <!-- better ponymotes -->
+          <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
+          <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
+          <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
+          <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
+          <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
+      """ if window.bpm or $cm! .find \.bpm-emote .length
+      
+      res += """\n
+          <style>
+          #{css \yellowMod}
+          </style>
+      """ if window.yellowMod
+      */
+      res += "\n\n</head>\n<body id=\"chatlog\">\n" + $('.app-right').html().replace(/https:\/\/api\.plugCubed\.net\/proxy\//g, '').replace(/src="\/\//g, 'src="https://') + "\n</body>";
+      copy(res);
+    };
+    /*
+    module \_$contextUpdateEvent, do
+        require: <[ _$context ]>
+        setup: ({replace}) !->
+            for fn in <[ on off onEarly ]>
+                replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
+                    fn_ ...
+                    _$context .trigger \context:update, type, cb, context
+                    return this
+    */
+    /*@source p0ne.ponify.ls */
+    /**
+     * ponify chat - a script to ponify some words in the chat on plug.dj
+     * Text ponification based on http://pterocorn.blogspot.dk/2011/10/ponify.html
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #            PONIFY CHAT             #
+    ####################################*/
+    module('ponify', {
+      optional: ['emoticons'],
+      displayName: 'Ponify Chat',
+      settings: 'pony',
+      help: 'Ponify the chat! (replace words like "anyone" with "anypony")\nReplaced words will be underlined. Move your cursor over the word to see it\'s original.\n\nIt also replaces some of the emoticons with pony emoticons.',
+      disabled: true
+      /*== TEXT ==*/,
+      map: {
+        "anybody": "anypony",
+        "anyone": "anypony",
+        "ass": "flank",
+        "asses": "flanks",
+        "boner": "wingboner",
+        "boy": "colt",
+        "boyfriend": "coltfriend",
+        "boyfriends": "coltfriends",
+        "boys": "colts",
+        "bro fist": "brohoof",
+        "bro-fist": "brohoof",
+        "butt": "flank",
+        "butthurt": "saddle-sore",
+        "butts": "flanks",
+        "child": "foal",
+        "children": "foals",
+        "cowboy": "cowpony",
+        "cowboys": "cowponies",
+        "cowgirl": "cowpony",
+        "cowgirls": "cowponies",
+        "disappoint": "disappony",
+        "disappointed": "disappony",
+        "disappointment": "disapponyment",
+        "doctor who": "doctor whooves",
+        "dr who": "dr whooves",
+        "dr. who": "dr. whooves",
+        "everybody": "everypony",
+        "everyone": "everypony",
+        "fap": "clop",
+        "faps": "clops",
+        "foot": "hoof",
+        "feet": "hooves",
+        "folks": "foalks",
+        "fool": "foal",
+        "foolish": "foalish",
+        "germany": "germaneigh",
+        "gentleman": "gentlecolt",
+        "gentlemen": "gentlecolts",
+        "girl": "filly",
+        "girls": "fillies",
+        "girlfriend": "fillyfriend",
+        "girlfriends": "fillyfriends",
+        "halloween": "nightmare night",
+        "hand": "hoof",
+        "hands": "hooves",
+        "handed": "hoofed",
+        "handedly": "hoofedly",
+        "handers": "hoofers",
+        "handmade": "hoofmade",
+        "hey": "hay",
+        "high-five": "hoof-five",
+        "highfive": "hoof-five",
+        "ladies": "fillies",
+        "main": "mane",
+        "man": "stallion",
+        "men": "stallions",
+        "manhattan": "manehattan",
+        "marathon": "mareathon",
+        "miracle": "mareacle",
+        "miracles": "mareacles",
+        "money": "bits",
+        "naysayer": "neighsayer",
+        "no one else": "nopony else",
+        "no-one else": "nopony else",
+        "noone else": "nopony else",
+        "nobody": "nopony",
+        "nottingham": "trottingham",
+        "null": "nullpony",
+        "old-timer": "old-trotter",
+        "people": "ponies",
+        "person": "pony",
+        "persons": "ponies",
+        "philadelphia": "fillydelphia",
+        "somebody": "somepony",
+        "someone": "somepony",
+        "stalingrad": "stalliongrad",
+        "sure as hell": "sure as hay",
+        "tattoo": "cutie mark",
+        "tattoos": "cutie mark",
+        "da heck": "da hay",
+        "the heck": "the hay",
+        "the hell": "the hay",
+        "troll": "parasprite",
+        "trolls": "parasprites",
+        "trolled": "parasprited",
+        "trolling": "paraspriting",
+        "trollable": "paraspritable",
+        "woman": "mare",
+        "women": "mares",
+        "confound those dover boys": "confound these ponies"
+      },
+      ponifyMsg: function(msg){
+        var this$ = this;
+        msg.message = msg.message.replaceSansHTML(this.regexp, function(_, pronoun, s, possessive, i){
+          var w, r, lastUpperCaseLetters, l, ref$, ref1$, i$, o;
+          w = this$.map[s.toLowerCase()];
+          r = "";
+          /*preserve upper/lower case*/
+          lastUpperCaseLetters = 0;
+          l = (ref$ = s.length) < (ref1$ = w.length) ? ref$ : ref1$;
+          for (i$ = 0; i$ < l; ++i$) {
+            o = i$;
+            if (s[o].toLowerCase() !== s[o]) {
+              r += w[o].toUpperCase();
+              lastUpperCaseLetters++;
+            } else {
+              r += w[o];
+              lastUpperCaseLetters = 0;
+            }
+          }
+          if (w.length >= s.length && lastUpperCaseLetters >= 3) {
+            r += w.substr(l).toUpperCase();
+          } else {
+            r += w.substr(l);
+          }
+          r = "<abbr class=ponified title='" + s + "'>" + r + "</abbr>";
+          if (pronoun) {
+            if ("aeioujyh".has(w[0])) {
+              r = "an " + r;
+            } else {
+              r = "a " + r;
+            }
+          }
+          if (possessive) {
+            if ("szx".has(w[w.length - 1])) {
+              r += "' ";
+            } else {
+              r += "'s ";
+            }
+          }
+          console.log("replaced '" + s + "' with '" + r + "'", msg.cid);
+          return r;
+        });
+      }
+      /*== EMOTICONS ==*/
+      /* images from bronyland.com (reuploaded to imgur to not spam the console with warnings, because bronyland.com doesn't support HTTPS) */,
+      autoEmotiponies: {
+        '8)': {
+          name: 'rainbowdetermined2',
+          url: "https://i.imgur.com/WFa3vKA.png"
         },
-        disable: function(){
+        ':(': {
+          name: 'fluttershysad',
+          url: "https://i.imgur.com/6L0bpWd.png"
+        },
+        ':)': {
+          name: 'twilightsmile',
+          url: "https://i.imgur.com/LDoxwfg.png"
+        },
+        ':?': {
+          name: 'rainbowhuh',
+          url: "https://i.imgur.com/te0Mnih.png"
+        },
+        ':B': {
+          name: 'twistnerd',
+          url: "https://i.imgur.com/57VFd38.png"
+        },
+        ':D': {
+          name: 'pinkiehappy',
+          url: "https://i.imgur.com/uFwZib6.png"
+        },
+        ':S': {
+          name: 'unsuresweetie',
+          url: "https://i.imgur.com/EATu0iu.png"
+        },
+        ':O': {
+          name: 'pinkiegasp',
+          url: "https://i.imgur.com/b9G2kaz.png"
+        },
+        ':X': {
+          name: 'fluttershybad',
+          url: "https://i.imgur.com/mnJHnsv.png"
+        },
+        ':|': {
+          name: 'ajbemused',
+          url: "https://i.imgur.com/8SLymiw.png"
+        },
+        ';)': {
+          name: 'raritywink',
+          url: "https://i.imgur.com/9fo7ZW3.png"
+        },
+        '<3': {
+          name: 'heart',
+          url: "https://i.imgur.com/aPBXLob.png"
+        },
+        'B)': {
+          name: 'coolphoto',
+          url: "https://i.imgur.com/QDgMyIZ.png"
+        },
+        'D:': {
+          name: 'raritydespair',
+          url: "https://i.imgur.com/og1FoWN.png"
+        }
+      },
+      emotiponies: {
+        aj: "https://i.imgur.com/nnYMw87.png",
+        applebloom: "https://i.imgur.com/vAdPBJj.png",
+        applejack: "https://i.imgur.com/nnYMw87.png",
+        blush: "https://i.imgur.com/IpxwJ5c.png",
+        cool: "https://i.imgur.com/WFa3vKA.png",
+        cry: "https://i.imgur.com/fkYW4BG.png",
+        derp: "https://i.imgur.com/Y00vqcH.png",
+        derpy: "https://i.imgur.com/h6GdxHo.png",
+        eek: "https://i.imgur.com/mnJHnsv.png",
+        evil: "https://i.imgur.com/I8CNeRx.png",
+        fluttershy: "https://i.imgur.com/6L0bpWd.png",
+        fs: "https://i.imgur.com/6L0bpWd.png",
+        idea: "https://i.imgur.com/aitjp1R.png",
+        lol: "https://i.imgur.com/XVy41jX.png",
+        loveme: "https://i.imgur.com/H81S9x0.png",
+        mad: "https://i.imgur.com/taFXcWV.png",
+        mrgreen: "https://i.imgur.com/IkInelN.png",
+        oops: "https://i.imgur.com/IpxwJ5c.png",
+        photofinish: "https://i.imgur.com/QDgMyIZ.png",
+        pinkie: "https://i.imgur.com/tpQZaW4.png",
+        pinkiepie: "https://i.imgur.com/tpQZaW4.png",
+        rage: "https://i.imgur.com/H81S9x0.png",
+        rainbowdash: "https://i.imgur.com/xglySrD.png",
+        rarity: "https://i.imgur.com/9fo7ZW3.png",
+        razz: "https://i.imgur.com/f8SgNBw.png",
+        rd: "https://i.imgur.com/xglySrD.png",
+        roll: "https://i.imgur.com/JogpKQo.png",
+        sad: "https://i.imgur.com/6L0bpWd.png",
+        scootaloo: "https://i.imgur.com/9zVXkyg.png",
+        shock: "https://i.imgur.com/b9G2kaz.png",
+        sweetie: "https://i.imgur.com/EATu0iu.png",
+        sweetiebelle: "https://i.imgur.com/EATu0iu.png",
+        trixie: "https://i.imgur.com/2QEmT8y.png",
+        trixie2: "https://i.imgur.com/HWW2D6b.png",
+        trixieleft: "https://i.imgur.com/HWW2D6b.png",
+        twi: "https://i.imgur.com/LDoxwfg.png",
+        twilight: "https://i.imgur.com/LDoxwfg.png",
+        twist: "https://i.imgur.com/57VFd38.png",
+        twisted: "https://i.imgur.com/I8CNeRx.png",
+        wink: "https://i.imgur.com/9fo7ZW3.png"
+      },
+      setup: function(arg$){
+        var addListener, replace, css, aEM, emote, ref$, ref1$, name, url, m, ponyCSS, reversedMap;
+        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
+        this.regexp = RegExp('\\b(an?\\s+)?(' + Object.keys(this.map).join('|').replace(/\s+/g, '\\s*') + ')(\'s?)?\\b', 'gi');
+        addListener(API, 'chat:plugin', bind$(this, 'ponifyMsg'));
+        if (typeof emoticons != 'undefined' && emoticons !== null) {
+          aEM = importAll$({}, emoticons.autoEmoteMap);
+          for (emote in ref$ = this.autoEmotiponies) {
+            ref1$ = ref$[emote], name = ref1$.name, url = ref1$.url;
+            aEM[emote] = name;
+            this.emotiponies[name] = url;
+          }
+          replace(emoticons, 'autoEmoteMap', function(){
+            return aEM;
+          });
+          m = clone$(emoticons.map);
+          ponyCSS = ".ponimoticon { width: 27px; height: 27px }\n.chat-suggestion-item .ponimoticon { margin-left: -5px }\n.emoji-glow { width: auto; height: auto }\n.emoji { position: static; display: inline-block }\n";
+          reversedMap = {};
+          for (emote in ref$ = this.emotiponies) {
+            url = ref$[emote];
+            if (reversedMap[url]) {
+              m[emote] = reversedMap[url] + " ponimoticon";
+            } else {
+              reversedMap[url] = emote;
+              m[emote] = emote + " ponimoticon";
+            }
+            ponyCSS += ".emoji-" + emote + " { background: url(" + url + ") }\n";
+          }
+          css('ponify', ponyCSS);
+          replace(emoticons, 'map', function(){
+            return m;
+          });
           if (typeof emoticons.update == 'function') {
             emoticons.update();
           }
         }
-      });
-      module('ponifiedLang', {
-        require: ['Lang'],
-        disabled: true,
-        displayName: "Ponified Text",
-        settings: 'pony',
-        setup: function(arg$){
-          var replace;
-          replace = arg$.replace;
-          replace(Lang.roles, 'host', function(){
-            return "Alicorn Princess";
-          });
-          replace(Lang.roles, 'cohost', function(){
-            return "Alicorn";
-          });
-          replace(Lang.roles, 'manager', function(){
-            return "Royal Guard Captain";
-          });
-          replace(Lang.roles, 'bouncer', function(){
-            return "Royal Guard";
-          });
-          replace(Lang.roles, 'dj', function(){
-            return "Horse Famous";
-          });
-          replace(Lang.permissions, 'cohosts', function(){
-            return "Add/Remove Alicorns";
-          });
-          replace(Lang.permissions, 'dj', function(){
-            return "Set Horse Famous Ponies";
-          });
-          replace(Lang.roles, 'none', function(){
-            return "Mudpony";
-          });
-          replace(Lang.moderation, 'ban', function(){
-            return "sent %NAME% to the moon for a thousand years.";
-          });
-          replace(Lang.messages, 'minChatLevel', function(){
-            return "This community restricts chat to ponies who are level %LEVEL% and above.";
-          });
-          replace(Lang.permissions, 'ban', function(){
-            return "Ban Ponies.";
-          });
-          replace(Lang.permissions, 'unban', function(){
-            return "Unban Ponies.";
-          });
-          replace(Lang.tooltips, 'headersUsers', function(){
-            return "Ponies";
-          });
-          replace(Lang.tooltips, 'usersRoom', function(){
-            return "Ponies who are here right now";
-          });
-          replace(Lang.tooltips, 'usersBans', function(){
-            return "Ponies who have been banned";
-          });
-          replace(Lang.tooltips, 'usersIgnored', function(){
-            return "Ponies who you have ignored";
-          });
-          replace(Lang.tooltips, 'usersMutes', function(){
-            return "Ponies who have been muted";
-          });
-          replace(Lang.tooltips, 'chatLevel', function(){
-            return "Restrict chat to ponies who are this level or above";
-          });
-          replace(Lang.userList, 'roomTitle', function(){
-            return "Ponies here now";
-          });
-          replace(Lang.chat, 'help', function(){
-            return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr><strong>Bot Commands:</strong><br>!randgame &nbsp; <em>Pony Adventure</em><br/>!power &nbsp; <em>Random Power</em><br/>!hug (@user) &nbsp; <em>hug somepony</em><br/>!1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>!rule <number> &nbsp; <em>List a Rule</em><br/>!songinfo &nbsp; <em>Songstats</em><br/>!dc &nbsp; <em>be put back if you dc'd</em><br/>!eta &nbsp; <em>ETA til you dj</em><br/>!weird &nbsp; <em>Is it weirdday?</em><br/>";
-          });
-          replace(Lang.search, 'youtube', function(){
-            return "Search YouTube for ponies";
-          });
-          replace(Lang.search, 'soundcloud', function(){
-            return "Search SoundCloud for ponies";
-          });
+      },
+      disable: function(){
+        if (typeof emoticons.update == 'function') {
+          emoticons.update();
         }
-      });
-      /*@source p0ne.fimplug.ls */
-      /**
-       * fimplug related modules
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #              RULESKIP              #
-      ####################################*/
-      module('forceSkipButtonRuleskip', {
-        displayName: "Ruleskip Button",
-        settings: 'pony',
-        help: "Makes the Skip button show a ruleskip list instead.\n(you can still instaskip)",
-        screenshot: 'https://i.imgur.com/jGwYsn3.png',
-        moderator: true,
-        setup: function(arg$){
-          var addListener, replace, $create, css, $rulelist, visible, fn;
-          addListener = arg$.addListener, replace = arg$.replace, $create = arg$.$create, css = arg$.css;
-          css('forceSkipButtonRuleskip', '.p0ne-skip-ruleskip {position: absolute;right: 0;bottom: 54px;width: 250px;list-style: none;line-height: 2em;display: none;}.p0ne-skip-ruleskip li {padding: 5px;background: #222;}.p0ne-skip-ruleskip li:hover {background: #444;}');
-          visible = false;
-          fn = addListener(API, 'p0ne:moduleEnabled', function(m){
-            if (m.name === 'forceSkipButton') {
-              $rulelist = $create('<ul class=p0ne-skip-ruleskip><li data-rule=insta><b>insta skip</b></li><li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li><li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li><li data-rule=20><b>!ruleskip 20</b> (alts)</li><li data-rule=13><b>!ruleskip 13</b> (NSFW)</li><li  data-rule=5><b>!ruleskip  5</b> (too long)</li><li  data-rule=4><b>!ruleskip  4</b> (history)</li><li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li><li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li><li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li></ul>').appendTo(m.$btn);
-              replace(m, 'onClick', function(){
-                return function(e){
-                  var num;
-                  if (visible) {
-                    if (num = $(e.target).closest('li').data('rule')) {
-                      if (num === 'insta') {
-                        API.moderateForceSkip();
-                      } else {
-                        API.sendChat("!ruleskip " + num);
-                      }
-                    }
-                    m.$btn.find('.icon:first').addClass('icon-skip').removeClass('icon-arrow-down');
-                    $rulelist.fadeOut();
-                    visible = false;
-                  } else if ($(e.target).is('.p0ne-skip-btn, .p0ne-skip-btn>.icon')) {
-                    m.$btn.find('.icon:first').removeClass('icon-skip').addClass('icon-arrow-down');
-                    $rulelist.fadeIn();
-                    visible = true;
-                  }
-                };
-              });
-              console.log("[forceSkipButton] 'fimplug !ruleskip list' patch applied");
-            }
-          });
-          addListener('early', window._$context || API, 'advance', function(){
-            if (visible) {
-              visible = false;
-              $rulelist.fadeOut();
-              $('.p0ne-skip-btn>.icon:first').addClass('icon-skip').removeClass('icon-arrow-down');
-            }
-          });
-          if (typeof forceSkipButton != 'undefined' && forceSkipButton !== null) {
-            fn(forceSkipButton);
-          }
-        }
-      });
-      /*####################################
-      #              FIMSTATS              #
-      ####################################*/
-      module('fimstats', {
-        settings: 'pony',
-        optional: ['_$context', 'app', 'playlists'],
-        disabled: true,
-        _settings: {
-          highlightUnplayed: false
-        },
-        CACHE_DURATION: 1 .h,
-        setup: function(arg$, fimstats){
-          var addListener, $create, replace, $el, that, ref$, ref1$, ref2$, $yourNextMedia, this$ = this;
-          addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
-          css('fimstats', '.p0ne-fimstats {position: absolute;left: 0;right: 345px;bottom: 54px;height: 1em;padding: 5px 0;font-size: .9em;color: #12A9E0;background: rgba(0,0,0, 0.4);text-align: center;z-index: 6;transition: opacity .2s ease-out;}.video-only .p0ne-fimstats {bottom: 116px;padding-top: 0px;background: rgba(0,0,0, 0.8);}.p0ne-fimstats-field {display: block;position: absolute;width: 100%;padding: 0 5px;box-sizing: border-box;}.p0ne-fimstats-last { text-align: left; }.p0ne-fimstats-plays, .p0ne-fimstats-once, .p0ne-fimstats-first-notyet { text-align: center; }.p0ne-fimstats-first { text-align: right; }.p0ne-fimstats-field::before, .p0ne-fimstats-field::after,.p0ne-fimstats-first-time, .p0ne-fimstats-last-time, .p0ne-fimstats-once-time {color: #ddd;}#dialog-container .p0ne-fimstats {position: fixed;bottom: 0;left: 0;right: 345px;background: rgba(0,0,0, 0.8);}#dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }.p0ne-fimstats-first-notyet::before { content: "first played just now!"; color: #12A9E0 }.p0ne-fimstats-once::before { content: "once played by: "; }.p0ne-fimstats-last::before { content: "last played by: "; }.p0ne-fimstats-last-time::before,.p0ne-fimstats-first-time::before,.p0ne-fimstats-once-time::before { content: "("; }.p0ne-fimstats-last-time::after,.p0ne-fimstats-first-time::after,.p0ne-fimstats-once-time::after { content: ")"; }.p0ne-fimstats-plays::before { content: "played: "; }.p0ne-fimstats-plays::after { content: " times"; }.p0ne-fimstats-first::before { content: "first played by: "; }.p0ne-fimstats-first-time,.p0ne-fimstats-last-time,.p0ne-fimstats-once-time {font-size: 0.8em;display: inline;position: static;margin-left: 5px;}.p0ne-fimstats-unplayed {color: lime;}');
-          $el = $create('<span class=p0ne-fimstats>').appendTo('#room');
-          addListener(API, 'advance', this.updateStats = function(d){
-            var ref$, id;
-            if (d != null && ((ref$ = d.lastPlay) != null && ref$.media)) {
-              delete this$.cache[id = d.lastPlay.media.format + ":" + d.lastPlay.media.cid];
-            }
-            if (d.media) {
-              fimstats(d.media).then(function(res){
-                $el.html(res.html);
-              }).fail(function(err){
-                $el.html(err.html);
-              });
-            } else {
-              $el.html("");
-            }
-          });
-          if (typeof _$context != 'undefined' && _$context !== null) {
-            addListener(_$context, 'ShowDialogEvent:show', function(d){
-              _.defer(function(){
-                var ref$;
-                if ((ref$ = d.dialog.options) != null && ref$.media) {
-                  console.log("[fimstats]", d.dialog.options.media);
-                  fimstats(d.dialog.options.media).then(function(d){
-                    $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
-                  });
-                }
-              });
-            });
-          }
-          if (that = app != null ? (ref$ = app.dialog) != null ? (ref1$ = ref$.dialog) != null ? (ref2$ = ref1$.options) != null ? ref2$.media : void 8 : void 8 : void 8 : void 8) {
-            console.log("[fimstats]", that);
-            fimstats(that.toJSON()).then(function(d){
-              $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
-            });
-          }
-          console.info("[fimstats] prevent p0neSettings overlay", $('#p0ne-menu').css({
-            bottom: 54 + 21
-          }));
-          addListener(API, 'p0ne:moduleEnabled p0ne:moduleUpdated', function(m){
-            if (m.name === 'p0neSettings') {
-              $('#p0ne-menu').css({
-                bottom: 54 + 21
-              });
-            }
-          });
-          if (app != null && (typeof playlists != 'undefined' && playlists !== null)) {
-            $yourNextMedia = $('#your-next-media');
-            this.checkUnplayed = function(){
-              $yourNextMedia.removeClass('p0ne-fimstats-unplayed');
-              if (fimstats._settings.highlightUnplayed && playlists.activeMedia.length > 0) {
-                console.log("[fimstats] checking next song", playlists.activeMedia[0]);
-                fimstats(playlists.activeMedia[0]).then(function(d){
-                  if (d.unplayed) {
-                    $yourNextMedia.addClass('p0ne-fimstats-unplayed');
-                  }
-                });
+      }
+    });
+    module('ponifiedLang', {
+      require: ['Lang'],
+      disabled: true,
+      displayName: "Ponified Text",
+      settings: 'pony',
+      setup: function(arg$){
+        var replace, css, replaceMap, regx, i$, ref$, group, k, v, v2;
+        replace = arg$.replace, css = arg$.css;
+        replaceMap = {
+          people: 'ponies',
+          People: 'Ponies',
+          user: 'pony',
+          Nobody: 'Nopony',
+          woots: "Squees",
+          Woot: "Squee",
+          Points: "Bits",
+          "Resident DJs": 'Horse Famous',
+          "Resident DJ": 'Horse Famous',
+          Bouncer: 'Royal Guard',
+          Manager: 'Royal Guard Captain',
+          "Co-Host": 'Alicorn',
+          Host: 'Alicorn Princess',
+          staff: 'VIP Pony List'
+        };
+        regx = RegExp('\\b(' + Object.keys(replaceMap).join('|') + ')(s?|)\\b', 'g');
+        console.group("[ponifiedLang] dynamically replacing words");
+        for (i$ in ref$ = Lang) {
+          group = ref$[i$];
+          for (k in group) {
+            v = group[k];
+            if (k[k.length - 1] !== "_" && v) {
+              v2 = v.replace(regx, fn$);
+              if (v !== v2) {
+                replace(group, k, fn1$);
+                console.log("\treplacing '" + v + "' with '" + group[k] + "'");
               }
-            };
-            replace(app.footer.playlist, 'updateMeta', function(uM_){
-              return function(){
-                if (playlists.activeMedia.length > 0) {
-                  fimstats.checkUnplayed();
-                  uM_.apply(this, arguments);
-                } else {
-                  clearTimeout(this.updateMetaBind);
+            }
+          }
+        }
+        console.groupEnd();
+        replace(Lang.roles, 'none', function(){
+          return "Mudpony";
+        });
+        replace(Lang.moderation, 'staffDJ', function(){
+          return "made %NAME% Horse Famous.";
+        });
+        replace(Lang.moderation, 'staffBouncer', function(){
+          return "hired %NAME% as a Royal Guard.";
+        });
+        replace(Lang.moderation, 'staffManager', function(){
+          return "hired %NAME% as a Royal Guard Captain.";
+        });
+        replace(Lang.moderation, 'staffCohost', function(){
+          return "transformed %NAME% into an Alicorn.";
+        });
+        replace(Lang.moderation, 'staffHost', function(){
+          return "transformed %NAME% into an Alicorn Princess.";
+        });
+        replace(Lang.permissions, 'dj', function(){
+          return "Set Horse Famous Ponies";
+        });
+        replace(Lang.permissions, 'bouncers', function(){
+          return "Hire Royal Guard";
+        });
+        replace(Lang.permissions, 'managers', function(){
+          return "Hire Royal Guard Captains";
+        });
+        replace(Lang.moderation, 'ban', function(){
+          return "sent %NAME% to the moon for a thousand years.";
+        });
+        replace(Lang.userSettings, 'videoOnly', function(){
+          return "Video Only (no dancing horses)";
+        });
+        replace(Lang.userMeta, 'profileURL', function(){
+          return "Hoofbook Profile URL";
+        });
+        replace(Lang.userFriends, 'profile', function(){
+          return "Hoofbook Profile";
+        });
+        replace(Lang.userList, 'staffTitle', function(){
+          return replaceMap.staff;
+        });
+        replace(Lang.tooltips, 'profile', function(){
+          return "Edit your Hoofbook Profile";
+        });
+        replace(Lang.userSettings, 'nsfw', function(){
+          return "Show Clopper Communities (NSFW)";
+        });
+        replace(Lang.alerts, 'sessionExpired', function(){
+          return "Horseapples!";
+        });
+        replace($('#woot .label')[0], 'textContent', function(){
+          return "Squee!";
+        });
+        replace(Lang.chat, 'help', function(){
+          return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr><strong>Bot Commands:</strong><br>!randgame &nbsp; <em>Pony Adventure</em><br/>!power &nbsp; <em>Random Power</em><br/>!hug (@user) &nbsp; <em>hug somepony</em><br/>!1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>!rule <number> &nbsp; <em>List a Rule</em><br/>!songinfo &nbsp; <em>Songstats</em><br/>!dc &nbsp; <em>be put back if you dc'd</em><br/>!eta &nbsp; <em>ETA til you dj</em><br/>!weird &nbsp; <em>Is it weirdday?</em><br/>";
+        });
+        replace(Lang.search, 'youtube', function(){
+          return "Search YouTube for ponies";
+        });
+        replace(Lang.search, 'soundcloud', function(){
+          return "Search SoundCloud for ponies";
+        });
+        css('ponifiedLang', '#dialog-user-role .role-menu,#dialog-user-role .role-menu .selected {width: 205px;}');
+        function fn$(arg$, a, b){
+          return replaceMap[a] + b;
+        }
+        function fn1$(){
+          return v2;
+        }
+      }
+    });
+    /*@source p0ne.fimplug.ls */
+    /**
+     * fimplug related modules
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #              RULESKIP              #
+    ####################################*/
+    module('forceSkipButtonRuleskip', {
+      displayName: "Ruleskip Button",
+      settings: 'pony',
+      help: "Makes the Skip button show a ruleskip list instead.\n(you can still instaskip)",
+      screenshot: 'https://i.imgur.com/jGwYsn3.png',
+      moderator: true,
+      setup: function(arg$){
+        var addListener, replace, $create, css, $rulelist, visible, fn;
+        addListener = arg$.addListener, replace = arg$.replace, $create = arg$.$create, css = arg$.css;
+        css('forceSkipButtonRuleskip', '.p0ne-skip-ruleskip {position: absolute;right: 0;bottom: 54px;width: 250px;list-style: none;line-height: 2em;display: none;}.p0ne-skip-ruleskip li {padding: 5px;background: #222;}.p0ne-skip-ruleskip li:hover {background: #444;}');
+        visible = false;
+        fn = addListener(API, 'p0ne:moduleEnabled', function(m){
+          if (m.name === 'forceSkipButton') {
+            $rulelist = $create('<ul class=p0ne-skip-ruleskip><li data-rule=insta><b>insta skip</b></li><li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li><li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li><li data-rule=20><b>!ruleskip 20</b> (alts)</li><li data-rule=13><b>!ruleskip 13</b> (NSFW)</li><li  data-rule=6><b>!ruleskip  6</b> (too long)</li><li  data-rule=4><b>!ruleskip  4</b> (history)</li><li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li><li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li><li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li></ul>').appendTo(m.$btn);
+            replace(m, 'onClick', function(){
+              return function(e){
+                var num;
+                if (visible) {
+                  if (num = $(e.target).closest('li').data('rule')) {
+                    if (num === 'insta') {
+                      API.moderateForceSkip();
+                    } else {
+                      API.sendChat("!ruleskip " + num);
+                    }
+                  }
+                  m.$btn.find('.icon:first').addClass('icon-skip').removeClass('icon-arrow-down');
+                  $rulelist.fadeOut();
+                  visible = false;
+                } else if ($(e.target).is('.p0ne-skip-btn, .p0ne-skip-btn>.icon')) {
+                  m.$btn.find('.icon:first').removeClass('icon-skip').addClass('icon-arrow-down');
+                  $rulelist.fadeIn();
+                  visible = true;
                 }
               };
             });
-            replace(app.footer.playlist, 'updateMetaBind', function(){
-              return bind$(app.footer.playlist, 'updateMeta');
+            console.log("[forceSkipButton] 'fimplug !ruleskip list' patch applied");
+          }
+        });
+        addListener('early', window._$context || API, 'advance', function(){
+          if (visible) {
+            visible = false;
+            $rulelist.fadeOut();
+            $('.p0ne-skip-btn>.icon:first').addClass('icon-skip').removeClass('icon-arrow-down');
+          }
+        });
+        if (typeof forceSkipButton != 'undefined' && forceSkipButton !== null) {
+          fn(forceSkipButton);
+        }
+      }
+    });
+    /*####################################
+    #              FIMSTATS              #
+    ####################################*/
+    module('fimstats', {
+      settings: 'pony',
+      optional: ['_$context', 'app', 'playlists'],
+      disabled: true,
+      _settings: {
+        highlightUnplayed: false
+      },
+      CACHE_DURATION: 1 .h,
+      setup: function(arg$, fimstats){
+        var addListener, $create, replace, $el, that, ref$, ref1$, ref2$, $yourNextMedia, this$ = this;
+        addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
+        css('fimstats', '.p0ne-fimstats {position: absolute;left: 0;right: 345px;bottom: 54px;height: 1em;padding: 5px 0;font-size: .9em;color: #12A9E0;background: rgba(0,0,0, 0.4);text-align: center;z-index: 6;transition: opacity .2s ease-out;}.video-only .p0ne-fimstats {bottom: 116px;padding-top: 0px;background: rgba(0,0,0, 0.8);}.p0ne-fimstats-field {display: block;position: absolute;width: 100%;padding: 0 5px;box-sizing: border-box;}.p0ne-fimstats-last { text-align: left; }.p0ne-fimstats-plays, .p0ne-fimstats-once, .p0ne-fimstats-first-notyet { text-align: center; }.p0ne-fimstats-first { text-align: right; }.p0ne-fimstats-field::before, .p0ne-fimstats-field::after,.p0ne-fimstats-first-time, .p0ne-fimstats-last-time, .p0ne-fimstats-once-time {color: #ddd;}#dialog-container .p0ne-fimstats {position: fixed;bottom: 0;left: 0;right: 345px;background: rgba(0,0,0, 0.8);}#dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }.p0ne-fimstats-first-notyet::before { content: "first played just now!"; color: #12A9E0 }.p0ne-fimstats-once::before { content: "once played by: "; }.p0ne-fimstats-last::before { content: "last played by: "; }.p0ne-fimstats-last-time::before,.p0ne-fimstats-first-time::before,.p0ne-fimstats-once-time::before { content: "("; }.p0ne-fimstats-last-time::after,.p0ne-fimstats-first-time::after,.p0ne-fimstats-once-time::after { content: ")"; }.p0ne-fimstats-plays::before { content: "played: "; }.p0ne-fimstats-plays::after { content: " times"; }.p0ne-fimstats-first::before { content: "first played by: "; }.p0ne-fimstats-first-time,.p0ne-fimstats-last-time,.p0ne-fimstats-once-time {font-size: 0.8em;display: inline;position: static;margin-left: 5px;}.p0ne-fimstats-unplayed {color: lime;}');
+        $el = $create('<span class=p0ne-fimstats>').appendTo('#room');
+        addListener(API, 'advance', this.updateStats = function(d){
+          var ref$, id;
+          if (d != null && ((ref$ = d.lastPlay) != null && ref$.media)) {
+            delete this$.cache[id = d.lastPlay.media.format + ":" + d.lastPlay.media.cid];
+          }
+          if (d.media) {
+            fimstats(d.media).then(function(res){
+              $el.html(res.html);
+            }).fail(function(err){
+              $el.html(err.html);
             });
-            this.checkUnplayed();
           } else {
-            console.warn("[fimstats] failed to load requirements for checking next song. next song check disabled.");
+            $el.html("");
           }
-          this.updateStats({
-            media: API.getMedia()
-          });
-        },
-        checkUnplayed: function(){},
-        cache: {},
-        module: function(media){
-          var id, def, this$ = this;
-          media == null && (media = API.getMedia());
-          $('#p0ne-menu').css({
-            bottom: 54
-          });
-          if (media.attributes && media.toJSON) {
-            media = media.toJSON();
-          }
-          if (this.cache[id = media.format + ":" + media.cid]) {
-            clearTimeout(this.cache[id].timeoutID);
-            this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
-              var ref$, ref1$;
-              return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
-            });
-            return this.cache[id];
-          } else {
-            def = $.Deferred();
-            this.cache[id] = def.promise();
-            this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
-              var ref$, ref1$;
-              return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
-            });
-          }
-          $.getJSON("https://fimstats.anjanms.com/_/media/" + media.format + "/" + media.cid).then(function(d){
-            var k, v, k2, v2;
-            d = d.data[0];
-            for (k in d) {
-              v = d[k];
-              if (typeof v === 'string') {
-                d[k] = sanitize(v);
-              } else {
-                for (k2 in v) {
-                  v2 = v[k2];
-                  if (typeof v2 === 'string') {
-                    v[k2] = sanitize(v2);
-                  }
-                }
+        });
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          addListener(_$context, 'ShowDialogEvent:show', function(d){
+            _.defer(function(){
+              var ref$;
+              if ((ref$ = d.dialog.options) != null && ref$.media) {
+                console.log("[fimstats]", d.dialog.options.media);
+                fimstats(d.dialog.options.media).then(function(d){
+                  $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
+                });
               }
+            });
+          });
+        }
+        if (that = app != null ? (ref$ = app.dialog) != null ? (ref1$ = ref$.dialog) != null ? (ref2$ = ref1$.options) != null ? ref2$.media : void 8 : void 8 : void 8 : void 8) {
+          console.log("[fimstats]", that);
+          fimstats(that.toJSON()).then(function(d){
+            $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
+          });
+        }
+        console.info("[fimstats] prevent p0neSettings overlay", $('#p0ne-menu').css({
+          bottom: 54 + 21
+        }));
+        addListener(API, 'p0ne:moduleEnabled p0ne:moduleUpdated', function(m){
+          if (m.name === 'p0neSettings') {
+            $('#p0ne-menu').css({
+              bottom: 54 + 21
+            });
+          }
+        });
+        if (app != null && (typeof playlists != 'undefined' && playlists !== null)) {
+          $yourNextMedia = $('#your-next-media');
+          this.checkUnplayed = function(){
+            $yourNextMedia.removeClass('p0ne-fimstats-unplayed');
+            if (fimstats._settings.highlightUnplayed && playlists.activeMedia.length > 0) {
+              console.log("[fimstats] checking next song", playlists.activeMedia[0]);
+              fimstats(playlists.activeMedia[0]).then(function(d){
+                if (d.unplayed) {
+                  $yourNextMedia.addClass('p0ne-fimstats-unplayed');
+                }
+              });
             }
-            if (d.firstPlay.time !== d.lastPlay.time) {
-              d.text = "last played by " + d.lastPlay.user.username + " \xa0 - (" + d.plays + "x) - \xa0 first played by " + d.firstPlay.user.username;
-              d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=" + d.lastPlay.id + ">" + d.lastPlay.user.username + "<span class=p0ne-fimstats-last-time>" + ago(d.lastPlay.time * 1000) + "</span></span><span class='p0ne-fimstats-field p0ne-fimstats-plays'>" + d.plays + "</span><span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=" + d.firstPlay.id + ">" + d.firstPlay.user.username + "<span class=p0ne-fimstats-first-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
-            } else {
-              d.text = "once played by " + d.firstPlay.user.username;
-              d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-once'>" + d.firstPlay.user.username + "<span class=p0ne-fimstats-once-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
-            }
-            def.resolve(d);
-          }).fail(function(d, arg$, status){
-            if (status === "Not Found") {
-              d.text = "first played just now!";
-              d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>";
-              d.unplayed = true;
-              def.resolve(d);
-            } else {
-              d.text = d.html = "error loading fimstats";
-              def.reject(d);
-            }
+          };
+          replace(app.footer.playlist, 'updateMeta', function(uM_){
+            return function(){
+              if (playlists.activeMedia.length > 0) {
+                fimstats.checkUnplayed();
+                uM_.apply(this, arguments);
+              } else {
+                clearTimeout(this.updateMetaBind);
+              }
+            };
+          });
+          replace(app.footer.playlist, 'updateMetaBind', function(){
+            return bind$(app.footer.playlist, 'updateMeta');
+          });
+          this.checkUnplayed();
+        } else {
+          console.warn("[fimstats] failed to load requirements for checking next song. next song check disabled.");
+        }
+        this.updateStats({
+          media: API.getMedia()
+        });
+      },
+      checkUnplayed: function(){},
+      cache: {},
+      module: function(media){
+        var id, def, this$ = this;
+        media == null && (media = API.getMedia());
+        $('#p0ne-menu').css({
+          bottom: 54
+        });
+        if (media.attributes && media.toJSON) {
+          media = media.toJSON();
+        }
+        if (this.cache[id = media.format + ":" + media.cid]) {
+          clearTimeout(this.cache[id].timeoutID);
+          this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
+            var ref$, ref1$;
+            return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
           });
           return this.cache[id];
-          function sanitize(str){
-            return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          }
-        },
-        settingsExtra: function($el){
-          var fimstats, noReqMissing;
-          fimstats = this;
-          noReqMissing = app != null || (typeof playlists == 'undefined' || playlists === null);
-          $("<form><label><input type=checkbox class=p0ne-fimstats-unplayed-setting " + (this._settings.highlightUnplayed && noReqMissing ? 'checked' : '') + " " + (noReqMissing ? '' : 'disabled') + "> highlight next song if unplayed</label></form>").appendTo($el.css({
-            paddingLeft: 15
-          }));
-          if (noReqMissing) {
-            $el.on('click', '.p0ne-fimstats-unplayed-setting', function(){
-              console.log(getTime() + " [fimstats] updated highlightUnplayed to " + this.checked);
-              fimstats._settings.highlightUnplayed = this.checked;
-              if (this.checked) {
-                fimstats.checkUnplayed();
-              } else {
-                $('#your-next-media').removeClass('p0ne-fimstats-unplayed');
-              }
-            });
-          }
-        },
-        disable: function(){
-          $('#your-next-media').removeClass('p0ne-fimstats-unplayed');
-        }
-      });
-      /*@source p0ne.bpm.ls */
-      /**
-       * BetterPonymotes - a script add ponymotes to the chat on plug.dj
-       * based on BetterPonymotes https://ponymotes.net/bpm/
-       * for a ponymote tutorial see:
-       * http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
-       *
-       * @author jtbrinkmann aka. Brinkie Pie
-       * @license MIT License
-       * @copyright (c) 2015 J.-T. Brinkmann
-       */
-      /*####################################
-      #          BETTER PONYMOTES          #
-      ####################################*/
-      module('bpm', {
-        require: ['chatPlugin'],
-        displayName: 'Better Ponymotes',
-        settings: 'pony',
-        _settings: {
-          showNSFW: false
-        },
-        module: function(str){
-          if (!str) {
-            console.error("bpm(null)");
-          }
-          return this.bpm(str);
-        },
-        setup: function(arg$, arg1$){
-          var addListener, $create, _settings, host, ref$, _FLAG_NSFW, _FLAG_REDIRECT, EMOTE_REGEXP, sanitize_map;
-          addListener = arg$.addListener, $create = arg$.$create;
-          _settings = arg1$._settings;
-          host = ((ref$ = window.p0ne) != null ? ref$.host : void 8) || "https://cdn.p0ne.com";
-          /*== external sources ==*/
-          if (!window.emote_map) {
-            window.emote_map = {};
-            $.getScript(host + "/scripts/bpm-resources.js").then(function(){
-              return API.trigger('p0ne_emotes_map');
-            });
-          } else {
-            requestAnimationFrame(function(){
-              return API.trigger('p0ne_emotes_map');
-            });
-          }
-          $create("<div id='bpm-resources'><link rel='stylesheet' href='" + host + "/css/bpmotes.css?last-update=2015-02-15' type='text/css'><link rel='stylesheet' href='" + host + "/css/emote-classes.css?last-update=2015-06-02' type='text/css'><link rel='stylesheet' href='" + host + "/css/combiners-nsfw.css?last-update=2015-01-30' type='text/css'><link rel='stylesheet' href='" + host + "/css/gif-animotes.css?last-update=2015-06-02' type='text/css'>" + ('webkitAnimation' in document.body.style
-            ? "<link rel='stylesheet' href='" + host + "/css/extracss-webkit.css?last-update=2015-03-09' type='text/css'>"
-            : "<link rel='stylesheet' href='" + host + "/css/extracss-pure.css?last-update=2015-03-09' type='text/css'>") + "</div>").appendTo($body);
-          /*
-                  <style>
-                  \#chat-suggestion-items .bpm-emote {
-                      max-width: 27px;
-                      max-height: 27px
-                  }
-                  </style>
-          */
-          /*== constants ==*/
-          _FLAG_NSFW = 1;
-          _FLAG_REDIRECT = 2;
-          /*
-           * As a note, this regexp is a little forgiving in some respects and strict in
-           * others. It will not permit text in the [] portion, but alt-text quotes don't
-           * have to match each other.
-           */
-          /*                 [](/  <   emote   >   <     alt-text    >  )*/
-          EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g;
-          /*== auxiliaries ==*/
-          /*
-           * Escapes an emote name (or similar) to match the CSS classes.
-           *
-           * Must be kept in sync with other copies, and the Python code.
-           */
-          sanitize_map = {
-            '!': '_excl_',
-            ':': '_colon_',
-            '#': '_hash_',
-            '/': '_slash_'
-          };
-          function sanitize_emote(s){
-            return s.toLowerCase().replace(/[!:#\/]/g, function(c){
-              return sanitize_map[c];
-            });
-          }
-          function lookup_core_emote(name, altText){
-            var data, nameWithSlash, parts, flag_data, tag_data, flags, source_id, is_nsfw, is_redirect;
-            data = emote_map["/" + name];
-            if (!data) {
-              return null;
-            }
-            nameWithSlash = name;
-            parts = data.split(',');
-            flag_data = parts[0];
-            tag_data = parts[1];
-            flags = parseInt(flag_data.slice(0, 1), 16);
-            source_id = parseInt(flag_data.slice(1, 3), 16);
-            is_nsfw = flags & _FLAG_NSFW;
-            is_redirect = flags & _FLAG_REDIRECT;
-            /*tags = []
-            start = 0
-            while (str = tag_data.slice(start, start+2)) != ""
-                tags.push(parseInt(str, 16)) # Hexadecimal
-                start += 2
-            
-            if is_redirect
-                base = parts.2
-            else
-                base = name*/
-            return {
-              name: nameWithSlash,
-              is_nsfw: !!is_nsfw,
-              source_id: source_id,
-              source_name: sr_id2name[source_id],
-              css_class: "bpmote-" + sanitize_emote(name),
-              altText: altText
-            };
-          }
-          function convert_emote_element(info, parts, _){
-            var title, flags, i$, len$, i, flag;
-            title = (info.name + " from " + info.source_name).replace(/"/g, '');
-            flags = "";
-            for (i$ = 0, len$ = parts.length; i$ < len$; ++i$) {
-              i = i$;
-              flag = parts[i$];
-              if (i > 0) {
-                /* Normalize case, and forbid things that don't look exactly as we expect */
-                flag = sanitize_emote(flag.toLowerCase());
-                if (!/\W/.test(flag)) {
-                  flags += " bpflag-" + flag;
-                }
-              }
-            }
-            if (info.is_nsfw) {
-              if (_settings.showNSFW) {
-                title = "[NSFW] " + title;
-                flags += " bpm-nsfw";
-              } else {
-                console.warn("[bpm] nsfw emote (disabled)", name);
-                return "<span class='bpm-nsfw' title='NSFW emote'>" + _ + "</span>";
-              }
-            }
-            return "<span class='bpflag-in bpm-emote " + info.css_class + " " + flags + "' title='" + title + "'>" + (info.altText || '') + "</span>";
-          }
-          this.bpm = function(str){
-            if (!str) {
-              console.error("bpm(null) [2]");
-            }
-            return str.replace(EMOTE_REGEXP, function(all, parts, altText){
-              var name, info;
-              parts = parts.split('-');
-              name = parts[0];
-              info = lookup_core_emote(name, altText);
-              if (!info) {
-                return all;
-              } else {
-                return convert_emote_element(info, parts, all);
-              }
-            });
-          };
-          addListener(window._$context || API, 'chat:plugin', function(msg){
-            return msg.message = bpm(msg.message);
+        } else {
+          def = $.Deferred();
+          this.cache[id] = def.promise();
+          this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
+            var ref$, ref1$;
+            return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
           });
-          return addListener('once', API, 'p0ne_emotes_map', function(){
-            var cb;
-            console.info("[bpm] loaded");
-            $cms().find('.text').html(function(){
-              return bpm(this.innerHTML);
-            });
-            /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
-            cb = function(){
-              var AUTOCOMPLETE_REGEX;
-              AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/;
-              return typeof addAutocompletion == 'function' ? addAutocompletion({
-                name: "Ponymotes",
-                data: Object.keys(emote_map),
-                pre: "[]",
-                check: function(str, pos){
-                  var temp;
-                  if (!str[pos + 2] || str[pos + 2] === "(" && (!str[pos + 3] || str[pos + 3] === "(/")) {
-                    temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos));
-                    if (temp) {
-                      this.data = temp[2] || '';
-                      return true;
-                    }
-                  }
-                  return false;
-                },
-                display: function(items){
-                  var emote;
-                  return (function(){
-                    var i$, ref$, len$, results$ = [];
-                    for (i$ = 0, len$ = (ref$ = items).length; i$ < len$; ++i$) {
-                      emote = ref$[i$];
-                      results$.push({
-                        value: "[](/" + emote + ")",
-                        image: bpm("[](/" + emote + ")")
-                      });
-                    }
-                    return results$;
-                  }());
-                },
-                insert: function(suggestion){
-                  return suggestion.substr(0, suggestion.length - 1) + "" + this.data + ")";
-                }
-              }) : void 8;
-            };
-            if (window.addAutocompletion) {
-              return cb();
+        }
+        $.getJSON("https://fimstats.anjanms.com/_/media/" + media.format + "/" + media.cid).then(function(d){
+          var k, v, k2, v2;
+          d = d.data[0];
+          for (k in d) {
+            v = d[k];
+            if (typeof v === 'string') {
+              d[k] = sanitize(v);
             } else {
-              return addListener('once', API, 'p0ne:autocomplete', cb);
+              for (k2 in v) {
+                v2 = v[k2];
+                if (typeof v2 === 'string') {
+                  v[k2] = sanitize(v2);
+                }
+              }
+            }
+          }
+          if (d.firstPlay.time !== d.lastPlay.time) {
+            d.text = "last played by " + d.lastPlay.user.username + " \xa0 - (" + d.plays + "x) - \xa0 first played by " + d.firstPlay.user.username;
+            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=" + d.lastPlay.id + ">" + d.lastPlay.user.username + "<span class=p0ne-fimstats-last-time>" + ago(d.lastPlay.time * 1000) + "</span></span><span class='p0ne-fimstats-field p0ne-fimstats-plays'>" + d.plays + "</span><span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=" + d.firstPlay.id + ">" + d.firstPlay.user.username + "<span class=p0ne-fimstats-first-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
+          } else {
+            d.text = "once played by " + d.firstPlay.user.username;
+            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-once'>" + d.firstPlay.user.username + "<span class=p0ne-fimstats-once-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
+          }
+          def.resolve(d);
+        }).fail(function(d, arg$, status){
+          if (status === "Not Found") {
+            d.text = "first played just now!";
+            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>";
+            d.unplayed = true;
+            def.resolve(d);
+          } else {
+            d.text = d.html = "error loading fimstats";
+            def.reject(d);
+          }
+        });
+        return this.cache[id];
+        function sanitize(str){
+          return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+      },
+      settingsExtra: function($el){
+        var fimstats, noReqMissing;
+        fimstats = this;
+        noReqMissing = app != null || (typeof playlists == 'undefined' || playlists === null);
+        $("<form><label><input type=checkbox class=p0ne-fimstats-unplayed-setting " + (this._settings.highlightUnplayed && noReqMissing ? 'checked' : '') + " " + (noReqMissing ? '' : 'disabled') + "> highlight next song if unplayed</label></form>").appendTo($el.css({
+          paddingLeft: 15
+        }));
+        if (noReqMissing) {
+          $el.on('click', '.p0ne-fimstats-unplayed-setting', function(){
+            console.log(getTime() + " [fimstats] updated highlightUnplayed to " + this.checked);
+            fimstats._settings.highlightUnplayed = this.checked;
+            if (this.checked) {
+              fimstats.checkUnplayed();
+            } else {
+              $('#your-next-media').removeClass('p0ne-fimstats-unplayed');
             }
           });
-        },
-        disable: function(revertPonimotes){
-          if (revertPonimotes) {
-            return $cms().find('.bpm-emote').replaceWith(function(){
-              var flags, i$, ref$, len$, class_, emote;
-              flags = "";
-              for (i$ = 0, len$ = (ref$ = this.classList || this.className.split(/s+/)).length; i$ < len$; ++i$) {
-                class_ = ref$[i$];
-                if (class_.startsWith('bpmote-')) {
-                  emote = class_.substr(7);
-                } else if (class_.startsWith('bpflag-') && class_ !== 'bpflag-in') {
-                  flags += class_.substr(6);
+        }
+      },
+      disable: function(){
+        $('#your-next-media').removeClass('p0ne-fimstats-unplayed');
+      }
+    });
+    /*@source p0ne.bpm.ls */
+    /**
+     * BetterPonymotes - a script add ponymotes to the chat on plug.dj
+     * based on BetterPonymotes https://ponymotes.net/bpm/
+     * for a ponymote tutorial see:
+     * http://www.reddit.com/r/mylittlepony/comments/177z8f/how_to_use_default_emotes_like_a_pro_works_for/
+     *
+     * @author jtbrinkmann aka. Brinkie Pie
+     * @license MIT License
+     * @copyright (c) 2015 J.-T. Brinkmann
+     */
+    /*####################################
+    #          BETTER PONYMOTES          #
+    ####################################*/
+    module('bpm', {
+      require: ['chatPlugin'],
+      displayName: 'Better Ponymotes',
+      settings: 'pony',
+      _settings: {
+        showNSFW: false
+      },
+      module: function(str){
+        if (!str) {
+          console.error("bpm(null)");
+        }
+        return this.bpm(str);
+      },
+      setup: function(arg$, arg1$){
+        var addListener, $create, _settings, host, ref$, _FLAG_NSFW, _FLAG_REDIRECT, EMOTE_REGEXP, sanitize_map;
+        addListener = arg$.addListener, $create = arg$.$create;
+        _settings = arg1$._settings;
+        host = ((ref$ = window.p0ne) != null ? ref$.host : void 8) || "https://cdn.p0ne.com";
+        /*== external sources ==*/
+        if (!window.emote_map) {
+          window.emote_map = {};
+          $.getScript(host + "/scripts/bpm-resources.js").then(function(){
+            return API.trigger('p0ne_emotes_map');
+          });
+        } else {
+          requestAnimationFrame(function(){
+            return API.trigger('p0ne_emotes_map');
+          });
+        }
+        $create("<div id='bpm-resources'><link rel='stylesheet' href='" + host + "/css/bpmotes.css?last-update=2015-02-15' type='text/css'><link rel='stylesheet' href='" + host + "/css/emote-classes.css?last-update=2015-06-02' type='text/css'><link rel='stylesheet' href='" + host + "/css/combiners-nsfw.css?last-update=2015-01-30' type='text/css'><link rel='stylesheet' href='" + host + "/css/gif-animotes.css?last-update=2015-06-02' type='text/css'>" + ('webkitAnimation' in document.body.style
+          ? "<link rel='stylesheet' href='" + host + "/css/extracss-webkit.css?last-update=2015-03-09' type='text/css'>"
+          : "<link rel='stylesheet' href='" + host + "/css/extracss-pure.css?last-update=2015-03-09' type='text/css'>") + "</div>").appendTo($body);
+        /*
+                <style>
+                \#chat-suggestion-items .bpm-emote {
+                    max-width: 27px;
+                    max-height: 27px
                 }
-              }
-              if (emote) {
-                return document.createTextNode("[](/" + emote + flags + ")");
-              } else {
-                return console.warn("[bpm] cannot convert back", this);
-              }
-            });
+                </style>
+        */
+        /*== constants ==*/
+        _FLAG_NSFW = 1;
+        _FLAG_REDIRECT = 2;
+        /*
+         * As a note, this regexp is a little forgiving in some respects and strict in
+         * others. It will not permit text in the [] portion, but alt-text quotes don't
+         * have to match each other.
+         */
+        /*                 [](/  <   emote   >   <     alt-text    >  )*/
+        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g;
+        /*== auxiliaries ==*/
+        /*
+         * Escapes an emote name (or similar) to match the CSS classes.
+         *
+         * Must be kept in sync with other copies, and the Python code.
+         */
+        sanitize_map = {
+          '!': '_excl_',
+          ':': '_colon_',
+          '#': '_hash_',
+          '/': '_slash_'
+        };
+        function sanitize_emote(s){
+          return s.toLowerCase().replace(/[!:#\/]/g, function(c){
+            return sanitize_map[c];
+          });
+        }
+        function lookup_core_emote(name, altText){
+          var data, nameWithSlash, parts, flag_data, tag_data, flags, source_id, is_nsfw, is_redirect;
+          data = emote_map["/" + name];
+          if (!data) {
+            return null;
           }
+          nameWithSlash = name;
+          parts = data.split(',');
+          flag_data = parts[0];
+          tag_data = parts[1];
+          flags = parseInt(flag_data.slice(0, 1), 16);
+          source_id = parseInt(flag_data.slice(1, 3), 16);
+          is_nsfw = flags & _FLAG_NSFW;
+          is_redirect = flags & _FLAG_REDIRECT;
+          /*tags = []
+          start = 0
+          while (str = tag_data.slice(start, start+2)) != ""
+              tags.push(parseInt(str, 16)) # Hexadecimal
+              start += 2
+          
+          if is_redirect
+              base = parts.2
+          else
+              base = name*/
+          return {
+            name: nameWithSlash,
+            is_nsfw: !!is_nsfw,
+            source_id: source_id,
+            source_name: sr_id2name[source_id],
+            css_class: "bpmote-" + sanitize_emote(name),
+            altText: altText
+          };
         }
-      });
-      /*@source p0ne.end.ls */
-      return _.defer(function(){
-        var remaining, name, ref$, m;
-        remaining = 1;
-        for (name in ref$ = p0ne.modules) {
-          m = ref$[name];
-          if (m.loading) {
-            remaining++;
-            m.loading.always(moduleLoaded);
+        function convert_emote_element(info, parts, _){
+          var title, flags, i$, len$, i, flag;
+          title = (info.name + " from " + info.source_name).replace(/"/g, '');
+          flags = "";
+          for (i$ = 0, len$ = parts.length; i$ < len$; ++i$) {
+            i = i$;
+            flag = parts[i$];
+            if (i > 0) {
+              /* Normalize case, and forbid things that don't look exactly as we expect */
+              flag = sanitize_emote(flag.toLowerCase());
+              if (!/\W/.test(flag)) {
+                flags += " bpflag-" + flag;
+              }
+            }
           }
+          if (info.is_nsfw) {
+            if (_settings.showNSFW) {
+              title = "[NSFW] " + title;
+              flags += " bpm-nsfw";
+            } else {
+              console.warn("[bpm] nsfw emote (disabled)", name);
+              return "<span class='bpm-nsfw' title='NSFW emote'>" + _ + "</span>";
+            }
+          }
+          return "<span class='bpflag-in bpm-emote " + info.css_class + " " + flags + "' title='" + title + "'>" + (info.altText || '') + "</span>";
         }
-        moduleLoaded();
-        if (remaining) {
-          console.info(getTime() + " [p0ne] " + plural(remaining, 'module') + " still loading");
+        this.bpm = function(str){
+          if (!str) {
+            console.error("bpm(null) [2]");
+          }
+          return str.replace(EMOTE_REGEXP, function(all, parts, altText){
+            var name, info;
+            parts = parts.split('-');
+            name = parts[0];
+            info = lookup_core_emote(name, altText);
+            if (!info) {
+              return all;
+            } else {
+              return convert_emote_element(info, parts, all);
+            }
+          });
+        };
+        addListener(window._$context || API, 'chat:plugin', function(msg){
+          return msg.message = bpm(msg.message);
+        });
+        return addListener('once', API, 'p0ne_emotes_map', function(){
+          var cb;
+          console.info("[bpm] loaded");
+          $cms().find('.text').html(function(){
+            return bpm(this.innerHTML);
+          });
+          /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
+          cb = function(){
+            var AUTOCOMPLETE_REGEX;
+            AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/;
+            return typeof addAutocompletion == 'function' ? addAutocompletion({
+              name: "Ponymotes",
+              data: Object.keys(emote_map),
+              pre: "[]",
+              check: function(str, pos){
+                var temp;
+                if (!str[pos + 2] || str[pos + 2] === "(" && (!str[pos + 3] || str[pos + 3] === "(/")) {
+                  temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos));
+                  if (temp) {
+                    this.data = temp[2] || '';
+                    return true;
+                  }
+                }
+                return false;
+              },
+              display: function(items){
+                var emote;
+                return (function(){
+                  var i$, ref$, len$, results$ = [];
+                  for (i$ = 0, len$ = (ref$ = items).length; i$ < len$; ++i$) {
+                    emote = ref$[i$];
+                    results$.push({
+                      value: "[](/" + emote + ")",
+                      image: bpm("[](/" + emote + ")")
+                    });
+                  }
+                  return results$;
+                }());
+              },
+              insert: function(suggestion){
+                return suggestion.substr(0, suggestion.length - 1) + "" + this.data + ")";
+              }
+            }) : void 8;
+          };
+          if (window.addAutocompletion) {
+            return cb();
+          } else {
+            return addListener('once', API, 'p0ne:autocomplete', cb);
+          }
+        });
+      },
+      disable: function(revertPonimotes){
+        if (revertPonimotes) {
+          return $cms().find('.bpm-emote').replaceWith(function(){
+            var flags, i$, ref$, len$, class_, emote;
+            flags = "";
+            for (i$ = 0, len$ = (ref$ = this.classList || this.className.split(/s+/)).length; i$ < len$; ++i$) {
+              class_ = ref$[i$];
+              if (class_.startsWith('bpmote-')) {
+                emote = class_.substr(7);
+              } else if (class_.startsWith('bpflag-') && class_ !== 'bpflag-in') {
+                flags += class_.substr(6);
+              }
+            }
+            if (emote) {
+              return document.createTextNode("[](/" + emote + flags + ")");
+            } else {
+              return console.warn("[bpm] cannot convert back", this);
+            }
+          });
         }
-        function moduleLoaded(m){
-          var noCollapsedGroup, name, ref$;
-          if (--remaining === 0) {
-            console.error = error_;
-            console.warn = warn_;
+      }
+    });
+    /*@source p0ne.end.ls */
+    return _.defer(function(){
+      var remaining, name, ref$, m;
+      remaining = 1;
+      for (name in ref$ = p0ne.modules) {
+        m = ref$[name];
+        if (m.loading) {
+          remaining++;
+          m.loading.always(moduleLoaded);
+        }
+      }
+      moduleLoaded();
+      if (remaining) {
+        console.info(getTime() + " [p0ne] " + plural(remaining, 'module') + " still loading");
+      }
+      function moduleLoaded(m){
+        var noCollapsedGroup, name, ref$;
+        if (--remaining === 0) {
+          console.error = error_;
+          console.warn = warn_;
+          console.groupEnd();
+          console.info("[p0ne] initialized!");
+          if (errors) {
+            console.error("[p0ne] There have been " + errors + " errors");
+          }
+          if (warnings) {
+            console.warn("[p0ne] There have been " + warnings + " warnings");
+          }
+          noCollapsedGroup = true;
+          for (name in ref$ = p0ne.modules) {
+            m = ref$[name];
+            if (m.disabled && !m.settings && !(m.moderator && user.isStaff)) {
+              if (noCollapsedGroup) {
+                console.groupCollapsed("[p0ne] there are disabled modules which are hidden from the settings");
+                noCollapsedGroup = false;
+              }
+              console.warn("\t" + name, m);
+            }
+          }
+          if (!noCollapsedGroup) {
             console.groupEnd();
-            console.info("[p0ne] initialized!");
-            if (errors) {
-              console.error("[p0ne] There have been " + errors + " errors");
-            }
-            if (warnings) {
-              console.warn("[p0ne] There have been " + warnings + " warnings");
-            }
-            noCollapsedGroup = true;
-            for (name in ref$ = p0ne.modules) {
-              m = ref$[name];
-              if (m.disabled && !m.settings && !(m.moderator && user.isStaff)) {
-                if (noCollapsedGroup) {
-                  console.groupCollapsed("[p0ne] there are disabled modules which are hidden from the settings");
-                  noCollapsedGroup = false;
-                }
-                console.warn("\t" + name, m);
-              }
-            }
-            if (!noCollapsedGroup) {
-              console.groupEnd();
-            }
-            if (typeof appendChat == 'function') {
-              appendChat("<div class='cm p0ne-notif p0ne-notif-loaded'>plug_p0ne v" + p0ne.version + " loaded " + (typeof getTimestamp == 'function' ? getTimestamp() : void 8) + "</div>");
-            }
-            return console.timeEnd("[p0ne] completly loaded");
           }
+          if (typeof appendChat == 'function') {
+            appendChat("<div class='cm p0ne-notif p0ne-notif-loaded'>plug_p0ne v" + p0ne.version + " loaded " + (typeof getTimestamp == 'function' ? getTimestamp() : void 8) + "</div>");
+          }
+          return console.timeEnd("[p0ne] completly loaded");
         }
-      });
+      }
     });
     function fn$(type, callback, context){
       var ref$;

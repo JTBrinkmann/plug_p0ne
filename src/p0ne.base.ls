@@ -26,7 +26,7 @@ module \disableCommand, do
                 if enabledModules.length
                     response += "disabled #{humanList enabledModules}."
                 if disabledModules.length
-                    response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} already disabled."
+                    response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} weren't enabled."
                 API.sendChat response
 
 module \getStatus, do
@@ -651,7 +651,10 @@ module \etaTimer, do
                 sum -= lastSongDur
                 sum += d.media.duration
                 lastSongDur := API.getHistory![l - 1].media.duration
-            # note: we don't trigger updateETA() because each advance is accompanied with a waitListUpdate
+
+            if API.getWaitList!.length == 0
+                updateETA!
+            # note: we otherwise don't trigger updateETA() because usually each advance is accompanied with a waitListUpdate
         if _$context?
             addListener _$context, \room:joined, updateETA
 
@@ -856,8 +859,7 @@ module \boothAlert, do
                 Show notification<br>
                 <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
                 <label>
-                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s)<br>
-                    before your play
+                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s) before your play
                 </label>
             </form>"
             .append do

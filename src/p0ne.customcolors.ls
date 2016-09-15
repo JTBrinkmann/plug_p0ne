@@ -13,9 +13,6 @@ if not window.staff
             staff[u.id] = u{role, gRole, sub, username, badge}
         l.resolve!
 
-if not window.colorPicker
-    colorPicker = {}
-
 /*####################################
 #           CUSTOM  COLORS           #
 ####################################*/
@@ -80,8 +77,8 @@ module \customColors, do
     scopeOrderRole: <[ globalCustomRole roomThemeRole vanilla ]>
     scopeOrderUser: <[ globalCustomUser roomThemeUser ]>
 
-    setup: ({@css, loadStyle, @addListener}) !->
-        loadStyle "#{p0ne.host}/playground/customcolors.css"
+    setup: ({@css, @addListener}) !->
+        @users = {}
         @scopes.vanilla = @roles
         @scopes.globalCustomRole = @_settings.global.roles
         @scopes.globalCustomUser = @_settings.global.users
@@ -96,19 +93,30 @@ module \customColors, do
         for role, style of @roles
             #style.role = role
             @roles[role].css = @calcCSSRole(role)
-        for uid of @users
-            @users[uid] = @calcCSSUser(uid)
-
+        for uid of @scopes.globalCustomUser
+            @users[uid] = css: @calcCSSUser(uid)
 
         @updateCSS!
 
+        # clear user cache
+        d = Date.now! - @CLEAR_USER_CACHE
+        for uid, u of @_settings.users when not @users[uid] and u.lastUsed < d
+            console.log "[customColors] removing #{u.id} (#{u.username}) from cache"
+            delete @_settings.users[uid]
 
+    settingsPanel: ($wrapper) !->
+        $wrapper .text "loading…"
+        loadModule \customColorsPicker, "#{p0ne.host}/scripts/p0ne.customcolors.picker.js?r=1"
+            .then (ccp) !~>
+                console.log "[ccp]", ccp
+                ccp.disable!.enable!
 
     updateCSS: !->
+        cpKey = colorPicker?.key
         styles = ""
-        for key, data of @roles when key != colorPicker.key
+        for key, data of @roles when key != cpKey
             styles += data.css
-        for key, data of @users when key != colorPicker.key
+        for key, data of @users when key != cpKey
             styles += data.css
 
         @css \customColors, styles
@@ -119,7 +127,7 @@ module \customColors, do
         styles = "/*= #{roleName} =*/"
         role = @roles[roleName]
         if style.color or style.font
-            font = style.font ||{}
+            font = style.font ||{+b}
             if role.icon
                 styles += "
                     \#app \#user-lists .#{role.icon} + .name,
@@ -215,7 +223,15 @@ module \customColors, do
             res.font ||= {+b, -i, -u}
         return res
 
+    getRoles: (uid, user) ->
+        if getUser(uid)
+            [role for role in @_settings.rolesOrder when @roles[role].test(that)]
+        else if @_settings.users[uid]
+            roomRole = getRank(role: that, true) if @room.userRole[uid] || staff[uid]?.role
+            [role for role in @_settings.rolesOrder when role in @_settings.users[uid].roles or role == roomRole]
+        else
+            []
 
-export cc = customColors
-<- (fn) -> if cc.loading then cc.loading.then fn else fn!
-customColors_test?.disable!.enable!
+#export cc = customColors
+#<- (fn) -> if cc.loading then cc.loading.then fn else fn!
+#customColors_test?.disable!.enable!

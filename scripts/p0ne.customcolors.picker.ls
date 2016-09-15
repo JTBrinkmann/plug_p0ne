@@ -1,4 +1,8 @@
-$ \.colorpicker .remove!
+/*=====================*\
+|* p0ne.customcolors.p *|
+\*=====================*/
+
+/*@source p0ne.customcolors.picker.ls */
 /*
     user data format
     user = {
@@ -16,20 +20,234 @@ $ \.colorpicker .remove!
             y: 0px
         } <OR> "bdg-raveb-s04"
     }
+*/
+module \customColorsPicker, do
+    iconCache: {}
+    rows: {}
+    setup: ({addListener, css, loadStyle, $create}, ccp) !->
+        #=== Left Pane ===
+        #== Setup ==
+        @cc = cc = p0ne.modules.customColors
+        $el = cc?._$settingsPanel?.wrapper
+        return if not cc or not $el
+        @rows = {}
 
- */
-export
-    padHex: (str, digits=2) !->
-        while str.length < digits
-            str = "0#str"
-        return str
-module \customColors_test, do
-    setup: ({addListener, css, $create}) !->
-        #DEBUG
-        cc.$el = $ \.p0ne-cc-settings
-            .css top: 270px
+        @lang = Lang.roles with
+            friend: Lang.userList.friend
+            subscriber: Lang.userStatus.subscriber
+            regular: 'Regular'
+            you: 'You'
 
-        cc.$el .append @$cp = $cp = $ '
+
+
+        #== Render UI ==
+        loadStyle "#{p0ne.host}/css/customcolors.css"
+        $el
+            .addClass \p0ne-cc-settings
+            .css left: $(\.p0ne-settings).width!
+            .html "
+                <h3>Custom Colours</h3>
+                <div class=p0ne-cc-buttons>
+                    <button class='p0ne-cc-reset-order-btn' disabled>reset order</button>
+                    <button class='p0ne-cc-reset-all-btn'>reset everything</button>
+                </div>
+                <div class='p0ne-cc-roles'></div>
+                <div class='p0ne-cc-users'>
+                    <div class=p0ne-cc-user-add>
+                        <i class='icon icon-add p0ne-cc-user-add-icon'></i>
+                        <input class='p0ne-settings-input p0ne-cc-user-input' placeholder='new custom user style' />
+                        <ul class=p0ne-cc-user-suggestion-list></ul>
+                    </div>
+                </div>
+            "
+        $roles  = $el .find \.p0ne-cc-roles
+        @$add = $el .find \.p0ne-cc-user-add
+        $input = @$add .find \.p0ne-cc-user-input
+
+
+
+        #== load data ==
+        # load roles UI and CSS
+        for roleName in cc._settings.rolesOrder
+            # get icon and cache icon-position
+            /*icon = false
+            for scope in cc.scopeOrderRole when cc.scopes[scope][roleName]?.icon
+                icon = cc.scopes[scope][roleName].icon
+                break*/
+            icon = cc.roles[roleName].icon || cc.roles.regular.icon
+            if typeof icon == \string
+                @iconCache[icon] ||= getIcon(icon, true)
+
+            $  "<div class='p0ne-cc-row p0ne-cc-name p0ne-name #roleName' data-scope=globalCustomRole data-key=#roleName>
+                    <i class='icon icon-drag-handle p0ne-cc-drag-handle'></i>
+                    #{@createIcon icon}
+                    <span class=name>#{@lang[roleName] || roleName}</span>
+                    <i class='icon icon-clear-input p0ne-cc-clear-icon'></i>
+                </div>"
+                .appendTo $roles
+                # => .from-#roleName; <icon>; <name>
+
+        # load custom user UI and CSS
+        d = Date.now!
+        for scopeName in cc.scopeOrderUser
+            for uid of cc.scopes[scopeName]
+                @createUser uid, false, d
+
+
+        #== UI Interaction ==
+        # attach UI event listeners
+        $el
+            .on \click, \.p0ne-cc-reset-all-btn, (e) !~> #DEBUG
+                e.preventDefault!
+                objectsToClear =
+                    * cc.scopes.globalCustomUser
+                    * cc.scopes.globalCustomRole
+                    * cc._settings.users
+                    * cc._settings.perRoom
+                for obj in objectsToClear
+                    for key of obj
+                        delete obj[key]
+                ccp.disable!
+                cc
+                    .disable!
+                    .enable!
+                    ._$settings .find \.p0ne-settings-panel-icon
+                        .click!
+
+            .on \click, \.p0ne-cc-row, (e) !->
+                $el.find \.p0ne-cc-row.selected .removeClass \selected
+                $row = $ this
+                    .addClass \selected
+                scope = $row.data(\scope)
+                row_key = $row.data(\key)
+                if not style = cc.scopes[scope][row_key]
+                    style = cc.scopes[scope][row_key] = {}
+                #scope = if style.uid then cc.scopes.globalCustomUser else cc.scopes.globalCustomRole
+                ccp.save! if key
+                ccp.loadData scope, row_key, $row
+                e.stopImmediatePropagation!
+            .on \click, '.p0ne-cc-clear-icon', (e) !->
+                $row = $ this .closest \.p0ne-cc-row
+                scope = $row.data(\scope)
+                row_key = $row.data(\key)
+                delete cc.scopes[scope][row_key]
+                if scope == \globalCustomUser
+                    removeUserCache = true
+                    for scopeName in cc.scopeOrderUser when row_key of cc.scopes[scopeName]
+                        removeUserCache = false
+                        break
+                    if removeUserCache
+                        delete cc.users[row_key]
+                        $row.remove!
+                    #ToDo show notification that row didn't get removed because user is still in roomTheme
+                if key == row_key
+                    ccp.close!
+                cc.updateCSS!
+                e.stopImmediatePropagation!
+
+        # new user input field
+        $input
+            .on \keydown, (e) !~>
+                t = e.which || e.keyCode
+                if ((t === 13 || t === 9) && @sugg.suggestions.length > 0)
+                    @sugg.trigger \submitSuggestion
+                else if ((t === 40 || t === 38) && @sugg.suggestions.length > 0)
+                    @sugg.upDown(t)
+                else
+                    return
+                e.preventDefault!
+                e.stopImmediatePropagation!
+
+            .on \keyup, (e) !->
+                # add custom user / apply user change
+                # load user into colorpicker
+                ccp.sugg.check("@#{@value}", @value.length+1)
+                ccp.sugg.updateSuggestions!
+        export @sugg = new SuggestionView()
+        @sugg.$el.appendTo @$add
+        @sugg
+            .render!
+            .on \refocus, !->
+                $input .focus!
+            .on \submitSuggestion, !~>
+                user = getUser(@sugg.getSelected!)
+                if not user
+                    return
+                $input .val ""
+                scope = cc.scopes.globalCustomUser
+                if scope[user.id]
+                    @rows[user.id] .click!
+                else
+                    scope[user.id] = {}
+                    @createUser user.id
+                        .click!
+
+
+
+        #== Keep user-data UpToDate ==
+        #...
+
+
+
+        #== finish up ==
+        # apply custom CSS
+        cc.updateCSS!
+
+
+
+        #== auxiliaries ==
+        var drag_cb, drag_pos, imageDragInitPos
+        export function onDrag target, cb, onMouseDown
+            cc.addListener $el, \mousedown, target, (e) ->
+                drag_cb := cb
+                drag_pos := $(this) .offset!
+                if onMouseDown
+                    onMouseDown.call(this, e, drag_pos)
+                drag_mousemove.call(this, e)
+                $body
+                    .on \mouseup, drag_mouseup
+                    .on \mousemove, drag_mousemove
+                e .preventDefault!
+
+        function drag_mouseup
+            $body
+                .off \mouseup, drag_mouseup
+                .off \mousemove, drag_mousemove
+
+        function drag_mousemove e
+            drag_cb.call this, (e.pageX - drag_pos.left), (e.pageY - drag_pos.top), e
+            e .preventDefault!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        #=== Right Pane ===
+        $el .append @$cp = $cp = $ '
             <div class=colorpicker>
                 <div class="p0ne-ccp-tabbar">
                     <div class="p0ne-ccp-tab-name">Name</div>
@@ -164,6 +382,8 @@ module \customColors_test, do
                     setImageMode \badge
             e .preventDefault!
 
+        addListener $cp, \click, '.p0ne-ccp-btn-save', !-> ccp.save!
+
         #=== page: name ===
         #== DOM elements ==
         $nameCustomToggles = $contentName .find \.p0ne-ccp-btn-toggle
@@ -224,14 +444,12 @@ module \customColors_test, do
                         .trigger \input
                 updateCSS!
         #= color picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-color
         onDrag \.p0ne-ccp-color, (x, y) ->
             $hsv.s .val Math.round((0px >? x <? 150px) * 100perc / 150px)
             $hsv.v .val 100perc - Math.round((0px >? y <? 150px) * 100perc / 150px)
             inputHSV!
 
         #= hue picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-hue
         onDrag \.p0ne-ccp-hue, (,y) ->
             $hsv.h .val colorHSV.h=360deg - Math.round((0px >? y <? 150px) * 360deg / 150px)
             inputHSV!
@@ -390,7 +608,7 @@ module \customColors_test, do
             h: $cp .find ".p0ne-ccp-image-h input"
 
         #== values ==
-        var icon, badge, scale, imageMode
+        var badge, scale, imageMode #, icon
         snapToGrid =
             w_2: 5px
             h_2: 5px
@@ -433,7 +651,6 @@ module \customColors_test, do
                 false
 
         #= image picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-image-overview
         onDrag \.p0ne-ccp-image-overview, (x,y,e) ->
             return if checkImageCustomMode!
             x = ~~((x - imagePicker.marginLeft)/scale) - image.w/2
@@ -445,7 +662,6 @@ module \customColors_test, do
             updateImageVal!
 
         #= image preview =
-        cc.$el.off \mousedown, \.p0ne-ccp-image-preview
         onDrag \.p0ne-ccp-image-preview,
             (x, y, e) !-> # onMouseMove
                 return if checkImageCustomMode!
@@ -649,7 +865,7 @@ module \customColors_test, do
         # => resized/recolored image upload to imgur?
         #show image load time
         #warn on long loading time (slow host, large GIF, …)
-        var scope, key, uid, $row
+        var scope, key, $row #, uid
         @loadData = loadData = (scopeName, key_, $row_) !->
             /* note: the reason we clone$ the variables (font, icon, badge)
              * is so that the initial values are stored in the prototype of the
@@ -789,9 +1005,9 @@ module \customColors_test, do
                 badge := badge.default
             #badge := data.badge || {default: true, url: "", x: 0px, y: 0px, w: 30px, h: 30px}
 
-            if cc.$el .find \.p0ne-ccp-tab-icon .hasClass \p0ne-ccp-tab-selected
+            if $cp .find \.p0ne-ccp-tab-icon .hasClass \p0ne-ccp-tab-selected
                 setImageMode \icon
-            else if cc.$el .find \.p0ne-ccp-tab-badge .hasClass \p0ne-ccp-tab-selected
+            else if $cp .find \.p0ne-ccp-tab-badge .hasClass \p0ne-ccp-tab-selected
                 setImageMode \badge
 
             console.log "imageCustomMode", imageCustomMode.icon, imageCustomMode.badge
@@ -1011,5 +1227,89 @@ module \customColors_test, do
 
 
         export loadData
+        $el .find \.p0ne-cc-row.selected .click!
 
-cc.$el.find \.p0ne-cc-row.selected .click!
+
+    createIcon: (icon) !->
+        return do
+            if typeof icon == \string
+                "<i class='icon #icon'></i>"
+            else
+                "<i class='icon p0ne-icon-placeholder'></i>"
+    createBadge: (badge) !->
+        return do
+            if typeof badge == \string
+                "<div class=badge-box><i class='bdg bdg-#badge #{badge[*-1]}'></i></div>"
+            else
+                "<div class=badge-box></div>"
+
+    # note: `!->` would add an extra function wrapper, so we should stick to `->` here
+    # returns a sorted list of roles that apply for the specified user
+
+
+    createUser: (uid, user, currTimestamp) !->
+        var icon
+        if user ||= getUser(uid)
+            rank = getRank(that)
+            username = that.username
+            @cc._settings.users[uid] = that{username, gRole, sub, friend, defaultBadge: badge}
+            @cc._settings.users[uid].roles = []
+            @cc.room.userRole[uid] = that.role
+            l=0
+            for role in @cc._settings.rolesOrder when @cc.roles[role].test(that)
+                if not @cc.roles[role].perRoom
+                    @cc._settings.users[uid].roles[l++] = role
+                if @cc.roles[role].icon and not icon?
+                    icon = @cc.roles[role].icon
+        else if user = @cc._settings.users[uid]
+            username = that.username
+            if @cc._settings.users[uid].gRole
+                rank = getRank(@cc._settings.users[uid])
+            else if @cc.room.userRole[uid]
+                rank = getRank(@cc.room.userRole[uid])
+            else
+                rank = ""
+            icon = @cc.roles[rank]?.icon
+        else
+            throw new TypeError "createUser: User #uid is not found, and no data was passed"
+
+        @cc.users[uid] ||= {}
+        @cc.users[uid].css = @cc.calcCSSUser(uid)
+
+        @cc._settings.users[uid].lastUsed = currTimestamp || Date.now()
+        rank += " subscriber" if user.sub
+        rank += " friend" if user.friend
+
+        console.log "[customColors] >createUser", uid, username
+        # find where to insert row
+        #   get some initual value
+        for id of @rows
+            insertBeforeUID = id; insertBeforeName = @cc._settings.users[id].username
+            break
+        if insertBeforeUID
+            #   find best match
+            for id of @rows when insertBeforeName > @cc._settings.users[id].username > username
+                insertBeforeUID = id
+                insertBeforeName = @cc._settings.users[id].username
+
+        $inserBeforeEl = if insertBeforeUID and @cc._settings.users[insertBeforeUID].username < username
+            @rows[insertBeforeUID]
+        else
+            @$add
+        console.log "[customColors] >createUser", uid, rank, icon, insertBeforeUID, $inserBeforeEl
+        return @rows[uid] =
+            $ "<div class='p0ne-cc-row p0ne-uid-#uid' data-scope=globalCustomUser data-key=#uid>
+                    #{@createBadge @cc._settings.users[uid].defaultBadge}
+                    <div class='p0ne-cc-name p0ne-name #rank'>
+                        #{@createIcon icon}
+                        <span class=name>#{username}</span>
+                        <i class='icon icon-clear-input p0ne-cc-clear-icon'></i>
+                        <div class=p0ne-cc-userid>#uid</div>
+                    </div>
+                </div>"
+                # => .from-#role.from-…; <badge>; <icon>; <name>; <uid>
+            .insertBefore $inserBeforeEl
+
+    disable: !->
+        @cc?._$settingsPanel?.wrapper?.html ""
+

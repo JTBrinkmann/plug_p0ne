@@ -390,3 +390,34 @@ window.module = (name, data) !->
             #_$context.trigger "p0ne:#type:#name", module, module_
         API.trigger "p0ne:#type", module, module_
         #API.trigger "p0ne:#type:#name", module, module_
+
+window.loadModule = (moduleName, url) !->
+    def = $.Deferred!
+    if p0ne.modules[moduleName]
+        if p0ne.modules[moduleName].loading
+            console.log "[loadModule] module loading", moduleName, url
+            p0ne.modules[moduleName].loading .then def.resolve
+        else
+            console.log "[loadModule] module already loaded", moduleName, url
+            return def.resolve(p0ne.modules[moduleName])
+
+    window[moduleName] = p0ne.modules[moduleName] =
+        loading: def
+        disable: (,m) !-> _.defer !->
+            if m?.loading
+                console.log "[loadModule] module loading", moduleName, url
+                p0ne.modules[moduleName].loading .then def.resolve
+            else if m
+                console.log "[loadModule] module initialized", moduleName, url
+                def.resolve(m)
+            else
+                def.reject!
+
+    console.log "[loadModule] loading", moduleName, url
+    $.getScript url
+        .then !->
+            console.log "[loadModule] script loaded", moduleName, url
+        .fail !->
+            console.warn "[loadModule] script failed to load", moduleName, url
+            def.reject
+    return def

@@ -222,6 +222,7 @@ module \p0neCSS, do
                 .attr \href, url /* ?p0 to force redownload instead of using obsolete cached versions */
                 .on 'load fail', !->
                     if --loadingStyles == 0
+                        <-! requestAnimationFrame
                         _$context?.trigger \p0ne:stylesLoaded
                         API.trigger \p0ne:stylesLoaded
                 .appendTo document.head

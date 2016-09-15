@@ -194,20 +194,19 @@ require <[ sockjs ]>, (SockJS) !->
 
             # - set avatarID to custom value
             @changeAvatar = (userID, avatarID) !~>
-                avatar = p0ne._avatars[avatarID]
-                if not avatar
-                    console.warn "[p0ne custom avatars] can't load avatar: '#{avatarID}'"
+                if not (u = users.get(userID)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                    console.warn "[p0ne custom avatars] can't load user or avatar: '#userID', '#avatarID'"
                     return
 
-                return if not user = users.get userID
 
                 if not avatar.permissions or API.hasPermissions(userID, avatar.permissions)
-                    user.attributes.avatarID_ ||= user.get \avatarID
-                    user.set \avatarID, avatarID
+                    if not u.get \vanillaAvatarID
+                        u.set \vanillaAvatarID, u.get(\avatarID)
+                    u.set \avatarID, avatarID
                 else
                     console.warn "user with ID #userID doesn't have permissions for avatar '#{avatarID}'"
 
-                if userID == user_.id
+                if userID == userID
                     @_settings.avatarID = avatarID
 
             @updateAvatarStore = !->
@@ -430,9 +429,9 @@ require <[ sockjs ]>, (SockJS) !->
             console.log "[p0ne custom avatars] using socket as ppCAS avatar server"
             reconnect = true
 
-            if reconnectWarning
-                sleep 10_000ms, !~> if @connectAttemps==0
-                    chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
+            #if reconnectWarning
+            #    sleep 10_000ms, !~> if @connectAttemps==0
+            #        chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
             _$context.trigger \ppCAS:connecting
             API.trigger \ppCAS:connecting
@@ -538,16 +537,17 @@ require <[ sockjs ]>, (SockJS) !->
             # initUsers() is used by @socket.on \users and @socket.on \avatars
             ~function initUsers avatarID
                 for userID, avatarID of @socket.users
-                    console.log "#{getTime!} [ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
+                    #console.log "#{getTime!} [ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
                     @changeAvatar userID, avatarID
                 if reconnecting
                     chatWarn "reconnected", "p0ne avatars"
                 _$context.trigger \ppCAS:connected
                 API.trigger \ppCAS:connected
-            @socket.on \changeAvatarID, (userID, avatarID) !->
+            @socket.on \changeAvatarID, (userID, avatarID) !~>
                 console.log "#{getTime!} [ppCAS] change other's avatar:", userID, avatarID
 
-                users.get userID ?.set \avatarID, avatarID
+                #users.get userID ?.set \avatarID, avatarID
+                @changeAvatar userID, avatarID
 
             @socket.on \disconnect, (userID) !~>
                 console.log "#{getTime!} [ppCAS] user disconnected:", userID

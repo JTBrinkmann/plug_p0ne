@@ -261,32 +261,68 @@ module \ponifiedLang, do
     disabled: true
     displayName: "Ponified Text"
     settings: \pony
-    setup: ({replace}) !->
-        # roles
-        replace Lang.roles, \host, !-> return "Alicorn Princess"
-        replace Lang.roles, \cohost, !-> return "Alicorn"
-        replace Lang.roles, \manager, !-> return "Royal Guard Captain"
-        replace Lang.roles, \bouncer, !-> return "Royal Guard"
-        replace Lang.roles, \dj, !-> return "Horse Famous"
-        replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
-        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies"
-        replace Lang.roles, \none, !-> return "Mudpony"
-        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
-
+    setup: ({replace, css}) !->
         # ponies
-        replace Lang.messages, \minChatLevel, !-> return "This community restricts chat to ponies who are level %LEVEL% and above."
-        replace Lang.permissions, \ban, !-> return "Ban Ponies."
-        replace Lang.permissions, \unban, !-> return "Unban Ponies."
-        replace Lang.tooltips, \headersUsers, !-> return "Ponies"
-        replace Lang.tooltips, \usersRoom, !-> return "Ponies who are here right now"
-        replace Lang.tooltips, \usersBans, !-> return "Ponies who have been banned"
-        replace Lang.tooltips, \usersIgnored, !-> return "Ponies who you have ignored"
-        replace Lang.tooltips, \usersMutes, !-> return "Ponies who have been muted"
-        replace Lang.tooltips, \chatLevel, !-> return "Restrict chat to ponies who are this level or above"
-        replace Lang.userList, \roomTitle, !-> return "Ponies here now"
+        replaceMap =
+            people: 'ponies'
+            People: 'Ponies'
+            user: 'pony'
+            Nobody: 'Nopony'
+            woots: "Squees"
+            Woot: "Squee"
+            Points: "Bits"
+
+            "Resident DJs": 'Horse Famous'
+            "Resident DJ": 'Horse Famous'
+            Bouncer: 'Royal Guard'
+            Manager: 'Royal Guard Captain'
+            "Co-Host": 'Alicorn'
+            Host: 'Alicorn Princess'
+            staff: 'VIP Pony List'
+        regx = //\b(#{Object.keys replaceMap .join '|'})(s?|)\b//g
+        console.groupCollapsed "[ponifiedLang] dynamically replacing words"
+        for ,group of Lang
+            for k,v of group when k[*-1] != "_" and v
+                v2 = v.replace regx, (,a, b) !->
+                    return replaceMap[a]+b
+                if v != v2
+                    replace group, k, !-> return v2
+                    console.log "\treplacing '#v' with '#{group[k]}'"
+        console.groupEnd!
+
+        # roles
+        replace Lang.roles, \none, !-> return "Mudpony"
+        #replace Lang.roles, \dj, !-> return "Horse Famous"
+        #replace Lang.roles, \bouncer, !-> return "Royal Guard"
+        #replace Lang.roles, \manager, !-> return "Royal Guard Captain"
+        #replace Lang.roles, \cohost, !-> return "Alicorn"
+        #replace Lang.roles, \host, !-> return "Alicorn Princess"
+        #replace Lang.moderation, \staffNone, !-> return "removed %NAME% from the VIP Pony List."
+        replace Lang.moderation, \staffDJ, !-> return "made %NAME% Horse Famous."
+        replace Lang.moderation, \staffBouncer, !-> return "hired %NAME% as a Royal Guard."
+        replace Lang.moderation, \staffManager, !-> return "hired %NAME% as a Royal Guard Captain."
+        replace Lang.moderation, \staffCohost, !-> return "transformed %NAME% into an Alicorn."
+        replace Lang.moderation, \staffHost, !-> return "transformed %NAME% into an Alicorn Princess."
+        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies" # custom due to length
+        replace Lang.permissions, \bouncers, !-> return "Hire Royal Guard"
+        replace Lang.permissions, \managers, !-> return "Hire Royal Guard Captains"
+        #replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
+
+        # brony slang
+        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
+        replace Lang.userSettings, \videoOnly, !-> return "Video Only (no dancing horses)"
+        replace Lang.userMeta, \profileURL, !-> return "Hoofbook Profile URL"
+        replace Lang.userFriends, \profile, !-> return "Hoofbook Profile"
+        replace Lang.userList, \staffTitle, !-> return replaceMap.staff
+        replace Lang.tooltips, \profile, !-> return "Edit your Hoofbook Profile"
+        replace Lang.userSettings, \nsfw, !-> return "Show Clopper Communities (NSFW)"
+        replace Lang.alerts, \sessionExpired, !-> return "Horseapples!"
+        replace $('#woot .label').0, \textContent, !-> return "Squee!"
+
 
         # Bot Commands
-        replace Lang.chat, \help, !-> return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
+        replace Lang.chat, \help, !-> return "
+            <strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
             <strong>Bot Commands:</strong><br>
             !randgame &nbsp; <em>Pony Adventure</em><br/>
             !power &nbsp; <em>Random Power</em><br/>
@@ -297,8 +333,16 @@ module \ponifiedLang, do
             !dc &nbsp; <em>be put back if you dc'd</em><br/>
             !eta &nbsp; <em>ETA til you dj</em><br/>
             !weird &nbsp; <em>Is it weirdday?</em><br/>
-            "
+        "
 
         # misc
         replace Lang.search, \youtube, !-> return "Search YouTube for ponies"
         replace Lang.search, \soundcloud, !-> return "Search SoundCloud for ponies"
+
+        # adjust CSS to fit longer text
+        css \ponifiedLang, '
+            #dialog-user-role .role-menu,
+            #dialog-user-role .role-menu .selected {
+                width: 205px;
+            }
+        '

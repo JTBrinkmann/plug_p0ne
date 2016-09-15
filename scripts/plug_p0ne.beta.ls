@@ -42,7 +42,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.2
+    version: \1.8.3
     lastCompatibleVersion: \1.8.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1179,9 +1179,13 @@ jQuery.fn <<<<
                     cb!
         return this
     p0neFx: (effect) !->
-        @addClass "p0ne-fx-#effect"
-        <~! requestAnimationFrame
-        @removeClass "p0ne-fx-#effect"
+        if @length
+            @removeClass "p0ne-fx-off-#effect"
+            @addClass "p0ne-fx-#effect"
+            requestAnimationFrame !~>
+                @removeClass "p0ne-fx-#effect"
+                @addClass "p0ne-fx-off-#effect"
+        return this
     /*binaryGuess: (checkFn) !->
         # returns element with index `n` for which:
         # if checkFn(element) for all elements in this from 0 to `n` all returns false,
@@ -1385,6 +1389,10 @@ window <<<<
             return
                 if 0 <= num < 10 then "0#num"
                 else             then "#num"
+    padHex: (str, digits=2) !->
+        while str.length < digits
+            str = "0#str"
+        return str
 
     generateID: !-> return (~~(Math.random!*0xFFFFFF)) .toString(16).toUpperCase!
 
@@ -1528,7 +1536,8 @@ window <<<<
             if window.floodAPI_counter >= 15 /* 20 requests in 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
                 sleep 1_000ms, delay
             else
-                window.floodAPI_counter++; sleep 10_000ms, !-> window.floodAPI_counter--
+                # note: playlist changes will return 503 errors after ca. 15 requests per 10 seconds (plus some delay) so we'll add some more delay to ensure stability
+                window.floodAPI_counter++; sleep 15_000ms, !-> window.floodAPI_counter--
                 req = $.ajax options
                     .then def.resolve, def.reject, def.progress
                 def.abort = req.abort
@@ -1765,14 +1774,21 @@ window <<<<
                     &key=#{p0ne.YOUTUBE_V3_KEY}"
                     .fail fail
                     .success ({items}) !->
+                        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
+                            0        /* placeholder */,
+                            31104000 /* year   (360*24*60*60) */,
+                            2592000  /* month  (30*24*60*60) */,
+                            604800   /* week   (24*60*60*7) */,
+                            86400    /* day    (24*60*60) */,
+                            3600     /* hour   (60*60) */,
+                            60       /* minute (60) */,
+                            1        /* second (1) */
+                        ]
                         for d in items
                             duration = 0
-                            if /PT(?:(\d+)H)(?:(\d+)M)(?:(\d+)S)/.exec d.contentDetails.duration
-                                duration = +that.3 || 0
-                                if that.1
-                                    duration += +that.1 * 3600
-                                if that.2
-                                    duration += +that.2 * 60
+                            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec d.contentDetails.duration
+                                for t, i in that when +t
+                                    duration += t * multiplicators[i]
                             addResult queries.1[d.id], d.id, do
                                     format:       1
                                     data:         d
@@ -2538,16 +2554,15 @@ window <<<<
         else
             return "#{~~diff} #{<[ seconds minutes hours days years ]>[c]}"
     # show a timespan (in s) in a format like "mm:ss" or "hh:mm:ss" etc
-    mediaTime: (~~dur) !->
+    mediaTime: (dur) !->
         return "-#{mediaTime -dur}" if dur < 0
-        b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
-        res = pad dur%60
-        while dur = ~~(dur / b[c++])
-            res = "#{pad dur % b[c]}:#res"
-        if res.length == 2
-            return "00:#res"
-        else
-            return res
+        # usually the user would rather read 580 hours as "580:00:00" instead of "24:04:00:00"
+        m=0
+        if dur >= 60
+            m = ~~(dur / 60); dur %= 60
+            if m >= 60
+                h = ~~(m / 60); m %= 60
+        return "#{if h then pad(h)+":" else ''}#{pad(m)}:#{pad(~~dur)}"
 
     # create string saying how long ago a given timestamp (in ms since epoche) is
     ago: (d) !->
@@ -2561,7 +2576,10 @@ window <<<<
         return "#{it.toFixed(2)}MB"
 
     getRank: (user, defaultToGhost) !-> # returns the name of a rank of a user
-        user = getUser(user) if typeof user != \object
+        if user <= 5
+            user = role: user
+        else if typeof user != \object
+            user = getUser(user)
         if not user or user.role == -1
             return if defaultToGhost then \ghost else \regular
         else if user.gRole
@@ -3347,6 +3365,37 @@ window.module = (name, data) !->
         API.trigger "p0ne:#type", module, module_
         #API.trigger "p0ne:#type:#name", module, module_
 
+window.loadModule = (moduleName, url) !->
+    def = $.Deferred!
+    if p0ne.modules[moduleName]
+        if p0ne.modules[moduleName].loading
+            console.log "[loadModule] module loading", moduleName, url
+            p0ne.modules[moduleName].loading .then def.resolve
+        else
+            console.log "[loadModule] module already loaded", moduleName, url
+            return def.resolve(p0ne.modules[moduleName])
+
+    window[moduleName] = p0ne.modules[moduleName] =
+        loading: def
+        disable: (,m) !-> _.defer !->
+            if m?.loading
+                console.log "[loadModule] module loading", moduleName, url
+                p0ne.modules[moduleName].loading .then def.resolve
+            else if m
+                console.log "[loadModule] module initialized", moduleName, url
+                def.resolve(m)
+            else
+                def.reject!
+
+    console.log "[loadModule] loading", moduleName, url
+    $.getScript url
+        .then !->
+            console.log "[loadModule] script loaded", moduleName, url
+        .fail !->
+            console.warn "[loadModule] script failed to load", moduleName, url
+            def.reject
+    return def
+
 /*@source p0ne.auxiliary-modules.ls */
 /**
  * Auxiliary plug_p0ne modules
@@ -3572,6 +3621,7 @@ module \p0neCSS, do
                 .attr \href, url /* ?p0 to force redownload instead of using obsolete cached versions */
                 .on 'load fail', !->
                     if --loadingStyles == 0
+                        <-! requestAnimationFrame
                         _$context?.trigger \p0ne:stylesLoaded
                         API.trigger \p0ne:stylesLoaded
                 .appendTo document.head
@@ -4957,14 +5007,22 @@ module \streamSettings, do
 ####################################*/
 module \chatCommands, do
     optional: <[ currentMedia ]>
-    setup: ({addListener}) !->
+    setup: ({addListener},,cC_) !->
         addListener API, \chatCommand, (c) !~>
             if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1])
                 console.log "/chatCommand", cmd, cmd.moderation
-                if (not cmd.moderation or user.gRole or v.moderation == true and user.isStaff or user.role >= cmd.moderation)
-                    cmd.callback(c)
+                if (not cmd.moderation or user.gRole or cmd.moderation == true and user.isStaff or user.role >= cmd.moderation)
+                    try
+                        cmd.callback(c)
+                    catch err
+                        chatWarn "<div>#{err.message}</div>", "error while executing #c"
+                        console.error "[chatCommand] #c"
+                        throw err
                 else
                     chatWarn "You need to be #{if cmd.moderation === true then 'staff' else 'at least '+getRank(role: cmd.moderation)}", c
+        if cC_
+            for k,v of cC_.commands when k not of @commands
+                @commands[k] = v
         @updateCommands!
 
     updateCommands: !->
@@ -4989,11 +5047,11 @@ module \chatCommands, do
                 user = API.getUser!
                 res = "<div class='msg text'>"
                 for k,command of chatCommands.commands when command and (not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation))
+                    descr = "#{command.parameters ||''} - #{command.description}"
+                    title = "/#k #descr"
                     if command.aliases?.length
-                        aliases = "title='aliases: #{humanList command.aliases}'"
-                    else
-                        aliases = ''
-                    res += "<div class=p0ne-help-command #aliases><b>/#k</b> #{command.parameters ||''} - #{command.description}</div>"
+                        title += "\n#{plural command.aliases.length, 'alias', 'aliases'}: #{humanList command.aliases}"
+                    res += "<div class=p0ne-help-command title='#title'><b>/#k</b> #descr</div>"
                 res += "</div>"
                 appendChat($ "<div class='cm update p0ne-help'>" .html res)
 
@@ -5054,7 +5112,7 @@ module \chatCommands, do
         mute:
             aliases: <[ stfu silence ]>
             parameters: "[[duration] @username(s)]"
-            description: "mutes the audio or the specified user(s)"
+            description: "if no parameters then mute the audio, \notherwise mute the specified user(s)"
             callback: (user) !->
                 user .= replace(/^\/\w+\s*/, '').trim!
                 if not user
@@ -5407,7 +5465,7 @@ module \disableCommand, do
                 if enabledModules.length
                     response += "disabled #{humanList enabledModules}."
                 if disabledModules.length
-                    response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} already disabled."
+                    response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} weren't enabled."
                 API.sendChat response
 
 module \getStatus, do
@@ -6237,8 +6295,7 @@ module \boothAlert, do
                 Show notification<br>
                 <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
                 <label>
-                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s)<br>
-                    before your play
+                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s) before your play
                 </label>
             </form>"
             .append do
@@ -6533,10 +6590,6 @@ module \chatPlugin, do
             msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
             msg.originalMessage = msg.message
 
-            _$context .trigger \chat:plugin, msg
-            API .trigger \chat:plugin, msg
-
-
             # p0ne.chatLinkPlugins
             if msg.wasAtBottom
                 onload = 'onload="chatScrollDown()"'
@@ -6544,8 +6597,8 @@ module \chatPlugin, do
                 onload = ''
             msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,url, domain, offset)->
                 domain .= toLowerCase!
-                for ctx in [_$context, API] when ctx._events[\chat:image]
-                    for plugin in ctx._events[\chat:image]
+                for ctx in [_$context, API] when ctx._events[\p0ne:chat:link]
+                    for plugin in ctx._events[\p0ne:chat:link]
                         try
                             if plugin.callback.call plugin.ctx, {all,pre,completeURL,protocol,domain,url, offset,  onload,onerror,msg}
                                 return that
@@ -6559,9 +6612,13 @@ module \chatPlugin, do
                             console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
                 return all
 
+            # general chat plugins
+            _$context .trigger \p0ne:chat:plugin, msg
+            API .trigger \p0ne:chat:plugin, msg
+
         addListener _$context, \chat:receive, (e) !->
             e.$el = getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
-            e.addClass e.$el~addClass; e.removeClass e.$el~removeClass
+            e.addClass = e.$el~addClass; e.removeClass = e.$el~removeClass
         addClassesCB = _$context._events[\chat:receive][*-1]
 
         addListener _$context, \popout:open, !->
@@ -6614,13 +6671,13 @@ module \chatMessageClasses, do
                             fromRole = "from-#{r.substr 10}"
                         else
                             fromRole = \from-regular
-                    if $ this .find \.subscriber
+                    if $ this .find \.subscriber .length
                         fromRole += " from-subscriber"
                     $this .addClass "fromID-#{uid} #fromRole"
         catch err
             console.error "[chatMessageClasses] couldn't convert old messages", err.stack
 
-        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) !-> if uid
+        addListener (window._$context || API), \p0ne:chat:plugin, ({type, uid}:message) !-> if uid
             message.addClass "fromID-#uid"
 
 
@@ -6650,7 +6707,7 @@ module \unreadChatNotif, do
         $chatButton = $ \#chat-button
             .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
         @bottomMsg = $cm! .children! .last!
-        addListener _$context, \chat:plugin, (message) !->
+        addListener _$context, \p0ne:chat:plugin, (message) !->
             message.wasAtBottom ?= chatIsAtBottom!
             if not $chatButton.hasClass \selected and not PopoutView?.chat?
                 $chatButton.addClass \p0ne-toolbar-highlight
@@ -6725,7 +6782,7 @@ module \chatOthersMentions, do
     settings: \chat
     displayName: 'Highlight @mentions for others'
     setup: ({addListener}) !->
-        addListener _$context, \chat:plugin, ({type, uid}:message) !-> if uid
+        addListener _$context, \p0ne:chat:plugin, ({type, uid}:message) !-> if uid
             res = ""; lastI = 0
             for mention in getMentions(message, true) when mention.id != userID or type == \emote
                 res += "
@@ -6759,7 +6816,7 @@ module \chatInlineImages, do
         filterTags: <[ nsfw suggestive gore spoiler questionable no-inline noinline ]>
     regexpCache: {}
     setup: ({addListener}) !->
-        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
+        addListener API, \p0ne:chat:link, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
             if img = @inlineify ...
                 if not msg.hasFilterWord?
@@ -6767,7 +6824,6 @@ module \chatInlineImages, do
                     msgLC = msg.message.toLowerCase!
                     for tag in @_settings.filterTags when msgLC.has tag
                         msg.hasFilterWord = tag
-                        msg.message .= replaceSansHTML (@regexpCache[tag] ||= //#{escapeRegExp tag}//ig), "<span class=p0ne-img-filterword>$&</span>"
                         console.warn "[inline-img] message contains \"#tag\", images will not be converted"
                         break
 
@@ -6784,7 +6840,8 @@ module \chatInlineImages, do
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
             else
                 return false
-
+        addListener API, \p0ne:chat:plugin, (msg) !~> if msg.hasFilterWord
+            msg.message .= replaceSansHTML (@regexpCache[msg.hasFilterWord] ||= //#{escapeRegExp msg.hasFilterWord}//ig), "<span class=p0ne-img-filterword>$&</span>"
     # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
     #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
     regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
@@ -6820,7 +6877,7 @@ module \chatInlineImages, do
 
     forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
-        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
+        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv|webm))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
         \prntscr.com :     [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct", \https://]
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
@@ -7024,7 +7081,7 @@ module \chatYoutubeThumbnails, do
             console.log "[p0ne_yt_preview]", "stopped"
             #ToDo hide YT-options
 
-        addListener API, \chat:image, ({pre, url, onload}) !->
+        addListener API, \p0ne:chat:link, ({pre, url, onload}) !->
         yt = YT_REGEX .exec(url)
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
@@ -7054,7 +7111,7 @@ module \customChatNotificationTrigger, do
     disabled: true
     require: <[ chatPlugin _$context ]>
     setup: ({addListener}) !->
-        @test = addListener _$context, \chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
+        @test = addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
             mentioned = false
             mentions = {}
             if @hasUsernameTrigger
@@ -7157,7 +7214,7 @@ module \animatedUI, do
                     sleep 0ms, !~> @$el.addClass \opaque
 
         replace Dialog, \close, (close_) !-> return !->
-            @$el.removeClass \opaque
+            @$el?.removeClass \opaque
             @animate = $.noop
             sleep 200ms, !~> close_.call this
             return this
@@ -7552,11 +7609,7 @@ module \emojiPack, do
     help: '''
         Replace all emojis with the one from Google (for Android Lollipop).
 
-        Emojis are are the little images that show up e.g. when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>
-
-        <small>
-        Note: :yellow_heart: <span class="emoji emoji-1f49b"></span> and :green_heart: <span class="emoji emoji-1f49a"></span> look neither yellow nor green with this emoji pack.
-        </small>
+        Emojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>
     '''
     screenshot: 'https://i.imgur.com/Ef94Csn.png'
     _settings:
@@ -7567,6 +7620,56 @@ module \emojiPack, do
     setup: ({loadStyle}) !->
         loadStyle "#{p0ne.host}/css/temp.#{@_settings.pack}-emoji.css"
 
+
+/*####################################
+#         CUSTOM BACKGROUND          #
+####################################*/
+module \customBackground, do
+    displayName: 'Custom Background'
+    settings: \look&feel
+    help: '''
+        This module lets you change the background image of plug.dj
+
+        e.g. a nice collection of background images can be found here <a href="https://imgur.com/a/8RIiu" target=_blank>https://imgur.com/a/8RIiu</a>
+    '''
+    _settings:
+        background: "https://i.imgur.com/k9zVa92.png"
+        booth: "https://i.imgur.com/tzlDl3L.png"
+        scalable: false
+    disabled: true
+    setup: ({@css}) !->
+        @updateCSS!
+        #ToDo: scalable backgrounds, blurred chat
+
+    updateCSS: !->
+        if isURL(@_settings.background)
+            if @_settings.scalable
+                @css \customBackground, """
+                    \#app { background: url(#{@_settings.background}) fixed center center / cover !important; }\n
+                    .room-background { display: none !important; }\n
+                """
+            else
+                @css \customBackground, """
+                    \#app { background: transparent !important }\n
+                    \#app .app-right { background: rgba(0,0,0, 0.8) !important; }
+                    \#app \#avatars-container::before { content: "" !important; }
+                    \#app .room-background { background-image: url(#{@_settings.background}) !important; display: block !important; }\n
+                """
+        else
+            css \customBackground, ""
+
+    settingsExtra: ($el) !->
+        customBackground = this
+        $input = $ "<input class=p0ne-settings-input>"
+            .val @_settings.background
+            .on \input, !->
+                customBackground._settings.background = @value
+                customBackground.updateCSS!
+            .on \focus, !->
+                p0ne.modules.p0neSettings?.$ppW .css opacity: 0.7
+            .on \blur, !->
+                p0ne.modules.p0neSettings?.$ppW .css opacity: ""
+            .appendTo $el
 
 /*####################################
 #               CENSOR               #
@@ -7723,11 +7826,16 @@ module \roomTheme, do
                 styles += "\n/*== images ==*/\n"
                 /* custom p0ne stuff */
                 if isURL(d.images.backgroundScalable)
-                    styles += "\#app { background-image: url(#{d.images.background}) fixed center center / cover }\n"
+                    styles += """
+                        \#app { background: url(#{d.images.background}) fixed center center / cover }
+                        .room-background { display: none }\n
+                    """
 
                     /* original plug³ stuff */
                 else if isURL(d.images.background)
-                    styles += ".room-background { background-image: url(#{d.images.background}) !important }\n"
+                    styles += """
+                        .room-background { background-image: url(#{d.images.background}) !important; }\n
+                    """
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image
                         ..onload = !~>
@@ -7800,7 +7908,7 @@ module \roomTheme, do
         @_data = {}
 
 
-/*@source customcolors.ls */
+/*@source p0ne.customcolors.ls */
 #DEBUG
 window.clear = (obj) !-> for k of obj then delete obj[k]
 
@@ -7815,9 +7923,6 @@ if not window.staff
         for u in d when u.username
             staff[u.id] = u{role, gRole, sub, username, badge}
         l.resolve!
-
-if not window.colorPicker
-    colorPicker = {}
 
 /*####################################
 #           CUSTOM  COLORS           #
@@ -7883,8 +7988,8 @@ module \customColors, do
     scopeOrderRole: <[ globalCustomRole roomThemeRole vanilla ]>
     scopeOrderUser: <[ globalCustomUser roomThemeUser ]>
 
-    setup: ({@css, loadStyle, @addListener}) !->
-        loadStyle "#{p0ne.host}/playground/customcolors.css"
+    setup: ({@css, @addListener}) !->
+        @users = {}
         @scopes.vanilla = @roles
         @scopes.globalCustomRole = @_settings.global.roles
         @scopes.globalCustomUser = @_settings.global.users
@@ -7899,19 +8004,30 @@ module \customColors, do
         for role, style of @roles
             #style.role = role
             @roles[role].css = @calcCSSRole(role)
-        for uid of @users
-            @users[uid] = @calcCSSUser(uid)
-
+        for uid of @scopes.globalCustomUser
+            @users[uid] = css: @calcCSSUser(uid)
 
         @updateCSS!
 
+        # clear user cache
+        d = Date.now! - @CLEAR_USER_CACHE
+        for uid, u of @_settings.users when not @users[uid] and u.lastUsed < d
+            console.log "[customColors] removing #{u.id} (#{u.username}) from cache"
+            delete @_settings.users[uid]
 
+    settingsPanel: ($wrapper) !->
+        $wrapper .text "loading…"
+        loadModule \customColorsPicker, "#{p0ne.host}/scripts/p0ne.customcolors.picker.js?r=1"
+            .then (ccp) !~>
+                console.log "[ccp]", ccp
+                ccp.disable!.enable!
 
     updateCSS: !->
+        cpKey = colorPicker?.key
         styles = ""
-        for key, data of @roles when key != colorPicker.key
+        for key, data of @roles when key != cpKey
             styles += data.css
-        for key, data of @users when key != colorPicker.key
+        for key, data of @users when key != cpKey
             styles += data.css
 
         @css \customColors, styles
@@ -7922,7 +8038,7 @@ module \customColors, do
         styles = "/*= #{roleName} =*/"
         role = @roles[roleName]
         if style.color or style.font
-            font = style.font ||{}
+            font = style.font ||{+b}
             if role.icon
                 styles += "
                     \#app \#user-lists .#{role.icon} + .name,
@@ -8018,1027 +8134,18 @@ module \customColors, do
             res.font ||= {+b, -i, -u}
         return res
 
-
-export cc = customColors
-<- (fn) -> if cc.loading then cc.loading.then fn else fn!
-customColors_test?.disable!.enable!
-
-/*@source customcolors-cp.ls */
-$ \.colorpicker .remove!
-/*
-    user data format
-    user = {
-        uid: 00000000
-        color: "#AABBCC"
-        font: {b: true, i: false, u: null /*fallthrough* /}
-        icon: {
-            url: ""
-            x: 0px
-            y: 0px
-        } <OR> "icon-chat-bouncer"
-        badge: {
-            url: ""
-            x: 0px
-            y: 0px
-        } <OR> "bdg-raveb-s04"
-    }
-
- */
-export
-    padHex: (str, digits=2) !->
-        while str.length < digits
-            str = "0#str"
-        return str
-module \customColors_test, do
-    setup: ({addListener, css, $create}) !->
-        #DEBUG
-        cc.$el = $ \.p0ne-cc-settings
-            .css top: 270px
-
-        cc.$el .append @$cp = $cp = $ '
-            <div class=colorpicker>
-                <div class="p0ne-ccp-tabbar">
-                    <div class="p0ne-ccp-tab-name">Name</div>
-                    <div class="p0ne-ccp-tab-icon p0ne-ccp-tab-selected">Icon</div>
-                    <div class="p0ne-ccp-tab-badge">Badge</div>
-                </div>
-                <div class="p0ne-ccp-content-name">
-                    <div class="p0ne-ccp-group p0ne-ccp-group-custom-toggle">
-                        <button class="p0ne-ccp-btn-toggle" data-mode=default>default</button>
-                        <button class="p0ne-ccp-btn-toggle" data-mode=custom>custom</button>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-picker">
-                        <div class="p0ne-ccp-color">
-                            <div class="p0ne-cpp-color-overlay">
-                                <div class="p0ne-ccp-crosshair"></div>
-                            </div>
-                        </div>
-                        <div class="p0ne-ccp-hue" style="background: url(https://dl.dropboxusercontent.com/u/4217628/plug_p0ne/vendor/colorpicker/images/slider.png); background-size: contain; background-repeat: no-repeat; background-position: center; ">
-                            <div class="p0ne-ccp-hue-pointer"></div>
-                        </div>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-hex">
-                        <div class="p0ne-ccp-new-color">new</div>
-                        <div class="p0ne-ccp-current-color">previous</div>
-                        <div class="p0ne-ccp-field p0ne-ccp-hex">
-                            <input type=text maxlength=6 />
-                        </div>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-rgb">
-                        <div class="p0ne-ccp-field p0ne-ccp-r">
-                            <input type=text maxlength=3 />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-g">
-                            <input type=text maxlength=3 />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-b">
-                            <input type=text maxlength=3 />
-                        </div>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-hsv">
-                        <div class="p0ne-ccp-field p0ne-ccp-h">
-                            <input type=text maxlength=3 />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-s">
-                            <input type=text maxlength=3 />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-v">
-                            <input type=text maxlength=3 />
-                        </div>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-btns">
-                        <button class="p0ne-ccp-btn-b">b</button>
-                        <button class="p0ne-ccp-btn-i">i</button>
-                        <button class="p0ne-ccp-btn-u">u</button>
-                        <button class="p0ne-ccp-btn-reset">reset</button>
-                        <button class="p0ne-ccp-btn-save">save</button>
-                    </div>
-                </div>
-                <div class="p0ne-ccp-content-image">
-                    <div class="p0ne-ccp-group p0ne-ccp-group-custom-toggle">
-                        <button class="p0ne-ccp-btn-toggle" data-mode=none>none</button>
-                        <button class="p0ne-ccp-btn-toggle" data-mode=default>default</button>
-                        <button class="p0ne-ccp-btn-toggle" data-mode=custom>custom</button>
-                        <br>
-                        <label><input type=checkbox class="checkbox p0ne-ccp-snaptogrid" /> snap to grid</label>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-image-picker">
-                        <div class="p0ne-ccp-image-preview">
-                            <div class="p0ne-ccp-cloak-tl"></div>
-                            <div class="p0ne-ccp-cloak-tr"></div>
-                            <div class="p0ne-ccp-cloak-bl"></div>
-                            <div class="p0ne-ccp-cloak-br"></div>
-                        </div>
-                        <div class="p0ne-ccp-image-overview">
-                            <div class="p0ne-ccp-image-rect"></div>
-                        </div>
-                    </div>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-image">
-                        <div class="p0ne-ccp-field p0ne-ccp-image-url">
-                            <input type=text placeholder="plug.dj default" />
-                        </div>
-                        <button class="p0ne-ccp-btn-reset">reset</button>
-                        <div class="p0ne-ccp-field p0ne-ccp-image-x">
-                            <input type=number />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-image-y">
-                            <input type=number />
-                        </div>
-                    </div>
-                    <button class="p0ne-ccp-btn-save">save</button>
-                    <div class="p0ne-ccp-group p0ne-ccp-group-badge">
-                        <div class="p0ne-ccp-field p0ne-ccp-image-w">
-                            <input type=number />
-                        </div>
-                        <div class="p0ne-ccp-field p0ne-ccp-image-h">
-                            <input type=number />
-                        </div>
-                    </div>
-                </div>
-            </div>'
-
-        # we create another <style> element to avoid lags when changing the CSS
-        # of the universal plug_p0ne one
-        var image
-        $css = $create \<style> .appendTo \head
-        tmpCSS = true
-        defaultIconURL = getIcon('', true).url
-
-        #=== general ===
-        $cp = $ \.colorpicker
-        $cpp = $cp .find \.p0ne-ccp-color
-        $un = $ '.p0ne-cc-user .name:last'
-        #uid = $ \.p0ne-cc-userid:last .text!
-        $contentName  = $cp .find \.p0ne-ccp-content-name
-        $contentImage = $cp .find \.p0ne-ccp-content-image
-
-        #= Tabs =
-        addListener $cp, \click, '.p0ne-ccp-tab-name, .p0ne-ccp-tab-icon, .p0ne-ccp-tab-badge', (e) ->
-            $this = $ this
-            $this
-                .addClass \p0ne-ccp-tab-selected
-                .siblings! .removeClass \p0ne-ccp-tab-selected
-            if $this .hasClass \p0ne-ccp-tab-name
-                $contentName .show!
-                $contentImage .hide!
-            else
-                $contentName .hide!
-                $contentImage .show!
-                if $this .hasClass \p0ne-ccp-tab-icon
-                    setImageMode \icon
-                else #if $this.hasClass \p0ne-ccp-tab-badge
-                    setImageMode \badge
-            e .preventDefault!
-
-        #=== page: name ===
-        #== DOM elements ==
-        $nameCustomToggles = $contentName .find \.p0ne-ccp-btn-toggle
-        $newColor = $cp .find \.p0ne-ccp-new-color
-        $currentColor = $cp .find \.p0ne-ccp-current-color
-        $crosshair = $cp .find \.p0ne-ccp-crosshair
-        $huePointer = $cp .find \.p0ne-ccp-hue-pointer
-
-        #= input fields =
-        $hex = $cp .find ".p0ne-ccp-hex input"
-        $rgb =
-            r: $cp .find ".p0ne-ccp-r input"
-            g: $cp .find ".p0ne-ccp-g input"
-            b: $cp .find ".p0ne-ccp-b input"
-        $hsv =
-            h: $cp .find ".p0ne-ccp-h input"
-            s: $cp .find ".p0ne-ccp-s input"
-            v: $cp .find ".p0ne-ccp-v input"
-        $font =
-            b: $cp .find \.p0ne-ccp-btn-b
-            i: $cp .find \.p0ne-ccp-btn-i
-            u: $cp .find \.p0ne-ccp-btn-u
-
-        #== values ==
-        var currentColor, customColor, color, colorHSV, font, nameCustomMode
-        /*color =
-            r: 0 #+$rgb.r .val!
-            g: 0 #+$rgb.g .val!
-            b: 0 #+$rgb.b .val!
-        colorHSV =
-            h: 0 #+$hsv.h .val!
-            s: 0 #+$hsv.s .val!
-            v: 0 #+$hsv.v .val!
-        font =
-            b: false #$font.b .hasClass \p0ne-ccp-btn-selected
-            i: false #$font.i .hasClass \p0ne-ccp-btn-selected
-            u: false #$font.u .hasClass \p0ne-ccp-btn-selected
-        */
-
-        #== event listeners ==
-        #= customMode =
-        addListener $nameCustomToggles, \click, ->
-            $this = $ this
-            if not $this .hasClass \selected
-                $nameCustomToggles .removeClass \selected
-                $this .addClass \selected
-                switch $(this).data(\mode)
-                | \default =>
-                    customColor := getHex!
-                    $hex
-                        .val currentColor
-                        .trigger \input
-                    nameCustomMode := \default # change nameCustomMode afterwards to make the input listener not reset it immediately
-                | \custom =>
-                    nameCustomMode := \custom # change nameCustomMode before to make the input listener not reset it immediately
-                    $hex
-                        .val customColor
-                        .trigger \input
-                updateCSS!
-        #= color picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-color
-        onDrag \.p0ne-ccp-color, (x, y) ->
-            $hsv.s .val Math.round((0px >? x <? 150px) * 100perc / 150px)
-            $hsv.v .val 100perc - Math.round((0px >? y <? 150px) * 100perc / 150px)
-            inputHSV!
-
-        #= hue picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-hue
-        onDrag \.p0ne-ccp-hue, (,y) ->
-            $hsv.h .val colorHSV.h=360deg - Math.round((0px >? y <? 150px) * 360deg / 150px)
-            inputHSV!
-
-        #= input fields =
-        addListener $cp, \input, '.p0ne-ccp-hex input', inputHex
-        addListener $cp, \blur, '.p0ne-ccp-hex input', updateUI
-
-        addListener $cp, \input, '.p0ne-ccp-group-rgb input', ->
-            checkNameCustomMode!
-            color.r = +$rgb.r.val!
-            color.g = +$rgb.g.val!
-            color.b = +$rgb.b.val!
-            inputRGB!
-        addListener $cp, \input, '.p0ne-ccp-group-hsv input', ->
-            colorHSV.h = +$hsv.h.val!
-            colorHSV.s = +$hsv.s.val!
-            colorHSV.v = +$hsv.v.val!
-            inputHSV!
-        addListener $cp, \click, '.p0ne-ccp-group-btns button', (e) ->
-            $this = $ this
-            btn = do
-                if      $this .hasClass \p0ne-ccp-btn-b then \b
-                else if $this .hasClass \p0ne-ccp-btn-i then \i
-                else if $this .hasClass \p0ne-ccp-btn-u then \u
-            return if not btn
-
-            if $this.hasClass \p0ne-ccp-btn-selected
-                # set to false
-                font[btn] = false
-                $this .removeClass 'p0ne-ccp-btn-selected p0ne-ccp-btn-default p0ne-ccp-btn-default-selected'
-            else if font[btn] = not $this.hasClass \p0ne-ccp-btn-default
-                # set to default
-                delete font[btn]
-                $this .addClass \p0ne-ccp-btn-selected
-                if font[btn] # default value is in font.__proto__[btn]
-                    $this .addClass \p0ne-ccp-btn-default-selected
-            else
-                # set to true
-                font[btn] = true
-                $this .addClass \p0ne-ccp-btn-selected
-            updateUI!
-            e.preventDefault!
-
-
-        addListener $cp, \click, '.p0ne-ccp-content-name .p0ne-ccp-btn-reset', (e) ->
-            $hex .val currentColor
-            inputHex!
-
-            delete [font.b, font.i, font.u]
-            for btn, state of font
-                if state
-                    $font[btn] .addClass \p0ne-ccp-btn-selected
-                else
-                    $font[btn] .removeClass \p0ne-ccp-btn-selected
-
-            e.preventDefault!
-
-        #== update values ==
-        function inputHSV
-            checkNameCustomMode!
-            colorHSV :=
-                h: ~~($hsv.h .val!)
-                s: ~~($hsv.s .val!)
-                v: ~~($hsv.v .val!)
-            color := hsvToRgb(colorHSV)
-            $rgb.r .val color.r
-            $rgb.g .val color.g
-            $rgb.b .val color.b
-            updateUI true
-        function inputRGB
-            checkNameCustomMode!
-            color :=
-                r: ~~($rgb.r .val!)
-                g: ~~($rgb.g .val!)
-                b: ~~($rgb.b .val!)
-            colorHSV := rgbToHsv(color)
-            $hsv.h .val colorHSV.h
-            $hsv.s .val colorHSV.s
-            $hsv.v .val colorHSV.v
-            updateUI true
-        function inputHex
-            checkNameCustomMode!
-            val_ = $.trim $hex.val!
-            val = [parseInt(val_[char], 16) for char from (if val_.0 == \# then 1 else 0) til val_.length]
-            var r,g,b
-            switch val.length
-            # assume gray
-            | 1 => r=g=b=16*val+ +val #AAAAAA
-            | 2 => r=g=b=val #ABABAB
-            # short hex form
-            | 3 => r=16*val.0+ +val.0; g=16*val.1+ +val.1; b=16*val.2+ +val.2 #AABBCC
-            # assume incomplete
-            | 4 => r=16*val.0+ +val.1; g=16*val.2+ +val.3; b=0 #ABCD00
-            | 5 => r=16*val.0+ +val.1; g=16*val.2+ +val.3; b=16*val.4 #ABCDE0
-            # truncate to first 6 chars
-            | _ => r=16*val.0+ +val.1; g=16*val.2+ +val.3; b=16*val.4+ +val.5
-            color := {r, g, b}
-            $rgb.r .val r
-            $rgb.g .val g
-            $rgb.b .val b
-            colorHSV := rgbToHsv(color)
-            $hsv.h .val colorHSV.h
-            $hsv.s .val colorHSV.s
-            $hsv.v .val colorHSV.v
-            updateUI false
-
-        function getHex
-            return "
-                #{padHex color.r.toString(16)}
-                #{padHex color.g.toString(16)}
-                #{padHex color.b.toString(16)}
-            "
-
-        function updateUI(updateHex)
-            hexVal = getHex!
-            if updateHex
-                $hex.val hexVal.toUpperCase!
-            hexVal = "##hexVal"
-            $crosshair .css do
-                left: colorHSV.s * 150px / 100perc
-                top: 150px - colorHSV.v * 150px / 100perc
-            $huePointer .css top: 150px - colorHSV.h * 150px / 360deg
-            $cpp .css background: "hsl(#{colorHSV.h}, 100%, 50%)"
-            $newColor .css background: hexVal
-            updateCSS!
-
-        function checkNameCustomMode
-            if nameCustomMode == \default
-                nameCustomMode := \custom
-                $nameCustomToggles
-                    .removeClass \selected
-                    .filter '[data-mode=custom]' .addClass \selected
-
-
-        #=== page: icon/badge ===
-        #== DOM elements ==
-        $imageCustomToggles = $contentImage .find \.p0ne-ccp-btn-toggle
-        $snapToGrid = $contentImage .find \.p0ne-ccp-snaptogrid
-        $badgeGroup = $cp .find \.p0ne-ccp-group-badge
-        $imagePicker =
-            preview: $cp .find \.p0ne-ccp-image-preview
-            overview: $cp .find \.p0ne-ccp-image-overview
-            rect: $cp .find \.p0ne-ccp-image-rect
-        $cloak =
-            tl: $cp .find \.p0ne-ccp-cloak-tl
-            tr: $cp .find \.p0ne-ccp-cloak-tr
-            bl: $cp .find \.p0ne-ccp-cloak-bl
-            br: $cp .find \.p0ne-ccp-cloak-br
-
-        $image =
-            url: $cp .find ".p0ne-ccp-image-url input"
-            x: $cp .find ".p0ne-ccp-image-x input"
-            y: $cp .find ".p0ne-ccp-image-y input"
-            w: $cp .find ".p0ne-ccp-image-w input"
-            h: $cp .find ".p0ne-ccp-image-h input"
-
-        #== values ==
-        var icon, badge, scale, imageMode
-        snapToGrid =
-            w_2: 5px
-            h_2: 5px
-
-        imageCustomMode = {}
-        imagePicker =
-            marginLeft: 0px
-            marginTop:  0px
-        imageEl = new Image
-        imageEl.onload = updateImage
-        imageEl.onerror = updateImageOnError
-
-        #== event listeners ==
-        #= customMode =
-        addListener $imageCustomToggles, \click, ->
-            $this = $ this
-            if not $this .hasClass \selected
-                $imageCustomToggles .removeClass \selected
-                $this .addClass \selected
-                switch imageCustomMode[imageMode] := $(this).data(\mode)
-                | \none =>
-                    $contentImage .addClass \disabled
-                    $contentImage .find \input .attr \disabled, true
-                | \default =>
-                    $contentImage .removeClass \disabled
-                    $contentImage .find \input .attr \disabled, null
-                    setImageMode \default
-                | \custom =>
-                    $contentImage .removeClass \disabled
-                    $contentImage .find \input .attr \disabled, null
-                    setImageMode \custom
-
-        #= snap to grid =
-        addListener $snapToGrid, \click, !->
-            console.log "snapToGrid", @checked
-            snapToGrid := if @checked
-                w_2: ~~(image.w / 2  /  5px) * 5px
-                h_2: ~~(image.h / 2  /  5px) * 5px
-            else
-                false
-
-        #= image picker =
-        cc.$el.off \mousedown, \.p0ne-ccp-image-overview
-        onDrag \.p0ne-ccp-image-overview, (x,y,e) ->
-            return if checkImageCustomMode!
-            x = ~~((x - imagePicker.marginLeft)/scale) - image.w/2
-            y = ~~((y - imagePicker.marginTop)/scale) - image.h/2
-            if snapToGrid
-                x = Math.round(x / snapToGrid.w_2) * snapToGrid.w_2
-                y = Math.round(y / snapToGrid.h_2) * snapToGrid.h_2
-            updateImagePos x, y
-            updateImageVal!
-
-        #= image preview =
-        cc.$el.off \mousedown, \.p0ne-ccp-image-preview
-        onDrag \.p0ne-ccp-image-preview,
-            (x, y, e) !-> # onMouseMove
-                return if checkImageCustomMode!
-                if snapToGrid
-                    x = Math.round(x / snapToGrid.w_2) * snapToGrid.w_2
-                    y = Math.round(y / snapToGrid.h_2) * snapToGrid.h_2
-                updateImagePos -x, -y
-                updateImageVal!
-            (e,drag_pos) !-> # onMouseDown
-                drag_pos.left = e.pageX + image.x
-                drag_pos.top  = e.pageY + image.y
-
-        var urlUpdateTimeout
-        addListener $cp, \input, '.p0ne-ccp-group-image input', ->
-            return if checkImageCustomMode!
-            console.log "input", this, @value
-            if $ this .parent! .hasClass \p0ne-ccp-image-url
-                clearTimeout urlUpdateTimeout
-                console.log ">", @value
-                urlUpdateTimeout := sleep 500ms, ~>
-                    console.log ">>", @value
-                    loadImage @value
-            else
-                x = +$image.x.val!
-                y = +$image.y.val!
-                if isFinite(x) and isFinite(y)
-                    updateImagePos x, y
-
-        addListener $cp, \input, '.p0ne-ccp-group-badge input', ->
-            return if checkImageCustomMode!
-            w = ~~$image.w.val!
-            h = ~~$image.h.val!
-            if w > 0 and h > 0
-                updateImageSize w, h
-
-        addListener $cp, \click, '.p0ne-ccp-content-image .p0ne-ccp-btn-reset', (e) ->
-            if imageCustomMode[imageMode] == \custom
-                for k of image
-                    delete image[k]
-                if image == icon
-                    setImageMode \icon
-                else
-                    setImageMode \badge
-            e.preventDefault!
-
-
-        function updateImagePos x, y
-            if image.srcW
-                x = 0 >? ~~x <? image.srcW - image.w
-                y = 0 >? ~~y <? image.srcH - image.h
-            x2 = x / imagePicker.scale -  50px + image.w / (2 * imagePicker.scale)
-            y2 = y / imagePicker.scale - 100px + image.h / (2 * imagePicker.scale)
-            $imagePicker.preview .css do
-                backgroundPosition: "#{-x2}px #{-y2}px"
-            $imagePicker.rect .css do
-                left: (x2 * scale + imagePicker.marginLeft) * imagePicker.scale
-                top:  (y2 * scale + imagePicker.marginTop) * imagePicker.scale
-            image.x = x; image.y = y
-            updateCSS!
-
-        function updateImageVal
-            $image.x .val image.x
-            $image.y .val image.y
-            if image == badge
-                $image.w .val image.w
-                $image.h .val image.h
-
-        function updateImageSize w, h
-            image.w = w; image.h = h
-            $image.w.val w
-            $image.h.val h
-            imagePicker.scale = Math.ceil((w >? h) / 100px)
-            w_2 = ~~(image.w / (imagePicker.scale * 2))
-            h_2 = ~~(image.h / (imagePicker.scale * 2))
-            console.log "updating size", w, h, "#{imagePicker.scale}x"
-
-            # preview rect
-            imagePicker.rectW = 100px * scale * imagePicker.scale
-            imagePicker.rectH = 200px * scale * imagePicker.scale
-
-            if snapToGrid
-                snapToGrid :=
-                    w_2: ~~(w / 2  /  5px) * 5px
-                    h_2: ~~(h / 2  /  5px) * 5px
-
-            # update cloak
-            w_px = +(image.w /  imagePicker.scale % 2 == 1) # extra pixel
-            h_px = +(image.h /  imagePicker.scale % 2 == 1) # extra pixel
-            $cloak.tl .css width: 50px + w_2 + w_px, height: 99px - h_2
-            $cloak.tr .css width: 49px - w_2, height: 100px + h_2 + h_px, left: 50px + w_2 + w_px
-            $cloak.bl .css width: 49px - w_2, height: 100px + h_2, top: 100px - h_2
-            $cloak.br .css width: 50px + w_2, height:  99px - h_2, top: 100px + h_2 + h_px, left: 50px - w_2
-
-            # update image preview position
-            updateImagePicker! if image.srcW
-            updateImagePos image.x, image.y
-
-            updateCSS!
-
-        function updateImagePicker
-            console.log "[updateImagePicker]", imagePicker.rectW, imagePicker.rectH
-            $imagePicker.preview .css do
-                backgroundSize: "#{image.srcW / imagePicker.scale}px #{image.srcH / imagePicker.scale}px"
-            $imagePicker.rect .css do
-                width:  imagePicker.rectW
-                height: imagePicker.rectH
-
-        function setImageMode mode
-            switch mode
-            | \icon =>
-                imageMode := \icon
-                image := icon
-                $badgeGroup .hide!
-            | \badge =>
-                imageMode := \badge
-                image := badge
-                $badgeGroup .show!
-            | \default => if image.default
-                imageCustomMode[imageMode] := \default
-                image := image.default
-            | \custom => if image.custom
-                imageCustomMode[imageMode] := \custom
-                image := image.custom
-            console.log "set image mode", mode, image
-            if imageCustomMode[imageMode] == \none
-                $contentImage .addClass \disabled
-            else
-                $contentImage .removeClass \disabled
-
-            $imageCustomToggles
-                .removeClass \selected
-                .filter "[data-mode=#{imageCustomMode[imageMode]}]" .addClass \selected
-
-
-            loadImage image.url
-            updateImageVal!
-            updateCSS!
-
-        function loadImage url
-            if not url
-                console.error "invalid image URL: #{url}"
-            else
-                console.log "loading image #{url}"
-                image.url = url
-                if url != imageEl.src
-                    $image.url .val image.url || defaultIconURL
-                    imageEl.isLoaded = false
-                    imageEl.src = url
-                    return true
-                else
-                    updateImage.call imageEl
-                    return false
-
-        function updateImage
-            image.isLoaded = true
-            image.src_ = image.src
-            image.srcW = @width
-            image.srcH = @height
-            if image.src == $image.url.val!
-                $image.url .removeClass \error
-            scale := 100px / @width <? 200px / @height
-            imagePicker :=
-                rectW: 100px * scale
-                rectH: 200px * scale
-                marginLeft: 50px - @width*scale / 2
-                marginTop: 100px - @height*scale / 2
-            #updateImagePicker!
-            updateImagePos image.x, image.y
-            updateImageSize image.w, image.h
-            $imagePicker.preview .css do
-                backgroundImage: "url(#{@src})"
-            $imagePicker.overview .css do
-                backgroundImage: "url(#{@src})"
-            updateCSS!
-
-        function updateImageOnError
-            if image.src != ''
-                $image.url .addClass \error
-                console.warn "error loading image", image.src
-                #delete image.src_ if image.src == image.src_
-                #loadImage image.src_ || ''
-
-        function checkImageCustomMode
-            if imageCustomMode[imageMode] == \default
-                image := image.custom <<< image
-                imageCustomMode[imageMode] = \custom
-                $imageCustomToggles
-                    .removeClass \selected
-                    .filter '[data-mode=custom]' .addClass \selected
-            else if imageCustomMode[imageMode] == \none
-                return true
-
-
-        #== TODO ==
-        #save button
-        #store native plug icons/badges as CSS classes instead of URL,x,y
-        #image loading animation
-        #badge page (using icon page but replacing images)
-        #width/height for badge
-        #recolor? rotate?
-        # => resized/recolored image upload to imgur?
-        #show image load time
-        #warn on long loading time (slow host, large GIF, …)
-        var scope, key, uid, $row
-        @loadData = loadData = (scopeName, key_, $row_) !->
-            /* note: the reason we clone$ the variables (font, icon, badge)
-             * is so that the initial values are stored in the prototype of the
-             * variables, not the in variables themselves
-             * this way the reset button can delete the custom properties
-             * which will than default back to the initial values
-             */
-            @key = key := key_
-            scope := cc.scopes[scopeName]
-            data = scope[key]
-            $row := $row_
-            console.log "loading data", scopeName, key, data
-            if key of cc.roles
-                uid := 0
-                $cp .addClass \p0ne-ccp-nobadge
-                if imageMode == \badge
-                    $cp .find \.p0ne-ccp-tab-icon
-                        .addClass \p0ne-ccp-tab-selected
-                        .siblings! .removeClass \p0ne-ccp-tab-selected
-            else
-                uid := key
-                $cp .removeClass \p0ne-ccp-nobadge
-
-
-            delete scope[key] # removing temporarily
-            try
-                # try catch to avoid permanently losing scope[key]
-                if uid
-                    styleDefault = customColors.getUserStyle(key, true)
-                else
-                    styleDefault = customColors.getRoleStyle(key, true)
-                console.log "styleDefault", styleDefault
-
-                #= ICON =
-                iconTemplate = ->
-                switch typeof styleDefault.icon
-                | \string =>
-                    imageCustomMode.icon = \default
-                    iconTemplate::default = getIcon(styleDefault.icon, true)
-                | \object =>
-                    imageCustomMode.icon = \default
-                    iconTemplate::default = styleDefault.icon
-                | otherwise =>
-                    imageCustomMode.icon = \none
-                    iconTemplate::default = # white heart
-                        url: defaultIconURL
-                        x: 105px
-                        y: 350px
-
-                #= BADGE =
-                badgeTemplate = ->
-                if uid
-                    switch typeof styleDefault.badge
-                    | \string =>
-                        imageCustomMode.badge = \default
-                        badgeTemplate::default = getIcon("bdg bdg-#{styleDefault.badge} #{styleDefault.badge[*-1]}", true)
-                        badgeTemplate::default.w = badgeTemplate::default.h = 30px
-                    | \object =>
-                        imageCustomMode.badge = \default
-                        badgeTemplate::default = styleDefault.badge
-                    | otherwise =>
-                        imageCustomMode.badge = \none
-                        badgeTemplate::default =
-                            default: true
-                            disabled: true
-                            w: 30px
-                            h: 30px
-                else
-                    imageCustomMode.badge = \none
-                    badgeTemplate::default = {}
-            catch err
-                console.error "failed to create icon or badge template", err.messageAndStack
-            # restore custom settings
-            scope[key] = data
-
-            #NAME
-            if data.color
-                nameCustomMode := \custom
-                $hex .val currentColor:=data.color.substr(1)
-            else
-                nameCustomMode := \default
-                $hex .val currentColor:=styleDefault.color?.substr(1)
-            customColor := currentColor
-
-            font := {+b, -i, -u}
-            for btn, state of data.font
-                if font[btn] = state
-                    $font[btn] .addClass \p0ne-ccp-btn-selected
-                else
-                    $font[btn] .removeClass \p0ne-ccp-btn-selected
-            font := ^^font
-
-
-            #= ICON =
-            console.log "typeof data.icon", typeof data.icon
-            switch typeof data.icon
-            | \boolean => # false
-                imageCustomMode.icon = \none
-                fallthrough
-            | \undefined =>
-                iconTemplate ::= iconTemplate::default
-            | \string =>
-                imageCustomMode.icon = \custom
-                iconTemplate ::= getIcon(data.icon, true)
-            | \object =>
-                imageCustomMode.icon = \custom
-                iconTemplate ::= data.icon
-            iconTemplate::w = iconTemplate::h = iconTemplate::default.w = iconTemplate::default.h = 15px
-            icon := iconTemplate::default.custom = new iconTemplate
-            if imageCustomMode.icon != \custom
-                icon := icon.default
-
-
-            #= BADGE =
-            console.log "typeof data.badge", typeof data.badge
-            switch typeof data.badge
-            | \boolean => # false
-                imageCustomMode.badge = \custom
-                fallthrough
-            | \undefined =>
-                badgeTemplate ::= badgeTemplate::default
-                /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
-                getUserData data.uid, (d) ->
-                    console.log "[customColors] loaded user data", data.uid, data.name, d
-                    badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
-                    badgeTemplate::default = true
-                    badgeTemplate::w = badgeTemplate::h = 30px*/
-            | \string =>
-                imageCustomMode.badge = \custom
-                badgeTemplate ::= getIcon("bdg bdg-#{data.badge} #{data.badge[*-1]}", true)
-                badgeTemplate::w = badgeTemplate::h = 30px
-            | \object =>
-                imageCustomMode.badge = \custom
-                badgeTemplate ::= data.badge
-            badge := badgeTemplate::default.custom = new badgeTemplate
-            if imageCustomMode.badge != \custom
-                badge := badge.default
-            #badge := data.badge || {default: true, url: "", x: 0px, y: 0px, w: 30px, h: 30px}
-
-            if cc.$el .find \.p0ne-ccp-tab-icon .hasClass \p0ne-ccp-tab-selected
-                setImageMode \icon
-            else if cc.$el .find \.p0ne-ccp-tab-badge .hasClass \p0ne-ccp-tab-selected
-                setImageMode \badge
-
-            console.log "imageCustomMode", imageCustomMode.icon, imageCustomMode.badge
-
-            # UI
-            $nameCustomToggles
-                .removeClass \selected
-                .filter "[data-mode=#nameCustomMode]" .addClass \selected
-            inputHex!
-            $currentColor .css background: "##{getHex!}"
-
-            $snapToGrid
-                .attr \checked, false
-                .click!
-
-            $cp.show!
-
-
-
-        #== auxiliaries ==
-        function rgbToHsv rgb
-            hsv = h: 0, s: 0, v: 0
-            min = rgb.r <? rgb.g <? rgb.b
-            max = rgb.r >? rgb.g >? rgb.b
-            delta = max - min
-            hsv.v = max
-            hsv.s = if max != 0 then 255 * delta / max else 0
-            if hsv.s != 0
-                if rgb.r == max
-                    hsv.h = (rgb.g - rgb.b) / delta
-                else if rgb.g == max
-                    hsv.h = 2 + (rgb.b - rgb.r) / delta
-                else
-                    hsv.h = 4 + (rgb.r - rgb.g) / delta
-            else
-                hsv.h = -1
-            hsv.h = ~~(hsv.h*60deg)
-            if hsv.h < 0
-                hsv.h += 360deg
-            hsv.s = ~~(hsv.s*100perc/255)
-            hsv.v = ~~(hsv.v*100perc/255)
-            return hsv
-        /*
-        very boredom, such fancy code, wow
-        function rgbToHsvDoge(rgb) {
-            var hsv, min, max, delta
-            hsv = {h: 0- -0, s: 0*0+~~-0-~~+0*0, v: 0+ +0}
-            min = (min = rgb.r < rgb.g ? rgb.r : rgb.g) < rgb.b ? min : rgb.b
-            max = (max = rgb.r > rgb.g ? rgb.r : rgb.g) > rgb.b ? max : rgb.b
-            delta = max - min
-            hsv.v = max
-            hsv.s = max != 1- - -1 ? - -~-(2<<9>>2) * delta / max : 1+ - +1
-            if (0-~~-0 == hsv.s == 0<0>0) {
-                if (rgb.r == max)
-                    hsv.h = ~-2 - -     (rgb.g -~~- - -~~- rgb.b) / delta - ~-2
-                else if (rgb.g == max)
-                    hsv.h = ~-4 - - (rgb.b - -~~- - - - -~~- - rgb.r) / delta - ~-~-3
-                else
-                    hsv.h = ~-5 - -     (rgb.r -~~- - -~~- rgb.g) / delta - ~-1
-            } else {
-                hsv.h = 0 +-~~-~~-+1+-~~-~~-+ 0
-            }
-            hsv.h *= 0 +-~~-+ 60 +-~~-+ 0
-            if (hsv.h < 0+~~+0)
-                hsv.h += (3<<10>>3) - (3<<6>>3)
-            hsv.s *= (0 -~100 + + ~ + + 001-~ 0) / - -~-(4<<10>>4)
-            hsv.v *= (0 -~100 - - ~ - - 001-~ 0) / - -~-(8>>3<<8)
-            return hsv
-        }
-         */
-
-        function hsvToRgb hsv
-            rgb = {}
-            h = hsv.h
-            s = hsv.s * 255 / 100perc
-            v = hsv.v * 255 / 100perc
-            if s == 0
-                rgb.r = rgb.g = rgb.b = v
-            else
-                t1 = v
-                t2 = (255 - s) * v / 255
-                t3 = (t1 - t2) * (h % 60deg) / 60deg
-                if h == 360deg
-                    h = 0deg
-                if h < 60deg then rgb.r = ~~t1; rgb.b = ~~t2; rgb.g = ~~(t2+t3)
-                else if h < 120deg then rgb.g = ~~t1; rgb.b = ~~t2; rgb.r = ~~(t1 - t3)
-                else if h < 180deg then rgb.g = ~~t1; rgb.r = ~~t2; rgb.b = ~~(t2 + t3)
-                else if h < 240deg then rgb.b = ~~t1; rgb.r = ~~t2; rgb.g = ~~(t1 - t3)
-                else if h < 300deg then rgb.b = ~~t1; rgb.g = ~~t2; rgb.r = ~~(t2 + t3)
-                else if h < 360deg then rgb.r = ~~t1; rgb.g = ~~t2; rgb.b = ~~(t1 - t3)
-                else rgb.r=0; rgb.g=0; rgb.b=0
-            return rgb
-
-        var updateCSSTimeout
-        updateCSS = ->
-            clearTimeout updateCSSTimeout
-            updateCSSTimeout := sleep 200ms, ->
-                badge_ = badge[imageCustomMode.badge] || badge
-                if \srcW not of badge_
-                    badge_ = void
-                style = cc[if uid then \calcCSSUser else \calcCSSRole] do
-                    key
-                    color: "##{getHex!}"
-                    font: font
-                    icon: icon[imageCustomMode.icon] || icon
-                    badge: badge_
-
-                $css .text style
-                /*TODO add icon for non-staff */
-                /*TODO add .bdg for those without */
-        @close = !->
-            $css .text ""
-            $cp .hide!
-
-        @save = !-> if key
-            try
-                style = scope[key]
-
-                hex = getHex!
-                if hex != currentColor
-                    style.color = "##hex"
-                else
-                    delete style.color
-
-                style.font = {+b, -i, -u}
-                for k in <[ b i u ]> when font.hasOwnProperty k
-                    hasCustomFont = true
-                    style.font[k] = font[k]
-                if not hasCustomFont
-                    delete style.font
-
-                switch imageCustomMode.icon
-                | \custom =>
-                    icon_ = icon[imageCustomMode.icon] || icon
-                    for k in <[ url x y ]> when icon_.hasOwnProperty k
-                        hasCustomIcon = true
-                        style.icon = icon_{url, x, y}
-                        break
-                    if not hasCustomIcon
-                        delete style.icon
-                | \default =>
-                    delete style.icon
-                | \none => if uid or cc.roles[key].icon
-                    style.icon = false
-
-                switch uid && imageCustomMode.badge
-                | \custom =>
-                    badge_ = badge[imageCustomMode.badge] || badge
-                    for k in <[ url x y w h ]> when badge_.hasOwnProperty k
-                        hasCustomBadge = true
-                        style.badge = badge_{url, x, y, w, h, srcW, srcH}
-                        break
-                    if not hasCustomBadge
-                        delete style.badge
-                | \default =>
-                    delete style.badge
-                | \none =>
-                    style.badge = false
-
-                /*$row .html "<div class=p0ne-cc-row>
-                        #{createBadge style.badge}
-                        <div class=p0ne-cc-name>
-                            #{createIcon style.icon}
-                            #{createName style, style.name}
-                            <i class='icon icon-clear-input p0ne-cc-clear-icon'></i>
-                            <div class=p0ne-cc-userid>#{style.uid}</div>
-                        </div>
-                    </div>"*/
-                $css .text ""
-
-                if uid
-                    cc.users[uid].css = cc.calcCSSUser(uid)
-                else
-                    cc.roles[key].css = cc.calcCSSRole(key)
-
-                cc.updateCSS!
-                tmpCSS := true
-                /*if not tmpCSS
-                    tmpCSS := true
-                    $css .text ""
-                    css \customColors_test, $css.text!*/
-            catch err
-                console.error "Error while saving custom colors for #key", err.messageAndStack
-        export test = ->
-            return {image, defaultIconURL, currentColor, customColor, color, colorHSV, font, nameCustomMode, icon, badge, scale, imageMode, imageCustomMode, imagePicker, imageEl, scope, key, uid, snapToGrid}
-
-        # SAMPLE DATA
-        /*
-        loadData {}, do
-            name: "MᗣD Pᗣᗧ•••MᗣN"
-            uid: 3947647 # MᗣD Pᗣᗧ•••MᗣN
-            #uid: 4103672 # The Sensational Stallion
-            roles: <[ manager ]>
-            badge:
-                url: "http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png"
-                x:  0px
-                y:  0px
-                w: 30px
-                h: 30px
-                srcW: 30px
-                srcH: 30px
-            color: \#D35w
-            font: {+b, -i, +u}
-            icon:
-                url: "https://cdn.plug.dj/_/static/images/icons.d8b5eb442b3acb5ccfbbe2541b9db0756e45beba.png" # DUMMY
-                x:  15px
-                y: 365px
-            badge:
-                url: "https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png" # ponies
-                x: 140px
-                y: 210px
-                w:  70px
-                h:  70px
-                srcW: 280px
-                srcH: 700px
-            */
-
-
-        export loadData
-
-cc.$el.find \.p0ne-cc-row.selected .click!
+    getRoles: (uid, user) ->
+        if getUser(uid)
+            [role for role in @_settings.rolesOrder when @roles[role].test(that)]
+        else if @_settings.users[uid]
+            roomRole = getRank(role: that, true) if @room.userRole[uid] || staff[uid]?.role
+            [role for role in @_settings.rolesOrder when role in @_settings.users[uid].roles or role == roomRole]
+        else
+            []
+
+#export cc = customColors
+#<- (fn) -> if cc.loading then cc.loading.then fn else fn!
+#customColors_test?.disable!.enable!
 
 /*@source p0ne.song-notif.ls */
 /**
@@ -9703,20 +8810,19 @@ require <[ sockjs ]>, (SockJS) !->
 
             # - set avatarID to custom value
             @changeAvatar = (userID, avatarID) !~>
-                avatar = p0ne._avatars[avatarID]
-                if not avatar
-                    console.warn "[p0ne custom avatars] can't load avatar: '#{avatarID}'"
+                if not (u = users.get(userID)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                    console.warn "[p0ne custom avatars] can't load user or avatar: '#userID', '#avatarID'"
                     return
 
-                return if not user = users.get userID
 
                 if not avatar.permissions or API.hasPermissions(userID, avatar.permissions)
-                    user.attributes.avatarID_ ||= user.get \avatarID
-                    user.set \avatarID, avatarID
+                    if not u.get \vanillaAvatarID
+                        u.set \vanillaAvatarID, u.get(\avatarID)
+                    u.set \avatarID, avatarID
                 else
                     console.warn "user with ID #userID doesn't have permissions for avatar '#{avatarID}'"
 
-                if userID == user_.id
+                if userID == userID
                     @_settings.avatarID = avatarID
 
             @updateAvatarStore = !->
@@ -9939,9 +9045,9 @@ require <[ sockjs ]>, (SockJS) !->
             console.log "[p0ne custom avatars] using socket as ppCAS avatar server"
             reconnect = true
 
-            if reconnectWarning
-                sleep 10_000ms, !~> if @connectAttemps==0
-                    chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
+            #if reconnectWarning
+            #    sleep 10_000ms, !~> if @connectAttemps==0
+            #        chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
             _$context.trigger \ppCAS:connecting
             API.trigger \ppCAS:connecting
@@ -10047,16 +9153,17 @@ require <[ sockjs ]>, (SockJS) !->
             # initUsers() is used by @socket.on \users and @socket.on \avatars
             ~function initUsers avatarID
                 for userID, avatarID of @socket.users
-                    console.log "#{getTime!} [ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
+                    #console.log "#{getTime!} [ppCAS] change other's avatar", userID, "(#{users.get userID ?.get \username})", avatarID
                     @changeAvatar userID, avatarID
                 if reconnecting
                     chatWarn "reconnected", "p0ne avatars"
                 _$context.trigger \ppCAS:connected
                 API.trigger \ppCAS:connected
-            @socket.on \changeAvatarID, (userID, avatarID) !->
+            @socket.on \changeAvatarID, (userID, avatarID) !~>
                 console.log "#{getTime!} [ppCAS] change other's avatar:", userID, avatarID
 
-                users.get userID ?.set \avatarID, avatarID
+                #users.get userID ?.set \avatarID, avatarID
+                @changeAvatar userID, avatarID
 
             @socket.on \disconnect, (userID) !~>
                 console.log "#{getTime!} [ppCAS] user disconnected:", userID
@@ -10161,6 +9268,7 @@ module \p0neSettings, do
 
         #= add "simple" settings =
         @$vip = $ "<div class=p0ne-settings-vip>" .appendTo $ppS
+        @$vip.items = @$vip
 
         @toggleMenu groupToggles.p0neSettings
 
@@ -10181,30 +9289,76 @@ module \p0neSettings, do
 
 
         do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
-            for group, $el of @groups when @_settings.groupToggles[group]
+            for group, $el of @groups # when @_settings.groupToggles[group]
                 $el .trigger \p0ne:resize
 
 
+        #= DEBUG =
+        debugMode = 0
+        debugClosingDur = 500ms
 
         #= add DOM event listeners =
         # slide settings-menu in/out
-        $ppI .click !~> @toggleMenu!
+        $ppI .click !~>
+            if @toggleMenu!
+                #DEBUG
+                $ppW .removeClass "p0ne-settings-debug-#{debugMode}"
+                debugMode := (debugMode + 1) % 3
+                $ppI .children! .text debugMode
+                $ppW .addClass "p0ne-settings-debug-#{debugMode}"
+
+                if debugMode == 2
+                    debugClosingDur := 0ms
+                    @$vip.hide!
+                    $ppP .appendTo $ppW
+                else
+                    debugClosingDur := 500ms
+                    @$vip.show!
+                    $ppP .appendTo $ppM
+
+                for group, $el of @groups when @_settings.groupToggles[group]
+                    if not keepOpen
+                        $el .removeClass \open .css height: 30px
+                    else
+                        keepOpen = group
+                if not keepOpen
+                    keepOpen = \base
+                    @groupToggles.base = true
+                    @groups.base .find \.p0ne-settings-summary .click!
+
+                sleep debugClosingDur, !~>
+                    for group, $el of @groups when @_settings.groupToggles[group]
+                        if not groupToggles[group] and group != keepOpen
+                            groupToggles[group] = false
+                            $el .addClass \closed
 
         # toggle groups
         addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
             $s = $ this .parent!
-            if $s.hasClass \open # close
-                groupToggles[$s.data \group] = false
+            group = $s.data \group
+            if $s.hasClass \open    and debugMode != 2 # close
+                groupToggles[group] = false
                 $s
                     .removeClass \open
                     .css height: 30px
                     #.stop! .animate height: 30px, \slow
+                sleep 500ms, !-> if not groupToggles[group]
+                    $s .addClass \closed
             else
-                groupToggles[$s.data \group] = true
+                groupToggles[group] = true
                 $s
                     .addClass \open
+                    .removeClass \closed
                     #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
                     .trigger \p0ne:resize
+                if debugMode != 0 #DEBUG
+                    $s = $s .siblings(\.open) .removeClass \open .css height: 30px
+                    sleep debugClosingDur, !->
+                        $s.each !->
+                            $this = $(this)
+                            group = $this.data \group
+                            groupToggles[group] = false
+                            $this .addClass \closed
             e.preventDefault!
 
         addListener $ppW, \p0ne:resize, \.p0ne-settings-group, (e) !->
@@ -10212,7 +9366,7 @@ module \p0neSettings, do
             if p0neSettings._settings.groupToggles[$this.data \group]
                 $this .css height: 0 # reset scrollHeight
                 $this .css height: @scrollHeight # make group as large as content
-            $this .scrollTop 0
+            #$this .scrollTop 0
 
         addListener $ppW, \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
@@ -10372,7 +9526,7 @@ module \p0neSettings, do
                             left: @$ppW.width! - module._$settingsPanel.$el.width!
                             -> $(this).hide!
                     module._$settingsPanel.open = false
-        @groupToggles.p0neSettings = state
+        return @groupToggles.p0neSettings = state
 
 
     groups: {}
@@ -10401,12 +9555,15 @@ module \p0neSettings, do
                 $s = @groups[module.settings] = $ '<div class=p0ne-settings-group>'
                     .data \group, module.settings
                     .append do
-                        $ '<div class=p0ne-settings-summary>' .text module.settings.toUpperCase!
+                        $ '<div class=p0ne-settings-summary>' .text module.settings #.toUpperCase!
                     .insertBefore @$ppInfo
+                $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
                 if @_settings.groupToggles[module.settings]
                     $s .addClass \open
                 else
-                    $s .css height: 30px
+                    $s
+                        .addClass \closed
+                        .css height: 30px
 
                 if module.settings == \moderation
                     $s .addClass \p0ne-settings-group-moderation
@@ -10429,7 +9586,7 @@ module \p0neSettings, do
                 "
                 .data \module, module
 
-            if module_?._$settings?.parent! .is $s
+            if module_?._$settings?.parent!.parent! .is $s
                 module_._$settings
                     .after do
                         module._$settings .addClass \updated
@@ -10438,7 +9595,7 @@ module \p0neSettings, do
                     module._$settings .removeClass \updated
                 @loadSettingsExtra false, module, module_ if not module.disabled
             else
-                module._$settings .appendTo $s
+                module._$settings .appendTo $s.items
 
                 # render extra settings element if module is enabled
                 @loadSettingsExtra false, module if not module.disabled
@@ -10647,7 +9804,7 @@ module \warnOnMehers, do
         addListener API, \voteUpdate, (d) !~>
             current[d.user.id] = d.vote
             if d.vote == -1 and d.user.uid != userID
-                console.error "#{formatUser d.user, true} meh'd this song"
+                console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
                     appendChat $ "
                         <div class='cm system'>
@@ -10768,7 +9925,7 @@ module \afkTimer, do
         addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
         addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
         addListener API, 'chat', (u) !->
-            if not /\[afk\]/i.test(u.message) and not u.uid == IDs.MadPacman
+            if not /\[afk\]/i.test(u.message)
                 updateUser u.uid
         addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
@@ -11754,32 +10911,68 @@ module \ponifiedLang, do
     disabled: true
     displayName: "Ponified Text"
     settings: \pony
-    setup: ({replace}) !->
-        # roles
-        replace Lang.roles, \host, !-> return "Alicorn Princess"
-        replace Lang.roles, \cohost, !-> return "Alicorn"
-        replace Lang.roles, \manager, !-> return "Royal Guard Captain"
-        replace Lang.roles, \bouncer, !-> return "Royal Guard"
-        replace Lang.roles, \dj, !-> return "Horse Famous"
-        replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
-        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies"
-        replace Lang.roles, \none, !-> return "Mudpony"
-        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
-
+    setup: ({replace, css}) !->
         # ponies
-        replace Lang.messages, \minChatLevel, !-> return "This community restricts chat to ponies who are level %LEVEL% and above."
-        replace Lang.permissions, \ban, !-> return "Ban Ponies."
-        replace Lang.permissions, \unban, !-> return "Unban Ponies."
-        replace Lang.tooltips, \headersUsers, !-> return "Ponies"
-        replace Lang.tooltips, \usersRoom, !-> return "Ponies who are here right now"
-        replace Lang.tooltips, \usersBans, !-> return "Ponies who have been banned"
-        replace Lang.tooltips, \usersIgnored, !-> return "Ponies who you have ignored"
-        replace Lang.tooltips, \usersMutes, !-> return "Ponies who have been muted"
-        replace Lang.tooltips, \chatLevel, !-> return "Restrict chat to ponies who are this level or above"
-        replace Lang.userList, \roomTitle, !-> return "Ponies here now"
+        replaceMap =
+            people: 'ponies'
+            People: 'Ponies'
+            user: 'pony'
+            Nobody: 'Nopony'
+            woots: "Squees"
+            Woot: "Squee"
+            Points: "Bits"
+
+            "Resident DJs": 'Horse Famous'
+            "Resident DJ": 'Horse Famous'
+            Bouncer: 'Royal Guard'
+            Manager: 'Royal Guard Captain'
+            "Co-Host": 'Alicorn'
+            Host: 'Alicorn Princess'
+            staff: 'VIP Pony List'
+        regx = //\b(#{Object.keys replaceMap .join '|'})(s?|)\b//g
+        console.group "[ponifiedLang] dynamically replacing words"
+        for ,group of Lang
+            for k,v of group when k[*-1] != "_" and v
+                v2 = v.replace regx, (,a, b) !->
+                    return replaceMap[a]+b
+                if v != v2
+                    replace group, k, !-> return v2
+                    console.log "\treplacing '#v' with '#{group[k]}'"
+        console.groupEnd!
+
+        # roles
+        replace Lang.roles, \none, !-> return "Mudpony"
+        #replace Lang.roles, \dj, !-> return "Horse Famous"
+        #replace Lang.roles, \bouncer, !-> return "Royal Guard"
+        #replace Lang.roles, \manager, !-> return "Royal Guard Captain"
+        #replace Lang.roles, \cohost, !-> return "Alicorn"
+        #replace Lang.roles, \host, !-> return "Alicorn Princess"
+        #replace Lang.moderation, \staffNone, !-> return "removed %NAME% from the VIP Pony List."
+        replace Lang.moderation, \staffDJ, !-> return "made %NAME% Horse Famous."
+        replace Lang.moderation, \staffBouncer, !-> return "hired %NAME% as a Royal Guard."
+        replace Lang.moderation, \staffManager, !-> return "hired %NAME% as a Royal Guard Captain."
+        replace Lang.moderation, \staffCohost, !-> return "transformed %NAME% into an Alicorn."
+        replace Lang.moderation, \staffHost, !-> return "transformed %NAME% into an Alicorn Princess."
+        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies" # custom due to length
+        replace Lang.permissions, \bouncers, !-> return "Hire Royal Guard"
+        replace Lang.permissions, \managers, !-> return "Hire Royal Guard Captains"
+        #replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
+
+        # brony slang
+        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
+        replace Lang.userSettings, \videoOnly, !-> return "Video Only (no dancing horses)"
+        replace Lang.userMeta, \profileURL, !-> return "Hoofbook Profile URL"
+        replace Lang.userFriends, \profile, !-> return "Hoofbook Profile"
+        replace Lang.userList, \staffTitle, !-> return replaceMap.staff
+        replace Lang.tooltips, \profile, !-> return "Edit your Hoofbook Profile"
+        replace Lang.userSettings, \nsfw, !-> return "Show Clopper Communities (NSFW)"
+        replace Lang.alerts, \sessionExpired, !-> return "Horseapples!"
+        replace $('#woot .label').0, \textContent, !-> return "Squee!"
+
 
         # Bot Commands
-        replace Lang.chat, \help, !-> return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
+        replace Lang.chat, \help, !-> return "
+            <strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
             <strong>Bot Commands:</strong><br>
             !randgame &nbsp; <em>Pony Adventure</em><br/>
             !power &nbsp; <em>Random Power</em><br/>
@@ -11790,11 +10983,19 @@ module \ponifiedLang, do
             !dc &nbsp; <em>be put back if you dc'd</em><br/>
             !eta &nbsp; <em>ETA til you dj</em><br/>
             !weird &nbsp; <em>Is it weirdday?</em><br/>
-            "
+        "
 
         # misc
         replace Lang.search, \youtube, !-> return "Search YouTube for ponies"
         replace Lang.search, \soundcloud, !-> return "Search SoundCloud for ponies"
+
+        # adjust CSS to fit longer text
+        css \ponifiedLang, '
+            #dialog-user-role .role-menu,
+            #dialog-user-role .role-menu .selected {
+                width: 205px;
+            }
+        '
 
 /*@source p0ne.fimplug.ls */
 /**
@@ -11847,7 +11048,7 @@ module \forceSkipButtonRuleskip, do
                     <li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li>
                     <li data-rule=20><b>!ruleskip 20</b> (alts)</li>
                     <li data-rule=13><b>!ruleskip 13</b> (NSFW)</li>
-                    <li  data-rule=5><b>!ruleskip  5</b> (too long)</li>
+                    <li  data-rule=6><b>!ruleskip  6</b> (too long)</li>
                     <li  data-rule=4><b>!ruleskip  4</b> (history)</li>
                     <li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li>
                     <li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li>

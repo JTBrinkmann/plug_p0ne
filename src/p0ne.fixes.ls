@@ -382,7 +382,7 @@ module \warnOnAdblockPopoutBlock, do
                 ..textBaseline = \top
                 ..font = '32px Arial'
                 ..fillText '\ud83d\udc28', 0px, 0px # U+1F428 KOALA
-                if ..getImageData(offset, offset, 1, 1).data[0] !== 0
+                if ..getImageData(offset, offset, 1, 1).data[0] != 0
                     console.info "[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied"
                     @disable!
                 else

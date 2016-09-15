@@ -123,11 +123,16 @@ module \roomTheme, do
                 styles += "\n/*== images ==*/\n"
                 /* custom p0ne stuff */
                 if isURL(d.images.backgroundScalable)
-                    styles += "\#app { background-image: url(#{d.images.background}) fixed center center / cover }\n"
+                    styles += """
+                        \#app { background: url(#{d.images.background}) fixed center center / cover }
+                        .room-background { display: none }\n
+                    """
 
                     /* original plug³ stuff */
                 else if isURL(d.images.background)
-                    styles += ".room-background { background-image: url(#{d.images.background}) !important }\n"
+                    styles += """
+                        .room-background { background-image: url(#{d.images.background}) !important; }\n
+                    """
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image
                         ..onload = !~>

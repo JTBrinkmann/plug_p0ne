@@ -13,14 +13,22 @@
 ####################################*/
 module \chatCommands, do
     optional: <[ currentMedia ]>
-    setup: ({addListener}) !->
+    setup: ({addListener},,cC_) !->
         addListener API, \chatCommand, (c) !~>
             if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1])
                 console.log "/chatCommand", cmd, cmd.moderation
-                if (not cmd.moderation or user.gRole or v.moderation == true and user.isStaff or user.role >= cmd.moderation)
-                    cmd.callback(c)
+                if (not cmd.moderation or user.gRole or cmd.moderation == true and user.isStaff or user.role >= cmd.moderation)
+                    try
+                        cmd.callback(c)
+                    catch err
+                        chatWarn "<div>#{err.message}</div>", "error while executing #c"
+                        console.error "[chatCommand] #c"
+                        throw err
                 else
                     chatWarn "You need to be #{if cmd.moderation === true then 'staff' else 'at least '+getRank(role: cmd.moderation)}", c
+        if cC_
+            for k,v of cC_.commands when k not of @commands
+                @commands[k] = v
         @updateCommands!
 
     updateCommands: !->
@@ -45,11 +53,11 @@ module \chatCommands, do
                 user = API.getUser!
                 res = "<div class='msg text'>"
                 for k,command of chatCommands.commands when command and (not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation))
+                    descr = "#{command.parameters ||''} - #{command.description}"
+                    title = "/#k #descr"
                     if command.aliases?.length
-                        aliases = "title='aliases: #{humanList command.aliases}'"
-                    else
-                        aliases = ''
-                    res += "<div class=p0ne-help-command #aliases><b>/#k</b> #{command.parameters ||''} - #{command.description}</div>"
+                        title += "\n#{plural command.aliases.length, 'alias', 'aliases'}: #{humanList command.aliases}"
+                    res += "<div class=p0ne-help-command title='#title'><b>/#k</b> #descr</div>"
                 res += "</div>"
                 appendChat($ "<div class='cm update p0ne-help'>" .html res)
 
@@ -110,7 +118,7 @@ module \chatCommands, do
         mute:
             aliases: <[ stfu silence ]>
             parameters: "[[duration] @username(s)]"
-            description: "mutes the audio or the specified user(s)"
+            description: "if no parameters then mute the audio, \notherwise mute the specified user(s)"
             callback: (user) !->
                 user .= replace(/^\/\w+\s*/, '').trim!
                 if not user

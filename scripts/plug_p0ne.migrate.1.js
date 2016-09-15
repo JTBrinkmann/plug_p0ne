@@ -747,7 +747,7 @@ out$.localforage = localforage;
   var vArr, migrated, v, dest, i$, ref$, len$, key, k, err, res$, ref1$, m, renameMap, oldClass, newClass, perCommunityModules, that, noMutedSongs, avatarID, vanillaAvatarID, remaining, itemSet, data, x, yet$;
   migrated = function(v){
     API.trigger('p0ne_migrated', v);
-    return localStorage.p0neVersion = v;
+    localStorage.p0neVersion = v;
   };
   if (!(v = localStorage.p0neVersion)) {
     return;
@@ -846,11 +846,10 @@ out$.localforage = localforage;
         module = ref$[i$];
         editLocalStorage(module, fn$);
       }
-      return moduleSettings.streamSettings.disabled = false;
+      moduleSettings.streamSettings.disabled = false;
       function fn$(settings){
-        var ref$;
         settings.verbose = settings.warnings;
-        return ref$ = settings.warnings, delete settings.warnings, ref$;
+        delete settings.warnings;
       }
     });
     renameMap = {
@@ -876,15 +875,14 @@ out$.localforage = localforage;
     console.info("[p0ne migrate] added perCommunity settings, fixed a bunch of bugs");
     perCommunityModules = ['autojoin', 'customAvatars', 'fimstats', 'ponify', 'bpm'];
     editLocalStorage('moduleSettings', function(moduleSettings){
-      var i$, ref$, len$, module, ref1$, ref2$, results$ = [];
+      var i$, ref$, len$, module;
       for (i$ = 0, len$ = (ref$ = perCommunityModules).length; i$ < len$; ++i$) {
         module = ref$[i$];
         localStorage["p0ne__friendshipismagic_" + module] = localStorage["p0ne_" + module];
         if (moduleSettings[module]) {
-          results$.push((ref2$ = (ref1$ = moduleSettings[module]).disabled, delete ref1$.disabled, ref2$));
+          delete moduleSettings[module].disabled;
         }
       }
-      return results$;
     });
     migrated(dest);
     // fallthrough
@@ -897,7 +895,7 @@ out$.localforage = localforage;
         v = moduleSettings[k];
         moduleSettings[k] = v.disabled;
       }
-      return moduleSettings._rooms = {};
+      moduleSettings._rooms = {};
     });
     console.log('rename modules "moduleSettings" to "disabledModules"');
     if (that = localStorage.p0ne_moduleSettings) {
@@ -916,7 +914,7 @@ out$.localforage = localforage;
         delete songlist[k];
       }
       songlist.songlist = res;
-      return console.log("convert automute songlist - done", noMutedSongs, songlist);
+      console.log("convert automute songlist - done", noMutedSongs, songlist);
     });
     if (noMutedSongs) {
       delete localStorage.p0ne_automute;
@@ -936,7 +934,7 @@ out$.localforage = localforage;
         console.log("done");
         console.log("~~~~~~~~~~~~~~~");
         migrated(dest);
-        return migrate();
+        migrate();
       }
     };
     console.log("= converting localStorage to localForage =");
@@ -958,24 +956,25 @@ out$.localforage = localforage;
         console.log("not plug_p0ne setting: " + k);
       }
     }
-    return itemSet();
+    itemSet();
+    break;
   case compareVersions(v, dest = '1.7.10'):
     if (window.afkTimer) {
       window.afkTimer._settings.lastActivity = window.afkTimer.lastActivity;
       migrated(dest);
-      return migrate();
+      migrate();
     } else {
       console.log("updating afkTimer settings");
-      return localforage.getItem('p0ne_afkTimer', function(err, d){
+      localforage.getItem('p0ne_afkTimer', function(err, d){
         if (err) {
           console.warn("error loading afkTimer settings");
           migrated(dest);
-          return migrate();
+          migrate();
         } else {
           d.lastActivity = {};
-          return localforage.setItem('p0ne_afkTimer', d, function(){
+          localforage.setItem('p0ne_afkTimer', d, function(){
             migrated(dest);
-            return migrate();
+            migrate();
           });
         }
       });
@@ -993,23 +992,54 @@ out$.localforage = localforage;
         rolesOrder: ['admin', 'ambassador', 'host', 'cohost', 'manager', 'bouncer', 'dj', 'subscriber', 'you', 'friend', 'regular']
       };
       migrated(dest);
-      return migrate();
+      migrate();
     } else {
       console.log("updating customColors settings");
-      return localforage.getItem('p0ne_customColors', function(err, d){
+      localforage.getItem('p0ne_customColors', function(err, d){
         if (err) {
           console.warn("error loading customColors settings");
           migrated(dest);
-          return migrate();
+          migrate();
         } else {
           d.global = {
             role: d.global,
             user: {}
           };
           d.rolesOrder = ['admin', 'ambassador', 'host', 'cohost', 'manager', 'bouncer', 'dj', 'subscriber', 'you', 'friend', 'regular'];
-          return localforage.setItem('p0ne_customColors', d, function(){
+          localforage.setItem('p0ne_customColors', d, function(){
             migrated(dest);
-            return migrate();
+            migrate();
+          });
+        }
+      });
+    }
+    break;
+  case compareVersions(v, dest = '1.8.0'):
+    if (window.customColors) {
+      window.customColors._settings.roles = window.customColors._settings.role;
+      window.customColors._settings.users = window.customColors._settings.user;
+      delete window.customColors._settings.role;
+      delete window.customColors._settings.user;
+      migrated(dest);
+      migrate();
+    } else {
+      console.log("updating customColors settings");
+      localforage.getItem('p0ne_customColors', function(err, d){
+        if (err) {
+          console.warn("error loading customColors settings");
+          migrated(dest);
+          migrate();
+        } else if (!d.global) {
+          migrated(dest);
+          migrate();
+        } else {
+          d.global.roles = d.global.role;
+          d.global.users = d.global.user;
+          delete d.global.role;
+          delete d.global.user;
+          localforage.setItem('p0ne_customColors', d, function(){
+            migrated(dest);
+            migrate();
           });
         }
       });
