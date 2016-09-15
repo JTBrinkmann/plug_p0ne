@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=40"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=41"
 
 /*
 window.moduleStyle = (name, d) ->
