@@ -267,7 +267,7 @@ window.module = (name, data) !->
         if settingsPerCommunity
             roomSlug = getRoomSlug!
             disabledModules = p0ne.disabledModules._rooms[roomSlug]
-            module._updateRoom = ->
+            module._updateRoom = !->
                 module.disable!
                 roomSlug = getRoomSlug!
                 module_ = module
@@ -360,6 +360,9 @@ window.module = (name, data) !->
             else
                 trigger \moduleLoaded
                 console.info "#{getTime!} [#name] initialized#wasDisabled", "color: orange"
+
+            if not module.disabled
+                trigger \moduleEnabled
 
     function loadingFailed
         # if any dependency fails to load

@@ -29,7 +29,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.5
+    version: \1.7.8
     lastCompatibleVersion: \1.7.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -88,7 +88,7 @@ window.compareVersions = (a, b) !-> /* returns whether `a` is greater-or-equal t
     if not console.group
         console.group = console.log
         console.groupEnd = $.noop
-    fn = ->
+    fn = !->
         #== fix LocalForage ==
         # In Firefox' private mode, indexedDB will fail, and thus localforage will also fail silently
         # See https://github.com/mozilla/localForage/issues/195
@@ -98,9 +98,9 @@ window.compareVersions = (a, b) !-> /* returns whether `a` is greater-or-equal t
         try
             if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.OIndexedDB || window.msIndexedDB)
                 that .open \_localforage_spec_test, 1
-                    ..onsuccess = ->
+                    ..onsuccess = !->
                         fn_!
-                    ..onerror = ..onblocked = ..onupgradeneededd = (err) ->
+                    ..onerror = ..onblocked = ..onupgradeneededd = (err) !->
                         # fall back to localStorage
                         delete! [window.indexedDB, window.webkitIndexedDB, window.mozIndexedDB, window.OIndexedDB, window.msIndexedDB]
                         console.error "[p0ne] indexDB doesn't work, falling back to localStorage", err

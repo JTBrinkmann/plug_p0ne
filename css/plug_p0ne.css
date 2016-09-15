@@ -55,16 +55,17 @@
     .flag-fr { background-position: 0px -1012px }  /* French */
     .flag-hr { background-position: 0px -902px; }  /* Croatian */
     .flag-it { background-position: 0px -143px }   /* Italian */
+    .flag-lt { background-position: 0px -1122px;}  /* Polish */
     .flag-ms { background-position: 0px -1870px }  /* Malay */
     .flag-nl { background-position: 0px -1441px }  /* Dutch */
     .flag-pl { background-position: 0px -1177px }  /* Polish */
-    .flag-pt { background-position: 0px -517px }   /* Portuguese */
+    .flag-pt { background-position: 0px -770px;}   /* Portuguese (Brazil flag) */
     .flag-sk { background-position: 0px -1221px }  /* Slovak */
     .flag-sr { background-position: 0px -2465px }  /* Serbian */
     .flag-zh { background-position: 0px -825px; }  /* Chinese */
 
     /*
-    .flag-bs { background-position: 0px -1474px; } /* Bosnian */
+    .flag-bs { background-position: 0px -1474px; } /* Bosnian * /
     .flag-et { background-position: 0px -2410px }  /* Estonian * /
     .flag-hu { background-position: 0px -682px }   /* Hungarian * /
     .flag-ja { background-position: 0px -429px }   /* Japanese * /
@@ -96,9 +97,10 @@
 
     /* pirate flag by Aha-Soft  */
     .flag-pi {
-        background-image: url('https://i.imgur.com/h04cOa9.png');
+        background: url('https://i.imgur.com/h04cOa9.png');
         height: 16px;
-    }
+
+}
 
 /*== p0ne-notification ==*/
     #chat .p0ne-notif-loaded {
@@ -156,6 +158,9 @@
         display: inline-block;
         margin-bottom: -4px;
         width: 13px;
+    }
+    .p0ne-notif-joinleave .icon-chat-bouncer {
+        margin-bottom: -3px;
     }
     .p0ne-notif-join,
     .p0ne-notif-leave,
@@ -228,7 +233,7 @@
         border-bottom: none;
         height: 65px;
         /* top: 115px; */
-    
+
     }
     .playlist-icon-view .media-list .meta span {
         position: static;
@@ -238,7 +243,7 @@
         top: 0;
         font-size: 12px;
         font-weight: bold;
-    
+
         white-space: normal;
     }
     .playlist-icon-view .media-list .meta .author {
@@ -266,7 +271,7 @@
         overflow: visible;
         z-index: 1;
         position: relative;
-    
+
     }
     .playlist-icon-view .media-list .playlist-media-item:hover .title {
         height: auto;
@@ -292,13 +297,13 @@
         height: 30px;
         text-align: justify;
         background: rgba(0,0,0, 0.6) !important;
-    
+
         position: relative;
     }
     .playlist-icon-view #media-panel .actions::after {
         content: " ";
         display: inline-block;
-    
+
         width: 100%;
     }
     .playlist-icon-view .media-list .actions div {
@@ -327,12 +332,12 @@
         left: 0;
         width: 100%;
         text-align: center;
-    
+
         box-sizing: border-box;
     }
     .playlist-icon-view .history .meta .name {
         top: 0;
-    
+
         position: absolute;
         height: 17px;
         text-overflow: ellipsis;
@@ -425,11 +430,11 @@
     /*= Import =*/
     .playlist-icon-view .import-playlist-list .meta {
         text-align: left;
-    
+
         top: 5px;
         left: 30px;
     }
-    
+
     .playlist-icon-view .import-playlist-list .meta span {
         font-size: 15px;
     }
@@ -512,8 +517,8 @@
         max-height: 0;
         transition: max-height .7s ease-out;
         z-index: 90;
-    
-}
+
+    }
     /* .plugCubed + .p0ne-song-info { seems to work just fine }*/
     .p0ne-song-info.expanded {
         max-height: 100%;
@@ -633,7 +638,7 @@
         margin-left: 5px;
         width: 320px;
     }
-    
+
 
     .legacy-chat #chat .p0ne-notif-joinleave .un {
         padding-left: 5px;
@@ -645,6 +650,9 @@
         font-weight: bold;
         margin-left: -12px;
         margin-right: 3px;
+    }
+    .legacy-chat #chat .p0ne-notif .from .un {
+        color: #E43347;
     }
 
 /*== p0ne settings ==*/
@@ -701,15 +709,13 @@
         max-height: 100%;
         z-index: 999998;
         position: absolute;
-    
         background: #222;
-}
+    }
     .p0ne-settings {
         min-width: 300px;
         /* background: #222; */
         /* padding-bottom: 10px; */
-    
-}
+    }
 
     .p0ne-settings-item {
         display: block;
@@ -719,7 +725,7 @@
         vertical-align: top;
         white-space: nowrap;
         padding: 10px 5px;
-    
+
         transition: padding-bottom .2s ease-out;
     }
     .p0ne-settings-item:hover {
@@ -787,9 +793,8 @@
         overflow-y: hidden;
         min-height: 40px;
         transition: height 400ms ease-out;
-    
         height: 40px;
-}
+    }
     .p0ne-settings-group.closed {
         height: 40px;
     }
@@ -798,7 +803,7 @@
         padding-top: 10px;
         font-size: 1.5em;
         cursor: pointer;
-    
+
     }
     .p0ne-settings-summary::before {
         content: " ";
@@ -815,7 +820,7 @@
     .p0ne-settings-popup > img {
         max-height: 350px;
         max-width: 100%;
-    
+
         display: block;
     }
 
@@ -851,7 +856,7 @@
         margin-left: 5%;
         height: 1.7em;
         width: 90%;
-    
+
         overflow: hidden;
     }
 
@@ -861,7 +866,7 @@
     }
 
     .p0ne-settings-expert-toggle, .p0ne-settings-help-btn {
-        float: right;    
+        float: right;
         color: #999;
         cursor: not-allowed;
         /* cursor: pointer; */
@@ -919,7 +924,7 @@
         box-sizing: border-box;
         max-width: 100%;
         max-height: 100%;
-    
+
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
@@ -955,7 +960,7 @@
     .legacy-chat #chat .from-current-dj .text::before {
         width: 55px;
     }
-    #chat .text .p0ne-img-failed {
+    #chat .text a.p0ne-img-failed {
         color: #FF5422;
     }
 
@@ -1099,7 +1104,7 @@
 /*== AFK Timers ==*/
     .p0ne-last-activity {
         color: #aaa;
-      
+
         position: absolute;
         font-size: .8em;
         bottom: 0;
@@ -1244,7 +1249,7 @@
 /*== Votelist ==*/
     .p0ne-votelist {
         position: absolute;
-      
+
         bottom: 100%;
         background: #222;
         padding: 5px;
@@ -1271,7 +1276,7 @@
         right: 17px;
         font-size: 18px;
         padding-top: 15px;
-    
+
         cursor: help;
     }
     .p0ne-eta-text   {
@@ -1293,9 +1298,9 @@
     .p0ne-fix-hires #room:not(.video-only) #vote {
         width: auto !important;
         right: auto !important;
-    
+
         border-radius: 0 0 4px 4px;
-}
+    }
     .p0ne-fix-hires .video-only #vote {
         right: 345px !important;
     }
@@ -1351,6 +1356,8 @@
         padding-left: 0;
         background: transparent;
         bottom: 0;
+
+        box-shadow: none !important;
     }
 
     .legacy-footer #footer-user.menu .inventory {
@@ -1360,7 +1367,7 @@
     }
     .legacy-footer #footer-user.menu .inventory .image {
         margin: 0;
-        
+
         display: inline-block;
         margin-bottom: -20px;
         margin-left: -2px;
@@ -1456,6 +1463,9 @@
     .colorpicker {
         z-index: 2;
     }
+    .booth-alert {
+        width: 4em;
+    }
 
 /*== Custom Colors ==*/
     .p0ne-cc-settings {
@@ -1494,10 +1504,12 @@
     .colorpicker {
         z-index: 12;
     }
-   
+
 /*== warnOnMehers ==*/
     .p0ne-settings-extra .max-mehs {
         width: 2em;
+        padding: 2px 2px 2px 4px;
+        margin-left: 2px;
     }
     .p0ne-settings-extra .warning {
         color: #FD0;
@@ -1512,3 +1524,24 @@
         font-weight: bold;
         color: #Faa;
     }
+
+/*== Skip Button ==*/
+    .p0ne-skip-btn {
+        position: absolute;
+        right: 0;
+        cursor: pointer;
+        width: 54px;
+        height: 54px;
+    }
+    .p0ne-skip-btn > .icon {
+        top: 13px;
+        left: 13px;
+    }
+
+    .p0ne-skip-btn + .p0ne-eta {
+        right: 67px;
+    }
+
+/*== Chat Commands ==*/
+    .p0ne-help-command { color: #BBB; }
+    .p0ne-help-command b { color: #FFF; }

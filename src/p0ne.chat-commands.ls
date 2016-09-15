@@ -13,22 +13,29 @@
 ####################################*/
 module \chatCommands, do
     optional: <[ currentMedia ]>
-    setup: ({addListener}) ->
-        addListener API, \chatCommand, (c) ~>
+    setup: ({addListener}) !->
+        addListener API, \chatCommand, (c) !~>
             @_commands[/^\/(\w+)/.exec(c)?.1]?(c)
         @updateCommands!
 
-    updateCommands: ->
-        @_commands = {}
-        for k,v of @commands
-            @_commands[k] = v.callback
-            for k in v.aliases ||[]
-                if v.moderation
-                    @_commands[k] = (c) -> if user.isStaff
-                        v.callback(c)
+    updateCommands: !->
+        return if @updating
+        @updating = true
+        requestAnimationFrame ~>
+            @updating = false
+            @_commands = {}
+            for k,v of @commands
+                if  v.moderation
+                    let v=v, requiredRank = (if v.moderation == true then 2 else v.moderation)
+                        cb = (c) !->
+                            user = API.getUser!
+                            v.callback(c) if user.gRole or user.role >= requiredRank
                 else
-                    @_commands[k] = v.callback
-    parseUserArg: (str) ->
+                    cb = v.callback
+                @_commands[k] = cb
+                for k in v.aliases ||[]
+                    @_commands[k] = cb
+    parseUserArg: (str) !->
         if /[\s\d]+/.test str # list of user IDs
             return  [+id for id in str .split /\s+/ when +id]
         else
@@ -37,9 +44,10 @@ module \chatCommands, do
         help:
             aliases: <[ commands ]>
             description: "show this list of commands"
-            callback: ->
+            callback: !->
+                user = API.getUser!
                 res = "<div class='msg text'>"
-                for k,command of chatCommands.commands
+                for k,command of chatCommands.commands when not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
                     if command.aliases?.length
                         aliases = "aliases: #{humanList command.aliases}"
                     else
@@ -50,20 +58,18 @@ module \chatCommands, do
 
 
         woot:
-            aliases: <[ +1 ]>
-            description: "<b>woot</b> the current song"
+            description: "woot the current song"
             callback: woot
 
         meh:
-            aliases: <[ -1 ]>
-            description: "<b>meh</b> the current song"
+            description: "meh the current song"
             callback: meh
 
         grab:
             aliases: <[ curate ]>
             parameters: " (playlist)"
-            description: "<b>grab</b> the current song into a playlist (default is current playlist)"
-            callback: (c) ->
+            description: "grab the current song into a playlist (default is current playlist)"
+            callback: (c) !->
                 if c.replace(/^\/\w+\s+/, '')
                     grabMedia(that)
                 else
@@ -71,17 +77,17 @@ module \chatCommands, do
         /*away:
             aliases: <[ afk ]>
             description: "change your status to <b>away</b>"
-            callback: ->
+            callback: !->
                 API.setStatus 1
         busy:
             aliases: <[ work working ]>
             description: "change your status to <b>busy</b>"
-            callback:  ->
+            callback:  !->
                 API.setStatus 2
         gaming:
             aliases: <[ game ingame ]>
             description: "change your status to <b>gaming</b>"
-            callback:  ->
+            callback:  !->
                 API.setStatus 3*/
 
         join:
@@ -94,7 +100,7 @@ module \chatCommands, do
         stream:
             parameters: " [on|off]"
             description: "enable/disable the stream (just '/stream' toggles it)"
-            callback: ->
+            callback: !->
                 if currentMedia?
                     # depending on the parameter, this return true ("on"), false ("off") and defaults to "toggle"
                     stream c.has \on || not (c.has(\off) || \toggle)
@@ -119,7 +125,7 @@ module \chatCommands, do
         automute:
             parameters: " [add|remove]"
             description: "adds/removes this song from the automute list"
-            callback:  ->
+            callback:  !->
                 muteonce! if API.getVolume! != 0
                 if automute?
                     # see note for /stream
@@ -129,8 +135,8 @@ module \chatCommands, do
 
         popout:
             aliases: <[ popup ]>
-            description: "opens/closes the chat in the popout window"
-            callback: ->
+            description: "opens/closes the chat popout window"
+            callback: !->
                 if PopoutView?
                     if PopoutView._window
                         PopoutView.close!
@@ -142,44 +148,44 @@ module \chatCommands, do
         reconnect:
             aliases: <[ reconnectSocket ]>
             description: "forces the socket to reconnect. This might solve chat issues"
-            callback: ->
-                _$context?.once \sjs:reconnected, ->
+            callback: !->
+                _$context?.once \sjs:reconnected, !->
                     chatWarn "socket reconnected"
                 reconnectSocket!
         rejoin:
             aliases: <[ rejoinRoom ]>
-            description: "forces a rejoin to the room. This might solve some issues, but it might also kick you from the waitlist"
-            callback: ->
-                _$context?.once \room:joined, ->
+            description: "forces a rejoin to the room (to fix issues)"
+            callback: !->
+                _$context?.once \room:joined, !->
                     chatWarn "room rejoined"
                 rejoinRoom!
 
         #== moderator commands ==
-        #        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) -> updateUser u.mi
+        #        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         ban:
             parameters: " @username(s)"
-            description: ""
+            description: "bans the specified user(s)"
             moderation: true
-            callback: (user) ->
+            callback: (user) !->
                 for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
                     API.modBan id, \s, 1 #ToDo check this
         unban:
             aliases: <[ pardon revive ]>
             parameters: " @username(s)"
-            description: ""
+            description: "unbans the specified user(s)"
             moderation: true
-            callback: (user) ->
+            callback: (user) !->
                 for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
                     API.moderateUnbanUser id
 
         move:
             parameters: " @username position"
-            description: ""
+            description: "moves a user to the pos. in the waitlist"
             moderation: true
-            callback: (c) ->
+            callback: (c) !->
                 wl = API.getWaitList!
                 var pos
-                c .= replace /(\d+)\s*$/, (,d) ->
+                c .= replace /(\d+)\s*$/, (,d) !->
                     pos := +d
                     return ''
                 if 0 < pos < 51
@@ -197,9 +203,9 @@ module \chatCommands, do
         moveTop:
             aliases: <[ push ]>
             parameters: " @username(s)"
-            description: ""
+            description: "moves the specified user(s) to the top of the waitlist"
             moderation: true
-            callback: (c) ->
+            callback: (c) !->
                 users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
                 for i from users.length - 1 to 0
@@ -207,9 +213,9 @@ module \chatCommands, do
         /*moveUp:
             aliases: <[  ]>
             parameters: " @username(s) (how much)"
-            description: ""
+            description: "moves the specified user(s) up in the waitlist"
             moderation: true
-            callback: (user) ->
+            callback: (user) !->
                 res = []; djsToAdd = []; l=0
                 wl = API.getWaitList!
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
@@ -224,14 +230,14 @@ module \chatCommands, do
                         djsToAdd[l++] = id
                 console.log "[/move] starting to move…", res, djsToAdd
                 pos = -1; l = res.length
-                do helper = ->
+                do helper = !->
                     id = res[++pos]
                     if id
                         if not skipFirst
                             console.log "[/move]\tmoving #id to #{pos + 1}/#{wl.length}"
                             moveDJ id, pos
                                 .then helper
-                                .fail ->
+                                .fail !->
                                     chatWarn "couldn't /moveup #{if getUser(id) then that.username else id}"
                                     helper!
                         else
@@ -246,59 +252,59 @@ module \chatCommands, do
         moveDown:
             aliases: <[  ]>
             parameters: " @username(s) (how much)"
-            description: ""
+            description: "moves the specified user(s) down in the waitlist"
             moderation: true
-            callback: ->
+            callback: !->
                 ...
         */
 
         addDJ:
             aliases: <[ add ]>
             parameters: " @username(s)"
-            description: ""
+            description: "adds the specified user(s) to the waitlist"
             moderation: true
-            callback: (c) ->
+            callback: (c) !->
                 users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                 i = 0
-                do helper = ->
+                do helper = !->
                     if users[i]
                         addDJ users[i], helper
         removeDJ:
             aliases: <[ remove ]>
             parameters: " @username(s)"
-            description: ""
+            description: "removes the specified user(s) from the waitlist / DJ booth"
             moderation: true
-            callback: (c) ->
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     API.moderateRemoveDJ id
         skip:
             aliases: <[ forceSkip s ]>
-            description: ""
+            description: "skips the current song"
             moderation: true
             callback: API.moderateForceSkip
 
         promote:
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "promotes the specified user(s) to the next rank"
+            moderation: 3
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     if getUser(id)
                         API.moderateSetRole(id, that.role + 1)
         demote:
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "demotes the specified user(s) to the lower rank"
+            moderation: 3
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, user.role - 1)
         destaff:
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "removes the specified user(s) from the staff"
+            moderation: 3
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
@@ -306,9 +312,9 @@ module \chatCommands, do
         rdj:
             aliases: <[ resident residentDJ dj ]>
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "makes the specified user(s) resident DJ"
+            moderation: 3
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
@@ -316,18 +322,18 @@ module \chatCommands, do
         bouncer:
             aliases: <[ helper temp staff ]>
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "makes the specified user(s) bouncer"
+            moderation: 3
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 2)
         manager:
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "makes the specified user(s) manager"
+            moderation: 4
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
@@ -335,19 +341,18 @@ module \chatCommands, do
         cohost:
             aliases: <[ co-host co ]>
             parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
+            description: "makes the specified user(s) co-host"
+            moderation: 5
+            callback: (c) !->
                 for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 4)
         host:
-            parameters: " @username(s)"
-            description: ""
-            moderation: true
-            callback: (c) ->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
-                    user = getUser(id)
-                    if user?.role > 0
-                        API.moderateSetRole(id, 5)
+            parameters: " @username"
+            description: "makes the specified user the communities's host (USE WITH CAUTION!)"
+            moderation: 5
+            callback: (c) !->
+                user = getUser(chatCommands.parseUserArg c.replace(/^\/\w+\s+/, ''))
+                if user?.role > 0
+                    API.moderateSetRole(id, 5)

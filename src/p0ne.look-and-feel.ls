@@ -9,22 +9,22 @@
 
 
 module \p0neStylesheet, do
-    setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=45"
+    setup: ({loadStyle}) !->
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=47"
 
 /*
-window.moduleStyle = (name, d) ->
+window.moduleStyle = (name, d) !->
     options =
         settings: true
-        module: -> @toggle!
+        module: !-> @toggle!
     if typeof d == \string
         if isURL(d) # load external CSS
-            options.setup = ({loadStyle}) ->
+            options.setup = ({loadStyle}) !->
                 loadStyle d
         else if d.0 == "." # toggle class
-            options.setup = ->
+            options.setup = !->
                 $body .addClass d
-            options.disable = ->
+            options.disable = !->
                 $body .removeClass d
     else if typeof d == \function
         options.setup = d
@@ -37,8 +37,8 @@ window.moduleStyle = (name, d) ->
 module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
-    setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=27"
+    setup: ({loadStyle}) !->
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=28"
 
 
 /*####################################
@@ -46,20 +46,20 @@ module \fimplugTheme, do
 ####################################*/
 module \animatedUI, do
     require: <[ Dialog ]>
-    setup: ({addListener, replace}) ->
+    setup: ({addListener, replace}) !->
         $ \.dialog .addClass \opaque
-        replace Dialog, \render, -> return ->
+        replace Dialog, \render, !-> return !->
             @show!
-            sleep 0ms, ~> @$el.addClass \opaque
+            sleep 0ms, !~> @$el.addClass \opaque
             return this
 
-        addListener _$context, \ShowDialogEvent:show, (d) ->
+        addListener _$context, \ShowDialogEvent:show, (d) !->
                 if d.dialog.options?.media?.format == 2
-                    sleep 0ms, ~> @$el.addClass \opaque
+                    sleep 0ms, !~> @$el.addClass \opaque
 
-        replace Dialog, \close, (close_) -> return ->
+        replace Dialog, \close, (close_) !-> return !->
             @$el.removeClass \opaque
-            sleep 200ms, ~> close_.call this
+            sleep 200ms, !~> close_.call this
             return this
 
 
@@ -73,9 +73,9 @@ module \fixHiRes, do
         This will fix some odd looking things on larger screens
         NOTE: This is WORK IN PROGESS! Right now it doesn't help much.
     '''
-    setup: ({}) ->
+    setup: ({}) !->
         $body .addClass \p0ne-fix-hires
-    disable: ->
+    disable: !->
         $body .removeClass \p0ne-fix-hires
 
 
@@ -90,7 +90,7 @@ module \playlistIconView, do
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
     optional: <[ PlaylistItemList app ]>
-    setup: ({addListener, replace, replaceListener}, playlistIconView) ->
+    setup: ({addListener, replace, replaceListener}, playlistIconView) !->
         $body .addClass \playlist-icon-view
 
         #= fix visiblerows calculation =
@@ -99,7 +99,7 @@ module \playlistIconView, do
             return
         const CELL_HEIGHT = 185px # keep in sync with plug_p0ne.css
         const CELL_WIDTH = 160px
-        replace PlaylistItemList::, \onResize, -> return ->
+        replace PlaylistItemList::, \onResize, !-> return !->
             @@@__super__.onResize .call this
             newCellsPerRow = ~~((@$el.width! - 10px) / CELL_WIDTH)
             newVisibleRows = Math.ceil(2rows + @$el.height!/CELL_HEIGHT) * newCellsPerRow
@@ -110,7 +110,7 @@ module \playlistIconView, do
                 delete @currentRow
                 @onScroll!
 
-        replace PlaylistItemList::, \onScroll, (oS) -> return ->
+        replace PlaylistItemList::, \onScroll, (oS) !-> return !->
             if @scrollPane
                 top = ~~(@scrollPane.scrollTop! / CELL_HEIGHT) - 1row >? 0
                 @firstRow = top * @cellsPerRow
@@ -132,15 +132,15 @@ module \playlistIconView, do
             # onResize hook
             Layout
                 .off \resize, @pl.resizeBind
-                .resize replace(@pl, \resizeBind, ~> return @pl~onResize)
+                .resize replace(@pl, \resizeBind, !~> return @pl~onResize)
 
             # onScroll hook
             @pl.$el
                 .off \jsp-scroll-y, @pl.scrollBind
-                .on \jsp-scroll-y, replace(@pl, \scrollBind, ~> return @pl~onScroll)
+                .on \jsp-scroll-y, replace(@pl, \scrollBind, !~> return @pl~onScroll)
 
             # opening playlist drawer animation fix
-            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, ~> return ~>
+            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return !~>
                 @pl.onResize! if @pl.$el
 
             # to force rerender
@@ -151,7 +151,7 @@ module \playlistIconView, do
             console.warn "no pl"
 
         #= fix search =
-        replace searchManager, \_search, -> return ->
+        replace searchManager, \_search, !-> return !->
             limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
             console.log "[_search]", @lastQuery, @page, limit
             if @lastFormat == 1
@@ -163,11 +163,11 @@ module \playlistIconView, do
         # (The line that indicates when drag'n'dropping, where a song would be dropped)
         $hovered = $!
         $mediaPanel = $ \#media-panel
-        addListener $mediaPanel, \mouseover, \.row, ->
+        addListener $mediaPanel, \mouseover, \.row, !->
             $hovered .removeClass \hover
             $hovered := $ this
             $hovered .addClass \hover if not $hovered.hasClass \selected
-        addListener $mediaPanel, \mouseout, \.hovered, ->
+        addListener $mediaPanel, \mouseout, \.hovered, !->
             $hovered.removeClass \hover
 
 
@@ -176,7 +176,7 @@ module \playlistIconView, do
         # however with icons, we would rather want to move them LEFT or RIGHT of the hovered song (icon)
         # sadly the easiest way that's not TOO haxy requires us to redefine the whole function just to change two words
         # also some lines are removed, because the vanilla $dragRowLine is not used anymore, we use a CSS-based solution
-        replace PlaylistItemList::, \onDragUpdate, -> return (e) ->
+        replace PlaylistItemList::, \onDragUpdate, !-> return (e) !->
             @@@__super__.onDragUpdate .call this, e
             n = @scrollPane.scrollTop!
             if @currentDragRow && @currentDragRow.$el
@@ -205,7 +205,7 @@ module \playlistIconView, do
 
             o = @onCheckListScroll!
 
-    disableLate: ->
+    disableLate: !->
         # using disableLate so that `@pl.scrollBind` is already reset
         console.info "#{getTime!} [playlistIconView] disabling"
         $body .removeClass \playlist-icon-view
@@ -216,8 +216,8 @@ module \playlistIconView, do
 
         /*
         #= load all songs at once =
-        replace PlaylistItemList::, \onScroll, -> return $.noop
-        replace PlaylistItemList::, \drawList, -> return ->
+        replace PlaylistItemList::, \onScroll, !-> return $.noop
+        replace PlaylistItemList::, \drawList, !-> return !->
             @@@__super__.drawList .call this
             if this.collection.length == 1
                 this.$el.addClass \only-one
@@ -230,7 +230,7 @@ module \playlistIconView, do
 
         /*
         #= icon to toggle playlistIconView =
-        replace MediaPanel::, \show, (s_) -> return ->
+        replace MediaPanel::, \show, (s_) !-> return !->
             s_ ...
             @header.$el .append do
                 $create '<div class="button playlist-view-button"><i class="icon icon-playlist"></i></div>'
@@ -254,36 +254,23 @@ module \videoPlaceholderImage, do
         This is useful for knowing WHAT is playing, even when don't want to watch it.
     '''
     screenshot: 'https://i.imgur.com/TMHVsrN.gif'
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         $room = $ \#room
-        maxresdefault = false
         $playbackImg = $ \#playback-container
         addListener API, \advance, updatePic
-        addListener $playbackImg, \fail, -> if maxresdefault
-            maxresdefault := false
-            img = "https://i.ytimg.com/vi/#{API.getMedia!.cid}/0.jpg"
-            console.warn "[Video Placeholder Image] maxresdefault.jpg failed to load, falling back to #img"
-            $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
-
         updatePic media: API.getMedia!
 
         function updatePic d
-            maxresdefault := false
             if not d.media
                 #console.log "[Video Placeholder Image] hide"
                 $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
             else if d.media.format == 1  # YouTube
-                if $room .hasClass \video-only
-                    maxresdefault := true
-                    img = "https://i.ytimg.com/vi/#{d.media.cid}/maxresdefault.jpg"
-                else
-                    img = "https://i.ytimg.com/vi/#{d.media.cid}/0.jpg"
                 #console.log "[Video Placeholder Image] #img"
-                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
+                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(https://i.ytimg.com/vi/#{d.media.cid}/0.jpg)"
             else # SoundCloud
                 #console.log "[Video Placeholder Image] #{d.media.image}"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
-    disable: ->
+    disable: !->
         $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none
 
 
@@ -298,16 +285,16 @@ module \legacyChat, do
         Makes the messages smaller, so more fit on the screen
     '''
     disabled: true
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         $body .addClass \legacy-chat
         $cb = $ \#chat-button
-        addListener $cb, \dblclick, (e) ~>
+        addListener $cb, \dblclick, (e) !~>
             @toggle!
             e.preventDefault!
-        addListener chatDomEvents, \dblclick, '.popout .icon-chat', (e) ~>
+        addListener chatDomEvents, \dblclick, '.popout .icon-chat', (e) !~>
             @toggle!
             e.preventDefault!
-    disable: ->
+    disable: !->
         $body .removeClass \legacy-chat
 
 
@@ -322,20 +309,25 @@ module \legacyFooter, do
         To get to the settings etc, click anywhere on the panel.
     '''
     disabled: true
-    setup: ->
+    setup: ({addListener}) !->
+        # most of this module's magic is in the CSS
         $body .addClass \legacy-footer
 
-        foo = $ \#footer-user
-        info = foo.find \.info
-        info.on \click, ->
-        info.on \click, ->
-            foo.addClass \menu
-            <- requestAnimationFrame
-            $body.one \click, -> foo.removeClass \menu
-        foo.find '.back span'
+        # show the menu when the user clicks the footer
+        $foo = $ \#footer-user
+        addListener $foo.find(\.info), \click, !->
+            $foo.addClass \menu
+            <- _.delay
+            $body.one \click, !-> $foo.removeClass \menu
+
+        # make sure the "Back To Community" button text is loaded
+        # it usually isn't if the user didn't open the playlist-/settings-drawer yet
+        $foo .find '.back span:first'
             ..text Lang?.userMeta.backToCommunity || "Back To Community" if not /\S/.test ..text!
-    disable: ->
+
+    disable: !->
         $body .removeClass \legacy-footer
+        $ \#footer-user .removeClass \menu
 
 
 /*####################################
@@ -345,12 +337,118 @@ module \djIconChat, do
     require: <[ chatPlugin ]>
     settings: \look&feel
     displayName: "Current-DJ-icon in Chat"
-    setup: ({addListener, css}) ->
+    setup: ({addListener, css}) !->
+        # get the DJ icon image URL and background-position
         icon = getIcon \icon-current-dj
         css \djIconChat, "\#chat .from-current-dj .timestamp::before { background: #{icon.background}; }"
-        addListener _$context, \chat:plugin, (message) ->
+
+        # add .from-current-dj class to messages from the current DJ
+        addListener _$context, \chat:plugin, (message) !->
             if message.uid and message.uid == API.getDJ!?.id
                 message.addClass \from-current-dj
+
+
+/*####################################
+#          DRAGGABLE DIALOG          #
+####################################*/
+module \draggableDialog, do
+    require: <[ Dialog ]>
+    displayName: '☢ Draggable Dialog'
+    settings: \look&feel
+    setup: ({addListener, replace, css}) !->
+        # set up styles
+        css \dialogDragNDrop, '
+            .dialog-frame, .p0ne-lightsout-btn { cursor: pointer; }
+            #dialog-container { width: 0; }
+            #dialog-container.lightsout { width: auto; }
+            #dialog-container.dragging .dialog-frame { cursor: move; }
+            .dialog { position: absolute; }
+            #dialog-container { transition: background .5s ease-out; }
+            #dialog-container.dragging { background: rgba(0,0,0, 0); }
+            .p0ne-lightsout-btn {
+                top: 10px;
+                left: 10px;
+                opacity: .5;
+            }
+        '
+
+        # set up event listener to initiate Drag'n'Drop
+        var $dialog, startPos, startX, startY
+        $dialogContainer = $ \#dialog-container
+        addListener $dialogContainer, \mousedown, \.dialog-frame, (e) !->
+            # set up drag'n'drop event listeners
+            $body
+                .on \mousemove, mousemove
+                .on \mouseup, mouseup
+            $dialog := $ this .closest \.dialog
+                .addClass \dragging
+            pos = $dialog .position!
+            $dialog .css position: \absolute
+            startX := e.clientX - pos.left; startY := e.clientY - pos.top
+            #$dialogContainer .addClass \dragging
+
+        #addListener $dialogContainer, \click, \.dialog-frame, (e) !->
+        #    $dialogContainer .css \width, 0
+
+        /* add lights-out button to dialogs */
+        lightsout = true
+        replace Dialog, \getHeader, !-> return (title) !->
+            $  "<div class=dialog-frame>
+                    <span class=title>#title</span>
+                    <i class='icon icon-#{if lightsout then '' else 'un'}locked p0ne-lightsout-btn'></i>
+                    <i class='icon icon-dialog-close'></i>
+                </div>"
+                ..find \.icon-dialog-close
+                    .on \click, @~close
+                return ..
+        # if a dialog is already open
+        $ \.dialog-frame:first .append "<i class='icon icon-#{if lightsout then '' else 'un'}locked p0ne-lightsout-btn'></i>"
+
+        addListener _$context, \ShowDialogEvent:show, (d) !->
+            $dialog := $dialogContainer .find \.dialog
+                .css position: \static
+            $dialogContainer .addClass \lightsout
+            pos = $dialog .position!
+            pos?.position = \absolute
+            $dialog .css pos
+            if not lightsout
+                $dialogContainer .removeClass \lightsout
+
+        addListener $dialogContainer, \mousedown, \.p0ne-lightsout-btn, (e) !->
+            if lightsout
+                $dialogContainer.removeClass \lightsout
+                $ this .removeClass \icon-locked .addClass \icon-unlocked
+            else
+                $dialogContainer.addClass \lightsout
+                $ this .addClass \icon-locked .removeClass \icon-unlocked
+            lightsout := !lightsout
+
+        # reset when the dialog is closed
+        replace Dialog, \close, (c_) !-> return !->
+            console.log "[dialogDragNDrop] closing dialog"
+            stopDragging true
+            c_ ...
+
+        function mousemove e
+            # move dialog
+            $dialog .css do
+                left: e.clientX - startX
+                top: e.clientY - startY
+            e.preventDefault!
+
+        function mouseup e
+            # end dragging mode (i.e. drop the dialog)
+            stopDragging!
+
+        @stopDragging = stopDragging = !->
+            $dialog? .removeClass \dragging
+            $body
+                .off \mousemove, mousemove
+                .off \mouseup, mouseup
+    disable: !->
+        @stopDragging?!
+        $ '#dialog-container .dialog' .css position: \static
+        $ '#dialog-container .p0ne-lightsout-btn' .remove!
 
 
 /*####################################
@@ -375,7 +473,7 @@ module \emojiPack, do
         # note: as of now, only Google's emojicons (from Android Lollipop) are supported
         # possible future emoji packs are: Twitter's and EmojiOne's (and native browser)
         # by default, plug.dj uses Apple's emojipack
-    setup: ({loadStyle}) ->
+    setup: ({loadStyle}) !->
         loadStyle "#{p0ne.host}/css/temp.#{@_settings.pack}-emoji.css"
 
 
@@ -390,7 +488,7 @@ module \censor, do
         Great for taking screenshots
     '''
     disabled: true
-    setup: ({css}) ->
+    setup: ({css}) !->
         $body .addClass \censored
         css '
             @font-face {
@@ -404,5 +502,5 @@ module \censor, do
                 font-weight: 400;
                 font-stretch: normal;
             }'
-    disable: ->
+    disable: !->
         $body .removeClass \censored

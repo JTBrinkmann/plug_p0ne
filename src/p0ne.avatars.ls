@@ -49,11 +49,11 @@ if not window.SockJS
         paths:
             sockjs: "#{p0ne.host}/scripts/sockjs"
 console.time("[p0ne custom avatars] loaded SockJS")
-require <[ sockjs ]>, (SockJS) ->
+require <[ sockjs ]>, (SockJS) !->
     console.groupCollapsed "[p0ne custom avatars]"
     console.timeEnd "[p0ne custom avatars] loaded SockJS"
     # users
-    requireHelper \users, (it) ->
+    requireHelper \users, (it) !->
         return it.models?.0?.attributes.avatarID
             and \isTheUserPlaying not of it
             and \lastFilter not of it
@@ -63,7 +63,7 @@ require <[ sockjs ]>, (SockJS) ->
 
 
     # auxiliaries
-    window.sleep ||= (delay, fn) -> return setTimeout fn, delay
+    window.sleep ||= (delay, fn) !-> return setTimeout fn, delay
 
     requireHelper \InventoryDropdown, (.selected)
     requireHelper \avatarAuxiliaries, (.getAvatarUrl)
@@ -77,7 +77,7 @@ require <[ sockjs ]>, (SockJS) ->
 
     window.Lang = require \lang/Lang
 
-    window.Cells = requireAll (m) -> m::?.className == \cell and m::getBlinkFrame
+    window.Cells = requireAll (m) !-> return m::?.className == \cell and m::getBlinkFrame
 
 
     /*####################################
@@ -102,7 +102,8 @@ require <[ sockjs ]>, (SockJS) ->
         _settings:
             vanillaAvatarID: user.avatarID
             avatarID: user.avatarID
-        setup: ({addListener, @replace, revert, css}, customAvatars) ->
+        DEFAULT_SERVER: 'https://ppcas.p0ne.com/_'
+        setup: ({addListener, @replace, revert, css}, customAvatars) !->
             console.info "[p0ne custom avatars] initializing"
 
             p0ne._avatars = {}
@@ -111,17 +112,17 @@ require <[ sockjs ]>, (SockJS) ->
             hasNewAvatar = @_settings.vanillaAvatarID == avatarID
 
             # - display custom avatars
-            replace avatarAuxiliaries, \getAvatarUrl, (gAU_) -> return (avatarID, type) ->
+            replace avatarAuxiliaries, \getAvatarUrl, (gAU_) !-> return (avatarID, type) !->
                 return p0ne._avatars[avatarID]?[type] || gAU_(avatarID, type)
             getAvatarUrl_ = avatarAuxiliaries.getAvatarUrl_
-            #replace avatarAuxiliaries, \getHitSlot, (gHS_) -> return (avatarID) ->
+            #replace avatarAuxiliaries, \getHitSlot, (gHS_) !-> return (avatarID) !->
             #    return customAvatarManifest.getHitSlot(avatarID) || gHS_(avatarID)
             #ToDo
 
 
             #== AUXILIARIES ==
             # - set avatarID to custom value
-            _internal_addAvatar = (d) ->
+            _internal_addAvatar = (d) !->
                 # d =~ {category, thumbOffsetTop, thumbOffsetLeft, base_url, anim, dj, b, permissions}
                 #   soon also {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn}
                 avatarID = d.avatarID
@@ -165,13 +166,13 @@ require <[ sockjs ]>, (SockJS) ->
                 delete Avatar.IMAGES["#{avatarID}b"] # delete image cache
                 #for avi in audience.images when avi.avatarID == avatarID
                 #   #ToDo
-                if not updateAvatarStore.loading
-                    updateAvatarStore.loading = true
-                    requestAnimationFrame -> # throttle to avoid updating every time when avatars get added in bulk
-                        updateAvatarStore!
-                        updateAvatarStore.loading = false
+                if not customAvatars.updateAvatarStore.loading
+                    customAvatars.updateAvatarStore.loading = true
+                    requestAnimationFrame !-> # throttle to avoid updating every time when avatars get added in bulk
+                        customAvatars.updateAvatarStore!
+                        customAvatars.updateAvatarStore.loading = false
 
-            export @addAvatar = (avatarID, d) ->
+            @addAvatar = (avatarID, d) !->
                 # d =~ {h, w, standingLength, standingDuration, standingFn, dancingLength, dancingFn, url: {base_url, "", dj, b}}
                 if typeof d == \object
                     avatar = d
@@ -182,7 +183,7 @@ require <[ sockjs ]>, (SockJS) ->
                     throw new TypeError "invalid avatar data passed to addAvatar(avatarID*, data)"
                 d.isVanilla = false
                 return _internal_addAvatar d
-            export @removeAvatar = (avatarID, replace) ->
+            @removeAvatar = (avatarID, replace) !->
                 for u in users.models
                     if u.get(\avatarID) == avatarID
                         u.set(\avatarID, u.get(\avatarID_))
@@ -191,7 +192,7 @@ require <[ sockjs ]>, (SockJS) ->
 
 
             # - set avatarID to custom value
-            export @changeAvatar = (userID, avatarID) ~>
+            @changeAvatar = (userID, avatarID) !~>
                 avatar = p0ne._avatars[avatarID]
                 if not avatar
                     console.warn "[p0ne custom avatars] can't load avatar: '#{avatarID}'"
@@ -208,7 +209,7 @@ require <[ sockjs ]>, (SockJS) ->
                 if userID == user_.id
                     @_settings.avatarID = avatarID
 
-            export @updateAvatarStore = ->
+            @updateAvatarStore = !->
                 # update thumbs
                 styles = ""
                 avatarIDs = []; l=0
@@ -255,32 +256,35 @@ require <[ sockjs ]>, (SockJS) ->
                 return true
 
             #== Event Listeners ==
-            addListener myAvatars, \reset, (vanillaTrigger) ->
-                updateAvatarStore! if vanillaTrigger
+            addListener myAvatars, \reset, (vanillaTrigger) !~>
+                @updateAvatarStore! if vanillaTrigger
 
             #== patch avatar inventory view ==
-            replace InventoryDropdown::, \draw, (d_) -> return ->
+            replace InventoryDropdown::, \draw, (d_) !-> return !->
                 html = ""
                 categories = {}
-
+                curAvatarID = API.getUser!.avatarID
+                curCategory = \base
                 for avi in myAvatars.models
                     categories[avi.get \category] = true
+                    if avi.id == curAvatarID
+                        curCategory = avi.get \category
 
                 for category of categories
-                    html += """
-                        <div class="row" data-value="#category"><span>#{Lang.userAvatars[category]}</span></div>
-                    """
+                    html += "
+                        <div class=row data-value='#category'><span>#{Lang.userAvatars[category]}</span></div>
+                    "
 
                 @$el
-                    .html """
-                        <dl class="dropdown">
-                            <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
+                    .html "
+                        <dl class=dropdown>
+                            <dt><span></span><i class='icon icon-arrow-down-grey'></i><i class='icon icon-arrow-up-grey'></i></dt>
                             <dd>#html</dd>
                         </dl>
-                    """
-
+                    "
                     .on \click, \dt,   @~onBaseClick
                     .on \click, \.row, @~onRowClick
+                InventoryDropdown.selected = curCategory if not categories[InventoryDropdown.selected]
                 @select InventoryDropdown.selected
 
                 @$el.show!
@@ -301,7 +305,7 @@ require <[ sockjs ]>, (SockJS) ->
 
             #== patch Avatar Selection ==
             for Cell in window.Cells
-                replace Cell::, \onClick, (oC_) -> return ->
+                replace Cell::, \onClick, (oC_) !-> return !->
                     console.log "[p0ne custom avatars] Avatar Cell click", this
                     avatarID = this.model.get("id")
                     if /*not this.$el.closest \.inventory .length or*/ not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
@@ -311,12 +315,12 @@ require <[ sockjs ]>, (SockJS) ->
                     else
                         # if not, hax-apply it
                         customAvatars.socket? .emit \changeAvatarID, avatarID
-                        changeAvatar(userID, avatarID)
-                        this.onSelected!
+                        customAvatars.changeAvatar(userID, avatarID)
+                        @onSelected!
             # - get avatars in inventory -
             $.ajax do
                 url: '/_/store/inventory/avatars'
-                success: (d) ->
+                success: (d) !~>
                     avatarIDs = []; l=0
                     for avatar in d.data
                         avatarIDs[l++] = avatar.id
@@ -327,8 +331,8 @@ require <[ sockjs ]>, (SockJS) ->
                                 category: avatar.category
                         p0ne._avatars[avatar.id] .inInventory = true
                             #..category = d.category
-                    updateAvatarStore!
-                    /*requireAll (m) ->
+                    @updateAvatarStore!
+                    /*requireAll (m) !->
                         return if not m._models or not m._events?.reset
                         m_avatarIDs = ""
                         for el, i in m._models
@@ -336,7 +340,7 @@ require <[ sockjs ]>, (SockJS) ->
                     */
 
             if not hasNewAvatar and @_settings.avatarID
-                changeAvatar(userID, that)
+                @changeAvatar(userID, that)
 
 
 
@@ -346,12 +350,12 @@ require <[ sockjs ]>, (SockJS) ->
             # sjs:reconnected, socket:ack, ack, UserEvent:me, RoomEvent:state, change:avatarID (and just about every other user attribute), UserEvent:friends, room:joined, CustomRoomEvent:custom
             # we patch the user_.set after the ack and revert it on the UserEvent:friends. Between those two, the avatar cannot be reverted to the vanilla one, as it's most likely plug automatically doing that
             if _$context? and user_?
-                addListener _$context, \ack, ->
-                    replace user_, \set, (s_) -> return (obj, val) ->
+                addListener _$context, \ack, !->
+                    replace user_, \set, (s_) !-> return (obj, val) !->
                         if obj.avatarID and obj.avatarID == @.get \avatarID_
                             delete obj.avatarID
-                        s_.call this, obj, val
-                addListener _$context, \UserEvent:friends, ->
+                        return s_.call this, obj, val
+                addListener _$context, \UserEvent:friends, !->
                     revert user_, \set
 
 
@@ -362,17 +366,19 @@ require <[ sockjs ]>, (SockJS) ->
             @blurbIsChanged = false
 
             urlParser = document.createElement \a
-            addListener API, \chatCommand, (str) ~>
-                #str = "/ppcas https://p0ne.com/_" if str == "//" # FOR TESTING ONLY
-                if 0 == str .toLowerCase! .indexOf "/ppcas"
+            chatCommands.commands.ppcas = do
+                description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")'
+                callback: (str) !->
                     server = $.trim str.substr(6)
                     if server == "<url>"
                         chatWarn "hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars"
+                        return
                     else if server == "."
                         # Veteran avatars
+                        # This is more or less for testing only
                         base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/"
-                        helper = (fn) ->
-                            fn = window[fn]
+                        helper = (fn) !-> # helper to add or remove veteran avatars
+                            fn = customAvatars[fn]
                             for avatarID in <[ su01 su02 space03 space04 space05 space06 ]>
                                 fn avatarID, do
                                     category: \Veteran
@@ -388,23 +394,32 @@ require <[ sockjs ]>, (SockJS) ->
                                     category: \Veteran
                                     base_url: base_url
                                     thumbOffsetTop: -10px
+                            # if only we had backups of the Halloween avatars :C
+                            # if YOU have them, please contact me
 
-                        @socket = close: ->
-                            helper \removeAvatar
+                        @socket = close: !->
+                            helper \removeAvatar #ToDo check if this is even required
                             delete @socket
                         helper \addAvatar
+                        return
+                    else if server == \default
+                        server = 'https://ppcas.p0ne.com/_'
+                    else if server.length == 0
+                        chatWarn "Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again.", "p0ne avatars"
+                        return
                     urlParser.href = server
                     if urlParser.host != location.host
                         console.log "[p0ne custom avatars] connecting to", server
                         @connect server
                     else
                         console.warn "[p0ne custom avatars] invalid ppCAS server"
+            chatCommands.updateCommands!
 
-            @connect 'https://ppcas.p0ne.com/_'
+            @connect(@DEFAULT_SERVER)
 
 
         connectAttemps: 1
-        connect: (url, reconnecting, reconnectWarning) ->
+        connect: (url, reconnecting, reconnectWarning) !->
             if not reconnecting and @socket
                 return if url == @socket.url and @socket.readyState == 1
                 @socket.close!
@@ -412,20 +427,19 @@ require <[ sockjs ]>, (SockJS) ->
             reconnect = true
 
             if reconnectWarning
-                sleep 10_000ms, ~> if @connectAttemps==0
+                sleep 10_000ms, !~> if @connectAttemps==0
                     chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
             @socket = new SockJS(url)
             @socket.url = url
             @socket.on = @socket.addEventListener
             @socket.off = @socket.removeEventListener
-            @socket.once = (type, callback) -> @on type, -> @off type, callback; callback ...
-
-            @socket.emit = (type, ...data) ->
+            @socket.once = (type, callback) !-> @on type, !-> @off(type, callback); callback ...
+            @socket.emit = (type, ...data) !->
                 console.log "[ppCAS] > [#type]", data
-                this.send JSON.stringify {type, data}
+                @send JSON.stringify {type, data}
 
-            @socket.trigger = (type, args) ->
+            @socket.trigger = (type, args) !->
                 args = [args] if typeof args != \object or not args?.length
                 listeners = @_listeners[type]
                 if listeners
@@ -434,7 +448,7 @@ require <[ sockjs ]>, (SockJS) ->
                 else
                     console.error "[ppCAS] unknown event '#type'"
 
-            @socket.onmessage = ({data: message}) ~>
+            @socket.onmessage = ({data: message}) !~>
                 try
                     {type, data} = JSON.parse(message)
                     console.log "[ppCAS] < [#type]", data
@@ -444,8 +458,8 @@ require <[ sockjs ]>, (SockJS) ->
 
                 @socket.trigger type, data
 
-            @replace @socket, close, (close_) ~> return ->
-                    @trigger close
+            @replace @socket, \close, (close_) !-> return !->
+                    @trigger \close
                     close_ ...
 
             # replace old authTokens
@@ -454,10 +468,10 @@ require <[ sockjs ]>, (SockJS) ->
             newBlurb = oldBlurb .replace /🐎\w{6}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
             if oldBlurb != newBlurb
                 @changeBlurb newBlurb, do
-                    success: ~>
+                    success: !~>
                         console.info "[ppCAS] removed old authToken from user blurb"
 
-            @socket.on \authToken, (authToken) ~>
+            @socket.on \authToken, (authToken) !~>
                 user = API.getUser!
                 @oldBlurb = user.blurb || ""
                 if not user.blurb # user.blurb is actually `null` by default, not ""
@@ -469,47 +483,47 @@ require <[ sockjs ]>, (SockJS) ->
 
                 @blurbIsChanged = true
                 @changeBlurb newBlurb, do
-                    success: ~>
+                    success: !~>
                         @blurbIsChanged = false
                         @socket.emit \auth, userID
-                    error: ~>
+                    error: !~>
                         console.error "[ppCAS] failed to authenticate by changing the blurb."
-                        @changeBlurb @oldBlurb, success: ->
+                        @changeBlurb @oldBlurb, success: !->
                             console.info "[ppCAS] blurb reset."
 
-            @socket.on \authAccepted, ~>
+            @socket.on \authAccepted, !~>
                 @connectAttemps := 0
                 reconnecting := false
                 @changeBlurb @oldBlurb, do
-                    success: ~>
+                    success: !~>
                         @blurbIsChanged = false
-                    error: ~>
+                    error: !~>
                         chatWarn "failed to authenticate to avatar server, maybe plug.dj is down or changed it's API?", "p0ne avatars"
-                        @changeBlurb @oldBlurb, error: ->
+                        @changeBlurb @oldBlurb, error: !->
                             console.error "[ppCAS] failed to reset the blurb."
-            @socket.on \authDenied, ~>
+            @socket.on \authDenied, !~>
                 console.warn "[ppCAS] authDenied"
                 chatWarn "authentification failed", "p0ne avatars"
                 @changeBlurb @oldBlurb, do
-                    success: ~>
+                    success: !~>
                         @blurbIsChanged = false
-                    error: ~>
-                        @changeBlurb @oldBlurb, error: ->
+                    error: !~>
+                        @changeBlurb @oldBlurb, error: !->
                             console.error "[ppCAS] failed to reset the blurb."
                 chatWarn "Failed to authenticate with user id '#userID'", "p0ne avatars"
 
-            @socket.on \avatars, (avatars) ~>
+            @socket.on \avatars, (avatars) !~>
                 user = API.getUser!
                 @socket.avatars = avatars
                 requestAnimationFrame initUsers if @socket.users
                 for avatarID, avatar of avatars
-                    addAvatar avatarID, avatar
+                    @addAvatar avatarID, avatar
                 if @_settings.avatarID of avatars
-                    changeAvatar userID, @_settings.avatarID
+                    @changeAvatar userID, @_settings.avatarID
                 else if user.avatarID of avatars
                     @socket.emit \changeAvatarID, user.avatarID
 
-            @socket.on \users, (users) ~>
+            @socket.on \users, (users) !~>
                 @socket.users = users
                 requestAnimationFrame initUsers if @socket.avatars
 
@@ -525,21 +539,21 @@ require <[ sockjs ]>, (SockJS) ->
                 API.trigger \ppCAS:connected
                 #else
                 #    chatWarn "avatars loaded. Click on your name in the bottom right corner and then 'Avatars' to become a :horse: pony!", "p0ne avatars"
-            @socket.on \changeAvatarID, (userID, avatarID) ->
+            @socket.on \changeAvatarID, (userID, avatarID) !->
                 console.log "[ppCAS] change other's avatar:", userID, avatarID
 
                 users.get userID ?.set \avatarID, avatarID
 
-            @socket.on \disconnect, (userID) ~>
+            @socket.on \disconnect, (userID) !~>
                 console.log "[ppCAS] user disconnected:", userID
                 @changeAvatarID userID, avatarID
 
-            @socket.on \disconnected, (reason) ~>
+            @socket.on \disconnected, (reason) !~>
                 @socket.trigger \close, reason
-            @socket.on \close, (reason) ->
+            @socket.on \close, (reason) !->
                 console.warn "[ppCAS] connection closed", reason
                 reconnect := false
-            @socket.onclose = (e) ~>
+            @socket.onclose = (e) !~>
                 console.warn "[ppCAS] DISCONNECTED", e
                 _$context.trigger \ppCAS:disconnected
                 API.trigger \ppCAS:disconnected
@@ -548,7 +562,7 @@ require <[ sockjs ]>, (SockJS) ->
                 else if reconnect and not @disabled
                     timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps)
                     console.info "[ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
-                    @reconnectTimer = sleep timeout, ~>
+                    @reconnectTimer = sleep timeout, !~>
                         console.log "[ppCAS] reconnecting…"
                         @connectAttemps++
                         @connect(url, true, @connectAttemps==1)
@@ -558,7 +572,7 @@ require <[ sockjs ]>, (SockJS) ->
             API.trigger \ppCAS:connecting
 
 
-        changeBlurb: (newBlurb, options={}) ->
+        changeBlurb: (newBlurb, options={}) !->
             $.ajax do
                 method: \PUT
                 url: '/_/profile/blurb'
@@ -567,10 +581,10 @@ require <[ sockjs ]>, (SockJS) ->
                 success: options.success
                 error: options.error
 
-            #sleep 5_000ms, -> if @connectAttemps
+            #sleep 5_000ms, !-> if @connectAttemps
             #   @socket.emit \reqAuthToken
 
-        disable: ->
+        disable: !->
             @changeBlurb @oldBlurb if @blurbIsChanged
             @socket? .close!
             clearTimeout @reconnectTimer

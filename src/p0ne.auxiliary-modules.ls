@@ -54,23 +54,28 @@ module \chatDomEvents, do
     optional: <[ PopoutView PopoutListener ]>
     persistent: <[ _events ]>
     setup: ({addListener}) !->
-        @ <<<< backbone.Events
-        @one = @once # because jQuery uses .one instead of .once
         cm = $cm!
-        on_ = @on; @on = !->
-            on_ ...
+        @_events = []
+        @on = !->
+            @_events[*] = arguments
             cm.on .apply cm, arguments
-        off_ = @off; @off = !->
-            off_ ...
-            cm.off .apply cm, arguments
+        @off = !->
+            isAnyMatch = false
+            for cb, i in @_events
+                isMatch = true
+                for arg, o in arguments when cb[o] != arg[o]
+                    isMatch = false
+                if isMatch
+                    isAnyMatch = true
+                    @_events.removeItem(i)
+            cm .off.apply cm, arguments if isAnyMatch
+        @once = (type, callback) !-> @on type, !-> @off(type, callback); callback ...
 
-        patchCM = !~>
+        addListener API, \popout:open, !~>
             cm = PopoutView.chat
-            for event, callbacks of @_events
-                for cb in callbacks
-                    #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
-                    cm .on event, cb.callback, cb.context
-        addListener API, \popout:open, patchCM
+            for cb in @_events
+                #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
+                cm .on .apply cm, cb
 
 module \grabMedia, do
     require: <[ playlists auxiliaries ]>
@@ -86,10 +91,10 @@ module \grabMedia, do
             playlist = currentPlaylist # default to current playlist
             appendToEnd = media; media = playlistIDOrName
 
-        if not playlist
-            console.error "[grabMedia] could not find playlist", arguments
-            def.reject \playlistNotFound
-            return def .promise!
+        #if not playlist
+        #    console.error "[grabMedia] could not find playlist", arguments
+        #    def.reject \playlistNotFound
+        #    return def .promise!
 
         # get media
         if not media # default to current song
@@ -108,7 +113,7 @@ module \grabMedia, do
         function addMedia media
             console.log "[grabMedia] add '#{media.author} - #{media.title}' to playlist:", playlist
             playlist.set \syncing, true
-            media.get = l("it !-> this[it]")
+            media.get = (it) !-> this[it]
             ajax \POST, "playlists/#{playlist.id}/media/insert", media: auxiliaries.serializeMediaItems([media]), append: !!appendToEnd
                 .then ({[e]:data}) !->
                     if playlist.id != e.id
@@ -134,14 +139,14 @@ module \grabMedia, do
 ####################################*/
 module \p0neModuleRoomSettingsLoader, do
     require: <[ _$context ]>
-    setup: ({addListener}) ->
-        addListener _$context, \room:joining, ->
+    setup: ({addListener}) !->
+        addListener _$context, \room:joining, !->
             for ,m of p0ne.modules when m.settingsPerCommunity
                 m._updateRoom!
-        addListener _$context, \room:joined, ->
+        addListener _$context, \room:joined, !->
             for ,m of p0ne.modules when m.settingsPerCommunity and not m.disabled
                 if m.loading
-                    m.loading .then ->
+                    m.loading .then !->
                         m.enable!
                 else
                     m.enable!
@@ -235,25 +240,3 @@ module \p0neCSS, do
             $popoutEl .remove!
             Layout?.onResize!
             PopoutView.resizeBind! if PopoutView?._window
-
-
-module \_$contextUpdateEvent, do
-    require: <[ _$context ]>
-    setup: ({replace}) !->
-        for fn in <[ on off onEarly ]>
-            replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
-                fn_ ...
-                _$context .trigger \context:update, type, cb, context
-                return this
-
-
-
-/*
-module \login, do
-    persistent: <[ showLogin ]>
-    module: !->
-        if @showLogin
-            @showLogin!
-        else if not @loading
-            @loading = true
-            $.getScript "#{p0ne.host}/plug_p0ne.login.js"*/

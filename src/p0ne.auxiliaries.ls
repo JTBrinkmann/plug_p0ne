@@ -69,7 +69,7 @@ String::define \endsWith, (str) !->
     return true
 String::define \replaceSansHTML, (rgx, rpl) !->
     # this acts like .replace, but avoids HTML tags and their content
-    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) ->
+    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) !->
         return "#{pre .replace(rgx, rpl)}#post"
 
 for Constr in [String, Array]
@@ -270,17 +270,19 @@ dataSave.interval = setInterval dataSave, 15.min
 #
 # To create a plug_p0ne module as a DataEmitter, use `module(moduleName, { module: new DataEmitter(moduleName), … })`
 export class DataEmitter extends {prototype: Backbone.Events}
-    (@_name) ->
+    (@_name) !->
     _name: 'unnamed DataEmitter'
-    set: (newData) ->
+    set: (newData) !->
         if @_data != newData
             @_data = newData
             @trigger \data, @_data
-    clear: ->
+        return this
+    clear: !->
         delete @_data
         @trigger \cleared
+        return this
 
-    on: (type, fn, context) ->
+    on: (type, fn, context) !->
         super ...
         # immediately execute "data" and "all" events
         if @_data and type in <[ data all ]>
@@ -288,9 +290,10 @@ export class DataEmitter extends {prototype: Backbone.Events}
                 fn .call context||this, @_data
             catch e
                 console.error "[#{@_name}] Error while triggering #type [#{@_listeners[type].length - 1}]", this, args, e.stack
+        return this
     # shorthands
-    data: (fn, context) -> @on \data, fn, context
-    cleared: (fn, context) -> @on \cleared, fn, context
+    data: (fn, context) !-> return @on \data, fn, context
+    cleared: (fn, context) !-> return @on \cleared, fn, context
 
 /*####################################
 #         GENERAL AUXILIARIES        #
@@ -490,6 +493,9 @@ window <<<<
             .fail def.reject
         return def .promise!
 
+    joinRoom: (slug) !->
+        return ajax \POST, \rooms/join, {slug}
+
     getUserData: (user, cb) !->
         if typeof user != \number
             user = getUser user
@@ -532,9 +538,9 @@ window <<<<
         return $ '#dj-button.is-leave' .click! .length != 0
 
     $wootBtn: $ \#woot
-    woot: -> $wootBtn .click!
+    woot: !-> $wootBtn .click!
     $mehBtn: $ \#meh
-    meh: -> $mehBtn .click!
+    meh: !-> $mehBtn .click!
 
     ytItags: do !->
         resolutions = [ 72p, 144p, 240p,  360p, 480p, 720p, 1080p, 1440p, 2160p, 2304p, 3072p, 4320p ]
@@ -1038,28 +1044,31 @@ window <<<<
         fromUser = msg.from ||= getUser(msg) ||{}
         return msg.isMention ?=
             msg.message.has("@#{user.rawun}")
-            or fromUser.id != userID and (fromUser.gRole or fromUser.role >= 3) and do
-                    msg.message.has("@everyone")
-                    or user.role > 1 and do
-                        msg.message.has("@staff")
-                        or user.role == 1 and msg.message.has("@rdjs")
-                        or user.role == 2 and msg.message.has("@bouncers")
-                        or user.role == 3 and msg.message.has("@managers")
-                        or user.role == 4 and msg.message.has("@hosts")
-                    or msg.message.has("@djs") and API.getWaitListPosition! != -1
+            or fromUser.id != userID and do
+                    (fromUser.gRole or fromUser.role >= 4) and msg.message.has("@everyone") # @everyone is co-host+
+                    or (fromUser.gRole or fromUser.role >= 2) and do # all other special mentions are bouncer+
+                        user.role > 1 and do # if the user is staff
+                            msg.message.has("@staff")
+                            or user.role == 1 and msg.message.has("@rdjs")
+                            or user.role == 2 and msg.message.has("@bouncers")
+                            or user.role == 3 and msg.message.has("@managers")
+                            or user.role == 4 and msg.message.has("@hosts")
+                        or msg.message.has("@djs") and API.getWaitListPosition! != -1 # if the user is in the waitlist
         /*
         // for those of you looking at the compiled Javascript, have some readable code:
         return (ref$ = msg.isMention) != null ? ref$ : msg.isMention =
             msg.message.has("@" + user.rawun)
-            || fromUser.id !== userID && (fromUser.gRole || fromUser.role >= 3) && (
-                msg.message.has("@everyone")
-                || user.role > 1 && (
-                    msg.message.has("@staff")
-                    || user.role === 1 && msg.message.has("@rdjs")
-                    || user.role === 2 && msg.message.has("@bouncers")
-                    || user.role === 3 && msg.message.has("@managers")
-                    || user.role === 4 && msg.message.has("@hosts")
-                ) || msg.message.has("@djs") && API.getWaitListPosition() !== -1
+            || fromUser.id !== userID && (
+                (fromUser.gRole || fromUser.role >= 4) && msg.message.has("@everyone") // @everyone is co-host+
+                || (fromUser.gRole || fromUser.role >= 2) && ( // all other special mentions are bouncer+
+                    user.role > 1 && ( // if the user is staff
+                        msg.message.has("@staff")
+                        || user.role === 1 && msg.message.has("@rdjs")
+                        || user.role === 2 && msg.message.has("@bouncers")
+                        || user.role === 3 && msg.message.has("@managers")
+                        || user.role === 4 && msg.message.has("@hosts")
+                    ) || msg.message.has("@djs") && API.getWaitListPosition() !== -1 // if the user is in the waitlist
+                )
             );
          */
     getMentions: (data, safeOffsets) !->
@@ -1073,7 +1082,7 @@ window <<<<
         users = API.getUsers!; msgLength = data.message.length
 
         checkGeneric ||= getUser(data)
-        checkGeneric &&= checkGeneric.role >= 3 or checkGeneric.gRole
+        checkGeneric &&= if checkGeneric.gRole then 5 else checkGeneric.role
 
         # find all @mentions
         var user
@@ -1084,9 +1093,9 @@ window <<<<
             i = 0
 
             # check for generic @mentions, such as @everyone
-            if checkGeneric
+            if checkGeneric >= 3
                 str = data.message.substr(offset, 8)
-                for k, v of roles when str.startsWith k
+                for k, v of roles when str.startsWith k and (k != \everyone or checkGeneric >= 4)
                     genericMatch = {rawun: k, username: k, role: v, id: 0}
                     break
 
@@ -1450,8 +1459,9 @@ window <<<<
     getRoomSlug: !->
         return room?.get?(\slug) || decodeURIComponent location.pathname.substr(1)
 
-woot.click = woot
-meh.click = meh
+window.woot.click = window.woot
+window.meh.click = window.meh
+window.unsnooze = window.refresh
 
 # load cached requireIDs
 (err, data) <- dataLoadAll {p0ne_requireIDs: {}, p0ne_disabledModules: {_rooms: {}}}

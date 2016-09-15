@@ -35,7 +35,7 @@ module \betterChatInput, do
         Replaces the default chat input field with a multiline textfield.
         This allows you to more accurately see how your message will actually look when send
     '''
-    setup: ({addListener, replace, revert, css, $create}) ->
+    setup: ({addListener, replace, revert, css, $create}) !->
         # apply styles
         css \p0ne_chat_input, '
             #chat-input {
@@ -102,7 +102,7 @@ module \betterChatInput, do
 
 
         # add new input text-area
-        init = addListener API, \popout:open, (,PopoutView) ~>
+        init = addListener API, \popout:open, (,PopoutView) !~>
             chat := PopoutView.chat
             @popoutcIF_ = chat.$chatInputField.0
             @$popoutForm = chat.$chatInputField.parent!
@@ -116,9 +116,9 @@ module \betterChatInput, do
                 .focus! # who doesn't want to have the chat focused?
                 .attr \placeholder, Lang?.chat.placeholder || "Chat"
                 # add DOM event Listeners from original input field (not using .bind to allow custom chat.onKey* functions)
-                .on \keydown, (e) ->
+                .on \keydown, (e) !->
                     chat.onKeyDown e
-                .on \keyup, (e) ->
+                .on \keyup, (e) !->
                     chat.onKeyUp e
                 #.on \focus, _.bind(chat.onFocus, chat)
                 #.on \blur, _.bind(chat.onBlur, chat)
@@ -139,7 +139,7 @@ module \betterChatInput, do
         # init for current popout, if any
         init(null, PopoutView) if PopoutView._window
 
-        addListener API, \popout:close, ~>
+        addListener API, \popout:close, !~>
             window.chat.$chatInputField .val(chat.$chatInputField .val!)
             chat := window.chat
             $autoresize_helper := $onpage_autoresize_helper
@@ -180,7 +180,7 @@ module \betterChatInput, do
                 requestAnimationFrame(onInput)
 
 
-    disable: ->
+    disable: !->
         if @cIF_
             chat.$chatInputField = $ (chat.chatInput = @cIF_)
                 .val chat.$chatInputField.val!
@@ -201,10 +201,10 @@ module \betterChatInput, do
 ####################################*/
 module \chatPlugin, do
     require: <[ _$context ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         p0ne.chatLinkPlugins ||= []
         onerror = 'onerror="chatPlugin.imgError(this)"'
-        addListener \early, _$context, \chat:receive, (msg) -> # run plugins that modify chat msgs
+        addListener \early, _$context, \chat:receive, (msg) !-> # run plugins that modify chat msgs
             msg.wasAtBottom ?= chatIsAtBottom! # p0ne.saveChat also sets this
             msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
 
@@ -234,7 +234,7 @@ module \chatPlugin, do
                             console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
                 return all
 
-        addListener _$context, \chat:receive, (e) ->
+        addListener _$context, \chat:receive, (e) !->
             getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
 
         function addClass classes
@@ -245,7 +245,7 @@ module \chatPlugin, do
             if typeof classes == \string
                 for className in classes.split /\s+/g
                     delete @classes[className]
-    imgError: (elem) ->
+    imgError: (elem) !->
         console.warn "[inline-img] converting image back to link", elem.alt, elem, elem.outerHTML
         $ elem .parent!
             ..text ..attr \href
@@ -258,9 +258,9 @@ module \chatPlugin, do
 module \chatMessageClasses, do
     optional: <[ users ]>
     require: <[ chatPlugin ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         try
-            $cm! .children! .each ->
+            $cm! .children! .each !->
                 if uid = this.dataset.cid
                     uid .= substr(0, 7)
                     return if not uid
@@ -288,7 +288,7 @@ module \chatMessageClasses, do
         catch err
             console.error "[chatMessageClasses] couldn't convert old messages", err.stack
 
-        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) -> if uid
+        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) !-> if uid
             message.addClass "fromID-#uid"
 
 
@@ -306,7 +306,6 @@ module \chatMessageClasses, do
 
 
 
-
 /*####################################
 #      UNREAD CHAT NOTIFICAITON      #
 ####################################*/
@@ -315,12 +314,12 @@ module \unreadChatNotif, do
     bottomMsg: $!
     settings: \chat
     displayName: 'Mark Unread Chat'
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         unreadCount = 0
         $chatButton = $ \#chat-button
             .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
         @bottomMsg = $cm! .children! .last!
-        addListener _$context, \chat:plugin, (message) ->
+        addListener _$context, \chat:plugin, (message) !->
             message.wasAtBottom ?= chatIsAtBottom!
             if not $chatButton.hasClass \selected and not PopoutView?.chat?
                 $chatButton.addClass \p0ne-toolbar-highlight
@@ -339,7 +338,7 @@ module \unreadChatNotif, do
         addListener $chatButton, \click, updateUnread
 
         # reduce deleted messages from unreadCount
-        addListener \early _$context, \chat:delete, (cid) ->
+        addListener \early, _$context, \chat:delete, (cid) !->
             $msg = getChat(cid)
             if $msg.length and $msg.hasClass(\unread)
                 $msg.removeClass \unread # this is to avoid problems with disableChatDelete
@@ -348,7 +347,7 @@ module \unreadChatNotif, do
         ~function updateUnread
             return if @throttled
             @throttled := true
-            sleep 200ms, ~>
+            sleep 200ms, !~>
                 try
                     cm = $cm!
                     cmHeight = cm .height!
@@ -363,7 +362,7 @@ module \unreadChatNotif, do
                         lastMsg = msg
                     if l
                         unread = cm.find \.unread
-                        sleep 1_500ms, ~>
+                        sleep 1_500ms, !~>
                             $readMsgs.removeClass \unread
                             if (unread .= filter \.unread) .length
                                 @bottomMsg = unread .removeClass \unread .last!
@@ -372,14 +371,15 @@ module \unreadChatNotif, do
                         $chatButton .removeClass \p0ne-toolbar-highlight
                         unreadCount := 0
                 @throttled := false
-    fix: ->
+    fix: !->
+        #DEBUG for testing
         @throttled = false
         cm = $cm!
         cm
             .removeClass \has-unread
             .find \.unread .removeClass \unread
         @bottomMsg = cm.children!.last!
-    disable: ->
+    disable: !->
         $cm!
             .removeClass \has-unread
             .find \.unread .removeClass \unread
@@ -393,11 +393,8 @@ module \chatOthersMentions, do
     require: <[ chatPlugin ]>
     settings: \chat
     displayName: 'Highlight @mentions for others'
-    setup: ({addListener}) ->
-        /*sleep 0, ->
-            $cm! .children! .each ->*/
-
-        addListener _$context, \chat:plugin, ({type, uid}:message) -> if uid
+    setup: ({addListener}) !->
+        addListener _$context, \chat:plugin, ({type, uid}:message) !-> if uid
             res = ""; lastI = 0
             for mention in getMentions(message, true) when mention.id != userID or type == \emote
                 res += "
@@ -431,8 +428,8 @@ module \chatInlineImages, do
     '''
     _settings:
         filterTags: <[ nsfw suggestive gore spoiler no-inline noinline ]>
-    setup: ({addListener}) ->
-        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ~>
+    setup: ({addListener}) !->
+        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
             if img = @inlineify ...
                 msg.hasFilterWord ?= msg.message.toLowerCase!.hasAny @_settings.filterTags
@@ -450,30 +447,30 @@ module \chatInlineImages, do
     # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
     #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
     regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
-    inlineify: ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ->
-            #= images =
-            if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
-                [rgx, repl, forceProtocol] = that
-                if url != (img = url.replace(rgx, repl))
-                    return "#{forceProtocol||protocol}#img"
+    inlineify: ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !->
+        #= images =
+        if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
+            [rgx, repl, forceProtocol] = that
+            if url != (img = url.replace(rgx, repl))
+                return "#{forceProtocol||protocol}#img"
 
-            #= direct images =
-            if @regDirect .test url
-                if domain in @forceHTTPSDomains
-                    return completeURL .replace 'http://', 'https://'
-                else
-                    return completeURL
+        #= direct images =
+        if @regDirect .test url
+            if domain in @forceHTTPSDomains
+                return completeURL .replace 'http://', 'https://'
+            else
+                return completeURL
 
-            #= no match =
-            return false
+        #= no match =
+        return false
 
-    settingsExtra: ($el) ->
+    settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
             .text "filter tags:"
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.filterTags.join " "
-            .on \input, ~>
+            .on \input, !~>
                 @_settings.filterTags = [$.trim(tag) for tag in $input.val!.split " "]
             .appendTo $el
 
@@ -484,9 +481,9 @@ module \chatInlineImages, do
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
         \pbs.twitter.com : [/^(pbs.twimg.com\/media\/\w+\.(?:jpg|jpeg|gif|png|webp|apng))(?:\:large|\:small)?/, "$1:small"]
-        \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, (,src) -> return decodeURIComponent url]
-        \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
-        \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, -> chatInlineImages.imageshackPlugin ...]
+        \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, (,src) !-> return decodeURIComponent url]
+        \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
+        \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
 
         /* meme-plugins based on http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html ) */
         \quickmeme.com :     [/^(?:m\.)?quickmeme\.com\/meme\/(\w+)/, "i.qkme.me/$1.jpg"]
@@ -497,24 +494,26 @@ module \chatInlineImages, do
         \memedad.com :       [/^memedad.com\/meme\/(\d+)/, "memedad.com/memes/$1.jpg"]
         \makeameme.org :     [/^makeameme.org\/meme\/(.+)/, "makeameme.org/media/created/$1.jpg"]
 
-    imageshackPlugin: (,host,img,ext) ->
+    imageshackPlugin: (,host,img,ext) !->
         ext = {j: \jpg, p: \png, g: \gif, b: \bmp, t: \tiff}[ext]
         return "https://imagizer.imageshack.us/a/img#{parseInt(host,36)}/1337/#img.#ext"
 
-    pluginsAsync:
+    /*pluginsAsync:
         \deviantart.com
         \fav.me
         \sta.sh
-    deviantartPlugin: (replaceLink, url) ->
-        $.getJSON "http://backend.deviantart.com/oembed?format=json&url=#url", (d) ->
+    deviantartPlugin: (replaceLink, url) !->
+        $.getJSON "http://backend.deviantart.com/oembed?format=json&url=#url", (d) !->
             if d.height <= MAX_IMAGE_HEIGHT
                 replaceLink d.url
             else
                 replaceLink d.thumbnail_url
+    */
+
 
 module \imageLightbox, do
     require: <[ chatInlineImages chatDomEvents ]>
-    setup: ({addListener, $createPersistent}) ->
+    setup: ({addListener, $createPersistent}) !->
         var $img
         PADDING = 10px # padding on each side of the image
         $container = $ \#dialog-container
@@ -526,22 +525,22 @@ module \imageLightbox, do
                 cursor: \pointer
                 boxShadow: '0 0 35px black, 0 0 5px black'
             .hide!
-            .load ->
+            .load !->
                 _$context .trigger \ShowDialogEvent:show, {dialog}, true
             .appendTo $body
-        addListener $container, \click, \.p0ne-img-large, ->
+        addListener $container, \click, \.p0ne-img-large, !->
             dialog.close!
             return false
 
         @dialog = dialog =
-            on: (,,@container) ->
+            on: (,,@container) !->
             off: $.noop
             containerOnClose: $.noop
             destroy: $.noop
 
             $el: $el
 
-            render: ->
+            render: !->
                 # calculating image size
                 /*
                 $elImg .css do
@@ -571,7 +570,7 @@ module \imageLightbox, do
                         maxHeight: "#{               imgH    *100/contH}%"
                     .show!
                 $img.css visibility: \hidden # hide inline image
-                requestAnimationFrame ->
+                requestAnimationFrame !->
                     $el
                         .addClass \p0ne-img-large-open # use CSS transition to move enlarge the image (if possible)
                         .css do
@@ -580,7 +579,7 @@ module \imageLightbox, do
                             maxWidth: ''
                             maxHeight: ''
 
-            close: (cb) ->
+            close: (cb) !->
                 $img_ = $img
                 $el_ = $el
                 @isOpen = false
@@ -595,7 +594,7 @@ module \imageLightbox, do
                         top:       "#{(offset.top  + imgH/2) *100/contH}%"
                         maxWidth:  "#{                 imgW  *100/contW}%"
                         maxHeight: "#{                 imgH  *100/contH}%"
-                sleep 200ms, ~>
+                sleep 200ms, !~>
                     # let's hope this is somewhat sync with when the CSS transition ends
                     $el .removeClass \p0ne-img-large-open
                     $img_ .css visibility: \visible
@@ -603,7 +602,7 @@ module \imageLightbox, do
                     cb?!
         dialog.closeBind = dialog~close
 
-        addListener chatDomEvents, \click, \.p0ne-img, (e) ->
+        addListener chatDomEvents, \click, \.p0ne-img, (e) !->
             $img_ = $ this
             e.preventDefault!
 
@@ -622,12 +621,12 @@ module \imageLightbox, do
                     lastSrc := src
                     # not using jQuery event listeners to avoid having to directly replace old listener
                     # this way we don't have to .off \load .one \load, …
-                    $el.0 .onload = ->
+                    $el.0 .onload = !->
                         _$context .trigger \ShowDialogEvent:show, {dialog}, true
                     $el .attr \src, src
                 else
                     _$context .trigger \ShowDialogEvent:show, {dialog}, true
-    disable: ->
+    disable: !->
         if @dialog?.isOpen
             <~ @dialog.close
             @$el? .remove!
@@ -637,7 +636,7 @@ module \imageLightbox, do
 # /* image plugins using plugCubed API (credits go to TATDK / plugCubed) */
 # module \chatInlineImages_plugCubedAPI, do
 #    require: <[ chatInlineImages ]>
-#    setup: ->
+#    setup: !->
 #        chatInlineImages.plugins <<<< @plugins
 #    plugins:
 #        \deviantart.com :    [/^[\w\-\.]+\.deviantart.com\/(?:art\/|[\w:\-]+#\/)[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
@@ -652,8 +651,8 @@ module \chatYoutubeThumbnails, do
         Convert show thumbnails of linked Youtube videos in the chat.
         When hovering the thumbnail, it will animate, alternating between three frames of the video.
     '''
-    setup: ({add, addListener}) ->
-        addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) ~>
+    setup: ({add, addListener}) !->
+        addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) !~>
             clearInterval @interval
             img = this
             id = this.parentElement
@@ -662,14 +661,14 @@ module \chatYoutubeThumbnails, do
                 @frame = 1
                 @lastID = id
             img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-            @interval = repeat 1_000ms, ~>
+            @interval = repeat 1_000ms, !~>
                 console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
                 @frame = (@frame % 3) + 1
                 img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
             console.log "[p0ne_yt_preview]", "started", e, id, @interval
             #ToDo show YT-options (grab, open, preview, [automute])
 
-        addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) ~>
+        addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) !~>
             clearInterval @interval
             img = this
             id = this.parentElement.dataset.ytCid
@@ -677,7 +676,7 @@ module \chatYoutubeThumbnails, do
             console.log "[p0ne_yt_preview]", "stopped"
             #ToDo hide YT-options
 
-        addListener API, \chat:image, ({pre, url, onload}) ->
+        addListener API, \chat:image, ({pre, url, onload}) !->
         yt = YT_REGEX .exec(url)
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
@@ -703,21 +702,38 @@ module \customChatNotificationTrigger, do
     displayName: 'Notification Trigger Words'
     settings: \chat
     _settings:
-        triggerwords: []
+        triggerwords: if (tmp=user.username.split(' ')).length then tmp else []
+    disabled: true
     require: <[ chatPlugin _$context ]>
     setup: ({addListener}) !->
-        addListener _$context, \chat:plugin, (d) ~> if d.uid != userID
+        @test = addListener _$context, \chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
             mentioned = false
-            d.message .= replaceSansHTML @regexp, (,word) ->
+            mentions = {}
+            if @hasUsernameTrigger
+                @usernameReg .lastIndex = 0
+                while x = @usernameReg .exec d.message
+                    mentions[x.index] = true
+            d.message .= replaceSansHTML @regexp, (word, i) !~>
+                for o of @usernameTriggers[word]
+                    return word if mentions[i - o]
                 mentioned := true
                 return "<span class=p0ne-trigger-word>#word</span>"
             playChatSound! if mentioned
+        if window.user_
+            addListener window.user_, \change:username, @~updateRegexp
         @updateRegexp!
 
     updateRegexp: !->
         @regexp = //
-            \b(#{@_settings.triggerwords .join '|'})\b
+            \b(?:#{@_settings.triggerwords .join '|'})\b
         //gi
+        @hasUsernameTrigger = false
+        @usernameTriggers = {}
+        API.getUser!.username .replace @regexp, (word, i) !~>
+            @hasUsernameTrigger = true
+            @usernameTriggers[word] ||= {}
+            @usernameTriggers[word][i + 1] = true
+        @usernameReg = //@#{API.getUser!.username}//g
 
     settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
@@ -725,7 +741,7 @@ module \customChatNotificationTrigger, do
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.triggerwords.join ", "
-            .on \input, ~>
+            .on \input, !~>
                 @_settings.triggerwords = []; l=0
                 for word in $input.val!.split ","
                     @_settings.triggerwords[l++] = $.trim(word)

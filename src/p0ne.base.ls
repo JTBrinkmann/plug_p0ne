@@ -11,8 +11,8 @@
 #           DISABLE/STATUS           #
 ####################################*/
 module \disableCommand, do
-    setup: ({addListener}) ->
-        addListener API, \chat, (msg) ~>
+    setup: ({addListener}) !->
+        addListener API, \chat, (msg) !~>
             if msg.message.has("!disable") and API.hasPermission(msg.uid, API.ROLE.BOUNCER) and isMention(msg)
                 console.warn "[DISABLE] '#{status}'"
                 enabledModules = []; disabledModules = []
@@ -30,7 +30,7 @@ module \disableCommand, do
                 API.sendChat response
 
 module \getStatus, do
-    module: ->
+    module: !->
         status = "Running plug_p0ne v#{p0ne.version}"
         status += " (incl. chat script)" if window.p0ne_chat
         status += "\tand plug³ v#{that}" if getPlugCubedVersion!
@@ -41,14 +41,14 @@ module \getStatus, do
 
 module \statusCommand, do
     timeout: false
-    setup: ({addListener}) ->
-        addListener API, \chat, (data) ~> if not @timeout
+    setup: ({addListener}) !->
+        addListener API, \chat, (data) !~> if not @timeout
             if data.message.has( \!status ) and data.message.has("@#{user.username}") and API.hasPermission(data.uid, API.ROLE.BOUNCER)
                 @timeout = true
                 status = "#{getStatus!}"
                 console.info "[AUTORESPOND] status: '#status'", data.uid, data.un
                 API.sendChat status, data
-                sleep 30min *60_000to_ms, ->
+                sleep 30min *60_000to_ms, !->
                     @timeout = false
                     console.info "[status] timeout reset"
 
@@ -69,12 +69,12 @@ module \autojoin, do
     disabled: true
     disableCommand: true
     optional: <[ _$context booth socketListeners ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         # initial autojoin
         join! if API.getDJ!?.id != userID and API.getWaitListPosition! == -1
 
         # autojoin on DJ advances, Waitlist changes and reconnects
-        addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', (d) ->
+        addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', (d) !->
             if API.getDJ!?.id != userID and API.getWaitListPosition! == -1
                 if join!
                     console.log "#{getTime!} [autojoin] joined waitlist"
@@ -84,13 +84,13 @@ module \autojoin, do
 
         # when DJ Wait List gets unlocked
         wasLocked = $djButton.hasClass \is-locked
-        addListener _$context, \djButton:update, ~>
+        addListener _$context, \djButton:update, !~>
             isLocked = $djButton.hasClass \is-locked
             join! if wasLocked and not isLocked
             wasLocked := isLocked
 
         # disable when user gets removed by a moderator
-        addListener API, \socket:modRemoveDJ, (e) ~> if e.t == API.getUser!.rawun
+        addListener API, \socket:modRemoveDJ, (e) !~> if e.t == API.getUser!.rawun
             @disable!
 
 
@@ -106,7 +106,7 @@ module \autojoin, do
     disabled: true
     disableCommand: true
     optional: <[ _$context booth ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         wlPos = API.getWaitListPosition!
         if wlPos == -1
             @autojoin!
@@ -114,12 +114,12 @@ module \autojoin, do
             API.once \advance, @autojoin, this
 
         # regular autojoin
-        addListener API, \advance, ~>
+        addListener API, \advance, !~>
             if API.getDJ!?.id == userID # if user is the current DJ, delay autojoin until next advance
                 API.once \advance, @autojoin, this
 
         # autojoin on reconnect
-        addListener API, \p0ne:reconnected, ~>
+        addListener API, \p0ne:reconnected, !~>
             if wlPos != -1 # make sure we were actually in the waitlist before autojoining
                 @autojoin!
 
@@ -130,19 +130,19 @@ module \autojoin, do
 
             # when DJ booth gets unlocked
             wasLocked = $djButton.hasClass \is-locked
-            addListener _$context, \djButton:update, ~>
+            addListener _$context, \djButton:update, !~>
                 isLocked = $djButton.hasClass \is-locked
                 @autojoin! if wasLocked and not isLocked
                 wasLocked := isLocked
 
         #DEBUG
         # compare if old logic would have autojoined
-        addListener API, \advance, (d) ~>
+        addListener API, \advance, (d) !~>
             if d and d.id != userID and API.getWaitListPosition! == -1
-                sleep 5_000ms, ~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
+                sleep 5_000ms, !~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
                     chatWarn "old algorithm would have autojoined now. Please report about this in the beta tester Skype chat", "plug_p0ne autojoin"
 
-    autojoin: ->
+    autojoin: !->
         if API.getWaitListPosition! == -1 # if user is not in the waitlist yet
             if join!
                 console.log "#{getTime!} [autojoin] joined waitlist"
@@ -152,7 +152,7 @@ module \autojoin, do
         #else # user is already in the waitlsit
         #    console.log "#{getTime!} [autojoin] already in waitlist"
 
-    disable: ->
+    disable: !->
         API.off \advance, @autojoin
 */
 
@@ -171,18 +171,18 @@ module \autowoot, do
     optional: <[ chatDomEvents ]>
     _settings:
         warnOnMehs: true
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         var timer, timer2
         lastScore = API.getHistory!.1.score
         hasMehWarning = false
 
         # on each song
-        addListener API, \advance, (d) ->
+        addListener API, \advance, (d) !->
             if d.media
                 lastScore = d.lastPlay.score
                 clearTimeout timer
                 # wait between 1 to 4 seconds (to avoid flooding plug.dj servers)
-                timer := sleep 1.s  +  3.s * Math.random!, ->
+                timer := sleep 1.s  +  3.s * Math.random!, !->
                     if not API.getUser!.vote # only woot if user didn't vote already
                         console.log "#{getTime!} [autowoot] autowooting"
                         woot!
@@ -192,17 +192,17 @@ module \autowoot, do
                 hasMehWarning := false
 
         # warn if user is blocking a voteskip
-        addListener API, \voteUpdate, (d) ~>
+        addListener API, \voteUpdate, (d) !~>
             score = API.getScore!
             # some number magic
             if @_settings.warnOnMehs and (score.negative > 2 * score.positive and score.negative > (lastScore.positive + lastScore.negative) / 4 and score.negative >= 5) and not hasMehWarning and API.getTimeRemaining! > 30s
-                timer2 := sleep 5_000ms, ->
+                timer2 := sleep 5_000ms, !->
                     chatWarn "Many users meh'd this song, you may be preventing a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span> if you dislike the song", "Autowoot", true
                     playChatSound!
                 hasMehWarning := true
 
         # make the meh button meh
-        addListener chatDomEvents, \click, \.p0ne-autowoot-meh-btn, ->
+        addListener chatDomEvents, \click, \.p0ne-autowoot-meh-btn, !->
             meh!
             $ this .closest \.cm .remove!
 
@@ -215,10 +215,11 @@ module \automute, do
     _settings:
         songlist: {}
 
-    setup: ({addListener}, automute) ->
+    setup: ({addListener}, automute) !->
         @songlist = @_settings.songlist
         media = API.getMedia!
-        addListener API, \advance, (d) ~>
+        addListener API, \advance, (d) !~>
+            console.log "[automute test]", media, media?.cid, @songlist[media?.cid]
             if (media := d.media) and @songlist[media.cid]
                 console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
                 #muteonce!
@@ -229,7 +230,7 @@ module \automute, do
         @$box_ = $snoozeBtn .children!
         $box = $ "<div class='box'></div>"
         streamOff = isSnoozed!
-        addListener API, \p0ne:changeMode, onModeChange = (mode) ~>
+        addListener API, \p0ne:changeMode, onModeChange = (mode) !~>
             newStreamOff = (mode == \off)
             <~ requestAnimationFrame
             if newStreamOff
@@ -256,7 +257,15 @@ module \automute, do
                     .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
             streamOff := newStreamOff
 
-    module: (media, isAdd) ->
+        @updateBtn = (mode) !->
+            onModeChange(streamOff && \off)
+
+        addListener $snoozeBtn, \click, (e) !~>
+            if streamOff
+                console.info "[automute] snoozy", media.cid, @songlist[media.cid], streamOff
+                automute!
+
+    module: (media, isAdd) !->
         # add/remove/toggle `media` to/from/in list of automuted songs
         # and show a notification in chat
 
@@ -293,15 +302,7 @@ module \automute, do
         if media.cid == API.getMedia!?.cid
             @updateBtn!
 
-        @updateBtn = (mode) ->
-            onModeChange(streamOff && \off)
-
-        addListener $snoozeBtn, \click, (e) ~>
-            if streamOff
-                console.info "[automute] snoozy", media.cid, @songlist[media.cid], streamOff
-                automute!
-
-    disable: ->
+    disable: !->
         $ '#playback .snooze'
             .empty!
             .append @$box_
@@ -321,22 +322,22 @@ module \afkAutorespond, do
     disableCommand: true
 
     DEFAULT_MSG: "I'm AFK at the moment"
-    setup: ({addListener, $create}) ->
+    setup: ({addListener, $create}) !->
         var timeout
-        addListener API, \chat, (msg) ~>
+        addListener API, \chat, (msg) !~>
             if msg.uid and msg.uid != userID and isMention(msg, true) and not timeout and not msg.message.has \!disable
                 API.sendChat "[AFK] #{@_settings.message || @DEFAULT_MSG}"
                 timeout := true
-                sleep @_settings.timeout, -> timeout := false
+                sleep @_settings.timeout, !-> timeout := false
         $create '<div class=p0ne-afk-button>'
             .text "Disable #{@displayName}"
-            .click ~> @disable! # we cannot just `.click(@disable)` because `disable` should be called without any arguments
+            .click !~> @disable! # we cannot just `.click(@disable)` because `disable` should be called without any arguments
             .appendTo \#footer-user
 
-    settingsExtra: ($el) ->
+    settingsExtra: ($el) !->
         $input = $ "<input class=p0ne-settings-input placeholder=\"#{@DEFAULT_MSG}\">"
             .val @_settings.message
-            .on \input, ~>
+            .on \input, !~>
                 @_settings.message = $input.val!
             .appendTo $el
 
@@ -361,7 +362,7 @@ module \joinLeaveNotif, do
     '''
     _settings:
         mergeSameUser: true
-    setup: ({addListener, css}, joinLeaveNotif,,update) ->
+    setup: ({addListener, css}, joinLeaveNotif,,update) !->
         if update
             lastMsg = $cm! .children! .last!
             if lastMsg .hasClass \p0ne-notif-joinleave
@@ -377,7 +378,7 @@ module \joinLeaveNotif, do
             refresh: \refresh
             instaLeave: \instaleave
         for let event_ in <[ userJoin userLeave ]>
-            addListener API, event_, (u) ->
+            addListener API, event_, (u) !->
                 event = event_
                 if not reuseNotif = (chat?.lastType == CHAT_TYPE and $lastNotif)
                     lastUsers := {}
@@ -420,7 +421,7 @@ module \joinLeaveNotif, do
                     if chat?
                         chat.lastType = CHAT_TYPE
  
-        addListener API, 'popout:open popout:close', ->
+        addListener API, 'popout:open popout:close', !->
             $lastNotif = $cm! .find \.p0ne-notif-joinleave:last
 
 
@@ -432,10 +433,10 @@ module \joinLeaveNotif, do
 ####################################*/
 # add a tooltip (alt attr.) to the song title (in the header above the playback container)
 module \titleCurrentSong, do
-    disable: ->
+    disable: !->
         $ \#now-playing-media .prop \title, ""
-    setup: ({addListener}) ->
-        addListener API, \advance, (d) ->
+    setup: ({addListener}) !->
+        addListener API, \advance, (d) !->
             if d.media
                 $ \#now-playing-media .prop \title, "#{d.media.author} - #{d.media.title}"
             else
@@ -449,16 +450,16 @@ module \userlistIcons, do
     require: <[ users RoomUserRow ]>
     _settings:
         forceMehIcon: false
-    setup: ({replace})  ->
+    setup: ({replace})  !->
         settings = @_settings
-        replace RoomUserRow::, \vote, -> return ->
+        replace RoomUserRow::, \vote, !-> return !->
             if @model.id == API.getDJ!?.id
                 /* fixed in Febuary 2015 http://tech.plug.dj/2015/02/18/version-1-2-7-6478/
                 if vote # stupid haxxy edge-cases… well to be fair, I don't see many other people but me abuse that >3>
                     if not @$djIcon
                         @$djIcon = $ '<i class="icon icon-current-dj" style="right: 35px">'
                             .appendTo @$el
-                        API.once \advance, ~>
+                        API.once \advance, !~>
                             @$djIcon .remove!
                             delete @$djIcon
                 else*/
@@ -496,14 +497,14 @@ module \userlistIcons, do
 
         @updateEvents!
 
-    updateEvents: ->
+    updateEvents: !->
         for u in users.models when u._events
             for event in u._events[\change:vote] ||[] when event.ctx instanceof RoomUserRow
                 event.callback = RoomUserRow::vote
             for event in u._events[\change:grab] ||[] when event.ctx instanceof RoomUserRow
                 event.callback = RoomUserRow::vote
 
-    disableLate: ->
+    disableLate: !->
         @updateEvents!
 
 
@@ -516,8 +517,8 @@ module \chatDblclick2Mention, do
     #optional: <[ PopoutListener ]>
     settings: \chat
     displayName: 'DblClick username to Mention'
-    setup: ({replace, addListener}, chatDblclick2Mention) ->
-        newFromClick = (e) ->
+    setup: ({replace, addListener}, chatDblclick2Mention) !->
+        newFromClick = (e) !->
             # after a click, wait 0.2s
             # if the user clicks again, consider it a double click
             # otherwise fall back to default behaviour (show user rollover) 
@@ -525,7 +526,7 @@ module \chatDblclick2Mention, do
 
             # single click
             if not chatDblclick2Mention.timer
-                chatDblclick2Mention.timer = sleep 200ms, ~> if chatDblclick2Mention.timer
+                chatDblclick2Mention.timer = sleep 200ms, !~> if chatDblclick2Mention.timer
                     try
                         chatDblclick2Mention.timer = 0
                         $this = $ this
@@ -551,11 +552,11 @@ module \chatDblclick2Mention, do
         for [ctx, $el, attr, boundAttr] in [ [chat, $cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
             # remove individual event listeners (we use a delegated event listener below)
             # setting them to `$.noop` will prevent .bind to break
-            #replace ctx, attr, -> return $.noop
+            #replace ctx, attr, !-> return $.noop
             # setting them to `null` will make `.on("click", …)` in the vanilla code do nothing (this requires the underscore.bind fix)
             replace ctx, attr, noop
             if ctx[boundAttr]
-                replace ctx, boundAttr, -> noop
+                replace ctx, boundAttr, !-> noop
 
             # update DOM event listeners
             $el .off \click, ctx[boundAttr]
@@ -569,7 +570,7 @@ module \chatDblclick2Mention, do
         function noop
             return null
 
-    disableLate: ->
+    disableLate: !->
         # note: here we actually have to pay attention as to what to re-enable
         cm = $cms!
         for attr, [ctx, $el] of {fromClickBind: [chat, cm], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
@@ -585,16 +586,17 @@ module \etaTimer, do
     displayName: 'ETA Timer'
     settings: \base
     optional: <[ _$context ]>
-    setup: ({css, addListener, $create}) ->
+    setup: ({css, addListener, $create}) !->
         css \etaTimer, '
             .p0ne-eta {
-                width: auto;
+                position: absolute;
             }
             #your-next-media>span {
                 width: auto !important;
                 right: 50px;
             }
         '
+        # we put ".p0ne-eta { position: absolute; }" in here instead of plug_p0ne.css so $eta's width is calculated correctly even while the stylesheets are loading
         sum = lastSongDur = tooltipIntervalID = 0
         showingTooltip = false
         $nextMediaLabel = $ '#your-next-media > span'
@@ -614,12 +616,12 @@ module \etaTimer, do
                     rem = API.getTimeRemaining!
                     if _$context?
                         if p
-                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} ø song duration", $etaText
+                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} avg. song duration", $etaText
                         else if rem
                             _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
                         else
                             _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
-            .mouseout ->
+            .mouseout !->
                 if _$context?
                     clearInterval tooltipIntervalID
                     _$context.trigger \tooltip:hide
@@ -632,7 +634,7 @@ module \etaTimer, do
 
         # attach event listeners
         addListener API, \waitListUpdate, updateETA
-        addListener API, \advance, (d) ->
+        addListener API, \advance, (d) !->
             # update average song duration. This is to avoid having to loop through the whole song history on each update
             if d.media
                 sum -= lastSongDur
@@ -648,8 +650,8 @@ module \etaTimer, do
         # handle the case that history length is < 50
         if l < 50 # the history seems to be sometimes up to 51 and sometimes up to 50 .-.
             #lastSongDur = 0
-            do tinyhist = ->
-                addListener \once, API, \advance, (d) ->
+            do tinyhist = !->
+                addListener \once, API, \advance, (d) !->
                     if d.media
                         lastSongDur := 0
                         l++
@@ -663,7 +665,7 @@ module \etaTimer, do
         # show the ETA timer
         updateETA!
 
-        API.on \p0ne:stylesLoaded, -> requestAnimationFrame ->
+        addListener API, \p0ne:stylesLoaded, !-> requestAnimationFrame !->
             $nextMediaLabel .css right: $eta.width! - 50px
 
         ~function updateETA
@@ -700,7 +702,7 @@ module \etaTimer, do
             # setup timer to update ETA
             clearTimeout @timer
             @timer = sleep ((avg_ % 60s)+31s).s, updateETA
-    disable: ->
+    disable: !->
         clearTimeout @timer
 
 
@@ -714,7 +716,7 @@ module \votelist, do
     help: '''
         Moving your mouse above the woot/grab/meh icon shows a list of users who have wooted, grabbed or meh'd respectively.
     '''
-    setup: ({addListener, $create}) ->
+    setup: ({addListener, $create}) !->
         $tooltip = $ \#tooltip
         currentFilter = false
         $vote = $(\#vote)
@@ -722,23 +724,23 @@ module \votelist, do
             .hide!
             .appendTo $vote
 
-        addListener $(\#woot), \mouseenter, changeFilter 'left: 0', (userlist) ->
+        addListener $(\#woot), \mouseenter, changeFilter 'left: 0', (userlist) !->
             for u in API.getAudience! when u.vote == +1
                 userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
             return userlist
 
-        addListener $(\#grab), \mouseenter, changeFilter 'left: 50%; transform: translateX(-50%)', (userlist) ->
+        addListener $(\#grab), \mouseenter, changeFilter 'left: 50%; transform: translateX(-50%)', (userlist) !->
             for u in API.getAudience! when u.grab
                 userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
             return userlist
 
-        addListener $(\#meh), \mouseenter, changeFilter 'right: 0', (userlist) -> if user.isStaff
+        addListener $(\#meh), \mouseenter, changeFilter 'right: 0', (userlist) !-> if user.isStaff
             for u in API.getAudience! when u.vote == -1
                 userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
             return userlist
 
 
-        addListener $vote, \mouseleave, ->
+        addListener $vote, \mouseleave, !->
             currentFilter := false
             $vl.hide!
             $tooltip .show!
@@ -746,7 +748,7 @@ module \votelist, do
         addListener API, \voteUpdate, updateVoteList
 
         function changeFilter styles, filter
-            return ->
+            return !->
                 currentFilter := filter
                 css \votelist, ".p0ne-votelist { #{styles} }"
                 updateVoteList!
@@ -773,22 +775,22 @@ module \votelist, do
 # adds a user-rollover to the FriendsList when clicking someone's name
 module \friendslistUserPopup, do
     require: <[ friendsList FriendsList chat ]>
-    setup: ({addListener}) ->
-        addListener $(\.friends), \click, '.name, .image', (e) ->
+    setup: ({addListener}) !->
+        addListener $(\.friends), \click, '.name, .image', (e) !->
             id = friendsList.rows[$ this.closest \.row .index!] ?.model.id
             user = users.get(id) if id
             data = x: $body.width! - 353px, y: e.screenY - 90px
             if user
                 chat.onShowChatUser user, data
             else if id
-                chat.getExternalUser id, data, (user) ->
+                chat.getExternalUser id, data, (user) !->
                     chat.onShowChatUser user, data
-        #replace friendsList, \drawBind, -> return _.bind friendsList.drawRow, friendsList
+        #replace friendsList, \drawBind, !-> return _.bind friendsList.drawRow, friendsList
 # adds a user-rollover to the FriendsList when clicking someone's name
 module \waitlistUserPopup, do
     require: <[ WaitlistRow ]>
-    setup: ({replace}) ->
-        replace WaitlistRow::, "render", (r_) -> return ->
+    setup: ({replace}) !->
+        replace WaitlistRow::, "render", (r_) !-> return !->
             r_ ...
             @$ '.name, .image' .click @clickBind
 
@@ -806,22 +808,22 @@ module \boothAlert, do
     _settings:
         warnOnPrevPlay: true # takes precedence
         warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
-    setup: ({addListener}, {_settings},,module_) ->
+    setup: ({addListener}, {_settings},,module_) !->
         var warnTimeout
         @remainingStr = humanTime _settings.warnXMinBefore
         isNext = false
-        fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', ->
+        fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', !->
             if API.getWaitListPosition! == 0
                 if _settings.warnOnPrevPlay
                     if not isNext
                         isNext := true
-                        sleep 3_000ms, ->
+                        sleep 3_000ms, !->
                             chatWarn "You are about to DJ next!", "Booth Alert"
                             playChatSound!
                 else
                     clearTimeout warnTimeout
                     remaining = API.getTimeRemaining! *1000s_to_ms
-                    warnTimeout := sleep remaining - _settings.warnXMinBefore, ->
+                    warnTimeout := sleep remaining - _settings.warnXMinBefore, !->
                         if remaining > 0
                             chatWarn "You are about to DJ in #{humanTime remaining}!", "Booth Alert"
                         else
@@ -830,15 +832,15 @@ module \boothAlert, do
             else
                 isNext := false
         fn! if not module_
-    settingsExtra: ($el) ->
+    settingsExtra: ($el) !->
         boothAlert = this
         var resetTimer
         $ "<form>
                 Show notification<br>
                 <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
                 <label>
-                    <input type=radio name=booth-alert value=off #{if @_settings.instantWarn then '' else \checked}> <input type=number value='#{~~(@._settings.warnXMinBefore * 60_000_00) / 100}' class=booth-alert><br>
-                    minute(s) before your play
+                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s)<br>
+                    before your play
                 </label>
             </form>"
             .append do
@@ -882,11 +884,11 @@ module \avoidHistoryPlay, do
         This avoid playing songs that are already in history
     '''
     require: <[ app ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         #TODO make sure that `playlist` is actually the active playlist, not just the one the user is looking at
         # i.e. use another object which holds the next songs of the current playlist
         playlist = app.footer.playlist.playlist.media
-        addListener API, \advance, (d) ->
+        addListener API, \advance, (d) !->
             if d.media and d.dj?.id != userID
                 if playlist.list?.rows?.0?.model.cid == d.media.cid  and  getActivePlaylist?
                     chatWarn 'moved down', '☢ Avoid History Plays'

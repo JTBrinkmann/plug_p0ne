@@ -28,10 +28,10 @@ module \songNotif, do
         You can click anywhere on it to close it again.
     '''
     persistent: <[ lastMedia $div ]>
-    setup: ({addListener, $create, $createPersistent, css},,,module_) ->
+    setup: ({addListener, $create, $createPersistent, css},,,module_) !->
         $lastNotif = $!
         @$div ||= $cms! .find \.p0ne-song-notif:last
-        @callback = (d) ~>
+        @callback = (d) !~>
             try
                 media = d.media
                 if media?.id != @lastMedia
@@ -75,7 +75,7 @@ module \songNotif, do
                     mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent media.author+' - '+media.title}"
 
                 duration = mediaTime media.duration
-                console.logImg media.image.replace(/^\/\//, 'https://') .then ->
+                console.logImg media.image.replace(/^\/\//, 'https://') .then !->
                     console.log "#time [DJ_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#duration)", d
 
                 html += "
@@ -104,7 +104,7 @@ module \songNotif, do
                 if media.format == 2sc and p0ne.SOUNDCLOUD_KEY # SoundCloud
                     @$div .addClass \loading
                     mediaLookup media
-                        .then (d) ~>
+                        .then (d) !~>
                             @$div
                                 .removeClass \loading
                                 .data \description, d.description
@@ -126,11 +126,11 @@ module \songNotif, do
 
         addListener API, \advance, @callback
         if _$context
-            addListener _$context, \room:joined, ~>
+            addListener _$context, \room:joined, !~>
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== add skip listeners ==
-        addListener API, \modSkip, (modUsername) ->
+        addListener API, \modSkip, (modUsername) !->
             console.info "[API.modSkip]", modUsername
             if getUser(modUsername)
                 modID = "data-uid='#{that.id}'"
@@ -151,12 +151,12 @@ module \songNotif, do
             @callback media: that, dj: API.getDJ!
 
         # hide non-playable videos
-        addListener _$context, \RestrictedSearchEvent:search, ->
+        addListener _$context, \RestrictedSearchEvent:search, !->
             snooze!
 
         #== Grab Songs ==
         if popMenu?
-            addListener chatDomEvents, \click, \.song-add, ->
+            addListener chatDomEvents, \click, \.song-add, !->
                 $el = $ this
                 $notif = $el.closest \.p0ne-song-notif
                 id = $notif.data \id
@@ -164,11 +164,11 @@ module \songNotif, do
                 console.log "[add from notif]", $notif, id, format
 
                 msgOffset = $notif .offset!
-                $el.offset = -> # to fix position
+                $el.offset = !-> # to fix position
                     return { left: msgOffset.left + 17px, top: msgOffset.top + 18px }
 
                 obj = { id: id, format: 1yt }
-                obj.get = (name) ->
+                obj.get = (name) !->
                     return this[name]
                 obj.media = obj
 
@@ -177,21 +177,8 @@ module \songNotif, do
         else
             css \songNotificationsAdd, '.song-add {display:none}'
 
-        #== fimplug ruleskip ==
-        addListener chatDomEvents, \click, \.song-add, ->
-            showDescription $(this).closest(\.p0ne-song-notif), """
-                <span class='ruleskip'>!ruleskip 1 - nonpony</span>
-                <span class='ruleskip'>!ruleskip 2 - </span>
-                <span class='ruleskip'>!ruleskip 3 - </span>
-                <span class='ruleskip'>!ruleskip 4 - </span>
-                <span class='ruleskip'>!ruleskip  - </span>
-                <span class='ruleskip'>!ruleskip  - </span>
-                <span class='ruleskip'>!ruleskip  - </span>
-                <span class='ruleskip'>!ruleskip  - </span>
-            """
-
         #== search for author ==
-        addListener chatDomEvents, \click, \.song-author, ->
+        addListener chatDomEvents, \click, \.song-author, !->
             mediaSearch @textContent
 
         #== description ==
@@ -199,7 +186,7 @@ module \songNotif, do
         #$ \#chat-messages .off \click, \.song-description-btn
         #$ \#chat-messages .off \click, \.song-description
         $description = $()
-        addListener chatDomEvents, \click, \.song-description-btn, (e) ->
+        addListener chatDomEvents, \click, \.song-description-btn, (e) !->
             try
                 if $description
                     hideDescription! # close already open description
@@ -217,16 +204,16 @@ module \songNotif, do
                     # load description from Youtube
                     console.log "looking up", {cid, format}, do
                         mediaLookup {cid, format}, do
-                            success: (data) ->
+                            success: (data) !->
                                 text = formatPlainText data.description # let's get fancy
                                 $description .data \description, text
                                 showDescription $notif, text
-                            fail: ->
+                            fail: !->
                                 $description
                                     .text "Failed to load"
                                     .addClass \.song-description-failed
 
-                        .timeout 200ms, ->
+                        .timeout 200ms, !->
                             $description
                                 .text "Description loading…"
                                 .addClass \loading
@@ -234,7 +221,7 @@ module \songNotif, do
                 console.error "[song-notif]", e
 
 
-        addListener chatDomEvents, \click, \.song-description, (e) ->
+        addListener chatDomEvents, \click, \.song-description, (e) !->
             if not e.target.href
                 hideDescription!
 
@@ -256,7 +243,7 @@ module \songNotif, do
                     .animate do
                         opacity: 1
                         height: h
-                        -> $description .css height: \auto
+                        !-> $description .css height: \auto
 
                 # smooth scroll
                 cm = $cm!
@@ -276,7 +263,7 @@ module \songNotif, do
             $description.animate do
                 opacity: 0
                 height: 0px
-                ->
+                !->
                     $ this
                         .css opacity: '', height: \auto
                         .removeClass 'song-description text'
@@ -296,5 +283,5 @@ module \songNotif, do
         @showDescription = showDescription
         @hideDescription = hideDescription
 
-    disable: ->
+    disable: !->
         @hideDescription?!

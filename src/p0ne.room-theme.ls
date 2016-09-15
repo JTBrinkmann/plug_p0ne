@@ -21,13 +21,13 @@ module \roomSettings, do
     module: new DataEmitter(\roomSettings)
 
     _room: \dashboard
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         @_update!
         if _$context?
             addListener _$context, \room:joining, @clear, this
             addListener _$context, \room:joined, @_update, this
 
-    _update: ->
+    _update: !->
         roomslug = getRoomSlug!
         return if @_data and roomslug == @_room
 
@@ -36,20 +36,21 @@ module \roomSettings, do
         else if url = /@p3=(.*)/i .exec roomDescription
             console.log "[p0ne] p³ compatible Room Settings found", url.1
             $.getJSON proxify(url.1)
-                .then (data) ~>
+                .then (data) !~>
                     console.log "#{getTime!} [p0ne] loaded p³ compatible Room Settings"
                     @_room = roomslug
                     @set data
-                .fail ->
+                .fail !->
                     chatWarn "cannot load Room Settings", "p0ne"
 
 /*####################################
 #             YELLOW MOD             #
 ####################################*/
 module \yellowMod, do
-    setup: ({@css}) ->
+    disabled: true
+    setup: ({@css}) !->
         @update!
-    update: -> if not @disabled
+    update: !-> if not @disabled
         @css \yellowMod, "
             \#chat .fromID-#userID .un,
             .user[data-uid='#userID'] .name > span {
@@ -74,7 +75,7 @@ module \customColors, do
     _settings:
         global: {}
         perRoom: {}
-    setup: ({@css, loadStyle}) ->
+    setup: ({@css, loadStyle}) !->
         loadStyle "#{p0ne.host}/vendor/colorpicker/css/colorpicker.css"
 
     roles:
@@ -90,7 +91,7 @@ module \customColors, do
         * displayName: 'Brand Ambassador', name: \ambassador, default: 0x89be6c
         * displayName: 'Admin',            name: \admin,      default: 0x42a5dc
 
-    settingsExtra: ($wrapper) ->
+    settingsExtra: ($wrapper) !->
         #ToDo add custom icons
         #ToDo add icon colourizing (?)
         #   possibly via:
@@ -107,7 +108,7 @@ module \customColors, do
         $wrapper .append do
             $ \<button>
                 .text "change custom colours"
-                .click ~>
+                .click !~>
                     if visible
                         @$el.fadeOut!
                         visible := false
@@ -148,7 +149,7 @@ module \customColors, do
         var roleName, $row
         @$cp = $cp = $ \<div>
             .ColorPicker do
-                onChange: (hsb, hex, rgb) ->
+                onChange: (hsb, hex, rgb) !->
                     c = "##hex"
                     scope[roleName] = c
                     $row
@@ -158,7 +159,7 @@ module \customColors, do
         $cpDialog = $ "##{@$cp.data(\colorpickerId)}"
 
         @$el
-            .on \click, \.icon-clear-input, ->
+            .on \click, \.icon-clear-input, !->
                 $row = $ this .parent!
                 name = $row .data \role
                 $row
@@ -167,7 +168,7 @@ module \customColors, do
                 delete scope[name]
                 cc.updateCSS!
                 return false
-            .on \click, \.p0ne-cc-row, ->
+            .on \click, \.p0ne-cc-row, !->
                 $row := $ this
                 roleName := $row .data \role
                 $cp
@@ -183,15 +184,15 @@ module \customColors, do
             .attr \checked, not yellowMod.disabled
             .appendTo @$el
             .find \input
-                .on \click, (e) ->
+                .on \click, (e) !->
                     console.log "[custom colors] force 'you' Override:", @checked
                     if @checked
                         yellowMod.enable!
                     else
-                        yellowMod.disable!!
+                        yellowMod.disable!
         @updateCSS!
 
-    updateCSS: ->
+    updateCSS: !->
         styles = ""
         scope = @_settings.global
         for role in @roles when color = scope[role.name]
@@ -216,7 +217,7 @@ module \customColors, do
         #if roomTheme? and not roomTheme.disabled
         #    roomTheme.applyTheme roomSettings._data
 
-    disable: ->
+    disable: !->
         if @$cp
             @$cp .ColorPickerHide!
             $ "##{@$cp.data(\colorpickerId)}" .remove!
@@ -236,11 +237,11 @@ module \roomTheme, do
         Applies the room theme, if this room has one.
         Room Settings and thus a Room Theme can be added by (co-) hosts of the room.
     '''
-    setup: ({addListener, replace, css, loadStyle}) ->
+    setup: ({addListener, replace, css, loadStyle}) !->
         @$playbackBackground = $ '#playback .background img'
         @playbackBackgroundVanilla = @$playbackBackground .attr \src
 
-        addListener roomSettings, \data, @applyTheme = (d) ~>
+        addListener roomSettings, \data, @applyTheme = (d) !~>
             console.log "#{getTime!} [roomTheme] loading theme"
             @clear d.images.background, false
             @_data = d
@@ -305,16 +306,16 @@ module \roomTheme, do
                     styles += ".room-background { background-image: url(#{d.images.background}) !important }\n"
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image
-                        ..onload = ~>
+                        ..onload = !~>
                             @$playbackBackground .attr \src, d.images.playback
-                            replace roomLoader, \frameHeight,   -> return ..height - 10px
-                            replace roomLoader, \frameWidth,    -> return ..width  - 18px
+                            replace roomLoader, \frameHeight,   !-> return ..height - 10px
+                            replace roomLoader, \frameWidth,    !-> return ..width  - 18px
                             roomLoader.onVideoResize Layout.getSize!
                             console.log "#{getTime!} [roomTheme] loaded playback frame"
-                        ..onerror = ->
+                        ..onerror = !->
                             console.error "#{getTime!} [roomTheme] failed to load playback frame"
                         ..src = d.images.playback
-                    replace roomLoader, \src, -> return d.images.playback
+                    replace roomLoader, \src, !-> return d.images.playback
                 if isURL(d.images.booth)
                     styles += """
                         /* custom booth */
@@ -338,7 +339,7 @@ module \roomTheme, do
             if d.text
                 for key, text of d.text.plugDJ
                     for lang of Lang[key]
-                        replace Lang[key], lang, -> return text
+                        replace Lang[key], lang, !-> return text
 
             css \roomTheme, styles
             yellowMod.update!
@@ -346,7 +347,7 @@ module \roomTheme, do
 
         addListener roomSettings, \cleared, @clear, this
 
-    clear: (resetBackground, skipDisables) ->
+    clear: (resetBackground, skipDisables) !->
         console.log "#{getTime!} [roomTheme] clearing RoomTheme"
         if not skipDisables
             # copied from p0ne.module
@@ -361,10 +362,10 @@ module \roomTheme, do
         @currentRoom = null
         if resetBackground and @$playbackBackground
             @$playbackBackground
-                .one \load ->
+                .one \load !->
                     roomLoader?.onVideoResize Layout.getSize! if Layout?
                 .attr \src, @playbackBackgroundVanilla
 
-    disable: ->
+    disable: !->
         @clear true, true
         @_data = {}
