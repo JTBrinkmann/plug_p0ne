@@ -24,13 +24,14 @@
  * The following 3rd party scripts are used:
  *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
  *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
+ *     - Stefan Petre's Color Picker http://www.eyecon.ro/colorpicker/ (Dual licensed under the MIT and GPL licenses)
  * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
  *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
  *
- * Not happy with plug_p0ne? contact me (the developer) at brinkiepie^gmail.com
+ * Not happy with plug_p0ne? contact me (the developer) at brinkiepie@gmail.com
  * great alternative plug.dj scripts are
- *     - TastyPlug (relatively lightweight but does a great job - https://fungustime.pw/tastyplug/ )
- *     - RCS (Radiant Community Script - https://radiant.dj/rcs )
+ *     - TastyPlug (relatively lightweight but does a good job - https://fungustime.pw/tastyplug/ )
+ *     - RCS (best alternative I could recommend - https://radiant.dj/rcs )
  *     - plugCubed (does a lot of things, but breaks on plug.dj updates - https://plugcubed.net/ )
  *     - plugplug (lightweight as heck - https://bitbucket.org/mateon1/plugplug/ )
  */
@@ -40,11 +41,10 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.8
-    lastCompatibleVersion: \1.7.0 /* see below */
+    version: \1.8.0
+    lastCompatibleVersion: \1.8.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
-    YOUTUBE_KEY: \AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw # for obsolete V2
     YOUTUBE_V3_KEY: \AIzaSyDaWL9emnR9R_qBWlDAYl-Z_h4ZPYBDjzk
     FIMSTATS_KEY: \4983a7f2-b253-4300-8b18-6e7c57db5e2e
 
@@ -1096,9 +1096,8 @@ Array::define \unique, !->
         else
             res[l++] = el
     return res
-Array::define \joinWrapped, (pre, post, between) !->
+Array::define \joinWrapped, (pre='', post='', between='') !->
     return "" if @length == 0
-    pre ||= ''; post ||= ''; between ||= ''
     res = "#pre#{@0}#post"
     for i from 1 til @length
         res += "#between#pre#{@[i]}#post"
@@ -1135,6 +1134,13 @@ for Constr in [String, Array]
 Number::defineGetter \s,   !-> return this *     1_000s_to_ms
 Number::defineGetter \min, !-> return this *    60_000min_to_ms
 Number::defineGetter \h,   !-> return this * 3_600_000h_to_ms
+
+if window.chrome
+    Error::__defineGetter__ \messageAndStack !->
+        return @stack
+else
+    Error::__defineGetter__ \messageAndStack !->
+        return "#{@name}: #{@message}\n#{@stack}"
 
 
 jQuery.fn <<<<
@@ -1277,6 +1283,8 @@ window.dataUnload = (name) !->
         p0ne.autosave_num[name]--
     if p0ne.autosave_num[name] == 0
         delete p0ne.autosave[name]
+
+$window .off \beforeunload, window.dataSave if window.dataSave
 window.dataSave = !->
     err = ""
     for k,v of p0ne.autosave when v
@@ -1342,7 +1350,7 @@ export class DataEmitter extends {prototype: Backbone.Events}
             try
                 fn .call context||this, @_data
             catch e
-                console.error "[#{@_name}] Error while triggering #type [#{@_listeners[type].length - 1}]", this, args, e.stack
+                console.error "[#{@_name}] Error while triggering #type [#{@_listeners[type].length - 1}]", this, args, e.messageAndStack
         return this
     # shorthands
     data: (fn, context) !-> return @on \data, fn, context
@@ -1497,23 +1505,26 @@ window <<<<
         options = do
                 type: type
                 url: "https://plug.dj/_/#url"
-                contentType: \application/json
-                data: JSON.stringify(data)
                 success: ({data}) !->
                     console.info "[#url]", data if not silent
                     success? data
                 error: (err) !->
                     console.error "[#url]", data if not silent
                     error? data
+        data = JSON.stringify(data)
+        if data != "{}" and type not in <[ GET get ]>
+            options.contentType = \application/json
+            options.data = data
 
         def = $.Deferred!
         do delay = !->
-            if window.floodAPI_counter >= 15 /* 20 requests / 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
+            if window.floodAPI_counter >= 15 /* 20 requests in 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
                 sleep 1_000ms, delay
             else
                 window.floodAPI_counter++; sleep 10_000ms, !-> window.floodAPI_counter--
-                return $.ajax options
+                req = $.ajax options
                     .then def.resolve, def.reject, def.progress
+                def.abort = req.abort
         return def
 
     befriend: (userID, cb) !-> ajax \POST, "friends", id: userID, cb
@@ -1552,12 +1563,14 @@ window <<<<
     getUserData: (user, cb) !->
         if typeof user != \number
             user = getUser user
-        cb ||= (data) !-> console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
         return $.get "/_/users/#user"
             .then ({[data]:data}:arg) !->
-                return data
+                if cb
+                    return data
+                else
+                    console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
             .fail !->
-                console.warn "couldn't get slug for user with id '#{id}'"
+                console.warn "couldn't get userdata for user with id '#{id}'"
 
     $djButton: $ \#dj-button
     mute: !->
@@ -1568,17 +1581,17 @@ window <<<<
         API.once \advance, !->
             unmute! if API.getMedia!.id != muteonce.last
     unmute: !->
-        return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click! .length
+        return $ '#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once' .click! .length
     snooze: !->
         return $ '#playback .snooze' .click! .length
-    isSnoozed: !-> $ \#playback-container .children! .length == 0
+    isSnoozed: !-> return $ \#playback-container .children! .length == 0
     refresh: !->
         return $ '#playback .refresh' .click! .length
     stream: (val) !->
         if not currentMedia
             console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
         else
-            database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            return database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
     join: !->
         # for this, performance might be essential
         # return $ '#dj-button.is-wait' .click! .length != 0
@@ -1587,6 +1600,8 @@ window <<<<
             return true
         else
             return false
+    forceJoin: !->
+        ajax \POST, \booth
     leave: !->
         return $ '#dj-button.is-leave' .click! .length != 0
 
@@ -1662,7 +1677,8 @@ window <<<<
             cb API.getMedia!
         cb!
 
-    mediaLookup: ({format, id, cid}:url, cb) !->
+    mediaLookupCache: {}
+    mediaLookup: (songs, cb) !->
         if typeof cb == \function
             success = cb
         else
@@ -1673,103 +1689,174 @@ window <<<<
         def = $.Deferred()
         def.then(success, fail)
 
-        if typeof url == \string
-            if cid = YT_REGEX .exec(url)?.1
-                format = 1
-            else if parseURL url .hostname in <[ soundcloud.com  i1.sndcdn.com ]>
-                format = 2
-        else
-            cid ||= id
+        if not (isArray = $.isArray songs)
+            songs = [songs]
 
-        if window.mediaLookup.lastID == (cid || url) and window.mediaLookup.lastData
-            success window.mediaLookup.lastData
-        else
-            window.mediaLookup.lastID = cid || url
-            window.mediaLookup.lastData = null
-        if format == 1 # youtube
-            /*# Youtube API v2
-            $.getJSON "https://gdata.youtube.com/feeds/api/videos/#cid?v=2&alt=json"
-                .fail fail
-                .success (d) !->
-                    cid = d.entry.id.$t.substr(27)
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:       1
-                            data:         d
-                            cid:          cid
-                            uploader:
-                                name:     d.entry.author.0.name.$t
-                                id:       d.entry.media$group.yt$uploaderId.$t
-                                url:      "https://www.youtube.com/channel/#{d.entry.media$group.yt$uploaderId.$t}"
-                            image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                            title:        d.entry.title.$t
-                            uploadDate:   d.entry.published.$t
-                            url:          "https://youtube.com/watch?v=#cid"
-                            description:  d.entry.media$group.media$description.$t
-                            duration:     d.entry.media$group.yt$duration.seconds # in s
+        res = []; l=0
+        duplicates = {}
+        queries = 1: {}, 2: {}
+        for media, i in songs
+            format = false
+            # only CID is given
+            if +media # SoundCloud ID
+                #note: this could also be a plug.dj ID, which is bad, as we can't parse that
+                console.warn "[mediaLookup] warning, media only described by an ID, assuming SoundCloud ID. It is recommended to use {format: 2, cid: id} instead"
+                format = 2; cid = +media
+            else if typeof media == \string
+                if media.length == 11 # Youtube ID
+                    format = 1; cid = media
 
-                            restriction:  if d.data.entry.media$group.media$restriction
-                                blocked: that
-            */
-            # Youtube API v3
-            $.getJSON "https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&maxResults=1&id=#cid&key=#{p0ne.YOUTUBE_V3_KEY}"
-                .fail fail
-                .success ({items: [d]}) !->
-                    cid = d.id
-                    duration = 0
-                    if /PT(\d+)M(\d+)S/.exec d.contentDetails.duration
-                        duration = that.1 * 60 + that.2
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:       1
-                            data:         d
-                            cid:          cid
-                            uploader:
-                                name:     d.snippet.channelTitle
-                                id:       d.snippet.channelId
-                                url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
-                            image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                            title:        d.snippet.title
-                            uploadDate:   d.snippet.publishedAt
-                            url:          "https://youtube.com/watch?v=#cid"
-                            description:  d.snippet.description
-                            duration:     duration # in s
+                # URL is given
+                else if cid = YT_REGEX .exec(media)?.1 # Youtube URL
+                    format = 1 #; cid = cid
+                else if media.has \.com and parseURL media .hostname in <[ soundcloud.com  i1.sndcdn.com ]> # SoundCloud URL
+                    format = 2; cid = media
 
-                            restriction: d.contentDetails.regionRestriction
-        else if format == 2
-            if cid
+            # Media Object is given
+            else if typeof media == \object and media and media.cid
+                if media.format == 1 or media.format == 2 # Youtube or SoundCloud
+                    {format, cid} = media
+
+            if not format
+                console.warn "[mediaLookup] unknown format", media, "as ##i in", songs
+                l++
+                continue
+
+            if cid of queries[format] # if already in a query
+                console.log "[mediaLookup] #format : #cid appears multiple times in the same query"
+                duplicates[l++] = queries[format][cid]
+
+            else if window.mediaLookupCache[cid] # if already in cache
+                console.log "[mediaLookup] #format : #cid fetched from cache"
+                res[l] = window.mediaLookupCache[cid]
+                clearTimeout res[l]._timeoutID
+                res[l]._timeoutID = sleep 5.min, ->
+                    delete window.mediaLookupCache[cid]
+                l++
+
+            else # otherwise add to query
+                console.log "[mediaLookup] #format : #cid adding to query [#l]"
+                queries[format][cid] = l++
+
+        console.log "[mediaLookup] queries:", queries
+        remaining = 0
+        ytCids_ = Object.keys(queries.1)
+        if ytCids_.length # Youtube (API v3)
+            remaining += ytCids_.length
+            if ytCids_.length > 50
+                packs = []
+                for i from 0 to ~~(ytCids_.length/50)
+                    packs[i] = []
+                for id, i in ytCids_
+                    packs[~~(i / 50)][i % 50] = id
+            else
+                packs = [ytCids_]
+            for ytCids in packs
+                $.getJSON "https://www.googleapis.com/youtube/v3/videos
+                    ?part=contentDetails,snippet
+                    &fields=items(id,contentDetails/duration,contentDetails/regionRestriction,snippet/channelId,snippet/channelTitle,snippet/description,snippet/publishedAt,snippet/title)
+                    &id=#{ytCids .join(',')}
+                    &key=#{p0ne.YOUTUBE_V3_KEY}"
+                    .fail fail
+                    .success ({items}) !->
+                        for d in items
+                            duration = 0
+                            if /PT(\d+)M(\d+)S/.exec d.contentDetails.duration
+                                duration = +that.1 * 60 + +that.2
+                            addResult queries.1[d.id], d.id, do
+                                    format:       1
+                                    data:         d
+                                    cid:          d.id
+                                    uploader:
+                                        name:     d.snippet.channelTitle
+                                        id:       d.snippet.channelId
+                                        url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
+                                    image:        "https://i.ytimg.com/vi/#{d.id}/0.jpg"
+                                    title:        d.snippet.title
+                                    uploadDate:   d.snippet.publishedAt
+                                    url:          "https://youtube.com/watch?v=#{d.id}"
+                                    description:  d.snippet.description
+                                    duration:     duration # in s
+                                    restriction:  d.contentDetails.regionRestriction
+                                    _timeoutID: sleep 5.min, ->
+                                        delete window.mediaLookupCache[d.id]
+
+                        # add not-found results
+                        for cid, l of queries.1 when not res[l]
+                            console.warn "[mediaLookup] failed to look up Youtube video ##l", cid
+                            addResult l, cid, do
+                                _timeoutID: sleep 5.min, ->
+                                    delete window.mediaLookupCache[cid]
+                        doneLoading!
+
+
+        for let cid, pos of queries.2
+            remaining++
+            if +cid
                 req = $.getJSON "https://api.soundcloud.com/tracks/#cid.json", do
                     client_id: p0ne.SOUNDCLOUD_KEY
             else
                 req = $.getJSON "https://api.soundcloud.com/resolve/", do
-                    url: url
+                    url: cid
                     client_id: p0ne.SOUNDCLOUD_KEY
             req
-                .fail fail
+                .fail ->
+                    console.warn "[mediaLookup] failed to look up soundcloud song", cid
+                    addResult pos, cid, do
+                        _timeoutID: sleep 5.min, ->
+                            delete window.mediaLookupCache[cid]
+                    doneLoading!
                 .success (d) !->
-                    def.resolve do
-                        window.mediaLookup.lastData =
-                            format:         2
-                            data:           d
-                            cid:            cid
-                            uploader:
-                                id:         d.user.id
-                                name:       d.user.username
-                                image:      d.user.avatar_url
-                                url:        d.user.permalink_url
-                            image:          d.artwork_url
-                            title:          d.title
-                            uploadDate:     d.created_at
-                            url:            d.permalink_url
-                            description:    d.description
-                            duration:       d.duration / 1000ms_to_s # in s
+                    addResult pos, d.id, data =
+                        format:         2
+                        data:           d
+                        cid:            d.id
+                        uploader:
+                            id:         d.user.id
+                            name:       d.user.username
+                            image:      d.user.avatar_url
+                            url:        d.user.permalink_url
+                        image:          d.artwork_url
+                        title:          d.title
+                        uploadDate:     d.created_at
+                        url:            d.permalink_url
+                        description:    d.description
+                        duration:       d.duration / 1000ms_to_s # in s
 
-                            download:       if d.download_url then d.download_url + "?client_id=#{p0ne.SOUNDCLOUD_KEY}" else false
-                            downloadSize:   d.original_content_size
-                            downloadFormat: d.original_format
-        else
-            def .reject "unsupported format"
-        return def
+                        download:       if d.download_url then "#{d.download_url}?client_id=#{p0ne.SOUNDCLOUD_KEY}" else false
+                        downloadSize:   d.original_content_size
+                        downloadFormat: d.original_format
+
+                    if typeof cid == \number
+                        data._timeoutID = sleep 5.min, ->
+                            delete window.mediaLookupCache[cid]
+                    else
+                        window.mediaLookupCache[data.cid] = data
+                        data._timeoutID = sleep 5.min, ->
+                            delete window.mediaLookupCache[data.cid]
+                            delete window.mediaLookupCache[cid]
+                    doneLoading!
+
+        doneLoading!
+
+        function addResult pos, cid, data
+            console.log "[mediaLookup] looked up ##pos", cid, data
+            window.mediaLookupCache[cid] = data
+            res[pos] = data
+            remaining--
+
+        function doneLoading
+            if remaining <= 0
+                console.log "[mediaLookup] done, resolving…"
+                if not isArray
+                    res := res.0
+                else
+                    for k,v of duplicates
+                        res[k] = res[v]
+                def.resolve res
+
+        return def.promise!
+
     # https://www.youtube.com/annotations_invideo?video_id=gkp9ohUPIuo
     # AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,SS,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW
     mediaDownload: do !->
@@ -2069,6 +2156,16 @@ window <<<<
 
             return res.promise!
 
+    createPlaylist: (name, media) !->
+        if not window.playlists
+            throw new Error "createPlaylist(name, media) requires `window.playlists`"
+        ajax \POST, \playlists, {name, media}
+            .then (pl) !->
+                playlists.push new Backbone.Model(pl.data.0)
+                playlists.sort!
+                console.log "added playlist #name [#{pl.id}]"
+            .fail (err) !->
+                console.error "failed to add playlist #name", err
     proxify: (url) !->
         if url.startsWith?("http:")
             return p0ne.proxy url
@@ -2183,6 +2280,9 @@ window <<<<
         else
             return false
 
+    escapeRegExp: (str) ->
+        return "#str".replace /[\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:]/g, "\\$&"
+
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
     htmlEscape: (str) !->
@@ -2239,7 +2339,7 @@ window <<<<
         lvl = 0
         text .= replace /([\s\S]*?)($|(?:https?:|www\.)(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, (,pre,url,post) !->
             pre = pre
-                .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
+                .replace /(\s)(".*?")([\.,!\?\s])/g, "$1<i class='song-description-string'>$2</i>$3"
                 .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
                 .replace /(lyrics|download|original|re-?upload)/gi, "<b>$1</b>"
                 .replace /(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6"
@@ -2367,7 +2467,7 @@ window <<<<
         return language*/
     formatUser: (user, showModInfo) !->
         user .= toJSON! if user.toJSON
-        info = getRank(user)
+        info = getRank(user, true)
         if info == \regular
             info = ""
         else
@@ -2375,7 +2475,7 @@ window <<<<
 
         if showModInfo
             info += " lvl #{if user.gRole == 5 then '∞' else user.level}"
-            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+            if Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
                 info += " - created #{ago d}"
 
         return "#{user.username} (#{user.language}#info)"
@@ -2388,11 +2488,11 @@ window <<<<
 
         if showModInfo
             info = " (lvl #{if user.gRole == 5 then '∞' else user.level}"
-            if Date.now! - 48.h < d = new Date(user.joined) # warn on accounts younger than 2 days
+            if Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
                 info += " - created #{ago d}"
             info += ")"
         if fromClass
-            fromClass = " #{getRank(user)}"
+            fromClass = " #{getRank(user, true)}"
         else
             fromClass = ""
 
@@ -2413,12 +2513,14 @@ window <<<<
         return new Date(t - timezoneOffset *60_000min_to_ms).toISOString! .replace(/T.+/g, '')
     getISOTime: (t = new Date)!->
         return t.toISOString! .replace(/T|\..+/g, " ")
+    parseISOTime: (t) !->
+        return new Date(t) - timezoneOffset *60_000min_to_ms
 
     # show a timespan (in ms) in a human friendly format (e.g. "2 hours")
     humanTime: (diff, shortFormat) !->
         if diff < 0
             return "-#{humanTime -diff}"
-        else if not shortFormat and diff < 2_000ms
+        else if not shortFormat and diff < 2_000ms # keep in sync with ago()
             return "just now"
         b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
         diff /= 1000to_s
@@ -2441,7 +2543,11 @@ window <<<<
 
     # create string saying how long ago a given timestamp (in ms since epoche) is
     ago: (d) !->
-        return "#{humanTime (Date.now! - d)} ago"
+        d = Date.now! - d
+        if d < 2_000ms # keep in sync with humanTime()
+            return "just now"
+        else
+            return "#{humanTime(d)} ago"
 
     lssize: (sizeWhenDecompressed) !->
         size = 0mb
@@ -2453,19 +2559,22 @@ window <<<<
     formatMB: !->
         return "#{it.toFixed(2)}MB"
 
-    getRank: (user) !-> # returns the name of a rank of a user
+    getRank: (user, defaultToGhost) !-> # returns the name of a rank of a user
         user = getUser(user)
-        if not user or (role = user.role || user.get?(\role)) == -1
-            return \ghost
-        else if user.gRole || user.get?(\gRole)
+        if not user or user.role == -1
+            if defaultToGhost
+                return \ghost
+            else
+                return \regular
+        else if user.gRole
             if that == 5
                 return \admin
             else
                 return \ambassador
         else
-            return <[ regular dj bouncer manager cohost host ]>[role || 0]
+            return <[ regular dj bouncer manager cohost host ]>[user.role ||0]
     getRankIcon: (user) !->
-        rank = getRank(user)
+        rank = getRank(user, true)
         return rank != \regular && "<i class='icon icon-chat-#rank p0ne-icon-small'></i>" ||''
 
     parseURL: (href) !->
@@ -2476,19 +2585,25 @@ window <<<<
         #$dummy.0{hash, host, hostname, href, pathname, port, protocol, search}
 
     getIcon: do !->
-        # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
-        # if you plan to use it over and over again, use fn.enableCaching()
+        /* note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
+         * if you plan to use it over and over again, use getIcon.enableCaching() */
         $icon = $ "<i class=icon><!-- this is used by plug_p0ne's getIcon() --></i>"
                 .css visibility: \hidden
                 .appendTo \body
-        fn = (className) !->
+        fn = (className, parsed) !->
             $icon.addClass className
             res =
                 image:      $icon .css \background-image
                 position:   $icon .css \background-position
-            res.background = "#{res.image} #{res.position}"
-            $icon.removeClass className
-            return res
+            $icon.removeClass className if className
+            if parsed
+                res2 = x: 0, y: 0, url: res.image.substring(4, res.image.length - 1)
+                if /-?(\d+)px\s+-?(\d+)px/.exec(res.position)
+                    res2.x = +that.1; res2.y = +that.2
+                return res2
+            else
+                res.background = "#{res.image} #{res.position}"
+                return res
         fn.enableCaching = !-> res = _.memoize(fn); res.enableCaching = $.noop; window.getIcon = res
         return fn
 
@@ -2530,6 +2645,7 @@ console.info "[p0ne] main function body", p0ne.disabledModules.autojoin
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
+requireHelper \users, (.onRole)
 requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
 requireHelper \playlists, (.activeMedia)
 requireHelper \auxiliaries, (.deserializeMedia)
@@ -2553,6 +2669,8 @@ requireHelper \settings, (.settings)
 requireHelper \soundcloud, (.sc)
 requireHelper \searchAux, (.ytSearch)
 requireHelper \searchManager, (._search)
+requireHelper \SearchList, (.::?.listClass == \search)
+requireHelper \YtSearchService, (.::?.onVideos)
 requireHelper \AlertEvent, (._name == \AlertEvent)
 requireHelper \userRollover, (.id == \user-rollover)
 requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
@@ -2563,6 +2681,9 @@ requireHelper \RoomUserRow, (.::?.vote)
 requireHelper \WaitlistRow, (.::?.onAvatar)
 requireHelper \room, (.attributes?.hostID)
 requireHelper \RoomHistory, (it) !-> return it::?.listClass == \history and it::hasOwnProperty \listClass
+requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+requireHelper \Avatar, (.AUDIENCE)
+#requireHelper \AvatarList, (._byId?.admin01)
 
 if requireHelper \emoticons, (.emojify)
     emoticons.reversedMap = {[v, k] for k,v of emoticons.map}
@@ -2573,6 +2694,8 @@ if requireHelper \PlaylistItemList, (.::?.listClass == \playlist-media)
 if requireHelper \DialogAlert, (.::?.id == \dialog-alert)
     export Dialog = DialogAlert.__super__
 
+if requireHelper \InventoryAvatarPage, ((a) -> a::?.className == 'avatars' && a::eventName)
+    export InventoryDropdown = new InventoryAvatarPage().dropDown.constructor
 
 #= _$context =
 requireHelper \_$context, (._events?.\chat:receive), do
@@ -2591,14 +2714,19 @@ for context in [ Backbone.Events, _$context, API ] when context
 for cb in (room?._events?[\change:name] || _$context?._events?[\show:room] || Layout?._events?[\resize] ||[]) when cb.ctx.room
     export app = cb.ctx
     export friendsList = app.room.friends
+    export pl = app.footer.playlist.playlist.media
     break
+
 
 #= user_ =
 # the internal user-object
 if requireHelper \user_, (.canModChat) #(._events?.'change:username')
-    export users = user_.collection # it's the most reliable methode of getting `users`
     export user = user_.toJSON!
-if user || user = window.user
+    for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx.comparator == \id
+        export myAvatars = ev.ctx
+        break
+
+if user ||= window.user
     # API.getUser! will fail when used on the Dashboard if no room has been visited before
     export userID = user.id
     user.isStaff = user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
@@ -2947,7 +3075,7 @@ window.module = (name, data) !->
                     console.error "#{getTime!} [ERROR] unable to replace listener of type '#event' (no such event for event emitter specified)", emitter, ctx
                     return false
                 if callback
-                    for e in evts when e.ctx instanceof ctx
+                    for e in evts when e.ctx == ctx  or  typeof ctx == \function and e.ctx instanceof ctx
                         return @replace e, \callback, callback
                 else
                     callback = ctx
@@ -2961,6 +3089,9 @@ window.module = (name, data) !->
                 if not _$context?
                     console.error "#{getTime!} [ERROR] unable to replace listener in _$context._events['#event'] (no _$context)"
                     return false
+                if arguments.length == 2
+                    callback = constructor
+                    constructor = _$context
                 helperFNs.replaceListener _$context, event, constructor, callback
 
             add: (target, callback, options) !->
@@ -2969,6 +3100,10 @@ window.module = (name, data) !->
                 d.index = target.length # not part of the Array, so arrEqual ignores it
                 target[d.index] = callback
                 cbs.[]adds[*] = d
+
+            addCommand: (commandName, data) !->
+                helperFNs.replace chatCommands.commands, commandName, !-> return data
+                chatCommands.updateCommands!
 
             $create: (html) !->
                 return cbs.[]$elements[*] = $ html
@@ -2993,25 +3128,30 @@ window.module = (name, data) !->
                 @disabled = false
                 disabledModules[name] = false if not module.modDisabled
                 try
-                    setup.call module, helperFNs, module, data, module
+                    setup.call module, helperFNs, module
                     trigger \moduleEnabled
                     console.info "#{getTime!} [#name] enabled", setup != null
                 catch err
-                    console.error "#{getTime!} [#name] error while re-enabling", err.stack
+                    console.error "#{getTime!} [#name] error while re-enabling", err.messageAndStack
                 return this
-            disable: (temp /*internal*/) !->
+
+            disable: (temp) !->
                 # if `temp` is true-ish, module will not be disabled in the settings
                 # `temp` can also be the new instance of the module, in case it gets updated
                 return if module.disabled
                 newModule = temp if temp and temp != true
                 try
                     module.disabled = true
-                    disable.call module, helperFNs, newModule, data if typeof disable == \function
+                    hasChatCommands = chatCommands?.commands?
+                    disable.call module, helperFNs, newModule if typeof disable == \function
                     for {target, args} in cbs.listeners ||[]
                         target.off .apply target, args
                     for [target, attr , replacement, orig] in cbs.replacements ||[]
                         if target[attr] == replacement
                             target[attr] = orig #target["#{attr}_"]
+                            if hasChatCommands and target == chatCommands.commands
+                                delete chatCommands.commands.roomsettings if not orig
+                                chatCommands.updateCommands!
                     for [target /*, callback, options*/]:d in cbs.adds ||[]
                         target .remove d.index
                         d.index = -1
@@ -3032,9 +3172,9 @@ window.module = (name, data) !->
                         console.info "#{getTime!} [#name] disabled"
                         dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
-                    disableLate.call module, helperFNs, newModule, data if typeof disableLate == \function
+                    disableLate.call module, helperFNs, newModule if typeof disableLate == \function
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
+                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
                     delete window[name]
                 delete p0ne.dependencies[name]
                 return this
@@ -3067,7 +3207,7 @@ window.module = (name, data) !->
                 try
                     module_.disable? module
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.stack
+                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
 
 
         # checking dependencies (required modules)
@@ -3157,7 +3297,7 @@ window.module = (name, data) !->
 
 
     catch e
-        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.stack
+        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.messageAndStack
     return module
 
     function loadingDone
@@ -3178,13 +3318,12 @@ window.module = (name, data) !->
             else
                 wasDisabled = "%c"
                 try # run module's setup function
-                    setup?.call module, helperFNs, module, data, module_
+                    setup?.call module, helperFNs, module, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#{getTime!} [#name] error initializing", e.stack
+                    console.error "#{getTime!} [#name] error initializing", e.messageAndStack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
-                    delete window[name]
 
             # trigger events
             if module_
@@ -3236,7 +3375,7 @@ module \updateUserData, do
         for user in users.models
             user.set \joinedRoom, -1
         addListener API, \userJoin, ({id}) !->
-            users.get(id).set \joinedRoom, Date.now!
+            users.get(id)? .set \joinedRoom, Date.now!
 
 module \throttleOnFloodAPI, do
     setup: ({addListener}) !->
@@ -3258,36 +3397,52 @@ module \PopoutListener, do
             _$context?.trigger \popout:open, PopoutView._window, PopoutView
             API.trigger \popout:open, PopoutView._window, PopoutView
         replace PopoutView, \clear, (c_) !-> return !->
-            c_ ...
+            console.log "[popout:clear]", this, this.clear_ == c_, c_
+            if not @chat
+                # silently fail
+                #appendChat do
+                #    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: no this.chat - blame adblock?"
+                #        .on \click, !-> console.error new Error().stack
+                return
+            try
+                c_ ...
+            catch err
+                appendChat do
+                    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: #{err.message}"
+                        .on \click, !-> console.error err.messageAndStack
+                window.error = err
             _$context?.trigger \popout:close, PopoutView._window, PopoutView
             API.trigger \popout:close, PopoutView._window, PopoutView
 
 module \chatDomEvents, do
     require: <[ backbone ]>
-    optional: <[ PopoutView PopoutListener ]>
+    optional: <[ chat PopoutView PopoutListener ]>
     persistent: <[ _events ]>
+    _events: []
     setup: ({addListener}) !->
-        cm = $cm!
-        @_events = []
+        cm = chat?.$chatMessages || $ \#chat-messages
         @on = !->
             @_events[*] = arguments
-            cm.on .apply cm, arguments
+            cm .on.apply cm, arguments
+            PopoutView.chat.$el .on.apply PopoutView.chat.$el, arguments if PopoutView.chat
         @off = !->
             isAnyMatch = false
-            for cb, i in @_events
-                isMatch = true
-                for arg, o in arguments when cb[o] != arg[o]
-                    isMatch = false
-                if isMatch
+            i = -1
+            while cb = @_events[++i]
+                for ,o in arguments when cb[o] != arguments[o]
+                    break
+                else
                     isAnyMatch = true
-                    @_events.removeItem(i)
+                    @_events.remove(i--)
             cm .off.apply cm, arguments if isAnyMatch
         @once = (type, callback) !-> @on type, !-> @off(type, callback); callback ...
 
         addListener API, \popout:open, !~>
-            cm = PopoutView.chat
+            cm = PopoutView.chat.$el
+            console.log "[chatDomEvents] popup opened", @_events
             for cb in @_events
                 #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
+                console.log "[chatDomEvents] adding listener", cm, cb
                 cm .on .apply cm, cb
 
 module \grabMedia, do
@@ -3372,15 +3527,15 @@ module \p0neCSS, do
     $popoutEl: $!
     styles: {}
     urlMap: {}
-    persistent: <[ styles ]>
-    setup: ({addListener, $create}) !->
+    persistent: <[ styles ]> # urlMap gets transferred in setup()
+    setup: ({addListener, $create},,p0neCSS_) !->
         @$el = $create \<style> .appendTo \head
         {$el, $popoutEl, styles, urlMap} = this
-        addListener API, \popout:open, (_window, PopoutView) !->
+        cb = addListener API, \popout:open, (_window, PopoutView) !->
             $popoutEl := $el .clone!
                 .loadAll PopoutView.resizeBind
                 .appendTo _window.document.head
-        PopoutView.render! if PopoutView?._window
+        cb! if PopoutView?._window
 
         export @getCustomCSS = (inclExternal) !->
             if inclExternal
@@ -3453,6 +3608,18 @@ module \p0neCSS, do
             $popoutEl .remove!
             Layout?.onResize!
             PopoutView.resizeBind! if PopoutView?._window
+
+        if p0neCSS_
+            res = ""
+            for n,css of styles
+                res += "/*== #n ==*/\n#css\n\n"
+            if res
+                $el       .first! .text res
+                $popoutEl .first! .text res
+
+            for url, i of p0neCSS_.urlMap
+                @loadStyle url
+                @urlMap[url] = i
 
 /*@source p0ne.perf.ls */
 /**
@@ -3759,8 +3926,11 @@ module \simpleFixes, do
         # add tab-index to chat-input
         replace $(\#chat-input-field).0, \tabIndex, !-> return 1
 
-        # why would plug such a horrible thing as cleaning the localStorage?! Q~Q
+        # why would plug do a horrible thing such as cleaning the localStorage?! Q~Q
         replace localStorage, \clear, !-> return $.noop
+
+        # clicking vote focuses the chat (again)
+        addListener $(\#vote), \click, !-> $ \#chat-input-field .focus!
 
         # close Connection Error dialog when reconnected
         # otherwise the dialog FORCES you to refresh the page
@@ -3777,6 +3947,19 @@ module \simpleFixes, do
                 return null
     disable: !->
         @scm? .insertAfter \#playlist-panel
+
+/*####################################
+#           USE P0 GAPI KEY          #
+####################################*/
+module \p0neGapiKey, do
+    setup: ({replace}) !->
+        gapi.client.key ||= \AIzaSyCXdCG_sDuHISSSFcbUmJatH70nS9NYnTs # plug.dj's key 2015-05-07
+        gapi.client.keyProvider ||= \plug.dj
+        replace gapi.client, \key, !-> return p0ne.YOUTUBE_V3_KEY
+        replace gapi.client, \keyProvider, !-> return \plug_p0ne
+        gapi.client.setApiKey(gapi.client.key)
+    disableLate: !->
+        gapi.client.setApiKey(gapi.client.key)
 
 # This fixes the current media reloading on socket reconnects, even if the song didn't change
 /* NOT WORKING
@@ -3846,8 +4029,7 @@ module \fixGhosting, do
         queue = []
 
         addListener API, \socket:userLeave, ({p}) !-> if p == userID
-            sleep 100ms, !->
-                # to avoid problems, like auto-rejoining when closing the tab
+            sleep 200ms, !-> # to avoid problems, like auto-rejoining when closing the tab
                 rejoinRoom 'you left the room'
 
         replace PlugAjax::, \onError, (oE_) !-> return (code, e) !->
@@ -3951,8 +4133,7 @@ module \fixStuckDJ, do
     '''
     _settings:
         verbose: true
-    setup: ({replace, addListener}) !->
-        fixStuckDJ = this
+    setup: ({replace, addListener}, fixStuckDJ) !->
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
         addListener API, \advance, (d) !~>
@@ -4030,24 +4211,25 @@ module \fixStuckDJButton, do
     displayName: 'Fix Stuck DJ Button'
     require: <[ _$context ]>
     setup: ({addListener}) !->
-        var fixTimeout
         $djbtn = $ \#dj-button
-        hasSpinner = $djbtn.find \.spinner .length != 0
-        addListener _$context, \djButton:update, !->
-            if $djbtn.find \.spinner .length == 0
-                hasSpinner := false
+        fixTimeout = false
+        do addListener _$context, \djButton:update, !->
+            spinning = $djbtn.find \.spinner .length == 0
+            console.log "[djButton:update]", spinning, fixTimeout
+            if fixTimeout and spinning
                 clearTimeout fixTimeout
-            else if not hasSpinner
-                hasSpinner := true
-                fixTimeout = sleep 10_000ms, !->
-                    getRoomState! .then (d) !->
-                        d = d.data.0
-                        if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
-                            if app?.room.djButton
-                                app.room.djButton.hideSpinner!
-                            else # pseudo djButton.hideSpinner()
-                                $djbtn .find \.spinner .remove!
-                                $djbtn .find \.icon .show!
+            else if not fixTimeout
+                fixTimeout := sleep 5_000ms, !->
+                    fixTimeout := false
+                    if $djbtn.find \.spinner .length != 0
+                        console.log "[djButton:update] force joining", true, fixTimeout
+                        ajax \GET, \rooms/state, (d) !->
+                            d = d.data.0
+                            if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
+                                chatWarn "fixing stuck the DJ button", "fixStuckDJButton"
+                                forceJoin!
+                    else
+                        console.log "[djButton:update] already fixed", false, fixTimeout
 
 
 module \zalgoFix, do
@@ -4078,11 +4260,11 @@ module \warnOnAdblockPopoutBlock, do
             if isOpen and not warningShown
                 chatWarn "Popout chat immediately closed again. This might be because of an adblocker. You'd have to make an exception for plug.dj or disable your adblocker. Specifically Adblock Plus is known for causing this problem", "p0ne"
                 warningShown := true
-                sleep 15.min !->
+                sleep 15.min, !->
                     warningShown := false
 
 
-module \chatEmojiPolyfill, do
+/*module \chatEmojiPolyfill, do
     require: <[ users ]>
     #optional: <[ chatPlugin socketEvents database ]> defined later
     _settings:
@@ -4090,8 +4272,8 @@ module \chatEmojiPolyfill, do
     fixedUsernames: {}
     originalNames: {}
     setup: ({addListener, replace}) !-> _.defer !~>
-        /*@security HTML injection should NOT be possible */
-        /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js */
+        /*@security HTML injection should NOT be possible * /
+        /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js * /
         try
             pixelRatio = window.devicePixelRatio || 1; offset = 12 * pixelRatio
             document.createElement \canvas .getContext \2d
@@ -4186,18 +4368,97 @@ module \chatEmojiPolyfill, do
             getUserInternal(uid)? .set \rawun, original
         if @originalNames[userID]
             user.rawun = @originalNames[userID]
+*/
+
+module \stopSubscriberSpam, do
+    displayName: "Stop Subscriber Spam"
+    settings: \fixes
+    require: <[ _$context ]>
+    setup: ({replace_$Listener}) ->
+        replace_$Listener \chat:nonsubimage, -> return $.noop
 
 
-module \disableIntercomTracking, do
-    require: <[ tracker ]>
-    disabled: true
-    settings: \dev
-    displayName: 'Disable Tracking'
+/*####################################
+#          YT PAGED SEARCH           #
+####################################*/
+/* The paginated search was removed on plug.dj on purpose, because searches use up quite a lot of
+ * the Youtube API quota that plug.dj has. Limiting the search results is to avoid running out of quota.
+ * This is not an issue with plug_p0ne, because plug_p0ne replaces the API key with plug_p0ne's own,
+ * so that the plug.dj quota won't be used up.
+ */
+module \ytPagedSearch, do
+    displayName: "Paged YT Search"
+    settings: \fixes
+    require: <[ searchManager searchAux SearchList YtSearchService ]>
+    optional: <[ pl ]>
     setup: ({replace}) !->
-        for k,v of tracker when typeof v == \function
-            replace tracker, k, !-> return !-> return $.noop
-        replace tracker, \event, !-> return !-> return this
+        replace SearchList::, \onScroll, !-> return !->
+            #console.log "[onScroll]", @searching, @scrollPane.getPercentScrolledY!, @collection
+            if not @searching and @collection.length < 200 and searchManager.lastCount > 0 and @scrollPane.getPercentScrolledY! > 0.97
+                @searching = !0
+                searchManager.collection = @collection
+                if searchManager.more!
+                    @showRowSpinner!
+                else
+                    @hideRowSpinner!
 
+        pl?.list?.scrollBind = pl~onScroll
+
+        replace searchManager, \more, !-> return !->
+            #console.log("load more", this)
+            if not @relatedSearch and @lastCount > 0 and @collection.length < 200
+                ++@page
+                if not @scFavoritesLookup and not @scTracksLookup
+                    @_search!
+                else if @scFavoritesLookup
+                    @loadSCFavorites @page
+                else if @scTracksLookup
+                    @loadSCTracks @page
+                return true
+            else
+                return false
+
+
+        replace searchManager, \_search, !-> return !->
+            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
+            console.log "[_search]", @lastQuery, @page, limit
+            if @lastFormat == 1
+                searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)
+            else if @lastFormat == 2
+                searchAux.scSearch(@lastQuery, @page, limit, @scBind)
+
+        replace searchAux, \ytSearch, !-> return (query, page, limit, callback) !->
+            #console.log("ytSearch", query, page, limit, callback)
+            @ytSearchService ||= new YtSearchService
+            @ytSearchService.load(query, page, limit, callback)
+
+        replace YtSearchService::, \load, !-> return (query, page, limit, callback) !->
+            @nextPage = page + 1; @lastQuery = query
+            @callback = callback
+            gapi.client.youtube.search.list do
+                q: query,
+                part: \snippet
+                fields: 'nextPageToken,items(id/videoId,snippet/title,snippet/thumbnails,snippet/channelTitle)',
+                maxResults: limit,
+                pageToken: if page != 1 and query == @lastQuery then @nextPageToken else null,
+                videoEmbeddable: not 0,
+                videoDuration: \any
+                type: \video
+                safeSearch: \none
+                videoSyndicated: "true"
+            .then do
+                (e) ~>
+                      #console.log("youtube loaded", e)
+                      @nextPageToken = e.result.nextPageToken
+                      @onList(e)
+                @errorBind
+            #window.ga and window.ga("send", "event", "Search")
+
+module \fixPopoutChatClose, do
+    require: <[ PopoutListener ]>
+    setup: ({addListener}) !->
+        addListener API, \popout:open, (window_) !->
+            window_.onbeforeunload = PopoutView~close
 
 /*@source p0ne.stream.ls */
 /**
@@ -4217,12 +4478,12 @@ module \disableIntercomTracking, do
 module \streamSettings, do
     #settings: \dev
     #displayName: 'Stream-Settings'
-    require: <[ app currentMedia database _$context ]>
+    require: <[ app Playback currentMedia database _$context ]>
     optional: <[ database ]>
     audioOnly: false
     _settings:
         audioOnly: false
-    setup: ({addListener, replace, revert, replaceListener, $create, css}, streamSettings,,m_) !->
+    setup: ({addListener, replace, revert, replaceListener, $create, css}, streamSettings, m_) !->
         css \streamSettings "
             .icon-stream-video {
                 background: #{getIcon \icon-chat-sound-on .background};
@@ -4252,7 +4513,7 @@ module \streamSettings, do
         @$btn_ = $btn.children!
         $btn .html '
                 <div class="box">
-                    <span id=p0ne-stream-label>Stream: Video</span>
+                    <span id=p0ne-stream-label></span>
                     <div class="p0ne-stream-buttons">
                         <i class="icon icon-stream-video enabled"></i> <i class="icon icon-stream-audio enabled"></i> <i class="icon icon-stream-off enabled"></i> <div class="p0ne-stream-fancy"></div>
                     </div>
@@ -4302,9 +4563,9 @@ module \streamSettings, do
                 else
                     @media = media
                     @getURL(media)
-            getURL: !->
+            /*getURL: !->
                 ...
-                /*@media.src = ...
+                @media.src = ...
                 @start!*/
             start: !->
                 @seek!
@@ -4377,6 +4638,7 @@ module \streamSettings, do
                         $playback .addClass \p0ne-stream-audio-failed
 
         #= Unblocked Youtube Player =
+        /*not working*/
         unblocker.name = "Youtube (unblocked)"
         unblocker.mode = \video
         unblocker.getURL = (media) !->
@@ -4415,7 +4677,6 @@ module \streamSettings, do
                     .appendTo playback.$container
             disable: !->
                 $playbackContainer .empty!
-            #seekTo: $.noop
             updateVolume: (vol) !->
                 playback.tx "setVolume=#vol"
 
@@ -4430,17 +4691,17 @@ module \streamSettings, do
                         playback.$container
                             .empty!
                             .append "<iframe id=yt-frame frameborder=0 src='#{playback.visualizers.random!}'></iframe>"
+                        b = setTimeout playback.scTimeoutBind, 5_000ms
                         soundcloud.sc.whenStreamingReady !->
-                            if media == currentMedia.get \media # SC DOUBLE PLAY FIX
-                                startTime = currentMedia.get \elapsed
-                                playback.player = soundcloud.sc.stream media.get(\cid), do
-                                    autoPlay: true
-                                    volume: currentMedia.get \volume
-                                    position: if startTime < 4s then 0s else startTime * 1_000ms
-                                    onload: playback.scOnLoadBind
-                                    whileloading: playback.scLoadingBind
-                                    onfinish: playback.playbackCompleteBind
-                                    ontimeout: playback.scTimeoutBind
+                            d.sc.stream do
+                                n.get \cid
+                                autoPlay: true
+                                !-> if media == currentMedia.get \media # SC DOUBLE PLAY FIX
+                                    clearTimeout(b)
+                                    playback.player = e
+                                    e.seek(if startTime < 4_000ms then 0ms else startTime *1_000ms)
+                                    e.setVolume(currentMedia.get \volume / 100)
+                                    e._player.on \stateChange, playback.scStateBind
                     else
                         playback.$container.append do
                             $ '<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>'
@@ -4458,7 +4719,6 @@ module \streamSettings, do
             disable: !->
                 playback.player?
                     .stop!
-                    .destruct!
                 playback.buffering = false
                 $playbackContainer .empty!
             #seekTo: $.noop
@@ -4466,8 +4726,12 @@ module \streamSettings, do
                 playback.player.setVolume vol
 
         # pseudo players
-        #ToDo check if all of those are even used
-        noDJ = Player with
+        DummyPlayer =
+            enable: $.noop
+            disable: $.noop
+            updateVolume: $.noop
+
+        noDJ = DummyPlayer with
             name: "No DJ"
             mode: \off
             enable: !->
@@ -4475,32 +4739,33 @@ module \streamSettings, do
                 playback.$controls.hide!
             disable: !->
                 playback.$noDJ.hide!
-            updateVolume: $.noop
 
-        syncingPlayer = Player with
+        syncingPlayer = DummyPlayer with
             name: "waiting…"
             mode: \off
             enable: !->
                 $playbackContainer
-                    .append "<iframe id=yt-frame frameborder=0 src='#{m.syncing}'></iframe>"
+                    .html "<iframe id=yt-frame frameborder=0 src='#{m.syncing}'></iframe>"
             updateVolume: $.noop
 
-        streamOff =
-            name: "Stream OFF"
+        streamOff = DummyPlayer with
+            name: "Stream: OFF"
             mode: \off
-        snoozed =
+        snoozed = DummyPlayer with
             name: "Snoozed"
             mode: \off
 
-        if currentMedia.get(\media)
-            player = [youtube, sc][that .get(\format) - 1]
-            if isSnoozed!
-                changeStream \off, "Snoozed"
-            else
-                changeStream player.mode, player.name
+        if m = currentMedia.get \media
+            player = do
+                if database.settings.streamDisabled
+                    streamOff
+                else if isSnoozed!
+                    snoozed
+                else
+                    [youtube, sc][m .get(\format) - 1]
         else
             player = noDJ
-            changeStream \off, "No DJ"
+        changeStream player
 
 
 
@@ -4514,7 +4779,7 @@ module \streamSettings, do
             media = currentMedia.get \media
             if media
                 if database.settings.streamDisabled
-                    changeStream \off, "Stream: OFF"
+                    changeStream streamOff
                     return
 
                 @ignoreComplete = true; sleep 1_000ms, !~> @resetIgnoreComplete!
@@ -4546,7 +4811,7 @@ module \streamSettings, do
                 player := noDJ
 
             #= update player =
-            changeStream player.mode
+            changeStream player
 
             player.enable(media)
 
@@ -4554,7 +4819,7 @@ module \streamSettings, do
             player.disable!
         replace Playback::, \reset, (r_) !-> return !->
             if database.settings.streamDisabled
-                changeStream \off, "Stream: OFF"
+                changeStream streamOff
             player.disable!
             r_ ...
 
@@ -4571,9 +4836,9 @@ module \streamSettings, do
                 @$controls .show!
         replace Playback::, \onSnoozeClick, !-> return !->
             if not isSnoozed!
-                changeStream \off, "Snoozed"
+                changeStream snoozed
                 @reset!
-        window.snooze = !-> changeStream \off, "Snoozed"
+        #window.snooze = !-> changeStream snoozed
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do
@@ -4616,6 +4881,8 @@ module \streamSettings, do
                     playback.onRefreshClick!*/
 
         function changeStream mode, name
+            if typeof mode == \object
+                {mode, name} = mode
             console.log "[streamSettings] => stream-#mode"
             $label .text (name || player.name)
             $playback
@@ -4665,7 +4932,12 @@ module \chatCommands, do
     optional: <[ currentMedia ]>
     setup: ({addListener}) !->
         addListener API, \chatCommand, (c) !~>
-            @_commands[/^\/(\w+)/.exec(c)?.1]?(c)
+            if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1])
+                console.log "/chatCommand", cmd, cmd.moderation
+                if (not cmd.moderation or user.gRole or v.moderation == true and user.isStaff or user.role >= cmd.moderation)
+                    cmd.callback(c)
+                else
+                    chatWarn "You need to be #{if cmd.moderation === true then 'staff' else 'at least '+getRank(role: cmd.moderation)}", c
         @updateCommands!
 
     updateCommands: !->
@@ -4674,35 +4946,27 @@ module \chatCommands, do
         requestAnimationFrame ~>
             @updating = false
             @_commands = {}
-            for k,v of @commands
-                if  v.moderation
-                    let v=v, requiredRank = (if v.moderation == true then 2 else v.moderation)
-                        cb = (c) !->
-                            user = API.getUser!
-                            v.callback(c) if user.gRole or user.role >= requiredRank
-                else
-                    cb = v.callback
-                @_commands[k] = cb
+            for k,v of @commands when v
+                @_commands[k] = v
                 for k in v.aliases ||[]
-                    @_commands[k] = cb
+                    @_commands[k] = v
     parseUserArg: (str) !->
         if /[\s\d]+/.test str # list of user IDs
             return  [+id for id in str .split /\s+/ when +id]
         else
             return [user.id for user in getMentions str]
     commands:
-        help:
-            aliases: <[ commands ]>
+        commands:
             description: "show this list of commands"
             callback: !->
                 user = API.getUser!
                 res = "<div class='msg text'>"
-                for k,command of chatCommands.commands when not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
+                for k,command of chatCommands.commands when command and not command.moderation or user.gRole or (if command.moderation == true then user.role > 2 else user.role >= command.moderation)
                     if command.aliases?.length
-                        aliases = "aliases: #{humanList command.aliases}"
+                        aliases = "title='aliases: #{humanList command.aliases}'"
                     else
                         aliases = ''
-                    res += "<div class='p0ne-help-command' alt='#aliases'><b>/#k</b> #{command.params ||''} - #{command.description}</div>"
+                    res += "<div class=p0ne-help-command #aliases><b>/#k</b> #{command.parameters ||''} - #{command.description}</div>"
                 res += "</div>"
                 appendChat($ "<div class='cm update p0ne-help'>" .html res)
 
@@ -4720,7 +4984,7 @@ module \chatCommands, do
             parameters: " (playlist)"
             description: "grab the current song into a playlist (default is current playlist)"
             callback: (c) !->
-                if c.replace(/^\/\w+\s+/, '')
+                if c.replace(/^\/\w+\s*/, '')
                     grabMedia(that)
                 else
                     grabMedia!
@@ -4761,14 +5025,52 @@ module \chatCommands, do
             description: "snoozes the current song"
             callback: snooze
         mute:
-            description: "mutes the audio"
-            callback: mute
+            aliases: <[ stfu silence ]>
+            parameters: "[[duration] @username(s)]"
+            description: "mutes the audio or the specified user(s)"
+            callback: (user) !->
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user
+                    mute!
+                else
+                    if durArg = /\w+/.exec user
+                        duration = {
+                            s: \s, short:  \s, 15: \s, \15min : \s,
+                            m: \m, middle: \m, 30: \m, \30min : \m
+                            l: \l, long:   \l, 45: \l, \45min : \l
+                        }[durArg.1]
+                        if duration
+                            user .= substr durArg.1.length
+                        else if getUser(durArg.1)
+                            duration = \s
+                    else
+                        duration = \s
+
+                    if not duration or user in <[ h -h help --help ? hlep ]>
+                        chatWarn '<div class=p0ne-help-command>
+                            possible durations are:<br>
+                            - <b>s</b> (<em>15min</em>, <em>short</em>)<br>
+                            - <b>m</b> (<em>30min</em>, <em>middle</em>)<br>
+                            - <b>l</b> (<em>45min</em>, <em>long</em>)<br>
+                            If left out, defaults to 15 minutes.<br>
+                            You can also use /mute to extend/reduce the mute time.
+                        </div>', '/mute [[duration] @username(s)]', true /*HTML*/
+                    else
+                        for id in chatCommands.parseUserArg user
+                            API.moderateMuteUser id, duration, 1 #ToDo check this
         unmute:
-            description: "unmutes the audio"
-            callback: unmute
+            parameters: "[@username(s)]"
+            description: "unmutes the audio or specified user(s)"
+            callback: (user) !->
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user
+                    unmute!
+                else
+                    for id in chatCommands.parseUserArg user
+                        API.moderateUnmuteUser id, duration, 1 #ToDo check this
 
         muteonce:
-            aliases: <[ muteonce ]>
+            aliases: <[ muteone ]>
             description: "mutes the current song"
             callback: muteonce
 
@@ -4783,6 +5085,13 @@ module \chatCommands, do
                 else
                     chatWarn "automute is not yet implemented"
 
+        volume:
+            parameters: " (0 - 100)"
+            description: "sets the volume to the specified percentage"
+            callback: (vol) !->
+                vol .= replace(/^\/\w+\s*|%/, '').trim!
+                API.setVolume +vol
+
         popout:
             aliases: <[ popup ]>
             description: "opens/closes the chat popout window"
@@ -4796,28 +5105,45 @@ module \chatCommands, do
                     chatWarn "sorry, the command currently doesn't work"
 
         reconnect:
-            aliases: <[ reconnectSocket ]>
+            aliases: <[ reconnectSocket forceReconnect ]>
             description: "forces the socket to reconnect. This might solve chat issues"
             callback: !->
                 _$context?.once \sjs:reconnected, !->
-                    chatWarn "socket reconnected"
+                    chatWarn "socket reconnected", '/reconnect'
                 reconnectSocket!
         rejoin:
             aliases: <[ rejoinRoom ]>
             description: "forces a rejoin to the room (to fix issues)"
             callback: !->
                 _$context?.once \room:joined, !->
-                    chatWarn "room rejoined"
+                    chatWarn "room rejoined", '/rejoin'
                 rejoinRoom!
+
+        intercom:
+            aliases: <[ messages ]>
+            description: "Show Intercom messages"
+            callback: !->
+                Intercom("showMessages")
 
         #== moderator commands ==
         #        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         ban:
-            parameters: " @username(s)"
-            description: "bans the specified user(s)"
+            aliases: <[ gtfo rekt abuse ]>
+            parameters: "[duration] @username(s)"
+            description: "bans the specified user(s). use `/ban help` for more info"
             moderation: true
             callback: (user) !->
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                user .= replace(/^\/\w+\s*/, '').trim!
+                if not user or user in <[ h -h help --help ? hlep ]>
+                    chatWarn '<div class=p0ne-help-command>
+                        possible durations are:<br>
+                        - <b>s</b> (<em>15min</em>, <em>short</em>)<br>
+                        - <b>h</b> (<em>1h</em>, <em>hour</em>, <em>long</em>)<br>
+                        - <b>f</b> (<em>forever</em>, <em>p</em>, <em>perma</em>)<br>
+                        If left out, defaults to 15 minutes.<br>
+                        You can also use /ban to extend the ban time.
+                    </div>', '/ban [duration] @username(s)', true /*HTML*/
+                for id in chatCommands.parseUserArg user
                     API.modBan id, \s, 1 #ToDo check this
         unban:
             aliases: <[ pardon revive ]>
@@ -4825,8 +5151,10 @@ module \chatCommands, do
             description: "unbans the specified user(s)"
             moderation: true
             callback: (user) !->
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s*/, '')
                     API.moderateUnbanUser id
+                else
+                    chatWarn "couldn't find any user", '/unban'
 
         move:
             parameters: " @username position"
@@ -4839,7 +5167,7 @@ module \chatCommands, do
                     pos := +d
                     return ''
                 if 0 < pos < 51
-                    if users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))
+                    if users = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))
                         if not (id = users.0) or not getUser(id)
                             chatWarn "The user doesn't seem to be in the room"
                         else
@@ -4856,10 +5184,12 @@ module \chatCommands, do
             description: "moves the specified user(s) to the top of the waitlist"
             moderation: true
             callback: (c) !->
-                users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                users = chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
                 for i from users.length - 1 to 0
                     moveDJ i, 1
+                else
+                    chatWarn "couldn't find any user", '/moveTop'
         /*moveUp:
             aliases: <[  ]>
             parameters: " @username(s) (how much)"
@@ -4869,7 +5199,7 @@ module \chatCommands, do
                 res = []; djsToAdd = []; l=0
                 wl = API.getWaitList!
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s*(?:)/, '')
                     for u, pos in wl when u.id == id
                         if pos == 0
                             skipFirst = true
@@ -4914,31 +5244,44 @@ module \chatCommands, do
             description: "adds the specified user(s) to the waitlist"
             moderation: true
             callback: (c) !->
-                users = chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                users = chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                 i = 0
-                do helper = !->
-                    if users[i]
-                        addDJ users[i], helper
+                if users.length
+                    do helper = !->
+                        if users[i]
+                            addDJ users[i++], helper
+                else
+                    chatWarn "couldn't find any user", '/addDJ'
         removeDJ:
             aliases: <[ remove ]>
             parameters: " @username(s)"
             description: "removes the specified user(s) from the waitlist / DJ booth"
             moderation: true
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     API.moderateRemoveDJ id
+                else
+                    chatWarn "couldn't find any user", '/removeDJ'
         skip:
             aliases: <[ forceSkip s ]>
             description: "skips the current song"
             moderation: true
-            callback: API.moderateForceSkip
+            callback: ->
+                if API.getTimeElapsed! > 2s
+                    API.moderateForceSkip!
+                else
+                    chatWarn "
+                        The song just changed, are you sure you want to skip?<br>
+                        <button class=p0ne-btn onclick='API.moderateForceSkip()'>skip</button>\xa0
+                        <button class=p0ne-btn onclick='$(this).closest(\".cm\").remove()'>cancel</button>
+                    ", '/skip', true
 
         promote:
             parameters: " @username(s)"
             description: "promotes the specified user(s) to the next rank"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     if getUser(id)
                         API.moderateSetRole(id, that.role + 1)
         demote:
@@ -4946,7 +5289,7 @@ module \chatCommands, do
             description: "demotes the specified user(s) to the lower rank"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, user.role - 1)
@@ -4955,7 +5298,7 @@ module \chatCommands, do
             description: "removes the specified user(s) from the staff"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 0)
@@ -4965,7 +5308,7 @@ module \chatCommands, do
             description: "makes the specified user(s) resident DJ"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 1)
@@ -4975,7 +5318,7 @@ module \chatCommands, do
             description: "makes the specified user(s) bouncer"
             moderation: 3
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 2)
@@ -4984,7 +5327,7 @@ module \chatCommands, do
             description: "makes the specified user(s) manager"
             moderation: 4
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 3)
@@ -4994,7 +5337,7 @@ module \chatCommands, do
             description: "makes the specified user(s) co-host"
             moderation: 5
             callback: (c) !->
-                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg c.replace(/^\/\w+\s*/, '')
                     user = getUser(id)
                     if user?.role > 0
                         API.moderateSetRole(id, 4)
@@ -5003,7 +5346,7 @@ module \chatCommands, do
             description: "makes the specified user the communities's host (USE WITH CAUTION!)"
             moderation: 5
             callback: (c) !->
-                user = getUser(chatCommands.parseUserArg c.replace(/^\/\w+\s+/, ''))
+                user = getUser(chatCommands.parseUserArg c.replace(/^\/\w+\s*/, ''))
                 if user?.role > 0
                     API.moderateSetRole(id, 5)
 
@@ -5230,7 +5573,6 @@ module \automute, do
         @songlist = @_settings.songlist
         media = API.getMedia!
         addListener API, \advance, (d) !~>
-            console.log "[automute test]", media, media?.cid, @songlist[media?.cid]
             if (media := d.media) and @songlist[media.cid]
                 console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
                 #muteonce!
@@ -5251,7 +5593,7 @@ module \automute, do
                         .append $box
                 if not media
                     # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
-                    console.warn "[automute] uw0tm8?"
+                    console.warn "[automute] uw0tm8? how did the stream mode change if there's no song playing? well this could happen if you changed the room or something…"
                 else if @songlist[media.cid] # btn "remove from automute"
                     console.log "[automute] change automute-btn to REMOVE"
                     $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
@@ -5334,10 +5676,15 @@ module \afkAutorespond, do
 
     DEFAULT_MSG: "I'm AFK at the moment"
     setup: ({addListener, $create}) !->
-        var timeout
+        timeout = true
+        sleep @_settings.timeout, !-> timeout := false
         addListener API, \chat, (msg) !~>
-            if msg.uid and msg.uid != userID and isMention(msg, true) and not timeout and not msg.message.has \!disable
+            if msg.uid and msg.uid != userID and not timeout and isMention(msg, true) and not msg.message.has \!disable
+                # it is neglected that a non-staff might send a @mentioning message with "!disable"
                 API.sendChat "[AFK] #{@_settings.message || @DEFAULT_MSG}"
+                timeout := true
+                sleep @_settings.timeout, !-> timeout := false
+            else if msg.uid == userID
                 timeout := true
                 sleep @_settings.timeout, !-> timeout := false
         $create '<div class=p0ne-afk-button>'
@@ -5373,7 +5720,7 @@ module \joinLeaveNotif, do
     '''
     _settings:
         mergeSameUser: true
-    setup: ({addListener, css}, joinLeaveNotif,,update) !->
+    setup: ({addListener, css}, joinLeaveNotif, update) !->
         if update
             lastMsg = $cm! .children! .last!
             if lastMsg .hasClass \p0ne-notif-joinleave
@@ -5616,22 +5963,22 @@ module \etaTimer, do
             .append $etaTime = $ '<span class=p0ne-eta-time></span>'
             .mouseover !->
                 if _$context?
+                    updateToolTip!
                     clearInterval tooltipIntervalID
                     tooltipIntervalID := repeat 1_000ms, updateToolTip
 
-                do function updateToolTip
+                function updateToolTip
                     # show ETA calc
                     p = API.getWaitListPosition!
                     p = API.getWaitList!.length if p == -1
                     avg = sum / l |> Math.round
                     rem = API.getTimeRemaining!
-                    if _$context?
-                        if p
-                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} avg. song duration", $etaText
-                        else if rem
-                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
-                        else
-                            _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
+                    if p
+                        _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} avg. song duration", $etaText
+                    else if rem
+                        _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
+                    else
+                        _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
             .mouseout !->
                 if _$context?
                     clearInterval tooltipIntervalID
@@ -5652,6 +5999,8 @@ module \etaTimer, do
                 sum += d.media.duration
                 lastSongDur := API.getHistory![l - 1].media.duration
             # note: we don't trigger updateETA() because each advance is accompanied with a waitListUpdate
+        if _$context?
+            addListener _$context, \room:joined, updateETA
 
         # initialize average song length
         # (this is AFTER the event listeners, because tinyhist() has to run after it)
@@ -5666,7 +6015,7 @@ module \etaTimer, do
                     if d.media
                         lastSongDur := 0
                         l++
-                    tinyhist! if l < 51
+                    tinyhist! if l < 50
         else
             l = 50
             lastSongDur = hist[l - 1].media.duration
@@ -5677,8 +6026,10 @@ module \etaTimer, do
         updateETA!
 
         addListener API, \p0ne:stylesLoaded, !-> requestAnimationFrame !->
+            console.info "[TEST stylesLoaded] $eta.width: #{$eta.width!}"
             $nextMediaLabel .css right: $eta.width! - 50px
 
+        var lastETA
         ~function updateETA
             # update what the ETA timer says
             #clearTimeout @timer
@@ -5698,21 +6049,23 @@ module \etaTimer, do
                         $etaTime .text "DJ instantly"
                         return
             # calculate average duration
-            avg_ = (API.getTimeRemaining!  +  sum * p / l)
-            avg = avg_ / 60 |> Math.round
+            eta_ = (API.getTimeRemaining!  +  sum * p / l)
+            eta = eta_ / 60 |> Math.round
 
-            #console.log "[ETA] updated to (#avg min)"
-            $etaText .text "ETA ca. "
-            if avg > 60min
-                $etaTime .text "#{~~(avg / 60min_to_h)}h #{avg % 60}min"
-            else
-                $etaTime .text "#avg min"
+            #console.log "[ETA] updated to (#eta min)"
+            if lastETA != eta
+                lastETA := eta
+                $etaText .text "ETA ca. "
+                if eta > 60min
+                    $etaTime .text "#{~~(eta / 60)}h #{eta % 60}min"
+                else
+                    $etaTime .text "#eta min"
+                $nextMediaLabel .css right: $eta.width! - 50px
 
-            $nextMediaLabel .css right: $eta.width! - 50px
-
-            # setup timer to update ETA
-            clearTimeout @timer
-            @timer = sleep ((avg_ % 60s)+31s).s, updateETA
+                # setup timer to update ETA
+                if eta_ > 0 # when disconnecting from the socket, it might be that API.getTimeRemaining! returns a negative number
+                    clearTimeout @timer
+                    @timer = sleep ((eta_ % 60s)+31s).s, updateETA
     disable: !->
         clearTimeout @timer
 
@@ -5797,7 +6150,7 @@ module \friendslistUserPopup, do
                 chat.getExternalUser id, data, (user) !->
                     chat.onShowChatUser user, data
         #replace friendsList, \drawBind, !-> return _.bind friendsList.drawRow, friendsList
-# adds a user-rollover to the FriendsList when clicking someone's name
+# adds a user-rollover to the WaitList when clicking someone's name
 module \waitlistUserPopup, do
     require: <[ WaitlistRow ]>
     setup: ({replace}) !->
@@ -5819,7 +6172,7 @@ module \boothAlert, do
     _settings:
         warnOnPrevPlay: true # takes precedence
         warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
-    setup: ({addListener}, {_settings},,module_) !->
+    setup: ({addListener}, {_settings}, module_) !->
         var warnTimeout
         @remainingStr = humanTime _settings.warnXMinBefore
         isNext = false
@@ -5909,7 +6262,7 @@ module \avoidHistoryPlay, do
             else
                 API.once \advance, checkOnNextAdv
 
-        function checkOnNextAdv d
+        !function checkOnNextAdv d
             # assuming that the playlist did not already advance
             console.info "[Avoid History Plays]", playlist.list?.rows?.0?.model, playlist.list?.rows?.1?.model
             return if not (nextSong = playlist.list?.rows?.1?.nextSong) or not getActivePlaylist?
@@ -5920,6 +6273,19 @@ module \avoidHistoryPlay, do
                         beforeID: -1
                         ids: [nextSong.id]
         do @checkOnNextAdv = checkOnNextAdv
+
+/*####################################
+#         WARN ON PAGE LEAVE         #
+####################################*/
+module \warnOnPageLeave, do
+    displayName: "Warn on Leaving plug.dj"
+    settings: \base
+    setup: ({addListener}) !->
+        addListener $window, \beforeunload, !~>
+            #return "[plug_p0ne] Are you sure you want to leave the page?"
+            # Chrome shows the text + "Are you sure you want to leave the page? [Leave this page] [Stay on this page]"
+            # Firefox always shows "This page is asking you to confirm that you want to leave - data you have entered may not be saved. [Leave Page] [Stay on Page]"
+            return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under #{@settings .toUpperCase!} > #{@displayName})"
 
 /*@source p0ne.chat.ls */
 /**
@@ -6160,12 +6526,17 @@ module \chatPlugin, do
 
         addListener _$context, \chat:receive, (e) !->
             getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
+        addClassesCB = _$context._events[\chat:receive][*-1]
 
-        function addClass classes
+        addListener _$context, \popout:open, !->
+            _$context._events[\chat:receive].removeItem(addClassesCB)
+            _$context._events[\chat:receive].push(addClassesCB)
+
+        !function addClass classes
             if typeof classes == \string
                 for className in classes.split /\s+/g when className
                     @classes[className] = true
-        function removeClass classes
+        !function removeClass classes
             if typeof classes == \string
                 for className in classes.split /\s+/g
                     delete @classes[className]
@@ -6183,21 +6554,22 @@ module \chatMessageClasses, do
     optional: <[ users ]>
     require: <[ chatPlugin ]>
     setup: ({addListener}) !->
+        /* designed to be compatible with p³-compatible Room Themes */
         try
-            $cm! .children! .each !->
+            $cms! .children! .each !->
                 if uid = this.dataset.cid
                     uid .= substr(0, 7)
                     return if not uid
                     $this = $ this
                     if fromUser = users.get uid
-                        role = getRank(fromUser)
+                        role = getRank(fromUser, true)
                         #if role != \ghost
                         fromRole = "from-#role"
                         if role == \regular
                             fromRole = \from-you if uid == userID
                         else
                             fromRole += " from-staff"
-                        /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                        /*else # stupid p³. who would abuse the class `from` instead of using something sensible instead?!
                             fromRole += " from"
                         */
                         fromRole += " from-friend" if fromUser.friend
@@ -6217,7 +6589,7 @@ module \chatMessageClasses, do
 
 
             if message.user = getUser(uid)
-                rank = getRank message.user
+                rank = getRank(message.user, true)
                 if uid == userID
                     message.addClass \from-you
                     also = \-also
@@ -6227,7 +6599,6 @@ module \chatMessageClasses, do
                 if rank == \regular
                     message.addClass \from-subscriber if message.user.sub
                     message.addClass \from-friend if message.user.friend
-
 
 
 /*####################################
@@ -6323,15 +6694,13 @@ module \chatOthersMentions, do
             for mention in getMentions(message, true) when mention.id != userID or type == \emote
                 res += "
                     #{message.message .substring(lastI, mention.offset)}
-                    <span class='mention-other mentionID-#{mention.id} mention-#{getRank(mention)} #{if! (mention.role||mention.gRole) then '' else \mention-staff}'>
+                    <span class='mention-other mentionID-#{mention.id} mention-#{getRank(mention, false)} #{if (mention.role||mention.gRole) then \mention-staff else ''} #{if type == \emote and mention.id == userID then \mention-you else ''}'>
                         @#{mention.rawun}
                     </span>
                 "
                 lastI = mention.offset + 1 + mention.rawun.length
-            else
-                return
-
-            message.message = res + message.message.substr(lastI)
+            if res
+                message.message = res + message.message.substr(lastI)
 
 
 /*####################################
@@ -6351,17 +6720,27 @@ module \chatInlineImages, do
         ☢ The taglist is subject to improvement
     '''
     _settings:
-        filterTags: <[ nsfw suggestive gore spoiler no-inline noinline ]>
+        filterTags: <[ nsfw suggestive gore spoiler questionable no-inline noinline ]>
     setup: ({addListener}) !->
         addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
             if img = @inlineify ...
-                msg.hasFilterWord ?= msg.message.toLowerCase!.hasAny @_settings.filterTags
+                if not msg.hasFilterWord?
+                    msg.hasFilterWord = false
+                    msgLC = msg.message.toLowerCase!
+                    for tag in @_settings.filterTags when msgLC.has tag
+                        msg.hasFilterWord = true
+                        console.warn "[inline-img] message contains \"#tag\", images will not be converted"
+                        break
+
                 if msg.hasFilterWord or msg.message[offset + all.length] == ";" or domain == \plug.dj
                     console.info "[inline-img] filtered image", "#completeURL ==> #protocol#img"
-                    return "<a #{pre .replace /class=('|")?(\S+)/i, (,q,cl) !->
+                    if pre .has "class="
+                        pre .= replace /class=('|")?(\S+)/i, (,q,cl) !->
                             return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
-                        } data-image-url='#img'>#completeURL</a>"
+                    else
+                        pre = "class=p0ne-img-filtered #pre"
+                    return "<a #pre src='#img'>#completeURL</a>"
                 else
                     console.log "[inline-img]", "#completeURL ==> #img"
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
@@ -6375,8 +6754,8 @@ module \chatInlineImages, do
         #= images =
         if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
             [rgx, repl, forceProtocol] = that
-            if url != (img = url.replace(rgx, repl))
-                return "#{forceProtocol||protocol}#img"
+            if rgx.test(url)
+                return "#{forceProtocol||protocol}#{url.replace(rgx, repl)}"
 
         #= direct images =
         if @regDirect .test url
@@ -6395,12 +6774,15 @@ module \chatInlineImages, do
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.filterTags.join " "
             .on \input, !~>
-                @_settings.filterTags = [$.trim(tag) for tag in $input.val!.split " "]
+                @_settings.filterTags = []; l=0; map={"":true}
+                for tag in $input.val!.split " "
+                    tag = $.trim(tag)
+                    @_settings.filterTags[l++] = tag if not map[tag]
             .appendTo $el
 
     forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
-        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,7}(?:[&,][\w]{5,7})*)(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif"] # from RedditEnhancementSuite
+        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
         \prntscrn.com :    [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"]
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
@@ -6408,6 +6790,10 @@ module \chatInlineImages, do
         \googleimg.com :   [/^google\.com\/imgres\?imgurl=(.+?)(?:&|$)/, (,src) !-> return decodeURIComponent url]
         \imageshack.com :  [/^imageshack\.com\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
         \imageshack.us :   [/^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, !-> return chatInlineImages.imageshackPlugin ...]
+
+        # direct image URLs that are not automatically detected
+        \gstatic.com : [/^https:\/\/encrypted-tbn\d.gstatic.com\/images/, "$&"]
+        \i.chzbgr.com : [/(?:)/, ""]
 
         /* meme-plugins based on http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html ) */
         \quickmeme.com :     [/^(?:m\.)?quickmeme\.com\/meme\/(\w+)/, "i.qkme.me/$1.jpg"]
@@ -6526,7 +6912,7 @@ module \imageLightbox, do
                     cb?!
         dialog.closeBind = dialog~close
 
-        addListener chatDomEvents, \click, \.p0ne-img, (e) !->
+        addListener chatDomEvents, \click, '.p0ne-img, .p0ne-img-filtered', (e) !->
             $img_ = $ this
             e.preventDefault!
 
@@ -6649,7 +7035,7 @@ module \customChatNotificationTrigger, do
 
     updateRegexp: !->
         @regexp = //
-            \b(?:#{@_settings.triggerwords .join '|'})\b
+            \b(?:#{@_settings.triggerwords .join '|' |> escapeRegExp})\b
         //gi
         @hasUsernameTrigger = false
         @usernameTriggers = {}
@@ -6759,12 +7145,12 @@ module \fixHiRes, do
 ####################################*/
 # fix drag'n'drop styles for playlist icon view
 module \playlistIconView, do
-    displayName: "Playlist Icon View"
+    displayName: "Playlist Grid View"
     settings: \look&feel
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
-    optional: <[ PlaylistItemList app ]>
+    optional: <[ PlaylistItemList pl ]>
     setup: ({addListener, replace, replaceListener}, playlistIconView) !->
         $body .addClass \playlist-icon-view
 
@@ -6803,36 +7189,27 @@ module \playlistIconView, do
                     @$container.append(@$lastRow)
 
 
-        if (@pl = app?.footer.playlist.playlist.media.list)?.rows
+        if pl?.list?.rows
             # onResize hook
             Layout
-                .off \resize, @pl.resizeBind
-                .resize replace(@pl, \resizeBind, !~> return @pl~onResize)
+                .off \resize, pl.list.resizeBind
+                .resize replace(pl.list, \resizeBind, !~> return pl.list~onResize)
 
             # onScroll hook
-            @pl.$el
-                .off \jsp-scroll-y, @pl.scrollBind
-                .on \jsp-scroll-y, replace(@pl, \scrollBind, !~> return @pl~onScroll)
+            pl.list.$el
+                .off \jsp-scroll-y, pl.list.scrollBind
+                .on \jsp-scroll-y, replace(pl.list, \scrollBind, !~> return pl.list~onScroll)
 
             # opening playlist drawer animation fix
             replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return !~>
-                @pl.onResize! if @pl.$el
+                #pl.list.onResize! if pl.list.$el
 
             # to force rerender
-            delete @pl.currentRow
-            @pl.onResize Layout.getSize!
-            @pl.onScroll?!
+            delete pl.list.currentRow
+            pl.list.onResize Layout.getSize!
+            pl.list.onScroll?!
         else
             console.warn "no pl"
-
-        #= fix search =
-        replace searchManager, \_search, !-> return !->
-            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
-            console.log "[_search]", @lastQuery, @page, limit
-            if @lastFormat == 1
-                searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)
-            else if @lastFormat == 2
-                searchAux.scSearch(@lastQuery, @page, limit, @scBind)
 
         #= fix dragRowLine =
         # (The line that indicates when drag'n'dropping, where a song would be dropped)
@@ -6881,12 +7258,12 @@ module \playlistIconView, do
             o = @onCheckListScroll!
 
     disableLate: !->
-        # using disableLate so that `@pl.scrollBind` is already reset
+        # using disableLate so that `pl.scrollBind` is already reset
         console.info "#{getTime!} [playlistIconView] disabling"
         $body .removeClass \playlist-icon-view
-        @pl?.$el?
+        pl?.list?.$el?
             .off \jsp-scroll-y
-            .on \jsp-scroll-y, @pl.scrollBind
+            .on \jsp-scroll-y, pl.list.scrollBind
 
 
         /*
@@ -7083,9 +7460,9 @@ module \draggableDialog, do
             $dialog := $dialogContainer .find \.dialog
                 .css position: \static
             $dialogContainer .addClass \lightsout
-            pos = $dialog .position!
-            pos?.position = \absolute
-            $dialog .css pos
+            if pos = $dialog .position!
+                pos.position = \absolute
+                $dialog .css pos
             if not lightsout
                 $dialogContainer .removeClass \lightsout
 
@@ -7200,16 +7577,20 @@ module \censor, do
 ####################################*/
 module \roomSettings, do
     require: <[ room ]>
-    optional: <[ _$context ]>
+    optional: <[ _$context socketListeners ]>
     persistent: <[ _data _room ]>
     module: new DataEmitter(\roomSettings)
 
     _room: \dashboard
-    setup: ({addListener}) !->
+    setup: ({addListener, addCommand}) !->
         @_update!
+        addListener API, \socket:roomDescriptionUpdate, @_update, this
         if _$context?
             addListener _$context, \room:joining, @clear, this
             addListener _$context, \room:joined, @_update, this
+        addCommand \roomsettings, do
+            description: "reloads the p³ compatible Room Settings"
+            callback: @~_update
 
     _update: !->
         roomslug = getRoomSlug!
@@ -7225,188 +7606,10 @@ module \roomSettings, do
                     @_room = roomslug
                     @set data
                 .fail !->
-                    chatWarn "cannot load Room Settings", "p0ne"
-
-/*####################################
-#             YELLOW MOD             #
-####################################*/
-module \yellowMod, do
-    disabled: true
-    setup: ({@css}) !->
-        @update!
-    update: !-> if not @disabled
-        @css \yellowMod, "
-            \#chat .fromID-#userID .un,
-            .user[data-uid='#userID'] .name > span {
-                color: #{customColors?.colors?.you || roomSettings?._data?.colors.chat.you || \#ffdd6f} !important;
-            }
-        "
+                    chatWarn "cannot load Room Settings. run /roomsettings to try loading them again", "p0ne"
 
 
-/*####################################
-#           CUSTOM  COLORS           #
-####################################*/
-window.ColorPicker = !!$.fn.ColorPicker
-module \customColors, do
-    displayName: "☢ Custom Colours"
-    settings: \look&feel
-    help: """
-        Change colours of usernames, depending on their role.
 
-        Note: some aggressive Room Themes might override custom colour settings from this module.
-    """
-    require: <[ yellowMod ColorPicker ]>
-    _settings:
-        global: {}
-        perRoom: {}
-    setup: ({@css, loadStyle}) !->
-        loadStyle "#{p0ne.host}/vendor/colorpicker/css/colorpicker.css"
-
-    roles:
-        * displayName: 'You',              name: \you,        default: 0xffdd6f, regular: true, noIcon: true
-        * displayName: 'Regular',          name: \regular,    default: 0xb0b0b0, regular: true, noIcon: true
-        * displayName: 'Friend',           name: \friend,     default: 0xb0b0b0, regular: true, noIcon: true
-        * displayName: 'Subscriber',       name: \subscriber, default: 0xc59840, regular: true
-        * displayName: 'Resident DJ',      name: \dj,         default: 0xac76ff, staff: true
-        * displayName: 'Bouncer',          name: \bouncer,    default: 0xac76ff, staff: true
-        * displayName: 'Manager',          name: \manager,    default: 0xac76ff, staff: true
-        #* displayName: 'Co-Host',          name: \co-host,    default: 0xac76ff, staff: true
-        * displayName: '(Co-) Host',       name: \host,       default: 0xac76ff, staff: true
-        * displayName: 'Brand Ambassador', name: \ambassador, default: 0x89be6c
-        * displayName: 'Admin',            name: \admin,      default: 0x42a5dc
-
-    settingsExtra: ($wrapper) !->
-        #ToDo add custom icons
-        #ToDo add icon colourizing (?)
-        #   possibly via:
-        #   - canvas + to BlobURI
-        #   - canvas + to Base64
-        #   - SVG
-        #   - PHP
-        #ToDo implement "Co-Host" class in ChatClasses
-        #ToDo add custom colours for custom users
-        cc = this
-        @colors = @_settings.global with @_settings.perRoom[getRoomSlug!]
-
-        visible = false
-        $wrapper .append do
-            $ \<button>
-                .text "change custom colours"
-                .click !~>
-                    if visible
-                        @$el.fadeOut!
-                        visible := false
-                    else
-                        @$el.fadeIn!
-                        visible := true
-
-        @$el = $ '<div class=p0ne-cc-settings>'
-            .hide!
-            #.css do
-            #    left: $ \.p0ne-settings .width!
-            .appendTo $body
-
-        # for simplicity, we only support setting global custom colours yet.
-        #ToDo add perRoom settings
-        scope = @_settings.global
-
-        @rolesHashmap = {}
-        i = @roles.length
-        while role = @roles[--i]
-            @rolesHashmap[role.name] = role
-            if not c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name]
-                c = "##{role.default.toString(16)}"
-                isDefault = true
-            $ "
-                <div data-role=#{role.name} class='
-                        p0ne-cc-row from-#{role.name}
-                        #{if role.staff then ' from-staff' else ''}
-                        #{if scope[role.name] then '' else ' p0ne-cc-default'}'>
-                    #{if role.noIcon then '' else '<i class=\'icon icon-chat-'+role.name+'\'></i>'}
-                    <span class=name>#{role.displayName}</span>
-                    <i class='icon icon-clear-input'></i>
-                </div>
-            "
-                .css color: c
-                .appendTo @$el
-
-        var roleName, $row
-        @$cp = $cp = $ \<div>
-            .ColorPicker do
-                onChange: (hsb, hex, rgb) !->
-                    c = "##hex"
-                    scope[roleName] = c
-                    $row
-                        .css color: c
-                        .removeClass \p0ne-cc-default
-                    cc.updateCSS!
-        $cpDialog = $ "##{@$cp.data(\colorpickerId)}"
-
-        @$el
-            .on \click, \.icon-clear-input, !->
-                $row = $ this .parent!
-                name = $row .data \role
-                $row
-                    .css color: roomTheme._data?.colors?.chat?[name] || "##{cc.rolesHashmap[name].default.toString(16)}"
-                    .addClass \p0ne-cc-default
-                delete scope[name]
-                cc.updateCSS!
-                return false
-            .on \click, \.p0ne-cc-row, !->
-                $row := $ this
-                roleName := $row .data \role
-                $cp
-                    .ColorPickerSetColor scope[roleName] || roomTheme._data?.colors?.chat?[roleName] || "##{cc.rolesHashmap[roleName].default.toString(16)}"
-                    .ColorPickerShow!
-                console.log "[colorpicker]", $cpDialog.0, $row.offset!
-                offset = $row.offset!
-                $cpDialog .css do
-                    left: offset.left
-                    top: offset.top + 24px;
-
-        $ '<label class=p0ne-css-override-you><input type=checkbox class=checkbox> "You" overrides other rules</label>'
-            .attr \checked, not yellowMod.disabled
-            .appendTo @$el
-            .find \input
-                .on \click, (e) !->
-                    console.log "[custom colors] force 'you' Override:", @checked
-                    if @checked
-                        yellowMod.enable!
-                    else
-                        yellowMod.disable!
-        @updateCSS!
-
-    updateCSS: !->
-        styles = ""
-        scope = @_settings.global
-        for role in @roles when color = scope[role.name]
-            name = role.name
-            name = "regular.from-#name" if role.regularOnly
-            styles += "/* #{role.name} => #color */\n"
-            if not role.noIcon
-                styles += """
-                    \#app \#user-lists .icon-chat-#{role.name} + .name,
-                    \#app \#waitlist .icon-chat-#{role.name} + span,
-                    \#app \#user-rollover .icon-chat-#{role.name} + span,\n
-                """
-            styles += """
-                \#app \#chat .from-#name#{if role.regularOnly then '.from-regular' else ''} .un,
-                \#app .p0ne-name.#{role.name}#{if role.regularOnly then '.regular' else ''}
-                {
-                    color: #color !important;
-                }\n
-            """
-        @css \customColors, styles
-        yellowMod.update!
-        #if roomTheme? and not roomTheme.disabled
-        #    roomTheme.applyTheme roomSettings._data
-
-    disable: !->
-        if @$cp
-            @$cp .ColorPickerHide!
-            $ "##{@$cp.data(\colorpickerId)}" .remove!
-            @$cp .remove!
-        @$el?.remove!
 
 
 /*####################################
@@ -7446,8 +7649,6 @@ module \roomTheme, do
                     \#user-rollover .icon-chat-#role + span, .p0ne-name.#role {
                             color: #color !important;
                     }\n"""
-                    if role == \you
-                        yellowMod?.update!
                     #ToDo @mention other colours
                 colorMap =
                     background: \.room-background
@@ -7522,11 +7723,16 @@ module \roomTheme, do
             /*== text ==*/
             if d.text
                 for key, text of d.text.plugDJ
-                    for lang of Lang[key]
-                        replace Lang[key], lang, !-> return text
+                    base = Lang
+                    key .= split \.
+                    endKey = key.pop!
+                    for key in key
+                        if not base = base[key]
+                            break
+                    if base
+                        replace base, endKey, !-> return text
 
             css \roomTheme, styles
-            yellowMod.update!
             @styles = styles
 
         addListener roomSettings, \cleared, @clear, this
@@ -7586,115 +7792,27 @@ module \songNotif, do
         You can click anywhere on it to close it again.
     '''
     persistent: <[ lastMedia $div ]>
-    setup: ({addListener, $create, $createPersistent, css},,,module_) !->
-        $lastNotif = $!
+    setup: ({addListener, $create, @$createPersistent, css},, module_) !->
+        @$lastNotif = $!
         @$div ||= $cms! .find \.p0ne-song-notif:last
-        @callback = (d) !~>
-            try
-                media = d.media
-                if media?.id != @lastMedia
-                    if score = d.lastPlay?.score
-                        /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
-                        @$div
-                            .removeClass \song-current
-                            .find \.song-stats
-                                .html "
-                                <div class=score>
-                                    <div class='item positive'>
-                                        <i class='icon icon-history-positive'></i> #{score.positive}
-                                    </div>
-                                    <div class='item grabs'>
-                                        <i class='icon icon-history-grabs'></i> #{score.grabs}
-                                    </div>
-                                    <div class='item negative'>
-                                        <i class='icon icon-history-negative'></i> #{score.negative}
-                                    </div>
-                                    <div class='item listeners'>
-                                        <i class='icon icon-history-listeners'></i> #{users?.length || API.getUsers!.length}
-                                    </div>
-                                </div>
-                                "
-                        @lastMedia := null; $lastNotif := @$div
-                else
-                    return
-                if not media
-                    return
-
-                @lastMedia := media.id
-                chat?.lastType = \p0ne-song-notif
-
-                @$div := $createPersistent "<div class='update p0ne-song-notif song-current' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
-                html = ""
-                time = getTime!
-                if media.format == 1  # YouTube
-                    mediaURL = "http://youtube.com/watch?v=#{media.cid}"
-                else # if media.format == 2 # SoundCloud
-                    # note: this gets replaced by a proper link as soon as data is available
-                    mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent media.author+' - '+media.title}"
-
-                duration = mediaTime media.duration
-                console.logImg media.image.replace(/^\/\//, 'https://') .then !->
-                    console.log "#time [DJ_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#duration)", d
-
-                html += "
-                    <div class='song-thumb-wrapper'>
-                        <img class='song-thumb' src='#{media.image}' />
-                        <span class='song-duration'>#duration</span>
-                        <div class='song-add btn'><i class='icon icon-add'></i></div>
-                        <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
-                        <!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> -->
-                        <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
-                    </div>
-                    #{getTimestamp!}
-                    <div class='song-stats'></div>
-                    <div class='song-dj un'></div>
-                    <b class='song-title'></b>
-                    <span class='song-author'></span>
-                    <div class='song-description-btn'>Description</div>
-                "
-                @$div.html html
-                @$div .find \.song-title .text d.media.title .prop \title, d.media.title
-                @$div .find \.song-author .text d.media.author
-                @$div .find \.song-dj
-                    .text d.dj.username
-                    .data \uid, d.dj.id
-
-                if media.format == 2sc and p0ne.SOUNDCLOUD_KEY # SoundCloud
-                    @$div .addClass \loading
-                    mediaLookup media
-                        .then (d) !~>
-                            @$div
-                                .removeClass \loading
-                                .data \description, d.description
-                                .find \.song-open .attr \href, d.url
-                            if d.download
-                                @$div
-                                    .addClass \downloadable
-                                    .find \.song-download
-                                        .attr \href, d.download
-                                        .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
-
-                appendChat @$div
-            catch e
-                console.error "[p0ne.notif]", e
 
         #$create \<div>
         #    .addClass \playback-thumb
         #    .insertBefore $ '#playback .background'
 
-        addListener API, \advance, @callback
+        addListener API, \advance, @~callback
         if _$context
             addListener _$context, \room:joined, !~>
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== add skip listeners ==
-        addListener API, \modSkip, (modUsername) !->
+        addListener API, \modSkip, (modUsername) !~>
             console.info "[API.modSkip]", modUsername
             if getUser(modUsername)
                 modID = "data-uid='#{that.id}'"
             else
                 modID = ""
-            $lastNotif .find \.timestamp
+            @$lastNotif .find \.timestamp
                 .after do
                     $ "<div class='song-skipped un' #modID>"
                         .text modUsername
@@ -7841,8 +7959,101 @@ module \songNotif, do
         @showDescription = showDescription
         @hideDescription = hideDescription
 
+
+    callback: (d) !->
+        media = d.media
+        if media?.id != @lastMedia
+            if @$div and score = d.lastPlay?.score
+                /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
+                @$div
+                    .removeClass \song-current
+                    .find \.song-stats
+                        .html "
+                        <div class=score>
+                            <div class='item positive'>
+                                <i class='icon icon-history-positive'></i> #{score.positive}
+                            </div>
+                            <div class='item grabs'>
+                                <i class='icon icon-history-grabs'></i> #{score.grabs}
+                            </div>
+                            <div class='item negative'>
+                                <i class='icon icon-history-negative'></i> #{score.negative}
+                            </div>
+                            <div class='item listeners'>
+                                <i class='icon icon-history-listeners'></i> #{users?.length || API.getUsers!.length}
+                            </div>
+                        </div>
+                        "
+                @lastMedia = null; @$lastNotif = @$div
+        if not media
+            return
+
+        @lastMedia := media.id
+        chat?.lastType = \p0ne-song-notif
+
+        @$div := @$createPersistent "<div class='update p0ne-song-notif song-current' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
+        html = ""
+        author = htmlUnescape media.author
+        title = htmlUnescape media.title
+        if media.format == 1  # YouTube
+            mediaURL = "http://youtube.com/watch?v=#{media.cid}"
+        else # if media.format == 2 # SoundCloud
+            # note: this gets replaced by a proper link as soon as data is available
+            mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent author+' - '+title}"
+
+        image = httpsify media.image
+        duration = mediaTime media.duration
+        console.logImg image, 120px, (if media.format == 1 then 90px else 120px)
+            .then !->
+                console.log "#{getTime!} [DJ_ADVANCE] #{d.dj.username} plays '#{author} - #{title}' (#duration)", d
+        html += "
+            <div class='song-thumb-wrapper'>
+                <img class='song-thumb' src='#image' />
+                <span class='song-duration'>#duration</span>
+                <div class='song-add btn'><i class='icon icon-add'></i></div>
+                <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
+            </div>
+            #{getTimestamp!}
+            <div class='song-stats'></div>
+            <div class='song-dj un'></div>
+            <b class='song-title'></b>
+            <span class='song-author'></span>
+            <div class='song-description-btn'>Description</div>
+        "
+        @$div.html html
+        @$div .find \.song-title .text title .prop \title, title
+        @$div .find \.song-author .text author
+        @$div .find \.song-dj
+            .text d.dj.username
+            .data \uid, d.dj.id
+
+        appendChat @$div
+        if media.format == 2 # SoundCloud
+            @$div .addClass \loading
+            mediaLookup media
+                .then (d) !~>
+                    @$div
+                        .removeClass \loading
+                        .data \description, d.description
+                        .find \.song-open .attr \href, d.url
+                    if d.download
+                        @$div
+                            .addClass \downloadable
+                            .find \.song-download
+                                .attr \href, d.download
+                                .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
+
+
     disable: !->
         @hideDescription?!
+
+chatCommands.commands.songinfo =
+    description: "forces a song notification to be shown, even if the module is disabled"
+    callback: !->
+        if window.songNotif?.callback and API.getMedia!
+            that.image = httpsify that.image
+            window.songNotif.callback media: that, dj: API.getDJ!
 
 /*@source p0ne.song-info.ls */
 /**
@@ -7956,7 +8167,7 @@ module \songInfo, do
         $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
             .text getDateTime new Date(d.uploadDate)
         $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
-            .text "duration: #{mediaTime +d.duration}"
+            .text "duration #{mediaTime +d.duration}"
         if media.format == 1 and d.restriction
             if d.restriction.allowed
                 $ \<span> .addClass \p0ne-song-info-blocked     .appendTo @$el
@@ -8029,27 +8240,29 @@ require <[ sockjs ]>, (SockJS) !->
     console.groupCollapsed "[p0ne custom avatars]"
     console.timeEnd "[p0ne custom avatars] loaded SockJS"
     # users
-    requireHelper \users, (it) !->
-        return it.models?.0?.attributes.avatarID
-            and \isTheUserPlaying not of it
-            and \lastFilter not of it
-    window.userID ||= API.getUser!.id
-    window.user_ ||= users.get(userID) if users?
-    #=======================
+    if not window.p0ne
+        requireHelper \users, (it) !->
+            return it.models?.0?.attributes.avatarID
+                and \isTheUserPlaying not of it
+                and \lastFilter not of it
+        window.userID ||= API.getUser!.id
+        window.user_ ||= users.get(userID) if users?
+        #=======================
 
 
-    # auxiliaries
-    window.sleep ||= (delay, fn) !-> return setTimeout fn, delay
+        # auxiliaries
+        window.sleep ||= (delay, fn) !-> return setTimeout fn, delay
 
-    requireHelper \InventoryDropdown, (.selected)
-    requireHelper \avatarAuxiliaries, (.getAvatarUrl)
-    requireHelper \Avatar, (.AUDIENCE)
-    #requireHelper \AvatarList, (._byId?.admin01)
-    requireHelper \myAvatars, (m) !->
-        if m.comparator == \id
-            for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx == m
-                return true
-        return false
+        requireHelper \InventoryDropdown, (.selected)
+        requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+        requireHelper \Avatar, (.AUDIENCE)
+        #requireHelper \AvatarList, (._byId?.admin01)
+        for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx.comparator == \id
+            window.myAvatars = ev.ctx
+            break
+
+        if requireHelper \InventoryAvatarPage, ((a) -> a::?.className == 'avatars' && a::eventName)
+            window.InventoryDropdown = new InventoryAvatarPage().dropDown.constructor
 
     window.Lang = require \lang/Lang
 
@@ -8061,7 +8274,7 @@ require <[ sockjs ]>, (SockJS) !->
     ####################################*/
     user.avatarID = API.getUser!.avatarID
     module \customAvatars, do
-        require: <[ users Lang avatarAuxiliaries Avatar myAvatars ]>
+        require: <[ users Lang avatarAuxiliaries Avatar myAvatars InventoryDropdown ]>
         optional: <[ user_ _$context ]>
         displayName: 'Custom Avatars'
         settings: \base
@@ -8240,11 +8453,11 @@ require <[ sockjs ]>, (SockJS) !->
                 html = ""
                 categories = {}
                 curAvatarID = API.getUser!.avatarID
-                curCategory = \base
                 for avi in myAvatars.models
                     categories[avi.get \category] = true
                     if avi.id == curAvatarID
                         curCategory = avi.get \category
+                curCategory ||= myAvatars.models.0?.get \category
 
                 for category of categories
                     html += "
@@ -8434,9 +8647,10 @@ require <[ sockjs ]>, (SockJS) !->
 
                 @socket.trigger type, data
 
-            @replace @socket, \close, (close_) !-> return !->
-                    @trigger \close
-                    close_ ...
+            close_ = @socket.close
+            @socket.close = !->
+                @trigger \close
+                close_ ...
 
             # replace old authTokens
             user = API.getUser!
@@ -8588,7 +8802,7 @@ require <[ sockjs ]>, (SockJS) !->
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
-    setup: ({$create, addListener}, p0neSettings,, oldModule) !->
+    setup: ({$create, addListener}, p0neSettings, oldModule) !->
         @$create = $create
 
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
@@ -8659,7 +8873,8 @@ module \p0neSettings, do
         addListener $body, \p0ne:resize, \.p0ne-settings-group, (e) !->
             $this = $ this
             if p0neSettings._settings.groupToggles[$this.data \group]
-                $this .css height: @scrollHeight
+                $this .css height: 0 # reset scrollHeight
+                $this .css height: @scrollHeight # make group as large as content
             $this .scrollTop 0
 
         addListener $ppW, \click, \.checkbox, throttle 200ms, !->
@@ -8674,6 +8889,29 @@ module \p0neSettings, do
                 module.enable!
             else
                 module.disable!
+        addListener $ppW, \click, \.p0ne-settings-panel-icon, throttle 200ms, (e) !->
+            $this = $ this .closest \.p0ne-settings-item
+            module = $this .data \module
+            if not module._$settingsPanel
+                module._$settingsPanel =
+                    open: false
+                    wrapper: $ '<div class=p0ne-settings-panel-wrapper>' .appendTo $ppM
+                    $el: $ '<div class=p0ne-settings-panel>'
+                module._$settingsPanel.$el .appendTo module._$settingsPanel.wrapper
+                module.settingsPanel(module._$settingsPanel.$el, module)
+
+            offsetLeft = $ppW.width!
+            if module._$settingsPanel.open # close panel
+                module._$settingsPanel.wrapper
+                    .animate do
+                        left: offsetLeft - module._$settingsPanel.$el.width!
+                        -> module._$settingsPanel.wrapper.hide!
+            else # open panel
+                module._$settingsPanel.wrapper
+                    .show!
+                    .css left: offsetLeft - module._$settingsPanel.$el.width!
+                    .animate left: offsetLeft
+            e.preventPropagation!
 
         addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
             $this = $ this
@@ -8701,7 +8939,7 @@ module \p0neSettings, do
                 .css top: tt, left: l
                 .stop!.fadeIn!
             $ppP .find \.p0ne-settings-popup-triangle
-                .css top: t
+                .css top: 14px >? t
         addListener $ppW, \mouseout, \.p0ne-settings-has-more, !->
             $ppP .stop!.fadeOut!
         addListener $ppP, \mouseover, !->
@@ -8792,6 +9030,8 @@ module \p0neSettings, do
             icons = ""
             for k in <[ help screenshot ]> when module[k]
                 icons += "<div class=p0ne-settings-#k></div>"
+            if module.settingsPanel
+                icons += "<div class=p0ne-settings-panel-icon><i class='icon icon-settings-white'></i></div>"
             if icons.length
                 icons = "<div class=p0ne-settings-icons>#icons</div>"
                 itemClasses += ' p0ne-settings-has-more'
@@ -8867,6 +9107,8 @@ module \p0neSettings, do
                             module._$settingsExtra .trigger \p0ne:resize
                     if autofocus
                         module._$settingsExtra .find \input .focus!
+                    else
+                        module._$settings .parent! .scrollTop 0
         catch err
             console.error "[#{module.name}] error while processing settingsExtra", err.stack
             module._$settingsExtra?
@@ -8978,7 +9220,7 @@ module \disableChatDelete, do
             markAsDeleted(c, users.get(mi)?.get(\username) || mi)
             lastDeletedCid := c
         #addListener \early, _$context, \chat:delete, !-> return (cid) !->
-        replace_$Listener \chat:delete, !-> (cid) !->
+        replace_$Listener \chat:delete, !-> return (cid) !->
             markAsDeleted(cid) if cid != lastDeletedCid
 
         function markAsDeleted cid, moderator
@@ -9041,7 +9283,7 @@ module \warnOnMehers, do
     _settings:
         instantWarn: false
         maxMehs: 3
-    setup: ({addListener},,, m_) !->
+    setup: ({addListener},, m_) !->
         if m_
             @users = m_.users
         users = @users
@@ -9063,20 +9305,23 @@ module \warnOnMehers, do
         lastAdvance = 0
         addListener API, \advance, (d) !~>
             d = Date.now!
-            for k,v of current
+            for cid,v of current
                 if v == -1
-                    users[k] ||= 0
-                    if ++users[k] > @_settings.maxMehs and troll = getUser(k)
+                    users[cid] ||= 0
+                    if ++users[cid] > @_settings.maxMehs and troll = getUser(cid)
                         # note: the user (`troll`) may have left during this song
                         appendChat $ "
                             <div class='cm system'>
                                 <div class=box><i class='icon icon-chat-system'></i></div>
                                 <div class='msg text'>
-                                    #{formatUserHTML troll} meh'd the past #{plural users[k], 'song'}!
+                                    #{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!
                                 </div>
                             </div>"
-                else if d > lastAdvance + 10_000ms and d.lastPlay?.dj.id != k
-                    delete users[k]
+                else if d > lastAdvance + 10_000ms
+                    delete users[cid]
+            if d > lastAdvance + 10_000ms
+                for {cid} in API.getUsers! when not current[cid] and d.lastPlay?.dj.id != cid
+                    delete users[cid]
             current := {}
             lastAdvance := d
 
@@ -9135,18 +9380,31 @@ module \afkTimer, do
         This module shows how long users have been inactive in the User- and Waitlist-Panel.
         "Being active"
     '''
-    lastActivity: {}
     _settings:
+        lastActivity: {}
         highlightOver: 43.min
-    setup: ({addListener, $create, replace},,,m_) !->
+
+    setup: ({addListener, $create, replace},, m_) !->
         # initialize users
         settings = @_settings
-        @start = start = Date.now!
+        start = Date.now!
         if m_
-            @lastActivity = m_.lastActivity ||{}
+            console.log "m_ =", m_
+            @start = m_.start
+            lastActivity = m_._settings.lastActivity ||{}
+        else
+            console.log "args", arguments
+            @start = start
+            if @_settings.lastActivity?.0 + 60_000ms > Date.now!
+                lastActivity = @_settings.lastActivity
+            else
+                lastActivity = {}
+        @lastActivity = lastActivity
+
         for user in API.getUsers!
-            @lastActivity[user.id] ||= start
-        lastActivity = @lastActivity
+            lastActivity[user.id] ||= start
+        start = @start
+
 
         $waitlistBtn = $ \#waitlist-button
             .append $afkCount = $create '<div class=p0ne-toolbar-count>'
@@ -9154,7 +9412,7 @@ module \afkTimer, do
         # set up event listeners to update the lastActivity time
         addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
         addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
-        addListener API, 'chat', (u) !-> updateUser u.uid
+        addListener API, 'chat', (u) !-> if not /afk/i.test(u.message) then updateUser u.uid
         addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
@@ -9168,12 +9426,13 @@ module \afkTimer, do
 
         # regularly update the AFK list / count
         lastAfkCount = 0
-        @timer = repeat 60_000ms, !->
+        var afkCount
+        @timer = repeat 60_000ms, fn=!->
             if chatHidden
                 forceRerender!
             else
                 # update AFK user count
-                afkCount = 0
+                afkCount := 0
                 d = Date.now!
                 usersToCheck = API.getWaitList!
                 usersToCheck[*] = that if API.getDJ!
@@ -9188,6 +9447,7 @@ module \afkTimer, do
                         #$waitlistBtn .removeClass \p0ne-toolbar-highlight
                         $afkCount .clear!
                     lastAfkCount := afkCount
+        fn!
 
         # UI
         d = 0
@@ -9201,25 +9461,36 @@ module \afkTimer, do
                     d := 0; noActivityYet := null
                 ago = d - lastActivity[@model.id]
                 if lastActivity[@model.id] <= start
-                    time = noActivityYet ||= ">#{humanTime(ago, true)}"
+                    if ago < 120_000ms
+                        time = noActivityYet ||= "? "
+                    else
+                        time = noActivityYet ||= ">#{humanTime(ago, true)}"
                 else if ago < 60_000ms
                     time = "<1m"
                 else if ago < 120_000ms
                     time = "<2m"
                 else
                     time = humanTime(ago, true)
-                $span = $ '<span class=p0ne-last-activity>' .text time
-                $span .addClass \p0ne-last-activity-warn if ago > settings.highlightOver
-                $span .addClass \p0ne-last-activity-update if isUpdate
-                @$el .append $span
+
+                if @$afk
+                    @$afk .removeClass 'p0ne-last-activity-warn'
+                else
+                    @$afk = $ '<span class=p0ne-last-activity>'
+                        .appendTo @$el
+                @$afk .text time
+                @$afk .addClass \p0ne-last-activity-warn if ago > settings.highlightOver
                 if isUpdate
-                    <-! requestAnimationFrame
-                    $span .removeClass \p0ne-last-activity-update
+                    @$afk .addClass \p0ne-last-activity-update
+                    <~! requestAnimationFrame
+                    @$afk .removeClass \p0ne-last-activity-update
 
 
 
         function updateUser uid
-            lastActivity[uid] = Date.now!
+            if Date.now! - lastActivity[uid] > settings.highlightOver
+                afkCount--
+                $afkCount .text afkCount
+            lastActivity.0 = lastActivity[uid] = Date.now!
             # waitlist.rows defaults to [], so no need to ||[]
             for r in userList?.listView?.rows || app?.room.waitlist.rows when r.model.id == uid
                 r.render true
@@ -9241,6 +9512,9 @@ module \afkTimer, do
             r.render!
 
 
+/*####################################
+#           FORCE SKIP BTN           #
+####################################*/
 module \forceSkipButton, do
     moderator: true
     setup: ({$create}, m) !->
@@ -9458,7 +9732,7 @@ module \logGrabbers, do
         replace votes, \grab, (g_) !-> return (uid) !->
             u = getUser(uid)
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
-            grabbers[uid] = u.un
+            grabbers[uid] = u.username
             hasGrabber := true
             return g_.call(this, uid)
         addListener API, \advance, !->
@@ -9584,7 +9858,7 @@ window <<<<
             keys = 0
             keysExact = 0
             isNotObj = typeof v not in <[ object function ]>
-            for id, m2 of require.s.contexts._.defined when m2 and m2[k] and k not in <[ requireID cid id ]>
+            for id, m2 of require.s.contexts._.defined when m2 and m2[k] and k not in <[ requireID cid id length ]>
                 keys++
                 keysExact++ if isNotObj and m2[k] == v
 
@@ -10116,8 +10390,16 @@ module \ponify, do
 #              RULESKIP              #
 ####################################*/
 module \forceSkipButtonRuleskip, do
-    require: <[ songNotif ]>
+    displayName: "Ruleskip Button"
+    settings: \pony
+    description: """
+        Makes the Skip button show a ruleskip list instead.
+        (you can still instaskip)
+    """
+    screenshot: 'https://i.imgur.com/jGwYsn3.png'
+    moderator: true
     setup: ({addListener, replace, $create, css}) !->
+        #TODO add this http://pastebin.com/hgmHKzYC
         css \forceSkipButtonRuleskip, '
             .p0ne-skip-ruleskip {
                 position: absolute;
@@ -10140,7 +10422,7 @@ module \forceSkipButtonRuleskip, do
         visible = false
         fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.name == \forceSkipButton
             $rulelist := $create '
-                <ul class="p0ne-skip-ruleskip">
+                <ul class=p0ne-skip-ruleskip>
                     <li data-rule=insta><b>insta skip</b></li>
                     <li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li>
                     <li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li>
@@ -10148,7 +10430,7 @@ module \forceSkipButtonRuleskip, do
                     <li data-rule=13><b>!ruleskip 13</b> (NSFW)</li>
                     <li  data-rule=5><b>!ruleskip  5</b> (too long)</li>
                     <li  data-rule=4><b>!ruleskip  4</b> (history)</li>
-                    <li  data-rule=3><b>!ruleskip  3</b> (low efford mix)</li>
+                    <li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li>
                     <li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li>
                     <li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li>
                 </ul>
@@ -10171,7 +10453,7 @@ module \forceSkipButtonRuleskip, do
 
             console.log "[forceSkipButton] 'fimplug !ruleskip list' patch applied"
 
-        addListener \early (window._$context || API), \advance, !-> if visible
+        addListener \early, (window._$context || API), \advance, !-> if visible
             # trying to attach the lister as early as possible to prevent accidental double-skips
             visible := false
             $rulelist .fadeOut!
@@ -10190,7 +10472,8 @@ module \fimstats, do
     disabled: true
     _settings:
         highlightUnplayed: false
-    setup: ({addListener, $create, replace}, lookup) !->
+    CACHE_DURATION: 1.h
+    setup: ({addListener, $create, replace}, fimstats) !->
         css \fimstats, '
             .p0ne-fimstats {
                 position: absolute;
@@ -10263,10 +10546,11 @@ module \fimstats, do
             }
         '
         $el = $create '<span class=p0ne-fimstats>' .appendTo \#room
-        addListener API, \advance, @updateStats = (d) !~>
-            d ||= media: API.getMedia!
+        addListener API, \advance, @updateStats = (d=API.getMedia!) !~>
+            if d?.lastPlay?.media
+                delete @cache[id = "#{d.lastPlay.media.format}:#{d.lastPlay.media.cid}"]
             if d.media
-                @currentSong = lookup d.media
+                fimstats d.media
                     .then (res) !->
                         $el .html res.html
                     .fail (err) !->
@@ -10278,13 +10562,13 @@ module \fimstats, do
             addListener _$context, \ShowDialogEvent:show, (d) !-> #\PreviewEvent:preview, (d) !->
                 _.defer !-> if d.dialog.options?.media
                     console.log "[fimstats]", d.dialog.options.media
-                    lookup d.dialog.options.media
+                    fimstats d.dialog.options.media
                         .then (d) !->
                             $ \#dialog-preview .after do
                                 $create '<div class=p0ne-fimstats>' .html d.html
         if app?.dialog?.dialog?.options?.media
             console.log "[fimstats]", that
-            lookup that.toJSON!
+            fimstats that.toJSON!
                 .then (d) !->
                     $ \#dialog-preview .after do
                         $create '<div class=p0ne-fimstats>' .html d.html
@@ -10299,61 +10583,78 @@ module \fimstats, do
             $yourNextMedia = $ \#your-next-media
 
             @checkUnplayed = !->
-                if playlists.activeMedia.length > 0
-                    #console.log "[fimstats] next song", playlists.activeMedia.0
-                    lookup playlists.activeMedia.0 .then (d) !->
+                $yourNextMedia .removeClass \p0ne-fimstats-unplayed
+                if fimstats._settings.highlightUnplayed and playlists.activeMedia.length > 0
+                    console.log "[fimstats] checking next song", playlists.activeMedia.0
+                    fimstats playlists.activeMedia.0 .then (d) !->
                         if d.unplayed
                             $yourNextMedia .addClass \p0ne-fimstats-unplayed
 
             replace app.footer.playlist, \updateMeta, (uM_) !-> return !->
                 if playlists.activeMedia.length > 0
-                    if fimstats._settings.highlightUnplayed
-                        fimstats.checkUnplayed!
+                    fimstats.checkUnplayed!
                     uM_ ...
                 else
                     clearTimeout @updateMetaBind
             replace app.footer.playlist, \updateMetaBind, !-> return app.footer.playlist~updateMeta
 
             # apply immediately
-            if @_settings.highlightUnplayed
-                @checkUnplayed!
+            @checkUnplayed!
+        else
+            console.warn "[fimstats] failed to load requirements for checking next song. next song check disabled."
 
         # show stats for current song
         @updateStats!
 
     checkUnplayed: !-> # Dummy function in case we cannot get `playlists` (which is required)
 
-    lastMedia: {}
+    cache: {}
     module: (media=API.getMedia!) !->
         $ \#p0ne-menu .css bottom: 54px
-        def = $.Deferred!
         if media.attributes and media.toJSON
             media .= toJSON!
-        if @lastMedia.cid == media.cid and @lastMedia.format == media.format
-            return @lastDeferred
+
+        # check if data is already cached
+        if @cache[id = "#{media.format}:#{media.cid}"]
+            clearTimeout @cache[id].timeoutID
+            @cache[id].timeoutID = sleep @CACHE_DURATION, ~>
+                delete @cache[id]
+            return @cache[id]
         else
-            @lastMedia = media
-            @lastDeferred = def
-        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
+            # if not yet cached, create a Deferred
+            def = $.Deferred!
+            @cache[id] = def.promise!
+            @cache[id].timeoutID = sleep @CACHE_DURATION, ~>
+                delete @cache[id]
+
+        # load data from fimstats
+        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}" #?key=#{p0ne.FIMSTATS_KEY}
             .then (d) !->
-                # note: `d.plays` (playcount) doesn't contain current play
                 d = d.data.0
-                # note: data is HTML escaped, but let's make sure
+                # note: `d.plays` (playcount) doesn't contain current play
+                # we need to sanitize everything to avoid HTML injection (some songtitles are actually not HTMl escaped)
+                for k,v of d
+                    if typeof v == \string
+                        d[k] = sanitize v
+                    else
+                        for k2,v2 of v when typeof v2 == \string
+                            v[k2] = sanitize v2
+
                 if d.firstPlay.time != d.lastPlay.time
-                    d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
+                    d.text = "last played by #{d.lastPlay.user.username} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user.username}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{sanitize d.lastPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{d.lastPlay.user.username}
                             <span class=p0ne-fimstats-last-time>#{ago d.lastPlay.time*1000s_to_ms}</span>
                         </span>
                         <span class='p0ne-fimstats-field p0ne-fimstats-plays'>#{d.plays}</span>
-                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{sanitize d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{d.firstPlay.user.username}
                             <span class=p0ne-fimstats-first-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>
                     "
                 else
-                    d.text = "once played by #{d.firstPlay.user}"
+                    d.text = "once played by #{d.firstPlay.user.username}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{sanitize d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{d.firstPlay.user.username}
                             <span class=p0ne-fimstats-once-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>"
                 def.resolve d
@@ -10363,11 +10664,10 @@ module \fimstats, do
                     d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>"
                     d.unplayed = true
                     def.resolve d
-                #else if status == \Unauthorized
                 else
                     d.text = d.html = "error loading fimstats"
                     def.reject d
-        return def.promise!
+        return @cache[id]
 
         function sanitize str
             return str .replace(/</g, '&lt;') .replace(/>/g, '&gt;')
@@ -10394,6 +10694,51 @@ module \fimstats, do
 
     disable: !->
         $ \#your-next-media .removeClass \p0ne-fimstats-unplayed
+
+
+module \ponifiedLang, do
+    require: <[ Lang ]>
+    disabled: true
+    displayName: "Ponified Text"
+    setup: ({replace}) !->
+        # roles
+        replace Lang.roles, \host, !-> return "Alicorn Princess"
+        replace Lang.roles, \cohost, !-> return "Alicorn"
+        replace Lang.roles, \dj, !-> return "Horse Famous"
+        replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
+        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies"
+        replace Lang.roles, \none, !-> return "Mudpony"
+        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
+
+        # ponies
+        replace Lang.messages, \minChatLevel, !-> return "This community restricts chat to ponies who are level %LEVEL% and above."
+        replace Lang.permissions, \ban, !-> return "Ban Ponies."
+        replace Lang.permissions, \unban, !-> return "Unban Ponies."
+        replace Lang.tooltips, \headersUsers, !-> return "Ponies"
+        replace Lang.tooltips, \usersRoom, !-> return "Ponies who are here right now"
+        replace Lang.tooltips, \usersBans, !-> return "Ponies who have been banned"
+        replace Lang.tooltips, \usersIgnored, !-> return "Ponies who you have ignored"
+        replace Lang.tooltips, \usersMutes, !-> return "Ponies who have been muted"
+        replace Lang.tooltips, \chatLevel, !-> return "Restrict chat to ponies who are this level or above"
+        replace Lang.userList, \roomTitle, !-> return "Ponies here now"
+
+        # Bot Commands
+        replace Lang.chat, \help, !-> return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
+            <strong>Bot Commands:</strong><br>
+            !randgame &nbsp; <em>Pony Adventure</em><br/>
+            !power &nbsp; <em>Random Power</em><br/>
+            !hug (@user) &nbsp; <em>hug somepony</em><br/>
+            !1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>
+            !rule <number> &nbsp; <em>List a Rule</em><br/>
+            !songinfo &nbsp; <em>Songstats</em><br/>
+            !dc &nbsp; <em>be put back if you dc'd</em><br/>
+            !eta &nbsp; <em>ETA til you dj</em><br/>
+            !weird &nbsp; <em>Is it weirdday?</em><br/>
+            "
+
+        # misc
+        replace Lang.search, \youtube, !-> return "Search YouTube for ponies"
+        replace Lang.search, \soundcloud, !-> return "Search SoundCloud for ponies"
 
 /*@source p0ne.bpm.ls */
 /**

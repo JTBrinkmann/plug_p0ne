@@ -959,6 +959,61 @@ out$.localforage = localforage;
       }
     }
     return itemSet();
+  case compareVersions(v, dest = '1.7.10'):
+    if (window.afkTimer) {
+      window.afkTimer._settings.lastActivity = window.afkTimer.lastActivity;
+      migrated(dest);
+      return migrate();
+    } else {
+      console.log("updating afkTimer settings");
+      return localforage.getItem('p0ne_afkTimer', function(err, d){
+        if (err) {
+          console.warn("error loading afkTimer settings");
+          migrated(dest);
+          return migrate();
+        } else {
+          d.lastActivity = {};
+          return localforage.setItem('p0ne_afkTimer', d, function(){
+            migrated(dest);
+            return migrate();
+          });
+        }
+      });
+    }
+    break;
+  case compareVersions(v, dest = '1.8.0'):
+    $('.p0ne-cc-settings').remove();
+    if (window.customColors) {
+      window.customColors._settings = {
+        global: {
+          role: window.customColors._settings.global,
+          user: {}
+        },
+        perRoom: {},
+        rolesOrder: ['admin', 'ambassador', 'host', 'cohost', 'manager', 'bouncer', 'dj', 'subscriber', 'you', 'friend', 'regular']
+      };
+      migrated(dest);
+      return migrate();
+    } else {
+      console.log("updating customColors settings");
+      return localforage.getItem('p0ne_customColors', function(err, d){
+        if (err) {
+          console.warn("error loading customColors settings");
+          migrated(dest);
+          return migrate();
+        } else {
+          d.global = {
+            role: d.global,
+            user: {}
+          };
+          d.rolesOrder = ['admin', 'ambassador', 'host', 'cohost', 'manager', 'bouncer', 'dj', 'subscriber', 'you', 'friend', 'regular'];
+          return localforage.setItem('p0ne_customColors', d, function(){
+            migrated(dest);
+            return migrate();
+          });
+        }
+      });
+    }
   }
 })();
 function editLocalStorage(moduleName, cb){

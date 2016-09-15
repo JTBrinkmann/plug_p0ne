@@ -24,13 +24,14 @@
  * The following 3rd party scripts are used:
  *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
  *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
+ *     - Stefan Petre's Color Picker http://www.eyecon.ro/colorpicker/ (Dual licensed under the MIT and GPL licenses)
  * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
  *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
  *
- * Not happy with plug_p0ne? contact me (the developer) at brinkiepie^gmail.com
+ * Not happy with plug_p0ne? contact me (the developer) at brinkiepie@gmail.com
  * great alternative plug.dj scripts are
- *     - TastyPlug (relatively lightweight but does a great job - https://fungustime.pw/tastyplug/ )
- *     - RCS (Radiant Community Script - https://radiant.dj/rcs )
+ *     - TastyPlug (relatively lightweight but does a good job - https://fungustime.pw/tastyplug/ )
+ *     - RCS (best alternative I could recommend - https://radiant.dj/rcs )
  *     - plugCubed (does a lot of things, but breaks on plug.dj updates - https://plugcubed.net/ )
  *     - plugplug (lightweight as heck - https://bitbucket.org/mateon1/plugplug/ )
  */
@@ -41,11 +42,10 @@ if (typeof console.time == 'function') {
 }
 p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.7.8',
-  lastCompatibleVersion: '1.7.0',
+  version: '1.8.0',
+  lastCompatibleVersion: '1.8.0',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
-  YOUTUBE_KEY: 'AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw',
   YOUTUBE_V3_KEY: 'AIzaSyDaWL9emnR9R_qBWlDAYl-Z_h4ZPYBDjzk',
   FIMSTATS_KEY: '4983a7f2-b253-4300-8b18-6e7c57db5e2e',
   proxy: function(url){
@@ -1135,12 +1135,12 @@ window.compareVersions = function(a, b){
   });
   Array.prototype.define('joinWrapped', function(pre, post, between){
     var res, i$, to$, i;
+    pre == null && (pre = '');
+    post == null && (post = '');
+    between == null && (between = '');
     if (this.length === 0) {
       return "";
     }
-    pre || (pre = '');
-    post || (post = '');
-    between || (between = '');
     res = pre + "" + this[0] + post;
     for (i$ = 1, to$ = this.length; i$ < to$; ++i$) {
       i = i$;
@@ -1197,6 +1197,15 @@ window.compareVersions = function(a, b){
   Number.prototype.defineGetter('h', function(){
     return this * 3600000;
   });
+  if (window.chrome) {
+    Error.prototype.__defineGetter__('messageAndStack', function(){
+      return this.stack;
+    });
+  } else {
+    Error.prototype.__defineGetter__('messageAndStack', function(){
+      return this.name + ": " + this.message + "\n" + this.stack;
+    });
+  }
   importAll$(jQuery.fn, {
     indexOf: function(selector){
       /* selector may be a String jQuery Selector or an HTMLElement */
@@ -1378,6 +1387,9 @@ window.compareVersions = function(a, b){
       delete p0ne.autosave[name];
     }
   };
+  if (window.dataSave) {
+    $window.off('beforeunload', window.dataSave);
+  }
   window.dataSave = function(){
     var err, k, ref$, v, _, e;
     err = "";
@@ -1432,7 +1444,7 @@ window.compareVersions = function(a, b){
           fn.call(context || this, this._data);
         } catch (e$) {
           e = e$;
-          console.error("[" + this._name + "] Error while triggering " + type + " [" + (this._listeners[type].length - 1) + "]", this, args, e.stack);
+          console.error("[" + this._name + "] Error while triggering " + type + " [" + (this._listeners[type].length - 1) + "]", this, args, e.messageAndStack);
         }
       }
       return this;
@@ -1682,8 +1694,6 @@ window.compareVersions = function(a, b){
       options = {
         type: type,
         url: "https://plug.dj/_/" + url,
-        contentType: 'application/json',
-        data: JSON.stringify(data),
         success: function(arg$){
           var data;
           data = arg$.data;
@@ -1703,8 +1713,14 @@ window.compareVersions = function(a, b){
           }
         }
       };
+      data = JSON.stringify(data);
+      if (data !== "{}" && (type !== 'GET' && type !== 'get')) {
+        options.contentType = 'application/json';
+        options.data = data;
+      }
       def = $.Deferred();
       (delay = function(){
+        var req;
         if (window.floodAPI_counter >= 15) {
           sleep(1000, delay);
         } else {
@@ -1712,7 +1728,8 @@ window.compareVersions = function(a, b){
           sleep(10000, function(){
             window.floodAPI_counter--;
           });
-          return $.ajax(options).then(def.resolve, def.reject, def.progress);
+          req = $.ajax(options).then(def.resolve, def.reject, def.progress);
+          def.abort = req.abort;
         }
       })();
       return def;
@@ -1794,15 +1811,16 @@ window.compareVersions = function(a, b){
       if (typeof user !== 'number') {
         user = getUser(user);
       }
-      cb || (cb = function(data){
-        console.log("[userdata]", data, data.level >= 5 ? "https://plug.dj/@/" + encodeURI(data.slug) : void 8);
-      });
       return $.get("/_/users/" + user).then(function(arg){
         var data;
         data = arg.data, data = data[0];
-        return data;
+        if (cb) {
+          return data;
+        } else {
+          console.log("[userdata]", data, data.level >= 5 ? "https://plug.dj/@/" + encodeURI(data.slug) : void 8);
+        }
       }).fail(function(){
-        console.warn("couldn't get slug for user with id '" + id + "'");
+        console.warn("couldn't get userdata for user with id '" + id + "'");
       });
     },
     $djButton: $('#dj-button'),
@@ -1819,13 +1837,13 @@ window.compareVersions = function(a, b){
       });
     },
     unmute: function(){
-      return $('#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once'.click()).length;
+      return $('#playback .snoozed .refresh, #volume .icon-volume-off, #volume .icon-volume-mute-once').click().length;
     },
     snooze: function(){
       return $('#playback .snooze').click().length;
     },
     isSnoozed: function(){
-      $('#playback-container').children().length === 0;
+      return $('#playback-container').children().length === 0;
     },
     refresh: function(){
       return $('#playback .refresh').click().length;
@@ -1834,9 +1852,7 @@ window.compareVersions = function(a, b){
       if (!currentMedia) {
         console.error("[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'");
       } else {
-        if (typeof database != 'undefined' && database !== null) {
-          database.settings.streamDisabled = val !== true && (val === false || currentMedia.get('streamDisabled'));
-        }
+        return typeof database != 'undefined' && database !== null ? database.settings.streamDisabled = val !== true && (val === false || currentMedia.get('streamDisabled')) : void 8;
       }
     },
     join: function(){
@@ -1846,6 +1862,9 @@ window.compareVersions = function(a, b){
       } else {
         return false;
       }
+    },
+    forceJoin: function(){
+      ajax('POST', 'booth');
     },
     leave: function(){
       return $('#dj-button.is-leave').click().length !== 0;
@@ -1952,9 +1971,9 @@ window.compareVersions = function(a, b){
           : !media ? cb(API.getMedia()) : void 8));
       cb();
     },
-    mediaLookup: function(url, cb){
-      var format, id, cid, success, fail, def, ref$, ref1$, req;
-      format = url.format, id = url.id, cid = url.cid;
+    mediaLookupCache: {},
+    mediaLookup: function(songs, cb){
+      var success, fail, def, isArray, res, l, duplicates, queries, i$, len$, i, media, format, cid, ref$, ref1$, remaining, ytCids_, packs, to$, id, ytCids;
       if (typeof cb === 'function') {
         success = cb;
       } else {
@@ -1972,88 +1991,187 @@ window.compareVersions = function(a, b){
       });
       def = $.Deferred();
       def.then(success, fail);
-      if (typeof url === 'string') {
-        if (cid = (ref$ = YT_REGEX.exec(url)) != null ? ref$[1] : void 8) {
-          format = 1;
-        } else if ((ref1$ = parseURL(url).hostname) === 'soundcloud.com' || ref1$ === 'i1.sndcdn.com') {
+      if (!(isArray = $.isArray(songs))) {
+        songs = [songs];
+      }
+      res = [];
+      l = 0;
+      duplicates = {};
+      queries = {
+        1: {},
+        2: {}
+      };
+      for (i$ = 0, len$ = songs.length; i$ < len$; ++i$) {
+        i = i$;
+        media = songs[i$];
+        format = false;
+        if (+media) {
+          console.warn("[mediaLookup] warning, media only described by an ID, assuming SoundCloud ID. It is recommended to use {format: 2, cid: id} instead");
           format = 2;
+          cid = +media;
+        } else if (typeof media === 'string') {
+          if (media.length === 11) {
+            format = 1;
+            cid = media;
+          } else if (cid = (ref$ = YT_REGEX.exec(media)) != null ? ref$[1] : void 8) {
+            format = 1;
+          } else if (media.has('.com') && ((ref1$ = parseURL(media).hostname) === 'soundcloud.com' || ref1$ === 'i1.sndcdn.com')) {
+            format = 2;
+            cid = media;
+          }
+        } else if (typeof media === 'object' && media && media.cid) {
+          if (media.format === 1 || media.format === 2) {
+            format = media.format, cid = media.cid;
+          }
         }
-      } else {
-        cid || (cid = id);
+        if (!format) {
+          console.warn("[mediaLookup] unknown format", media, "as #" + i + " in", songs);
+          l++;
+          continue;
+        }
+        if (cid in queries[format]) {
+          console.log("[mediaLookup] " + format + " : " + cid + " appears multiple times in the same query");
+          duplicates[l++] = queries[format][cid];
+        } else if (window.mediaLookupCache[cid]) {
+          console.log("[mediaLookup] " + format + " : " + cid + " fetched from cache");
+          res[l] = window.mediaLookupCache[cid];
+          clearTimeout(res[l]._timeoutID);
+          res[l]._timeoutID = sleep(5 .min, fn$);
+          l++;
+        } else {
+          console.log("[mediaLookup] " + format + " : " + cid + " adding to query [" + l + "]");
+          queries[format][cid] = l++;
+        }
       }
-      if (window.mediaLookup.lastID === (cid || url) && window.mediaLookup.lastData) {
-        success(window.mediaLookup.lastData);
-      } else {
-        window.mediaLookup.lastID = cid || url;
-        window.mediaLookup.lastData = null;
+      console.log("[mediaLookup] queries:", queries);
+      remaining = 0;
+      ytCids_ = Object.keys(queries[1]);
+      if (ytCids_.length) {
+        remaining += ytCids_.length;
+        if (ytCids_.length > 50) {
+          packs = [];
+          for (i$ = 0, to$ = ~~(ytCids_.length / 50); i$ <= to$; ++i$) {
+            i = i$;
+            packs[i] = [];
+          }
+          for (i$ = 0, len$ = ytCids_.length; i$ < len$; ++i$) {
+            i = i$;
+            id = ytCids_[i$];
+            packs[~~(i / 50)][i % 50] = id;
+          }
+        } else {
+          packs = [ytCids_];
+        }
+        for (i$ = 0, len$ = packs.length; i$ < len$; ++i$) {
+          ytCids = packs[i$];
+          $.getJSON("https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&fields=items(id,contentDetails/duration,contentDetails/regionRestriction,snippet/channelId,snippet/channelTitle,snippet/description,snippet/publishedAt,snippet/title)&id=" + ytCids.join(',') + "&key=" + p0ne.YOUTUBE_V3_KEY).fail(fail).success(fn1$);
+        }
       }
-      if (format === 1) {
-        /*# Youtube API v2
-        $.getJSON "https://gdata.youtube.com/feeds/api/videos/#cid?v=2&alt=json"
-            .fail fail
-            .success (d) !->
-                cid = d.entry.id.$t.substr(27)
-                def.resolve do
-                    window.mediaLookup.lastData =
-                        format:       1
-                        data:         d
-                        cid:          cid
-                        uploader:
-                            name:     d.entry.author.0.name.$t
-                            id:       d.entry.media$group.yt$uploaderId.$t
-                            url:      "https://www.youtube.com/channel/#{d.entry.media$group.yt$uploaderId.$t}"
-                        image:        "https://i.ytimg.com/vi/#cid/0.jpg"
-                        title:        d.entry.title.$t
-                        uploadDate:   d.entry.published.$t
-                        url:          "https://youtube.com/watch?v=#cid"
-                        description:  d.entry.media$group.media$description.$t
-                        duration:     d.entry.media$group.yt$duration.seconds # in s
-        
-                        restriction:  if d.data.entry.media$group.media$restriction
-                            blocked: that
-        */
-        $.getJSON("https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&maxResults=1&id=" + cid + "&key=" + p0ne.YOUTUBE_V3_KEY).fail(fail).success(function(arg$){
-          var d, cid, duration, that;
-          d = arg$.items[0];
-          cid = d.id;
+      for (i$ in ref1$ = queries[2]) {
+        (fn2$.call(this, i$, ref1$[i$]));
+      }
+      doneLoading();
+      function addResult(pos, cid, data){
+        console.log("[mediaLookup] looked up #" + pos, cid, data);
+        window.mediaLookupCache[cid] = data;
+        res[pos] = data;
+        return remaining--;
+      }
+      function doneLoading(){
+        var k, ref$, v;
+        if (remaining <= 0) {
+          console.log("[mediaLookup] done, resolving…");
+          if (!isArray) {
+            res = res[0];
+          } else {
+            for (k in ref$ = duplicates) {
+              v = ref$[k];
+              res[k] = res[v];
+            }
+          }
+          return def.resolve(res);
+        }
+      }
+      return def.promise();
+      function fn$(){
+        var ref$, ref1$;
+        return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
+      }
+      function fn1$(arg$){
+        var items, i$, len$, d, duration, that, cid, ref$, l;
+        items = arg$.items;
+        for (i$ = 0, len$ = items.length; i$ < len$; ++i$) {
+          d = items[i$];
           duration = 0;
           if (that = /PT(\d+)M(\d+)S/.exec(d.contentDetails.duration)) {
-            duration = that[1] * 60 + that[2];
+            duration = +that[1] * 60 + +that[2];
           }
-          def.resolve(window.mediaLookup.lastData = {
+          addResult(queries[1][d.id], d.id, {
             format: 1,
             data: d,
-            cid: cid,
+            cid: d.id,
             uploader: {
               name: d.snippet.channelTitle,
               id: d.snippet.channelId,
               url: "https://www.youtube.com/channel/" + d.snippet.channelId
             },
-            image: "https://i.ytimg.com/vi/" + cid + "/0.jpg",
+            image: "https://i.ytimg.com/vi/" + d.id + "/0.jpg",
             title: d.snippet.title,
             uploadDate: d.snippet.publishedAt,
-            url: "https://youtube.com/watch?v=" + cid,
+            url: "https://youtube.com/watch?v=" + d.id,
             description: d.snippet.description,
             duration: duration,
-            restriction: d.contentDetails.regionRestriction
+            restriction: d.contentDetails.regionRestriction,
+            _timeoutID: sleep(5 .min, fn$)
           });
-        });
-      } else if (format === 2) {
-        if (cid) {
+        }
+        for (cid in ref$ = queries[1]) {
+          l = ref$[cid];
+          if (!res[l]) {
+            console.warn("[mediaLookup] failed to look up Youtube video #" + l, cid);
+            addResult(l, cid, {
+              _timeoutID: sleep(5 .min, fn1$)
+            });
+          }
+        }
+        doneLoading();
+        function fn$(){
+          var ref$, key$, ref1$;
+          return ref1$ = (ref$ = window.mediaLookupCache)[key$ = d.id], delete ref$[key$], ref1$;
+        }
+        function fn1$(){
+          var ref$, ref1$;
+          return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
+        }
+      }
+      function fn2$(cid, pos){
+        var req;
+        remaining++;
+        if (+cid) {
           req = $.getJSON("https://api.soundcloud.com/tracks/" + cid + ".json", {
             client_id: p0ne.SOUNDCLOUD_KEY
           });
         } else {
           req = $.getJSON("https://api.soundcloud.com/resolve/", {
-            url: url,
+            url: cid,
             client_id: p0ne.SOUNDCLOUD_KEY
           });
         }
-        req.fail(fail).success(function(d){
-          def.resolve(window.mediaLookup.lastData = {
+        req.fail(function(){
+          console.warn("[mediaLookup] failed to look up soundcloud song", cid);
+          addResult(pos, cid, {
+            _timeoutID: sleep(5 .min, function(){
+              var ref$, ref1$;
+              return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
+            })
+          });
+          return doneLoading();
+        }).success(function(d){
+          var data;
+          addResult(pos, d.id, data = {
             format: 2,
             data: d,
-            cid: cid,
+            cid: d.id,
             uploader: {
               id: d.user.id,
               name: d.user.username,
@@ -2066,15 +2184,26 @@ window.compareVersions = function(a, b){
             url: d.permalink_url,
             description: d.description,
             duration: d.duration / 1000,
-            download: d.download_url ? d.download_url + ("?client_id=" + p0ne.SOUNDCLOUD_KEY) : false,
+            download: d.download_url ? d.download_url + "?client_id=" + p0ne.SOUNDCLOUD_KEY : false,
             downloadSize: d.original_content_size,
             downloadFormat: d.original_format
           });
+          if (typeof cid === 'number') {
+            data._timeoutID = sleep(5 .min, function(){
+              var ref$, ref1$;
+              return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
+            });
+          } else {
+            window.mediaLookupCache[data.cid] = data;
+            data._timeoutID = sleep(5 .min, function(){
+              var ref$, ref1$;
+              delete window.mediaLookupCache[data.cid];
+              return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
+            });
+          }
+          doneLoading();
         });
-      } else {
-        def.reject("unsupported format");
       }
-      return def;
     },
     mediaDownload: function(){
       var regexNormal, regexUnblocked, i$, ref$, len$, key;
@@ -2425,6 +2554,21 @@ window.compareVersions = function(a, b){
         return res.promise();
       };
     }(),
+    createPlaylist: function(name, media){
+      if (!window.playlists) {
+        throw new Error("createPlaylist(name, media) requires `window.playlists`");
+      }
+      ajax('POST', 'playlists', {
+        name: name,
+        media: media
+      }).then(function(pl){
+        playlists.push(new Backbone.Model(pl.data[0]));
+        playlists.sort();
+        console.log("added playlist " + name + " [" + pl.id + "]");
+      }).fail(function(err){
+        console.error("failed to add playlist " + name, err);
+      });
+    },
     proxify: function(url){
       if (typeof url.startsWith == 'function' && url.startsWith("http:")) {
         return p0ne.proxy(url);
@@ -2583,6 +2727,9 @@ window.compareVersions = function(a, b){
         return false;
       }
     },
+    escapeRegExp: function(str){
+      return (str + "").replace(/[\\\.\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:]/g, "\\$&");
+    },
     htmlEscapeMap: {
       sp: 32,
       blank: 32,
@@ -2724,7 +2871,7 @@ window.compareVersions = function(a, b){
       var lvl;
       lvl = 0;
       text = text.replace(/([\s\S]*?)($|(?:https?:|www\.)(?:\([^\s\]\)]*\)|\[[^\s\)\]]*\]|[^\s\)\]]+))+([\.\?\!\,])?/g, function(arg$, pre, url, post){
-        pre = pre.replace(/(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3").replace(/(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3").replace(/(lyrics|download|original|re-?upload)/gi, "<b>$1</b>").replace(/(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6").replace(/(\s)(\d+)(\w*|%|\+)(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4").replace(/(\s)(\d+)(\s)/g, "$1<b class='song-description-number'>$2</b>$3").replace(/^={5,}$/mg, "<hr class='song-description-hr-double' />").replace(/^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />").replace(/^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>").replace(/(.?)([\(\)])(.?)/g, function(x, a, b, c){
+        pre = pre.replace(/(\s)(".*?")([\.,!\?\s])/g, "$1<i class='song-description-string'>$2</i>$3").replace(/(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3").replace(/(lyrics|download|original|re-?upload)/gi, "<b>$1</b>").replace(/(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6").replace(/(\s)(\d+)(\w*|%|\+)(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4").replace(/(\s)(\d+)(\s)/g, "$1<b class='song-description-number'>$2</b>$3").replace(/^={5,}$/mg, "<hr class='song-description-hr-double' />").replace(/^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />").replace(/^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>").replace(/(.?)([\(\)])(.?)/g, function(x, a, b, c){
           if ("=^".indexOf(x) === -1 || a === ":") {
             return x;
           } else if (b === '(') {
@@ -2892,7 +3039,7 @@ window.compareVersions = function(a, b){
       if (user.toJSON) {
         user = user.toJSON();
       }
-      info = getRank(user);
+      info = getRank(user, true);
       if (info === 'regular') {
         info = "";
       } else {
@@ -2902,7 +3049,7 @@ window.compareVersions = function(a, b){
         info += " lvl " + (user.gRole === 5
           ? '∞'
           : user.level);
-        if (Date.now() - 48 .h < (d = new Date(user.joined))) {
+        if (Date.now() - 48 .h < (d = parseISOTime(user.joined))) {
           info += " - created " + ago(d);
         }
       }
@@ -2919,13 +3066,13 @@ window.compareVersions = function(a, b){
         info = " (lvl " + (user.gRole === 5
           ? '∞'
           : user.level);
-        if (Date.now() - 48 .h < (d = new Date(user.joined))) {
+        if (Date.now() - 48 .h < (d = parseISOTime(user.joined))) {
           info += " - created " + ago(d);
         }
         info += ")";
       }
       if (fromClass) {
-        fromClass = " " + getRank(user);
+        fromClass = " " + getRank(user, true);
       } else {
         fromClass = "";
       }
@@ -2950,6 +3097,9 @@ window.compareVersions = function(a, b){
     getISOTime: function(t){
       t == null && (t = new Date);
       return t.toISOString().replace(/T|\..+/g, " ");
+    },
+    parseISOTime: function(t){
+      return new Date(t) - timezoneOffset * 60000;
     },
     humanTime: function(diff, shortFormat){
       var b, c;
@@ -2989,7 +3139,12 @@ window.compareVersions = function(a, b){
       }
     },
     ago: function(d){
-      return humanTime(Date.now() - d) + " ago";
+      d = Date.now() - d;
+      if (d < 2000) {
+        return "just now";
+      } else {
+        return humanTime(d) + " ago";
+      }
     },
     lssize: function(sizeWhenDecompressed){
       var size, k, ref$, v;
@@ -3010,24 +3165,28 @@ window.compareVersions = function(a, b){
     formatMB: function(it){
       return it.toFixed(2) + "MB";
     },
-    getRank: function(user){
-      var role, that;
+    getRank: function(user, defaultToGhost){
+      var that;
       user = getUser(user);
-      if (!user || (role = user.role || (typeof user.get == 'function' ? user.get('role') : void 8)) === -1) {
-        return 'ghost';
-      } else if (that = user.gRole || (typeof user.get == 'function' ? user.get('gRole') : void 8)) {
+      if (!user || user.role === -1) {
+        if (defaultToGhost) {
+          return 'ghost';
+        } else {
+          return 'regular';
+        }
+      } else if (that = user.gRole) {
         if (that === 5) {
           return 'admin';
         } else {
           return 'ambassador';
         }
       } else {
-        return ['regular', 'dj', 'bouncer', 'manager', 'cohost', 'host'][role || 0];
+        return ['regular', 'dj', 'bouncer', 'manager', 'cohost', 'host'][user.role || 0];
       }
     },
     getRankIcon: function(user){
       var rank;
-      rank = getRank(user);
+      rank = getRank(user, true);
       return rank !== 'regular' && "<i class='icon icon-chat-" + rank + " p0ne-icon-small'></i>" || '';
     },
     parseURL: function(href){
@@ -3038,20 +3197,37 @@ window.compareVersions = function(a, b){
       return a;
     },
     getIcon: function(){
+      /* note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
+       * if you plan to use it over and over again, use getIcon.enableCaching() */
       var $icon, fn;
       $icon = $("<i class=icon><!-- this is used by plug_p0ne's getIcon() --></i>").css({
         visibility: 'hidden'
       }).appendTo('body');
-      fn = function(className){
-        var res;
+      fn = function(className, parsed){
+        var res, res2, that;
         $icon.addClass(className);
         res = {
           image: $icon.css('background-image'),
           position: $icon.css('background-position')
         };
-        res.background = res.image + " " + res.position;
-        $icon.removeClass(className);
-        return res;
+        if (className) {
+          $icon.removeClass(className);
+        }
+        if (parsed) {
+          res2 = {
+            x: 0,
+            y: 0,
+            url: res.image.substring(4, res.image.length - 1)
+          };
+          if (that = /-?(\d+)px\s+-?(\d+)px/.exec(res.position)) {
+            res2.x = +that[1];
+            res2.y = +that[2];
+          }
+          return res2;
+        } else {
+          res.background = res.image + " " + res.position;
+          return res;
+        }
       };
       fn.enableCaching = function(){
         var res;
@@ -3089,7 +3265,7 @@ window.compareVersions = function(a, b){
       _rooms: {}
     }
   }, function(err, data){
-    var res$, k, ref$, v, PlaylistItemRow, Dialog, i$, len$, context, ref1$, ref2$, ref3$, cb, app, friendsList, users, user, userID, _, ref4$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp;
+    var res$, k, ref$, v, PlaylistItemRow, Dialog, InventoryDropdown, i$, len$, context, ref1$, ref2$, ref3$, cb, app, friendsList, pl, user, ref4$, ev, myAvatars, userID, _, ref5$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp;
     window.requireIDs = data.p0ne_requireIDs;
     p0ne.disabledModules = data.p0ne_disabledModules;
     if (err) {
@@ -3105,6 +3281,9 @@ window.compareVersions = function(a, b){
     #          REQUIRE MODULES           #
     ####################################*/
     /* requireHelper(moduleName, testFn) */
+    requireHelper('users', function(it){
+      return it.onRole;
+    });
     requireHelper('Curate', function(it){
       var ref$, ref1$;
       return (ref$ = it.prototype) != null ? (ref1$ = ref$.execute) != null ? ref1$.toString().has("/media/insert") : void 8 : void 8;
@@ -3181,6 +3360,14 @@ window.compareVersions = function(a, b){
     requireHelper('searchManager', function(it){
       return it._search;
     });
+    requireHelper('SearchList', function(it){
+      var ref$;
+      return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'search';
+    });
+    requireHelper('YtSearchService', function(it){
+      var ref$;
+      return (ref$ = it.prototype) != null ? ref$.onVideos : void 8;
+    });
     requireHelper('AlertEvent', function(it){
       return it._name === 'AlertEvent';
     });
@@ -3217,6 +3404,12 @@ window.compareVersions = function(a, b){
       var ref$;
       return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'history' && it.prototype.hasOwnProperty('listClass');
     });
+    requireHelper('avatarAuxiliaries', function(it){
+      return it.getAvatarUrl;
+    });
+    requireHelper('Avatar', function(it){
+      return it.AUDIENCE;
+    });
     if (requireHelper('emoticons', function(it){
       return it.emojify;
     })) {
@@ -3239,6 +3432,12 @@ window.compareVersions = function(a, b){
     })) {
       out$.Dialog = Dialog = DialogAlert.__super__;
     }
+    if (requireHelper('InventoryAvatarPage', function(a){
+      var ref$;
+      return ((ref$ = a.prototype) != null ? ref$.className : void 8) === 'avatars' && a.prototype.eventName;
+    })) {
+      out$.InventoryDropdown = InventoryDropdown = new InventoryAvatarPage().dropDown.constructor;
+    }
     requireHelper('_$context', function(it){
       var ref$;
       return (ref$ = it._events) != null ? ref$['chat:receive'] : void 8;
@@ -3259,14 +3458,21 @@ window.compareVersions = function(a, b){
       if (cb.ctx.room) {
         out$.app = app = cb.ctx;
         out$.friendsList = friendsList = app.room.friends;
+        out$.pl = pl = app.footer.playlist.playlist.media;
         break;
       }
     }
     if (requireHelper('user_', function(it){
       return it.canModChat;
     })) {
-      out$.users = users = user_.collection;
       out$.user = user = user_.toJSON();
+      for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref4$ = user_._events) != null ? ref4$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+        ev = ref$[i$];
+        if (ev.ctx.comparator === 'id') {
+          out$.myAvatars = myAvatars = ev.ctx;
+          break;
+        }
+      }
     }
     if (user || (user = window.user)) {
       out$.userID = userID = user.id;
@@ -3277,13 +3483,13 @@ window.compareVersions = function(a, b){
     for (k in ref$ = typeof Lang != 'undefined' && Lang !== null ? Lang.languages : void 8) {
       v = ref$[k];
       if (v.has('\'')) {
-        (ref4$ = Lang.languages)[k] = ref4$[k].replace(/\\?'/g, "\\'");
+        (ref5$ = Lang.languages)[k] = ref5$[k].replace(/\\?'/g, "\\'");
       }
     }
     if (app && !(window.chat = app.room.chat) && window._$context) {
       for (i$ = 0, len$ = (ref$ = _$context._events['chat:receive'] || []).length; i$ < len$; ++i$) {
         e = ref$[i$];
-        if ((ref4$ = e.context) != null && ref4$.cid) {
+        if ((ref5$ = e.context) != null && ref5$.cid) {
           window.chat = e.context;
           break;
         }
@@ -3671,7 +3877,7 @@ window.compareVersions = function(a, b){
             if (callback) {
               for (i$ = 0, len$ = evts.length; i$ < len$; ++i$) {
                 e = evts[i$];
-                if (e.ctx instanceof ctx) {
+                if (e.ctx === ctx || typeof ctx === 'function' && e.ctx instanceof ctx) {
                   return this.replace(e, 'callback', callback);
                 }
               }
@@ -3692,6 +3898,10 @@ window.compareVersions = function(a, b){
               console.error(getTime() + " [ERROR] unable to replace listener in _$context._events['" + event + "'] (no _$context)");
               return false;
             }
+            if (arguments.length === 2) {
+              callback = constructor;
+              constructor = _$context;
+            }
             helperFNs.replaceListener(_$context, event, constructor, callback);
           },
           add: function(target, callback, options){
@@ -3703,6 +3913,12 @@ window.compareVersions = function(a, b){
             d.index = target.length;
             target[d.index] = callback;
             (ref$ = cbs.adds || (cbs.adds = []))[ref$.length] = d;
+          },
+          addCommand: function(commandName, data){
+            helperFNs.replace(chatCommands.commands, commandName, function(){
+              return data;
+            });
+            chatCommands.updateCommands();
           },
           $create: function(html){
             var ref$;
@@ -3739,17 +3955,17 @@ window.compareVersions = function(a, b){
               disabledModules[name] = false;
             }
             try {
-              setup.call(module, helperFNs, module, data, module);
+              setup.call(module, helperFNs, module);
               trigger('moduleEnabled');
               console.info(getTime() + " [" + name + "] enabled", setup !== null);
             } catch (e$) {
               err = e$;
-              console.error(getTime() + " [" + name + "] error while re-enabling", err.stack);
+              console.error(getTime() + " [" + name + "] error while re-enabling", err.messageAndStack);
             }
             return this;
           },
           disable: function(temp){
-            var newModule, i$, ref$, len$, ref1$, target, args, attr, replacement, orig, d, style, url, $el, m, err;
+            var newModule, hasChatCommands, i$, ref$, len$, ref1$, target, args, attr, replacement, orig, d, style, url, $el, m, err;
             if (module.disabled) {
               return;
             }
@@ -3758,8 +3974,9 @@ window.compareVersions = function(a, b){
             }
             try {
               module.disabled = true;
+              hasChatCommands = (typeof chatCommands != 'undefined' && chatCommands !== null ? chatCommands.commands : void 8) != null;
               if (typeof disable === 'function') {
-                disable.call(module, helperFNs, newModule, data);
+                disable.call(module, helperFNs, newModule);
               }
               for (i$ = 0, len$ = (ref$ = cbs.listeners || []).length; i$ < len$; ++i$) {
                 ref1$ = ref$[i$], target = ref1$.target, args = ref1$.args;
@@ -3769,6 +3986,12 @@ window.compareVersions = function(a, b){
                 ref1$ = ref$[i$], target = ref1$[0], attr = ref1$[1], replacement = ref1$[2], orig = ref1$[3];
                 if (target[attr] === replacement) {
                   target[attr] = orig;
+                  if (hasChatCommands && target === chatCommands.commands) {
+                    if (!orig) {
+                      delete chatCommands.commands.roomsettings;
+                    }
+                    chatCommands.updateCommands();
+                  }
                 }
               }
               for (i$ = 0, len$ = (ref$ = cbs.adds || []).length; i$ < len$; ++i$) {
@@ -3804,11 +4027,11 @@ window.compareVersions = function(a, b){
               }
               delete cbs.listeners, delete cbs.replacements, delete cbs.adds, delete cbs.css, delete cbs.loadedStyles, delete cbs.$elements;
               if (typeof disableLate === 'function') {
-                disableLate.call(module, helperFNs, newModule, data);
+                disableLate.call(module, helperFNs, newModule);
               }
             } catch (e$) {
               err = e$;
-              console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.stack);
+              console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.messageAndStack);
               delete window[name];
             }
             delete p0ne.dependencies[name];
@@ -3856,7 +4079,7 @@ window.compareVersions = function(a, b){
               }
             } catch (e$) {
               err = e$;
-              console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.stack);
+              console.error(getTime() + " [module] failed to disable '" + name + "' cleanly", err.messageAndStack);
             }
           }
         }
@@ -3950,7 +4173,7 @@ window.compareVersions = function(a, b){
         loadingDone();
       } catch (e$) {
         e = e$;
-        console.error(getTime() + " [p0ne module] error initializing '" + name + "':", e.stack);
+        console.error(getTime() + " [p0ne module] error initializing '" + name + "':", e.messageAndStack);
       }
       return module;
       function loadingDone(){
@@ -3970,19 +4193,18 @@ window.compareVersions = function(a, b){
             wasDisabled = "%c";
             try {
               if (setup != null) {
-                setup.call(module, helperFNs, module, data, module_);
+                setup.call(module, helperFNs, module, module_);
               }
               if (def != null) {
                 def.resolve(module);
               }
             } catch (e$) {
               e = e$;
-              console.error(getTime() + " [" + name + "] error initializing", e.stack);
+              console.error(getTime() + " [" + name + "] error initializing", e.messageAndStack);
               module.disable(true);
               if (def != null) {
                 def.reject(module);
               }
-              delete window[name];
             }
           }
           if (module_) {
@@ -4044,9 +4266,11 @@ window.compareVersions = function(a, b){
           user.set('joinedRoom', -1);
         }
         addListener(API, 'userJoin', function(arg$){
-          var id;
+          var id, ref$;
           id = arg$.id;
-          users.get(id).set('joinedRoom', Date.now());
+          if ((ref$ = users.get(id)) != null) {
+            ref$.set('joinedRoom', Date.now());
+          }
         });
       }
     });
@@ -4081,7 +4305,20 @@ window.compareVersions = function(a, b){
         });
         replace(PopoutView, 'clear', function(c_){
           return function(){
-            c_.apply(this, arguments);
+            var err;
+            console.log("[popout:clear]", this, this.clear_ === c_, c_);
+            if (!this.chat) {
+              return;
+            }
+            try {
+              c_.apply(this, arguments);
+            } catch (e$) {
+              err = e$;
+              appendChat($("<div style='color:red'>").text("[p0ne] Error closing the popout: " + err.message).on('click', function(){
+                console.error(err.messageAndStack);
+              }));
+              window.error = err;
+            }
             if (typeof _$context != 'undefined' && _$context !== null) {
               _$context.trigger('popout:close', PopoutView._window, PopoutView);
             }
@@ -4092,35 +4329,35 @@ window.compareVersions = function(a, b){
     });
     module('chatDomEvents', {
       require: ['backbone'],
-      optional: ['PopoutView', 'PopoutListener'],
+      optional: ['chat', 'PopoutView', 'PopoutListener'],
       persistent: ['_events'],
+      _events: [],
       setup: function(arg$){
         var addListener, cm, this$ = this;
         addListener = arg$.addListener;
-        cm = $cm();
-        this._events = [];
+        cm = (typeof chat != 'undefined' && chat !== null ? chat.$chatMessages : void 8) || $('#chat-messages');
         this.on = function(){
           var ref$;
           (ref$ = this._events)[ref$.length] = arguments;
           cm.on.apply(cm, arguments);
+          if (PopoutView.chat) {
+            PopoutView.chat.$el.on.apply(PopoutView.chat.$el, arguments);
+          }
         };
         this.off = function(){
-          var isAnyMatch, i$, ref$, len$, i, cb, isMatch, j$, len1$, o, arg;
+          var isAnyMatch, i, cb, i$, len$, yet$, o;
           isAnyMatch = false;
-          for (i$ = 0, len$ = (ref$ = this._events).length; i$ < len$; ++i$) {
-            i = i$;
-            cb = ref$[i$];
-            isMatch = true;
-            for (j$ = 0, len1$ = arguments.length; j$ < len1$; ++j$) {
-              o = j$;
-              arg = arguments[j$];
-              if (cb[o] !== arg[o]) {
-                isMatch = false;
+          i = -1;
+          while (cb = this._events[++i]) {
+            for (yet$ = true, i$ = 0, len$ = arguments.length; i$ < len$; ++i$) {
+              o = i$;
+              yet$ = false;
+              if (cb[o] !== arguments[o]) {
+                break;
               }
-            }
-            if (isMatch) {
+            } if (yet$) {
               isAnyMatch = true;
-              this._events.removeItem(i);
+              this._events.remove(i--);
             }
           }
           if (isAnyMatch) {
@@ -4135,9 +4372,11 @@ window.compareVersions = function(a, b){
         };
         addListener(API, 'popout:open', function(){
           var cm, i$, ref$, len$, cb;
-          cm = PopoutView.chat;
+          cm = PopoutView.chat.$el;
+          console.log("[chatDomEvents] popup opened", this$._events);
           for (i$ = 0, len$ = (ref$ = this$._events).length; i$ < len$; ++i$) {
             cb = ref$[i$];
+            console.log("[chatDomEvents] adding listener", cm, cb);
             cm.on.apply(cm, cb);
           }
         });
@@ -4254,16 +4493,16 @@ window.compareVersions = function(a, b){
       styles: {},
       urlMap: {},
       persistent: ['styles'],
-      setup: function(arg$){
-        var addListener, $create, $el, $popoutEl, styles, urlMap, throttled, loadingStyles;
+      setup: function(arg$, arg1$, p0neCSS_){
+        var addListener, $create, $el, $popoutEl, styles, urlMap, cb, throttled, loadingStyles, res, n, css, url, ref$, i;
         addListener = arg$.addListener, $create = arg$.$create;
         this.$el = $create('<style>').appendTo('head');
         $el = this.$el, $popoutEl = this.$popoutEl, styles = this.styles, urlMap = this.urlMap;
-        addListener(API, 'popout:open', function(_window, PopoutView){
+        cb = addListener(API, 'popout:open', function(_window, PopoutView){
           $popoutEl = $el.clone().loadAll(PopoutView.resizeBind).appendTo(_window.document.head);
         });
         if ((typeof PopoutView != 'undefined' && PopoutView !== null) && PopoutView._window) {
-          PopoutView.render();
+          cb();
         }
         out$.getCustomCSS = this.getCustomCSS = function(inclExternal){
           var el;
@@ -4361,6 +4600,22 @@ window.compareVersions = function(a, b){
             PopoutView.resizeBind();
           }
         };
+        if (p0neCSS_) {
+          res = "";
+          for (n in styles) {
+            css = styles[n];
+            res += "/*== " + n + " ==*/\n" + css + "\n\n";
+          }
+          if (res) {
+            $el.first().text(res);
+            $popoutEl.first().text(res);
+          }
+          for (url in ref$ = p0neCSS_.urlMap) {
+            i = ref$[url];
+            this.loadStyle(url);
+            this.urlMap[url] = i;
+          }
+        }
       }
     });
     /*@source p0ne.perf.ls */
@@ -4749,6 +5004,9 @@ window.compareVersions = function(a, b){
         replace(localStorage, 'clear', function(){
           return $.noop;
         });
+        addListener($('#vote'), 'click', function(){
+          $('#chat-input-field').focus();
+        });
         addListener(API, 'socket:reconnected', function(){
           var ref$;
           if ((app != null ? (ref$ = app.dialog.dialog) != null ? ref$.options.title : void 8 : void 8) === Lang.alerts.connectionError) {
@@ -4770,6 +5028,27 @@ window.compareVersions = function(a, b){
         if ((ref$ = this.scm) != null) {
           ref$.insertAfter('#playlist-panel');
         }
+      }
+    });
+    /*####################################
+    #           USE P0 GAPI KEY          #
+    ####################################*/
+    module('p0neGapiKey', {
+      setup: function(arg$){
+        var replace, ref$;
+        replace = arg$.replace;
+        (ref$ = gapi.client).key || (ref$.key = 'AIzaSyCXdCG_sDuHISSSFcbUmJatH70nS9NYnTs');
+        (ref$ = gapi.client).keyProvider || (ref$.keyProvider = 'plug.dj');
+        replace(gapi.client, 'key', function(){
+          return p0ne.YOUTUBE_V3_KEY;
+        });
+        replace(gapi.client, 'keyProvider', function(){
+          return 'plug_p0ne';
+        });
+        gapi.client.setApiKey(gapi.client.key);
+      },
+      disableLate: function(){
+        gapi.client.setApiKey(gapi.client.key);
       }
     });
     /* NOT WORKING
@@ -4843,7 +5122,7 @@ window.compareVersions = function(a, b){
           var p;
           p = arg$.p;
           if (p === userID) {
-            sleep(100, function(){
+            sleep(200, function(){
               rejoinRoom('you left the room');
             });
           }
@@ -4990,10 +5269,9 @@ window.compareVersions = function(a, b){
       _settings: {
         verbose: true
       },
-      setup: function(arg$){
-        var replace, addListener, fixStuckDJ, this$ = this;
+      setup: function(arg$, fixStuckDJ){
+        var replace, addListener, this$ = this;
         replace = arg$.replace, addListener = arg$.addListener;
-        fixStuckDJ = this;
         if (API.getTimeRemaining() === 0 && API.getMedia()) {
           this.timer = sleep(5000, fixStuckDJ);
         }
@@ -5087,32 +5365,34 @@ window.compareVersions = function(a, b){
       displayName: 'Fix Stuck DJ Button',
       require: ['_$context'],
       setup: function(arg$){
-        var addListener, fixTimeout, $djbtn, hasSpinner;
+        var addListener, $djbtn, fixTimeout;
         addListener = arg$.addListener;
         $djbtn = $('#dj-button');
-        hasSpinner = $djbtn.find('.spinner').length !== 0;
+        fixTimeout = false;
         addListener(_$context, 'djButton:update', function(){
-          var fixTimeout;
-          if ($djbtn.find('.spinner').length === 0) {
-            hasSpinner = false;
+          var spinning;
+          spinning = $djbtn.find('.spinner').length === 0;
+          console.log("[djButton:update]", spinning, fixTimeout);
+          if (fixTimeout && spinning) {
             clearTimeout(fixTimeout);
-          } else if (!hasSpinner) {
-            hasSpinner = true;
-            fixTimeout = sleep(10000, function(){
-              getRoomState().then(function(d){
-                d = d.data[0];
-                if (d.currentDJ === userID || d.waitingDJs.lastIndexOf(userID) !== -1) {
-                  if (app != null && app.room.djButton) {
-                    app.room.djButton.hideSpinner();
-                  } else {
-                    $djbtn.find('.spinner').remove();
-                    $djbtn.find('.icon').show();
+          } else if (!fixTimeout) {
+            fixTimeout = sleep(5000, function(){
+              fixTimeout = false;
+              if ($djbtn.find('.spinner').length !== 0) {
+                console.log("[djButton:update] force joining", true, fixTimeout);
+                ajax('GET', 'rooms/state', function(d){
+                  d = d.data[0];
+                  if (d.currentDJ === userID || d.waitingDJs.lastIndexOf(userID) !== -1) {
+                    chatWarn("fixing stuck the DJ button", "fixStuckDJButton");
+                    forceJoin();
                   }
-                }
-              });
+                });
+              } else {
+                console.log("[djButton:update] already fixed", false, fixTimeout);
+              }
             });
           }
-        });
+        })();
       }
     });
     module('zalgoFix', {
@@ -5142,159 +5422,232 @@ window.compareVersions = function(a, b){
           if (isOpen && !warningShown) {
             chatWarn("Popout chat immediately closed again. This might be because of an adblocker. You'd have to make an exception for plug.dj or disable your adblocker. Specifically Adblock Plus is known for causing this problem", "p0ne");
             warningShown = true;
-            sleep(15 .min(function(){
+            sleep(15 .min, function(){
               warningShown = false;
-            }));
+            });
           }
         });
       }
     });
-    module('chatEmojiPolyfill', {
-      require: ['users'],
-      _settings: {
-        verbose: true
-      },
-      fixedUsernames: {},
-      originalNames: {},
+    /*module \chatEmojiPolyfill, do
+        require: <[ users ]>
+        #optional: <[ chatPlugin socketEvents database ]> defined later
+        _settings:
+            verbose: true
+        fixedUsernames: {}
+        originalNames: {}
+        setup: ({addListener, replace}) !-> _.defer !~>
+            /*@security HTML injection should NOT be possible * /
+            /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js * /
+            try
+                pixelRatio = window.devicePixelRatio || 1; offset = 12 * pixelRatio
+                document.createElement \canvas .getContext \2d
+                    ..fillStyle = \#f00
+                    ..textBaseline = \top
+                    ..font = '32px Arial'
+                    ..fillText '\ud83d\udc28', 0px, 0px # U+1F428 KOALA
+                    if ..getImageData(offset, offset, 1, 1).data[0] != 0
+                        console.info "[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied"
+                        @disable!
+                    else
+                        console.info "[chatPolyfixEmoji] emojicons appear to NOT be natively supported. applying fix…"
+                        css \chatPolyfixEmoji, '
+                            .emoji {
+                                position: relative;
+                                display: inline-block;
+                            }
+                        '
+                        # cache usernames that require fixing
+                        # note: .rawun is used, because it's already HTML escaped
+                        for u in users?.models ||[] when (tmp=emojifyUnicode u.get(\rawun)) != (original=u.get \rawun)
+                            console.log "\t[chatPolyfixEmoji] fixed username from '#original' to '#{unemojify tmp}'" if @_settings.verbose
+                            u.set \rawun, @fixedUsernames[u.id] = tmp
+                            @originalNames[u.id] = original
+                            # ooooh dangerous dangerous :0
+                            # (not with regard to security, but breaking other scripts)
+                            # (though .rawun should only be used for inserting HTML)
+                            # i really hope this doesn't break anything :I
+                            #                                   --Brinkie 2015
+                        if @fixedUsernames[userID]
+                            user.rawun = @fixedUsernames[userID]
+                            userRegexp = //@#{user.rawun}//g
+    
+    
+                        if _$context?
+                            # fix joining users
+                            addListener _$context, \user:join, (u) !~>
+                                if  (tmp=emojifyUnicode u.get(\rawun)) != (original=u.get \rawun)
+                                    console.log "[chatPolyfixEmoji] fixed username '#original' => '#{unemojify tmp}'" if @_settings.verbose
+                                    u.set \rawun, @fixedUsernames[u.id] = tmp
+                                    @originalNames[u.id] = original
+    
+                            # prevent memory leak
+                            addListener _$context, \user:leave, (u) !~>
+                                delete @fixedUsernames[u.id]
+                                delete @originalNames[u.id]
+    
+                            # fix incoming messages
+                            addListener _$context, \chat:plugin, (msg) !~>
+                                # fix the message body
+                                if msg.uid and msg.message != (tmp = emojifyUnicode(msg.message))
+                                    console.log "\t[chatPolyfixEmoji] fixed message '#{msg.message}' to '#{unemojify tmp}'" if @_settings.verbose
+                                    msg.message = tmp
+    
+                                    # fix the username
+                                    if @fixedUsernames[msg.uid]
+                                        # usernames may not contain HTML, also .rawun is HTML escaped.
+                                        # The HTML that's added by the emoji fix is considered safe
+                                        # we modify it, so that the sender's name shows up fixed in the chat
+                                        msg.un_ = msg.un
+                                        msg.un = that
+    
+                                    if userRegexp?
+                                        userRegexp.lastIndex = 0
+                                        if userRegexp.test msg.message
+                                            console.log "\t[chatPolyfixEmoji] fix mention"
+                                            msg.type = \mention
+                                            msg.sound = \mention if database?.settings.chatSound
+                                            msg.[]mentions.push "@#{user.rawun}"
+                            # as soon as possible, we have to restore the sender's username again
+                            # otherwise other modules might act weird, such as disableCommand
+                            addListener \early, API, \chat, (msg) !->
+                                if msg.un_
+                                    msg.un = msg.un_
+                                    delete msg.un_
+    
+                            # fix users on name changes
+                            addListener _$context, \socket:userUpdate, (u) !~>
+                                # note: this gets called BEFORE userUpdate is natively processed
+                                # so changes to `u` will be applied
+                                delete @fixedUsernames[u.id]
+                                if (tmp=emojifyUnicode u.rawun) != u.rawun
+                                    console.log "[chatPolyfixEmoji] fixed username '#{u.rawun}' => '#{unemojify tmp}'" if @_settings.verbose
+                                    u.rawun = @fixedUsernames[u.id] = tmp
+                                    if u.id == userID
+                                        user.rawun = @fixedUsernames[userID]
+                                        userRegexp := //@#{user.rawun}//g
+            catch err
+                console.error "[chatPolyfixEmoji] error", err.stack
+        disable: !->
+            for uid, original of @originalNames
+                getUserInternal(uid)? .set \rawun, original
+            if @originalNames[userID]
+                user.rawun = @originalNames[userID]
+    */
+    module('stopSubscriberSpam', {
+      displayName: "Stop Subscriber Spam",
+      settings: 'fixes',
+      require: ['_$context'],
       setup: function(arg$){
-        var addListener, replace, this$ = this;
-        addListener = arg$.addListener, replace = arg$.replace;
-        _.defer(function(){
-          /*@security HTML injection should NOT be possible */
-          /* Emoji-support detection from Modernizr https://github.com/Modernizr/Modernizr/blob/master/feature-detects/emoji.js */
-          var pixelRatio, offset, x$, i$, ref$, len$, u, tmp, original, userRegexp, err;
-          try {
-            pixelRatio = window.devicePixelRatio || 1;
-            offset = 12 * pixelRatio;
-            x$ = document.createElement('canvas').getContext('2d');
-            x$.fillStyle = '#f00';
-            x$.textBaseline = 'top';
-            x$.font = '32px Arial';
-            x$.fillText('\ud83d\udc28', 0, 0);
-            if (x$.getImageData(offset, offset, 1, 1).data[0] !== 0) {
-              console.info("[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied");
-              this$.disable();
-            } else {
-              console.info("[chatPolyfixEmoji] emojicons appear to NOT be natively supported. applying fix…");
-              css('chatPolyfixEmoji', '.emoji {position: relative;display: inline-block;}');
-              for (i$ = 0, len$ = (ref$ = (users != null ? users.models : void 8) || []).length; i$ < len$; ++i$) {
-                u = ref$[i$];
-                if ((tmp = emojifyUnicode(u.get('rawun'))) !== (original = u.get('rawun'))) {
-                  if (this$._settings.verbose) {
-                    console.log("\t[chatPolyfixEmoji] fixed username from '" + original + "' to '" + unemojify(tmp) + "'");
-                  }
-                  u.set('rawun', this$.fixedUsernames[u.id] = tmp);
-                  this$.originalNames[u.id] = original;
-                }
-              }
-              if (this$.fixedUsernames[userID]) {
-                user.rawun = this$.fixedUsernames[userID];
-                userRegexp = RegExp('@' + user.rawun, 'g');
-              }
-              if (typeof _$context != 'undefined' && _$context !== null) {
-                addListener(_$context, 'user:join', function(u){
-                  var tmp, original;
-                  if ((tmp = emojifyUnicode(u.get('rawun'))) !== (original = u.get('rawun'))) {
-                    if (this$._settings.verbose) {
-                      console.log("[chatPolyfixEmoji] fixed username '" + original + "' => '" + unemojify(tmp) + "'");
-                    }
-                    u.set('rawun', this$.fixedUsernames[u.id] = tmp);
-                    this$.originalNames[u.id] = original;
-                  }
-                });
-                addListener(_$context, 'user:leave', function(u){
-                  delete this$.fixedUsernames[u.id];
-                  delete this$.originalNames[u.id];
-                });
-                addListener(_$context, 'chat:plugin', function(msg){
-                  var tmp, that;
-                  if (msg.uid && msg.message !== (tmp = emojifyUnicode(msg.message))) {
-                    if (this$._settings.verbose) {
-                      console.log("\t[chatPolyfixEmoji] fixed message '" + msg.message + "' to '" + unemojify(tmp) + "'");
-                    }
-                    msg.message = tmp;
-                    if (that = this$.fixedUsernames[msg.uid]) {
-                      msg.un_ = msg.un;
-                      msg.un = that;
-                    }
-                    if (userRegexp != null) {
-                      userRegexp.lastIndex = 0;
-                      if (userRegexp.test(msg.message)) {
-                        console.log("\t[chatPolyfixEmoji] fix mention");
-                        msg.type = 'mention';
-                        if ((typeof database != 'undefined' && database !== null) && database.settings.chatSound) {
-                          msg.sound = 'mention';
-                        }
-                        (msg.mentions || (msg.mentions = [])).push("@" + user.rawun);
-                      }
-                    }
-                  }
-                });
-                addListener('early', API, 'chat', function(msg){
-                  if (msg.un_) {
-                    msg.un = msg.un_;
-                    delete msg.un_;
-                  }
-                });
-                addListener(_$context, 'socket:userUpdate', function(u){
-                  var tmp;
-                  delete this$.fixedUsernames[u.id];
-                  if ((tmp = emojifyUnicode(u.rawun)) !== u.rawun) {
-                    if (this$._settings.verbose) {
-                      console.log("[chatPolyfixEmoji] fixed username '" + u.rawun + "' => '" + unemojify(tmp) + "'");
-                    }
-                    u.rawun = this$.fixedUsernames[u.id] = tmp;
-                    if (u.id === userID) {
-                      user.rawun = this$.fixedUsernames[userID];
-                      userRegexp = RegExp('@' + user.rawun, 'g');
-                    }
-                  }
-                });
+        var replace_$Listener;
+        replace_$Listener = arg$.replace_$Listener;
+        return replace_$Listener('chat:nonsubimage', function(){
+          return $.noop;
+        });
+      }
+    });
+    /*####################################
+    #          YT PAGED SEARCH           #
+    ####################################*/
+    /* The paginated search was removed on plug.dj on purpose, because searches use up quite a lot of
+     * the Youtube API quota that plug.dj has. Limiting the search results is to avoid running out of quota.
+     * This is not an issue with plug_p0ne, because plug_p0ne replaces the API key with plug_p0ne's own,
+     * so that the plug.dj quota won't be used up.
+     */
+    module('ytPagedSearch', {
+      displayName: "Paged YT Search",
+      settings: 'fixes',
+      require: ['searchManager', 'searchAux', 'SearchList', 'YtSearchService'],
+      optional: ['pl'],
+      setup: function(arg$){
+        var replace, ref$;
+        replace = arg$.replace;
+        replace(SearchList.prototype, 'onScroll', function(){
+          return function(){
+            if (!this.searching && this.collection.length < 200 && searchManager.lastCount > 0 && this.scrollPane.getPercentScrolledY() > 0.97) {
+              this.searching = !0;
+              searchManager.collection = this.collection;
+              if (searchManager.more()) {
+                this.showRowSpinner();
+              } else {
+                this.hideRowSpinner();
               }
             }
-          } catch (e$) {
-            err = e$;
-            console.error("[chatPolyfixEmoji] error", err.stack);
-          }
+          };
         });
-      },
-      disable: function(){
-        var uid, ref$, original, ref1$;
-        for (uid in ref$ = this.originalNames) {
-          original = ref$[uid];
-          if ((ref1$ = getUserInternal(uid)) != null) {
-            ref1$.set('rawun', original);
+        if (pl != null) {
+          if ((ref$ = pl.list) != null) {
+            ref$.scrollBind = bind$(pl, 'onScroll');
           }
         }
-        if (this.originalNames[userID]) {
-          user.rawun = this.originalNames[userID];
-        }
+        replace(searchManager, 'more', function(){
+          return function(){
+            if (!this.relatedSearch && this.lastCount > 0 && this.collection.length < 200) {
+              ++this.page;
+              if (!this.scFavoritesLookup && !this.scTracksLookup) {
+                this._search();
+              } else if (this.scFavoritesLookup) {
+                this.loadSCFavorites(this.page);
+              } else if (this.scTracksLookup) {
+                this.loadSCTracks(this.page);
+              }
+              return true;
+            } else {
+              return false;
+            }
+          };
+        });
+        replace(searchManager, '_search', function(){
+          return function(){
+            var limit, ref$;
+            limit = (ref$ = pl != null ? pl.visibleRows : void 8) > 50 ? ref$ : 50;
+            console.log("[_search]", this.lastQuery, this.page, limit);
+            if (this.lastFormat === 1) {
+              searchAux.ytSearch(this.lastQuery, this.page, limit, this.ytBind);
+            } else if (this.lastFormat === 2) {
+              searchAux.scSearch(this.lastQuery, this.page, limit, this.scBind);
+            }
+          };
+        });
+        replace(searchAux, 'ytSearch', function(){
+          return function(query, page, limit, callback){
+            this.ytSearchService || (this.ytSearchService = new YtSearchService);
+            this.ytSearchService.load(query, page, limit, callback);
+          };
+        });
+        replace(YtSearchService.prototype, 'load', function(){
+          return function(query, page, limit, callback){
+            var this$ = this;
+            this.nextPage = page + 1;
+            this.lastQuery = query;
+            this.callback = callback;
+            gapi.client.youtube.search.list({
+              q: query,
+              part: 'snippet',
+              fields: 'nextPageToken,items(id/videoId,snippet/title,snippet/thumbnails,snippet/channelTitle)',
+              maxResults: limit,
+              pageToken: page !== 1 && query === this.lastQuery ? this.nextPageToken : null,
+              videoEmbeddable: !0,
+              videoDuration: 'any',
+              type: 'video',
+              safeSearch: 'none',
+              videoSyndicated: "true"
+            }).then(function(e){
+              this$.nextPageToken = e.result.nextPageToken;
+              return this$.onList(e);
+            }, this.errorBind);
+          };
+        });
       }
     });
-    module('disableIntercomTracking', {
-      require: ['tracker'],
-      disabled: true,
-      settings: 'dev',
-      displayName: 'Disable Tracking',
+    module('fixPopoutChatClose', {
+      require: ['PopoutListener'],
       setup: function(arg$){
-        var replace, k, ref$, v;
-        replace = arg$.replace;
-        for (k in ref$ = tracker) {
-          v = ref$[k];
-          if (typeof v === 'function') {
-            replace(tracker, k, fn$);
-          }
-        }
-        replace(tracker, 'event', function(){
-          return function(){
-            return this;
-          };
+        var addListener;
+        addListener = arg$.addListener;
+        addListener(API, 'popout:open', function(window_){
+          window_.onbeforeunload = bind$(PopoutView, 'close');
         });
-        function fn$(){
-          return function(){
-            return $.noop;
-          };
-        }
       }
     });
     /*@source p0ne.stream.ls */
@@ -5313,14 +5666,14 @@ window.compareVersions = function(a, b){
        and due to them sharing a lot of code
     */
     module('streamSettings', {
-      require: ['app', 'currentMedia', 'database', '_$context'],
+      require: ['app', 'Playback', 'currentMedia', 'database', '_$context'],
       optional: ['database'],
       audioOnly: false,
       _settings: {
         audioOnly: false
       },
-      setup: function(arg$, streamSettings, arg1$, m_){
-        var addListener, replace, revert, replaceListener, $create, css, $playback, $playbackContainer, $el, playback, $btn, $label, $icons, disabledBtns, Player, audio, unblocker, i$, ref$, youtube, sc, noDJ, syncingPlayer, streamOff, snoozed, that, player, this$ = this;
+      setup: function(arg$, streamSettings, m_){
+        var addListener, replace, revert, replaceListener, $create, css, $playback, $playbackContainer, $el, playback, $btn, $label, $icons, disabledBtns, Player, audio, unblocker, i$, ref$, youtube, sc, DummyPlayer, noDJ, syncingPlayer, streamOff, snoozed, m, player, this$ = this;
         addListener = arg$.addListener, replace = arg$.replace, revert = arg$.revert, replaceListener = arg$.replaceListener, $create = arg$.$create, css = arg$.css;
         css('streamSettings', ".icon-stream-video {background: " + getIcon('icon-chat-sound-on').background + ";}.icon-stream-audio {background: " + getIcon('icon-chat-room').background + ";}.icon-stream-off {background: " + getIcon('icon-chat-sound-off').background + ";}");
         $playback = $('#playback');
@@ -5336,7 +5689,7 @@ window.compareVersions = function(a, b){
         });
         $btn = $('#playback .hd').addClass('p0ne-stream-select');
         this.$btn_ = $btn.children();
-        $btn.html('<div class="box"><span id=p0ne-stream-label>Stream: Video</span><div class="p0ne-stream-buttons"><i class="icon icon-stream-video enabled"></i> <i class="icon icon-stream-audio enabled"></i> <i class="icon icon-stream-off enabled"></i> <div class="p0ne-stream-fancy"></div></div></div>');
+        $btn.html('<div class="box"><span id=p0ne-stream-label></span><div class="p0ne-stream-buttons"><i class="icon icon-stream-video enabled"></i> <i class="icon icon-stream-audio enabled"></i> <i class="icon icon-stream-off enabled"></i> <div class="p0ne-stream-fancy"></div></div></div>');
         this.$label = $label = $btn.find('#p0ne-stream-label');
         $icons = $btn.find('.icon');
         disabledBtns = {};
@@ -5392,12 +5745,11 @@ window.compareVersions = function(a, b){
               this.media = media;
               this.getURL(media);
             }
-          },
-          getURL: function(){
-            throw Error('unimplemented');
-            /*@media.src = ...
-            @start!*/
-          },
+          }
+          /*getURL: !->
+              ...
+              @media.src = ...
+              @start!*/,
           start: function(){
             this.seek();
             this.src = this.media.src;
@@ -5458,6 +5810,7 @@ window.compareVersions = function(a, b){
             });
           });
         };
+        /*not working*/
         unblocker.name = "Youtube (unblocked)";
         unblocker.mode = 'video';
         unblocker.getURL = function(media){
@@ -5498,28 +5851,27 @@ window.compareVersions = function(a, b){
           playback.tx("setVolume=" + vol);
         }, ref$);
         sc = (ref$ = clone$(Player), ref$.name = "SoundCloud", ref$.mode = 'audio', ref$.enable = function(media){
-          var this$ = this;
+          var b, this$ = this;
           this.media = media;
           console.log("[StreamSettings] loading Soundcloud audio stream");
           if (soundcloud.r) {
             if (soundcloud.sc) {
               playback.$container.empty().append("<iframe id=yt-frame frameborder=0 src='" + playback.visualizers.random() + "'></iframe>");
+              b = setTimeout(playback.scTimeoutBind, 5000);
               soundcloud.sc.whenStreamingReady(function(){
-                var startTime;
-                if (media === currentMedia.get('media')) {
-                  startTime = currentMedia.get('elapsed');
-                  playback.player = soundcloud.sc.stream(media.get('cid'), {
-                    autoPlay: true,
-                    volume: currentMedia.get('volume'),
-                    position: startTime < 4
+                d.sc.stream(n.get('cid'), {
+                  autoPlay: true
+                }, function(){
+                  if (media === currentMedia.get('media')) {
+                    clearTimeout(b);
+                    playback.player = e;
+                    e.seek(startTime < 4000
                       ? 0
-                      : startTime * 1000,
-                    onload: playback.scOnLoadBind,
-                    whileloading: playback.scLoadingBind,
-                    onfinish: playback.playbackCompleteBind,
-                    ontimeout: playback.scTimeoutBind
-                  });
-                }
+                      : startTime * 1000);
+                    e.setVolume(currentMedia.get('volume' / 100));
+                    e._player.on('stateChange', playback.scStateBind);
+                  }
+                });
               });
             } else {
               playback.$container.append($('<img src="https://soundcloud-support.s3.amazonaws.com/images/downtime.png" height="271"/>').css({
@@ -5541,41 +5893,39 @@ window.compareVersions = function(a, b){
         }, ref$.disable = function(){
           var ref$;
           if ((ref$ = playback.player) != null) {
-            ref$.stop().destruct();
+            ref$.stop();
           }
           playback.buffering = false;
           $playbackContainer.empty();
         }, ref$.updateVolume = function(vol){
           playback.player.setVolume(vol);
         }, ref$);
-        noDJ = (ref$ = clone$(Player), ref$.name = "No DJ", ref$.mode = 'off', ref$.enable = function(){
+        DummyPlayer = {
+          enable: $.noop,
+          disable: $.noop,
+          updateVolume: $.noop
+        };
+        noDJ = (ref$ = clone$(DummyPlayer), ref$.name = "No DJ", ref$.mode = 'off', ref$.enable = function(){
           playback.$noDJ.show();
           playback.$controls.hide();
         }, ref$.disable = function(){
           playback.$noDJ.hide();
+        }, ref$);
+        syncingPlayer = (ref$ = clone$(DummyPlayer), ref$.name = "waiting…", ref$.mode = 'off', ref$.enable = function(){
+          $playbackContainer.html("<iframe id=yt-frame frameborder=0 src='" + m.syncing + "'></iframe>");
         }, ref$.updateVolume = $.noop, ref$);
-        syncingPlayer = (ref$ = clone$(Player), ref$.name = "waiting…", ref$.mode = 'off', ref$.enable = function(){
-          $playbackContainer.append("<iframe id=yt-frame frameborder=0 src='" + m.syncing + "'></iframe>");
-        }, ref$.updateVolume = $.noop, ref$);
-        streamOff = {
-          name: "Stream OFF",
-          mode: 'off'
-        };
-        snoozed = {
-          name: "Snoozed",
-          mode: 'off'
-        };
-        if (that = currentMedia.get('media')) {
-          player = [youtube, sc][that.get('format') - 1];
-          if (isSnoozed()) {
-            changeStream('off', "Snoozed");
-          } else {
-            changeStream(player.mode, player.name);
-          }
+        streamOff = (ref$ = clone$(DummyPlayer), ref$.name = "Stream: OFF", ref$.mode = 'off', ref$);
+        snoozed = (ref$ = clone$(DummyPlayer), ref$.name = "Snoozed", ref$.mode = 'off', ref$);
+        if (m = currentMedia.get('media')) {
+          player = database.settings.streamDisabled
+            ? streamOff
+            : isSnoozed()
+              ? snoozed
+              : [youtube, sc][m.get('format') - 1];
         } else {
           player = noDJ;
-          changeStream('off', "No DJ");
         }
+        changeStream(player);
         replace(Playback.prototype, 'onVolumeChange', function(){
           return function(arg$, vol){
             player.updateVolume(vol);
@@ -5589,7 +5939,7 @@ window.compareVersions = function(a, b){
             media = currentMedia.get('media');
             if (media) {
               if (database.settings.streamDisabled) {
-                changeStream('off', "Stream: OFF");
+                changeStream(streamOff);
                 return;
               }
               this.ignoreComplete = true;
@@ -5615,7 +5965,7 @@ window.compareVersions = function(a, b){
             } else {
               player = noDJ;
             }
-            changeStream(player.mode);
+            changeStream(player);
             player.enable(media);
           };
         });
@@ -5627,7 +5977,7 @@ window.compareVersions = function(a, b){
         replace(Playback.prototype, 'reset', function(r_){
           return function(){
             if (database.settings.streamDisabled) {
-              changeStream('off', "Stream: OFF");
+              changeStream(streamOff);
             }
             player.disable();
             r_.apply(this, arguments);
@@ -5651,14 +6001,11 @@ window.compareVersions = function(a, b){
         replace(Playback.prototype, 'onSnoozeClick', function(){
           return function(){
             if (!isSnoozed()) {
-              changeStream('off', "Snoozed");
+              changeStream(snoozed);
               this.reset();
             }
           };
         });
-        window.snooze = function(){
-          changeStream('off', "Snoozed");
-        };
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do
@@ -5701,6 +6048,10 @@ window.compareVersions = function(a, b){
           });
         }
         function changeStream(mode, name){
+          var ref$;
+          if (typeof mode === 'object') {
+            ref$ = mode, mode = ref$.mode, name = ref$.name;
+          }
           console.log("[streamSettings] => stream-" + mode);
           $label.text(name || player.name);
           $playback.removeClass().addClass("p0ne-stream-" + mode);
@@ -5769,9 +6120,18 @@ window.compareVersions = function(a, b){
         var addListener, this$ = this;
         addListener = arg$.addListener;
         addListener(API, 'chatCommand', function(c){
-          var ref$, key$, ref1$;
-          if (typeof (ref$ = this$._commands)[key$ = (ref1$ = /^\/(\w+)/.exec(c)) != null ? ref1$[1] : void 8] == 'function') {
-            ref$[key$](c);
+          var cmd, ref$;
+          if (cmd = this$._commands[(ref$ = /^\/(\w+)/.exec(c)) != null ? ref$[1] : void 8]) {
+            console.log("/chatCommand", cmd, cmd.moderation);
+            if (!cmd.moderation || user.gRole || v.moderation === true && user.isStaff || user.role >= cmd.moderation) {
+              cmd.callback(c);
+            } else {
+              chatWarn("You need to be " + (deepEq$(cmd.moderation, true, '===')
+                ? 'staff'
+                : 'at least ' + getRank({
+                  role: cmd.moderation
+                })), c);
+            }
           }
         });
         this.updateCommands();
@@ -5783,37 +6143,22 @@ window.compareVersions = function(a, b){
         }
         this.updating = true;
         requestAnimationFrame(function(){
-          var k, ref$, v, lresult$, cb, i$, ref1$, len$, results$ = [];
+          var k, ref$, v, lresult$, i$, ref1$, len$, results$ = [];
           this$.updating = false;
           this$._commands = {};
           for (k in ref$ = this$.commands) {
             v = ref$[k];
             lresult$ = [];
-            if (v.moderation) {
-              (fn$.call(this$, v, v.moderation === true
-                ? 2
-                : v.moderation));
-            } else {
-              cb = v.callback;
-            }
-            this$._commands[k] = cb;
-            for (i$ = 0, len$ = (ref1$ = v.aliases || []).length; i$ < len$; ++i$) {
-              k = ref1$[i$];
-              lresult$.push(this$._commands[k] = cb);
+            if (v) {
+              this$._commands[k] = v;
+              for (i$ = 0, len$ = (ref1$ = v.aliases || []).length; i$ < len$; ++i$) {
+                k = ref1$[i$];
+                lresult$.push(this$._commands[k] = v);
+              }
             }
             results$.push(lresult$);
           }
           return results$;
-          function fn$(v, requiredRank){
-            var cb;
-            cb = function(c){
-              var user;
-              user = API.getUser();
-              if (user.gRole || user.role >= requiredRank) {
-                v.callback(c);
-              }
-            };
-          }
         });
       },
       parseUserArg: function(str){
@@ -5841,8 +6186,7 @@ window.compareVersions = function(a, b){
         }
       },
       commands: {
-        help: {
-          aliases: ['commands'],
+        commands: {
           description: "show this list of commands",
           callback: function(){
             var user, res, k, ref$, command, ref1$, aliases;
@@ -5850,15 +6194,15 @@ window.compareVersions = function(a, b){
             res = "<div class='msg text'>";
             for (k in ref$ = chatCommands.commands) {
               command = ref$[k];
-              if (!command.moderation || user.gRole || (command.moderation === true
+              if (command && !command.moderation || user.gRole || (command.moderation === true
                 ? user.role > 2
                 : user.role >= command.moderation)) {
                 if ((ref1$ = command.aliases) != null && ref1$.length) {
-                  aliases = "aliases: " + humanList(command.aliases);
+                  aliases = "title='aliases: " + humanList(command.aliases) + "'";
                 } else {
                   aliases = '';
                 }
-                res += "<div class='p0ne-help-command' alt='" + aliases + "'><b>/" + k + "</b> " + (command.params || '') + " - " + command.description + "</div>";
+                res += "<div class=p0ne-help-command " + aliases + "><b>/" + k + "</b> " + (command.parameters || '') + " - " + command.description + "</div>";
               }
             }
             res += "</div>";
@@ -5879,7 +6223,7 @@ window.compareVersions = function(a, b){
           description: "grab the current song into a playlist (default is current playlist)",
           callback: function(c){
             var that;
-            if (that = c.replace(/^\/\w+\s+/, '')) {
+            if (that = c.replace(/^\/\w+\s*/, '')) {
               grabMedia(that);
             } else {
               grabMedia();
@@ -5925,15 +6269,67 @@ window.compareVersions = function(a, b){
           callback: snooze
         },
         mute: {
-          description: "mutes the audio",
-          callback: mute
+          aliases: ['stfu', 'silence'],
+          parameters: "[[duration] @username(s)]",
+          description: "mutes the audio or the specified user(s)",
+          callback: function(user){
+            var durArg, duration, i$, ref$, len$, id;
+            user = user.replace(/^\/\w+\s*/, '').trim();
+            if (!user) {
+              mute();
+            } else {
+              if (durArg = /\w+/.exec(user)) {
+                duration = {
+                  s: 's',
+                  short: 's',
+                  15: 's',
+                  '15min': 's',
+                  m: 'm',
+                  middle: 'm',
+                  30: 'm',
+                  '30min': 'm',
+                  l: 'l',
+                  long: 'l',
+                  45: 'l',
+                  '45min': 'l'
+                }[durArg[1]];
+                if (duration) {
+                  user = user.substr(durArg[1].length);
+                } else if (getUser(durArg[1])) {
+                  duration = 's';
+                }
+              } else {
+                duration = 's';
+              }
+              if (!duration || (user === 'h' || user === '-h' || user === 'help' || user === '--help' || user === '?' || user === 'hlep')) {
+                chatWarn('<div class=p0ne-help-command>possible durations are:<br>- <b>s</b> (<em>15min</em>, <em>short</em>)<br>- <b>m</b> (<em>30min</em>, <em>middle</em>)<br>- <b>l</b> (<em>45min</em>, <em>long</em>)<br>If left out, defaults to 15 minutes.<br>You can also use /mute to extend/reduce the mute time.</div>', '/mute [[duration] @username(s)]', true);
+              } else {
+                for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user)).length; i$ < len$; ++i$) {
+                  id = ref$[i$];
+                  API.moderateMuteUser(id, duration, 1);
+                }
+              }
+            }
+          }
         },
         unmute: {
-          description: "unmutes the audio",
-          callback: unmute
+          parameters: "[@username(s)]",
+          description: "unmutes the audio or specified user(s)",
+          callback: function(user){
+            var i$, ref$, len$, id;
+            user = user.replace(/^\/\w+\s*/, '').trim();
+            if (!user) {
+              unmute();
+            } else {
+              for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user)).length; i$ < len$; ++i$) {
+                id = ref$[i$];
+                API.moderateUnmuteUser(id, duration, 1);
+              }
+            }
+          }
         },
         muteonce: {
-          aliases: ['muteonce'],
+          aliases: ['muteone'],
           description: "mutes the current song",
           callback: muteonce
         },
@@ -5949,6 +6345,14 @@ window.compareVersions = function(a, b){
             } else {
               chatWarn("automute is not yet implemented");
             }
+          }
+        },
+        volume: {
+          parameters: " (0 - 100)",
+          description: "sets the volume to the specified percentage",
+          callback: function(vol){
+            vol = vol.replace(/^\/\w+\s*|%/, '').trim();
+            API.setVolume(+vol);
           }
         },
         popout: {
@@ -5967,12 +6371,12 @@ window.compareVersions = function(a, b){
           }
         },
         reconnect: {
-          aliases: ['reconnectSocket'],
+          aliases: ['reconnectSocket', 'forceReconnect'],
           description: "forces the socket to reconnect. This might solve chat issues",
           callback: function(){
             if (typeof _$context != 'undefined' && _$context !== null) {
               _$context.once('sjs:reconnected', function(){
-                chatWarn("socket reconnected");
+                chatWarn("socket reconnected", '/reconnect');
               });
             }
             reconnectSocket();
@@ -5984,19 +6388,31 @@ window.compareVersions = function(a, b){
           callback: function(){
             if (typeof _$context != 'undefined' && _$context !== null) {
               _$context.once('room:joined', function(){
-                chatWarn("room rejoined");
+                chatWarn("room rejoined", '/rejoin');
               });
             }
             rejoinRoom();
           }
         },
+        intercom: {
+          aliases: ['messages'],
+          description: "Show Intercom messages",
+          callback: function(){
+            Intercom("showMessages");
+          }
+        },
         ban: {
-          parameters: " @username(s)",
-          description: "bans the specified user(s)",
+          aliases: ['gtfo', 'rekt', 'abuse'],
+          parameters: "[duration] @username(s)",
+          description: "bans the specified user(s). use `/ban help` for more info",
           moderation: true,
           callback: function(user){
             var i$, ref$, len$, id;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            user = user.replace(/^\/\w+\s*/, '').trim();
+            if (!user || (user === 'h' || user === '-h' || user === 'help' || user === '--help' || user === '?' || user === 'hlep')) {
+              chatWarn('<div class=p0ne-help-command>possible durations are:<br>- <b>s</b> (<em>15min</em>, <em>short</em>)<br>- <b>h</b> (<em>1h</em>, <em>hour</em>, <em>long</em>)<br>- <b>f</b> (<em>forever</em>, <em>p</em>, <em>perma</em>)<br>If left out, defaults to 15 minutes.<br>You can also use /ban to extend the ban time.</div>', '/ban [duration] @username(s)', true);
+            }
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user)).length; i$ < len$; ++i$) {
               id = ref$[i$];
               API.modBan(id, 's', 1);
             }
@@ -6008,10 +6424,13 @@ window.compareVersions = function(a, b){
           description: "unbans the specified user(s)",
           moderation: true,
           callback: function(user){
-            var i$, ref$, len$, id;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            var i$, ref$, len$, yet$, id;
+            for (yet$ = true, i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(user.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
+              yet$ = false;
               API.moderateUnbanUser(id);
+            } if (yet$) {
+              chatWarn("couldn't find any user", '/unban');
             }
           }
         },
@@ -6027,7 +6446,7 @@ window.compareVersions = function(a, b){
               return '';
             });
             if (0 < pos && pos < 51) {
-              if (users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))) {
+              if (users = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))) {
                 if (!(id = users[0]) || !getUser(id)) {
                   chatWarn("The user doesn't seem to be in the room");
                 } else {
@@ -6049,11 +6468,14 @@ window.compareVersions = function(a, b){
           description: "moves the specified user(s) to the top of the waitlist",
           moderation: true,
           callback: function(c){
-            var users, i$, i;
-            users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''));
-            for (i$ = users.length - 1; i$ <= 0; ++i$) {
+            var users, i$, yet$, i;
+            users = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''));
+            for (yet$ = true, i$ = users.length - 1; i$ <= 0; ++i$) {
               i = i$;
+              yet$ = false;
               moveDJ(i, 1);
+            } if (yet$) {
+              chatWarn("couldn't find any user", '/moveTop');
             }
           }
         }
@@ -6066,7 +6488,7 @@ window.compareVersions = function(a, b){
                 res = []; djsToAdd = []; l=0
                 wl = API.getWaitList!
                 # iterating over the loop in reverse, so that the first name will be the first, second will be second, …
-                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s+/, '')
+                for id in chatCommands.parseUserArg user.replace(/^\/\w+\s*(?:)/, '')
                     for u, pos in wl when u.id == id
                         if pos == 0
                             skipFirst = true
@@ -6111,13 +6533,17 @@ window.compareVersions = function(a, b){
           moderation: true,
           callback: function(c){
             var users, i, helper;
-            users = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''));
+            users = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''));
             i = 0;
-            (helper = function(){
-              if (users[i]) {
-                addDJ(users[i], helper);
-              }
-            })();
+            if (users.length) {
+              (helper = function(){
+                if (users[i]) {
+                  addDJ(users[i++], helper);
+                }
+              })();
+            } else {
+              chatWarn("couldn't find any user", '/addDJ');
+            }
           }
         },
         removeDJ: {
@@ -6126,10 +6552,13 @@ window.compareVersions = function(a, b){
           description: "removes the specified user(s) from the waitlist / DJ booth",
           moderation: true,
           callback: function(c){
-            var i$, ref$, len$, id;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            var i$, ref$, len$, yet$, id;
+            for (yet$ = true, i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
+              yet$ = false;
               API.moderateRemoveDJ(id);
+            } if (yet$) {
+              chatWarn("couldn't find any user", '/removeDJ');
             }
           }
         },
@@ -6137,7 +6566,13 @@ window.compareVersions = function(a, b){
           aliases: ['forceSkip', 's'],
           description: "skips the current song",
           moderation: true,
-          callback: API.moderateForceSkip
+          callback: function(){
+            if (API.getTimeElapsed() > 2) {
+              return API.moderateForceSkip();
+            } else {
+              return chatWarn("The song just changed, are you sure you want to skip?<br><button class=p0ne-btn onclick='API.moderateForceSkip()'>skip</button>\xa0<button class=p0ne-btn onclick='$(this).closest(\".cm\").remove()'>cancel</button>", '/skip', true);
+            }
+          }
         },
         promote: {
           parameters: " @username(s)",
@@ -6145,7 +6580,7 @@ window.compareVersions = function(a, b){
           moderation: 3,
           callback: function(c){
             var i$, ref$, len$, id, that;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               if (that = getUser(id)) {
                 API.moderateSetRole(id, that.role + 1);
@@ -6159,7 +6594,7 @@ window.compareVersions = function(a, b){
           moderation: 3,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6174,7 +6609,7 @@ window.compareVersions = function(a, b){
           moderation: 3,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6190,7 +6625,7 @@ window.compareVersions = function(a, b){
           moderation: 3,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6206,7 +6641,7 @@ window.compareVersions = function(a, b){
           moderation: 3,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6221,7 +6656,7 @@ window.compareVersions = function(a, b){
           moderation: 4,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6237,7 +6672,7 @@ window.compareVersions = function(a, b){
           moderation: 5,
           callback: function(c){
             var i$, ref$, len$, id, user;
-            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, ''))).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, ''))).length; i$ < len$; ++i$) {
               id = ref$[i$];
               user = getUser(id);
               if ((user != null ? user.role : void 8) > 0) {
@@ -6252,7 +6687,7 @@ window.compareVersions = function(a, b){
           moderation: 5,
           callback: function(c){
             var user;
-            user = getUser(chatCommands.parseUserArg(c.replace(/^\/\w+\s+/, '')));
+            user = getUser(chatCommands.parseUserArg(c.replace(/^\/\w+\s*/, '')));
             if ((user != null ? user.role : void 8) > 0) {
               API.moderateSetRole(id, 5);
             }
@@ -6525,7 +6960,6 @@ window.compareVersions = function(a, b){
         this.songlist = this._settings.songlist;
         media = API.getMedia();
         addListener(API, 'advance', function(d){
-          console.log("[automute test]", media, media != null ? media.cid : void 8, this$.songlist[media != null ? media.cid : void 8]);
           if ((media = d.media) && this$.songlist[media.cid]) {
             console.info("[automute] '" + media.author + " - " + media.title + "' is in automute list. Automuting…");
             snooze();
@@ -6544,7 +6978,7 @@ window.compareVersions = function(a, b){
                 $snoozeBtn.empty().append($box);
               }
               if (!media) {
-                console.warn("[automute] uw0tm8?");
+                console.warn("[automute] uw0tm8? how did the stream mode change if there's no song playing? well this could happen if you changed the room or something…");
               } else if (this$.songlist[media.cid]) {
                 console.log("[automute] change automute-btn to REMOVE");
                 $snoozeBtn.addClass('p0ne-automute p0ne-automute-remove');
@@ -6625,9 +7059,18 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var addListener, $create, timeout, this$ = this;
         addListener = arg$.addListener, $create = arg$.$create;
+        timeout = true;
+        sleep(this._settings.timeout, function(){
+          timeout = false;
+        });
         addListener(API, 'chat', function(msg){
-          if (msg.uid && msg.uid !== userID && isMention(msg, true) && !timeout && !msg.message.has('!disable')) {
+          if (msg.uid && msg.uid !== userID && !timeout && isMention(msg, true) && !msg.message.has('!disable')) {
             API.sendChat("[AFK] " + (this$._settings.message || this$.DEFAULT_MSG));
+            timeout = true;
+            sleep(this$._settings.timeout, function(){
+              timeout = false;
+            });
+          } else if (msg.uid === userID) {
             timeout = true;
             sleep(this$._settings.timeout, function(){
               timeout = false;
@@ -6657,7 +7100,7 @@ window.compareVersions = function(a, b){
       _settings: {
         mergeSameUser: true
       },
-      setup: function(arg$, joinLeaveNotif, arg1$, update){
+      setup: function(arg$, joinLeaveNotif, update){
         var addListener, css, lastMsg, $lastNotif, CHAT_TYPE, lastUsers, cssClasses, i$, ref$, len$;
         addListener = arg$.addListener, css = arg$.css;
         if (update) {
@@ -6916,7 +7359,7 @@ window.compareVersions = function(a, b){
       settings: 'base',
       optional: ['_$context'],
       setup: function(arg$){
-        var css, addListener, $create, sum, lastSongDur, tooltipIntervalID, showingTooltip, $nextMediaLabel, $eta, $etaText, $etaTime, hist, l, tinyhist, i$, i, this$ = this;
+        var css, addListener, $create, sum, lastSongDur, tooltipIntervalID, showingTooltip, $nextMediaLabel, $eta, $etaText, $etaTime, hist, l, tinyhist, i$, i, lastETA, this$ = this;
         css = arg$.css, addListener = arg$.addListener, $create = arg$.$create;
         css('etaTimer', '.p0ne-eta {position: absolute;}#your-next-media>span {width: auto !important;right: 50px;}');
         sum = lastSongDur = tooltipIntervalID = 0;
@@ -6924,6 +7367,7 @@ window.compareVersions = function(a, b){
         $nextMediaLabel = $('#your-next-media > span');
         $eta = $create('<div class=p0ne-eta>').append($etaText = $('<span class=p0ne-eta-text>ETA: </span>')).append($etaTime = $('<span class=p0ne-eta-time></span>')).mouseover(function(){
           if (typeof _$context != 'undefined' && _$context !== null) {
+            updateToolTip();
             clearInterval(tooltipIntervalID);
             tooltipIntervalID = repeat(1000, updateToolTip);
           }
@@ -6936,16 +7380,14 @@ window.compareVersions = function(a, b){
             avg = Math.round(
             sum / l);
             rem = API.getTimeRemaining();
-            if (typeof _$context != 'undefined' && _$context !== null) {
-              if (p) {
-                return _$context.trigger('tooltip:show', mediaTime(rem) + " remaining + " + p + " × " + mediaTime(avg) + " avg. song duration", $etaText);
-              } else if (rem) {
-                return _$context.trigger('tooltip:show', mediaTime(rem) + " remaining, the waitlist is empty", $etaText);
-              } else {
-                return _$context.trigger('tooltip:show', "Nobody is playing and the waitlist is empty", $etaText);
-              }
+            if (p) {
+              return _$context.trigger('tooltip:show', mediaTime(rem) + " remaining + " + p + " × " + mediaTime(avg) + " avg. song duration", $etaText);
+            } else if (rem) {
+              return _$context.trigger('tooltip:show', mediaTime(rem) + " remaining, the waitlist is empty", $etaText);
+            } else {
+              return _$context.trigger('tooltip:show', "Nobody is playing and the waitlist is empty", $etaText);
             }
-          } updateToolTip();
+          }
         }).mouseout(function(){
           if (typeof _$context != 'undefined' && _$context !== null) {
             clearInterval(tooltipIntervalID);
@@ -6960,6 +7402,9 @@ window.compareVersions = function(a, b){
             lastSongDur = API.getHistory()[l - 1].media.duration;
           }
         });
+        if (typeof _$context != 'undefined' && _$context !== null) {
+          addListener(_$context, 'room:joined', updateETA);
+        }
         hist = API.getHistory();
         l = hist.length;
         if (l < 50) {
@@ -6969,7 +7414,7 @@ window.compareVersions = function(a, b){
                 lastSongDur = 0;
                 l++;
               }
-              if (l < 51) {
+              if (l < 50) {
                 tinyhist();
               }
             });
@@ -6985,13 +7430,14 @@ window.compareVersions = function(a, b){
         updateETA();
         addListener(API, 'p0ne:stylesLoaded', function(){
           requestAnimationFrame(function(){
+            console.info("[TEST stylesLoaded] $eta.width: " + $eta.width());
             $nextMediaLabel.css({
               right: $eta.width() - 50
             });
           });
         });
         function updateETA(){
-          var p, ref$, avg_, avg;
+          var p, ref$, eta_, eta;
           p = API.getWaitListPosition();
           if (p === 0) {
             $etaText.text("you are next DJ!");
@@ -7010,20 +7456,25 @@ window.compareVersions = function(a, b){
               }
             }
           }
-          avg_ = API.getTimeRemaining() + sum * p / l;
-          avg = Math.round(
-          avg_ / 60);
-          $etaText.text("ETA ca. ");
-          if (avg > 60) {
-            $etaTime.text(~~(avg / 60) + "h " + avg % 60 + "min");
-          } else {
-            $etaTime.text(avg + " min");
+          eta_ = API.getTimeRemaining() + sum * p / l;
+          eta = Math.round(
+          eta_ / 60);
+          if (lastETA !== eta) {
+            lastETA = eta;
+            $etaText.text("ETA ca. ");
+            if (eta > 60) {
+              $etaTime.text(~~(eta / 60) + "h " + eta % 60 + "min");
+            } else {
+              $etaTime.text(eta + " min");
+            }
+            $nextMediaLabel.css({
+              right: $eta.width() - 50
+            });
+            if (eta_ > 0) {
+              clearTimeout(this$.timer);
+              return this$.timer = sleep((eta_ % 60 + 31).s, updateETA);
+            }
           }
-          $nextMediaLabel.css({
-            right: $eta.width() - 50
-          });
-          clearTimeout(this$.timer);
-          return this$.timer = sleep((avg_ % 60 + 31).s, updateETA);
         }
       },
       disable: function(){
@@ -7160,7 +7611,7 @@ window.compareVersions = function(a, b){
         warnOnPrevPlay: true,
         warnXMinBefore: 2 .min
       },
-      setup: function(arg$, arg1$, arg2$, module_){
+      setup: function(arg$, arg1$, module_){
         var addListener, _settings, warnTimeout, isNext, fn;
         addListener = arg$.addListener;
         _settings = arg1$._settings;
@@ -7259,7 +7710,7 @@ window.compareVersions = function(a, b){
           }
         });
         function checkOnNextAdv(d){
-          var ref$, ref1$, ref2$, ref3$, ref4$, ref5$, nextSong, ref6$, ref7$, ref8$, i$, ref9$, len$, s, results$ = [];
+          var ref$, ref1$, ref2$, ref3$, ref4$, ref5$, nextSong, ref6$, ref7$, ref8$, i$, ref9$, len$, s;
           console.info("[Avoid History Plays]", (ref$ = playlist.list) != null ? (ref1$ = ref$.rows) != null ? (ref2$ = ref1$[0]) != null ? ref2$.model : void 8 : void 8 : void 8, (ref3$ = playlist.list) != null ? (ref4$ = ref3$.rows) != null ? (ref5$ = ref4$[1]) != null ? ref5$.model : void 8 : void 8 : void 8);
           if (!(nextSong = (ref6$ = playlist.list) != null ? (ref7$ = ref6$.rows) != null ? (ref8$ = ref7$[1]) != null ? ref8$.nextSong : void 8 : void 8 : void 8) || (typeof getActivePlaylist == 'undefined' || getActivePlaylist === null)) {
             return;
@@ -7268,15 +7719,28 @@ window.compareVersions = function(a, b){
             s = ref9$[i$];
             if (s.media.cid === nextSong.cid) {
               chatWarn('moved down', '☢ Avoid History Plays');
-              results$.push(ajax('PUT', "playlists/" + getActivePlaylist().id + "/media/move", {
+              ajax('PUT', "playlists/" + getActivePlaylist().id + "/media/move", {
                 beforeID: -1,
                 ids: [nextSong.id]
-              }));
+              });
             }
           }
-          return results$;
         }
         (this.checkOnNextAdv = checkOnNextAdv)();
+      }
+    });
+    /*####################################
+    #         WARN ON PAGE LEAVE         #
+    ####################################*/
+    module('warnOnPageLeave', {
+      displayName: "Warn on Leaving plug.dj",
+      settings: 'base',
+      setup: function(arg$){
+        var addListener, this$ = this;
+        addListener = arg$.addListener;
+        addListener($window, 'beforeunload', function(){
+          return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under " + this$.settings.toUpperCase() + " > " + this$.displayName + ")";
+        });
       }
     });
     /*@source p0ne.chat.ls */
@@ -7397,7 +7861,7 @@ window.compareVersions = function(a, b){
     module('chatPlugin', {
       require: ['_$context'],
       setup: function(arg$){
-        var addListener, onerror;
+        var addListener, onerror, addClassesCB, ref$;
         addListener = arg$.addListener;
         p0ne.chatLinkPlugins || (p0ne.chatLinkPlugins = []);
         onerror = 'onerror="chatPlugin.imgError(this)"';
@@ -7450,26 +7914,29 @@ window.compareVersions = function(a, b){
         addListener(_$context, 'chat:receive', function(e){
           getChat(e).addClass(Object.keys(e.classes || {}).join(' '));
         });
+        addClassesCB = (ref$ = _$context._events['chat:receive'])[ref$.length - 1];
+        addListener(_$context, 'popout:open', function(){
+          _$context._events['chat:receive'].removeItem(addClassesCB);
+          _$context._events['chat:receive'].push(addClassesCB);
+        });
         function addClass(classes){
-          var i$, ref$, len$, className, results$ = [];
+          var i$, ref$, len$, className;
           if (typeof classes === 'string') {
             for (i$ = 0, len$ = (ref$ = classes.split(/\s+/g)).length; i$ < len$; ++i$) {
               className = ref$[i$];
               if (className) {
-                results$.push(this.classes[className] = true);
+                this.classes[className] = true;
               }
             }
-            return results$;
           }
         }
         function removeClass(classes){
-          var i$, ref$, len$, className, ref1$, ref2$, results$ = [];
+          var i$, ref$, len$, className;
           if (typeof classes === 'string') {
             for (i$ = 0, len$ = (ref$ = classes.split(/\s+/g)).length; i$ < len$; ++i$) {
               className = ref$[i$];
-              results$.push((ref2$ = (ref1$ = this.classes)[className], delete ref1$[className], ref2$));
+              delete this.classes[className];
             }
-            return results$;
           }
         }
       },
@@ -7488,10 +7955,11 @@ window.compareVersions = function(a, b){
       optional: ['users'],
       require: ['chatPlugin'],
       setup: function(arg$){
+        /* designed to be compatible with p³-compatible Room Themes */
         var addListener, err;
         addListener = arg$.addListener;
         try {
-          $cm().children().each(function(){
+          $cms().children().each(function(){
             var uid, $this, fromUser, role, fromRole, i$, ref$, len$, yet$, r;
             if (uid = this.dataset.cid) {
               uid = uid.substr(0, 7);
@@ -7500,7 +7968,7 @@ window.compareVersions = function(a, b){
               }
               $this = $(this);
               if (fromUser = users.get(uid)) {
-                role = getRank(fromUser);
+                role = getRank(fromUser, true);
                 fromRole = "from-" + role;
                 if (role === 'regular') {
                   if (uid === userID) {
@@ -7509,7 +7977,7 @@ window.compareVersions = function(a, b){
                 } else {
                   fromRole += " from-staff";
                 }
-                /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                /*else # stupid p³. who would abuse the class `from` instead of using something sensible instead?!
                     fromRole += " from"
                 */
                 if (fromUser.friend) {
@@ -7542,7 +8010,7 @@ window.compareVersions = function(a, b){
           if (uid) {
             message.addClass("fromID-" + uid);
             if (message.user = getUser(uid)) {
-              rank = getRank(message.user);
+              rank = getRank(message.user, true);
               if (uid === userID) {
                 message.addClass('from-you');
                 also = '-also';
@@ -7669,22 +8137,21 @@ window.compareVersions = function(a, b){
         var addListener;
         addListener = arg$.addListener;
         addListener(_$context, 'chat:plugin', function(message){
-          var type, uid, res, lastI, i$, ref$, len$, yet$, mention;
+          var type, uid, res, lastI, i$, ref$, len$, mention;
           type = message.type, uid = message.uid;
           if (uid) {
             res = "";
             lastI = 0;
-            for (yet$ = true, i$ = 0, len$ = (ref$ = getMentions(message, true)).length; i$ < len$; ++i$) {
+            for (i$ = 0, len$ = (ref$ = getMentions(message, true)).length; i$ < len$; ++i$) {
               mention = ref$[i$];
-              yet$ = false;
               if (mention.id !== userID || type === 'emote') {
-                res += "" + message.message.substring(lastI, mention.offset) + "<span class='mention-other mentionID-" + mention.id + " mention-" + getRank(mention) + " " + (!(mention.role || mention.gRole) ? '' : 'mention-staff') + "'>@" + mention.rawun + "</span>";
+                res += "" + message.message.substring(lastI, mention.offset) + "<span class='mention-other mentionID-" + mention.id + " mention-" + getRank(mention, false) + " " + (mention.role || mention.gRole ? 'mention-staff' : '') + " " + (type === 'emote' && mention.id === userID ? 'mention-you' : '') + "'>@" + mention.rawun + "</span>";
                 lastI = mention.offset + 1 + mention.rawun.length;
               }
-            } if (yet$) {
-              return;
             }
-            message.message = res + message.message.substr(lastI);
+            if (res) {
+              message.message = res + message.message.substr(lastI);
+            }
           }
         });
       }
@@ -7700,21 +8167,37 @@ window.compareVersions = function(a, b){
       displayName: 'Inline Images',
       help: 'Converts image links to images in the chat, so you can see a preview.\n\nWhen enabled, you can enter tags to filter images which should not be shown inline. These tags are case-insensitive and space-seperated.\n\n☢ The taglist is subject to improvement',
       _settings: {
-        filterTags: ['nsfw', 'suggestive', 'gore', 'spoiler', 'no-inline', 'noinline']
+        filterTags: ['nsfw', 'suggestive', 'gore', 'spoiler', 'questionable', 'no-inline', 'noinline']
       },
       setup: function(arg$){
         var addListener, this$ = this;
         addListener = arg$.addListener;
         addListener(API, 'chat:image', function(arg$){
-          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img;
+          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img, msgLC, i$, ref$, len$, tag;
           all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, onerror = arg$.onerror, msg = arg$.msg, offset = arg$.offset;
           if (img = this$.inlineify.apply(this$, arguments)) {
-            msg.hasFilterWord == null && (msg.hasFilterWord = msg.message.toLowerCase().hasAny(this$._settings.filterTags));
+            if (msg.hasFilterWord == null) {
+              msg.hasFilterWord = false;
+              msgLC = msg.message.toLowerCase();
+              for (i$ = 0, len$ = (ref$ = this$._settings.filterTags).length; i$ < len$; ++i$) {
+                tag = ref$[i$];
+                if (msgLC.has(tag)) {
+                  msg.hasFilterWord = true;
+                  console.warn("[inline-img] message contains \"" + tag + "\", images will not be converted");
+                  break;
+                }
+              }
+            }
             if (msg.hasFilterWord || msg.message[offset + all.length] === ";" || domain === 'plug.dj') {
               console.info("[inline-img] filtered image", completeURL + " ==> " + protocol + img);
-              return "<a " + pre.replace(/class=('|")?(\S+)/i, function(arg$, q, cl){
-                return 'class=' + (q || '\'') + 'p0ne-img-filtered ' + cl + (q ? '' : '\'');
-              }) + " data-image-url='" + img + "'>" + completeURL + "</a>";
+              if (pre.has("class=")) {
+                pre = pre.replace(/class=('|")?(\S+)/i, function(arg$, q, cl){
+                  return 'class=' + (q || '\'') + 'p0ne-img-filtered ' + cl + (q ? '' : '\'');
+                });
+              } else {
+                pre = "class=p0ne-img-filtered " + pre;
+              }
+              return "<a " + pre + " src='" + img + "'>" + completeURL + "</a>";
             } else {
               console.log("[inline-img]", completeURL + " ==> " + img);
               return "<a " + pre + "><img src='" + img + "' class=p0ne-img " + onload + " " + onerror + "></a>";
@@ -7726,12 +8209,12 @@ window.compareVersions = function(a, b){
       },
       regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i,
       inlineify: function(arg$){
-        var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, that, rgx, repl, forceProtocol, img;
+        var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, that, rgx, repl, forceProtocol;
         all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, onerror = arg$.onerror, msg = arg$.msg, offset = arg$.offset;
         if (that = this.plugins[domain] || this.plugins[domain.substr(1 + domain.indexOf('.'))]) {
           rgx = that[0], repl = that[1], forceProtocol = that[2];
-          if (url !== (img = url.replace(rgx, repl))) {
-            return (forceProtocol || protocol) + "" + img;
+          if (rgx.test(url)) {
+            return (forceProtocol || protocol) + "" + url.replace(rgx, repl);
           }
         }
         if (this.regDirect.test(url)) {
@@ -7747,20 +8230,24 @@ window.compareVersions = function(a, b){
         var $input, this$ = this;
         $('<span class=p0ne-settings-input-label>').text("filter tags:").appendTo($el);
         $input = $('<input class="p0ne-settings-input">').val(this._settings.filterTags.join(" ")).on('input', function(){
-          var tag;
-          this$._settings.filterTags = (function(){
-            var i$, ref$, len$, results$ = [];
-            for (i$ = 0, len$ = (ref$ = $input.val().split(" ")).length; i$ < len$; ++i$) {
-              tag = ref$[i$];
-              results$.push($.trim(tag));
+          var l, map, i$, ref$, len$, tag;
+          this$._settings.filterTags = [];
+          l = 0;
+          map = {
+            "": true
+          };
+          for (i$ = 0, len$ = (ref$ = $input.val().split(" ")).length; i$ < len$; ++i$) {
+            tag = ref$[i$];
+            tag = $.trim(tag);
+            if (!map[tag]) {
+              this$._settings.filterTags[l++] = tag;
             }
-            return results$;
-          }());
+          }
         }).appendTo($el);
       },
       forceHTTPSDomains: ['i.imgur.com', 'deviantart.com'],
       plugins: {
-        'imgur.com': [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,7}(?:[&,][\w]{5,7})*)(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif"],
+        'imgur.com': [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", 'https://'],
         'prntscrn.com': [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct"],
         'gyazo.com': [/^gyazo.com\/\w+/, "$&/raw"],
         'dropbox.com': [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"],
@@ -7779,7 +8266,9 @@ window.compareVersions = function(a, b){
           /^imageshack\.us\/[fi]\/(\w\w)(\w+?)(\w)(?:\W|$)/, function(){
             return chatInlineImages.imageshackPlugin.apply(this, arguments);
           }
-        ]
+        ],
+        'gstatic.com': [/^https:\/\/encrypted-tbn\d.gstatic.com\/images/, "$&"],
+        'i.chzbgr.com': [/(?:)/, ""]
         /* meme-plugins based on http://userscripts.org/scripts/show/154915.html (mirror: http://userscripts-mirror.org/scripts/show/154915.html ) */,
         'quickmeme.com': [/^(?:m\.)?quickmeme\.com\/meme\/(\w+)/, "i.qkme.me/$1.jpg"],
         'qkme.me': [/^(?:m\.)?qkme\.me\/(\w+)/, "i.qkme.me/$1.jpg"],
@@ -7906,7 +8395,7 @@ window.compareVersions = function(a, b){
           }
         };
         dialog.closeBind = bind$(dialog, 'close');
-        addListener(chatDomEvents, 'click', '.p0ne-img', function(e){
+        addListener(chatDomEvents, 'click', '.p0ne-img, .p0ne-img-filtered', function(e){
           var $img_;
           $img_ = $(this);
           e.preventDefault();
@@ -8052,7 +8541,8 @@ window.compareVersions = function(a, b){
       },
       updateRegexp: function(){
         var this$ = this;
-        this.regexp = RegExp('\\b(?:' + this._settings.triggerwords.join('|') + ')\\b', 'gi');
+        this.regexp = RegExp('\\b(?:' + escapeRegExp(
+        this._settings.triggerwords.join('|')) + ')\\b', 'gi');
         this.hasUsernameTrigger = false;
         this.usernameTriggers = {};
         API.getUser().username.replace(this.regexp, function(word, i){
@@ -8181,10 +8671,10 @@ window.compareVersions = function(a, b){
     #         PLAYLIST ICON VIEW         #
     ####################################*/
     module('playlistIconView', {
-      displayName: "Playlist Icon View",
+      displayName: "Playlist Grid View",
       settings: 'look&feel',
       help: 'Shows songs in the playlist and history panel in an icon view instead of the default list view.',
-      optional: ['PlaylistItemList', 'app'],
+      optional: ['PlaylistItemList', 'pl'],
       setup: function(arg$, playlistIconView){
         var addListener, replace, replaceListener, CELL_HEIGHT, CELL_WIDTH, ref$, ref1$, $hovered, $mediaPanel, this$ = this;
         addListener = arg$.addListener, replace = arg$.replace, replaceListener = arg$.replaceListener;
@@ -8233,40 +8723,24 @@ window.compareVersions = function(a, b){
             }
           };
         });
-        if ((ref$ = this.pl = app != null ? app.footer.playlist.playlist.media.list : void 8) != null && ref$.rows) {
-          Layout.off('resize', this.pl.resizeBind).resize(replace(this.pl, 'resizeBind', function(){
-            return bind$(this$.pl, 'onResize');
+        if (pl != null && ((ref$ = pl.list) != null && ref$.rows)) {
+          Layout.off('resize', pl.list.resizeBind).resize(replace(pl.list, 'resizeBind', function(){
+            return bind$(pl.list, 'onResize');
           }));
-          this.pl.$el.off('jsp-scroll-y', this.pl.scrollBind).on('jsp-scroll-y', replace(this.pl, 'scrollBind', function(){
-            return bind$(this$.pl, 'onScroll');
+          pl.list.$el.off('jsp-scroll-y', pl.list.scrollBind).on('jsp-scroll-y', replace(pl.list, 'scrollBind', function(){
+            return bind$(pl.list, 'onScroll');
           }));
           replaceListener(_$context, 'anim:playlist:progress', PlaylistItemList, function(){
-            return function(){
-              if (this$.pl.$el) {
-                this$.pl.onResize();
-              }
-            };
+            return function(){};
           });
-          delete this.pl.currentRow;
-          this.pl.onResize(Layout.getSize());
-          if (typeof (ref1$ = this.pl).onScroll == 'function') {
+          delete pl.list.currentRow;
+          pl.list.onResize(Layout.getSize());
+          if (typeof (ref1$ = pl.list).onScroll == 'function') {
             ref1$.onScroll();
           }
         } else {
           console.warn("no pl");
         }
-        replace(searchManager, '_search', function(){
-          return function(){
-            var limit, ref$;
-            limit = (ref$ = typeof pl != 'undefined' && pl !== null ? pl.visibleRows : void 8) > 50 ? ref$ : 50;
-            console.log("[_search]", this.lastQuery, this.page, limit);
-            if (this.lastFormat === 1) {
-              searchAux.ytSearch(this.lastQuery, this.page, limit, this.ytBind);
-            } else if (this.lastFormat === 2) {
-              searchAux.scSearch(this.lastQuery, this.page, limit, this.scBind);
-            }
-          };
-        });
         $hovered = $();
         $mediaPanel = $('#media-panel');
         addListener($mediaPanel, 'mouseover', '.row', function(){
@@ -8313,9 +8787,11 @@ window.compareVersions = function(a, b){
         var ref$, ref1$;
         console.info(getTime() + " [playlistIconView] disabling");
         $body.removeClass('playlist-icon-view');
-        if ((ref$ = this.pl) != null) {
-          if ((ref1$ = ref$.$el) != null) {
-            ref1$.off('jsp-scroll-y').on('jsp-scroll-y', this.pl.scrollBind);
+        if (pl != null) {
+          if ((ref$ = pl.list) != null) {
+            if ((ref1$ = ref$.$el) != null) {
+              ref1$.off('jsp-scroll-y').on('jsp-scroll-y', pl.list.scrollBind);
+            }
           }
         }
         /*
@@ -8501,11 +8977,10 @@ window.compareVersions = function(a, b){
             position: 'static'
           });
           $dialogContainer.addClass('lightsout');
-          pos = $dialog.position();
-          if (pos != null) {
+          if (pos = $dialog.position()) {
             pos.position = 'absolute';
+            $dialog.css(pos);
           }
-          $dialog.css(pos);
           if (!lightsout) {
             $dialogContainer.removeClass('lightsout');
           }
@@ -8608,18 +9083,23 @@ window.compareVersions = function(a, b){
     ####################################*/
     module('roomSettings', {
       require: ['room'],
-      optional: ['_$context'],
+      optional: ['_$context', 'socketListeners'],
       persistent: ['_data', '_room'],
       module: new DataEmitter('roomSettings'),
       _room: 'dashboard',
       setup: function(arg$){
-        var addListener;
-        addListener = arg$.addListener;
+        var addListener, addCommand;
+        addListener = arg$.addListener, addCommand = arg$.addCommand;
         this._update();
+        addListener(API, 'socket:roomDescriptionUpdate', this._update, this);
         if (typeof _$context != 'undefined' && _$context !== null) {
           addListener(_$context, 'room:joining', this.clear, this);
           addListener(_$context, 'room:joined', this._update, this);
         }
+        addCommand('roomsettings', {
+          description: "reloads the p³ compatible Room Settings",
+          callback: bind$(this, '_update')
+        });
       },
       _update: function(){
         var roomslug, roomDescription, url, this$ = this;
@@ -8636,203 +9116,8 @@ window.compareVersions = function(a, b){
             this$._room = roomslug;
             this$.set(data);
           }).fail(function(){
-            chatWarn("cannot load Room Settings", "p0ne");
+            chatWarn("cannot load Room Settings. run /roomsettings to try loading them again", "p0ne");
           });
-        }
-      }
-    });
-    /*####################################
-    #             YELLOW MOD             #
-    ####################################*/
-    module('yellowMod', {
-      disabled: true,
-      setup: function(arg$){
-        this.css = arg$.css;
-        this.update();
-      },
-      update: function(){
-        var ref$, ref1$;
-        if (!this.disabled) {
-          this.css('yellowMod', "#chat .fromID-" + userID + " .un,.user[data-uid='" + userID + "'] .name > span {color: " + ((typeof customColors != 'undefined' && customColors !== null ? (ref$ = customColors.colors) != null ? ref$.you : void 8 : void 8) || (typeof roomSettings != 'undefined' && roomSettings !== null ? (ref1$ = roomSettings._data) != null ? ref1$.colors.chat.you : void 8 : void 8) || '#ffdd6f') + " !important;}");
-        }
-      }
-    });
-    /*####################################
-    #           CUSTOM  COLORS           #
-    ####################################*/
-    window.ColorPicker = !!$.fn.ColorPicker;
-    module('customColors', {
-      displayName: "☢ Custom Colours",
-      settings: 'look&feel',
-      help: "Change colours of usernames, depending on their role.\n\nNote: some aggressive Room Themes might override custom colour settings from this module.",
-      require: ['yellowMod', 'ColorPicker'],
-      _settings: {
-        global: {},
-        perRoom: {}
-      },
-      setup: function(arg$){
-        var loadStyle;
-        this.css = arg$.css, loadStyle = arg$.loadStyle;
-        loadStyle(p0ne.host + "/vendor/colorpicker/css/colorpicker.css");
-      },
-      roles: [
-        {
-          displayName: 'You',
-          name: 'you',
-          'default': 0xffdd6f,
-          regular: true,
-          noIcon: true
-        }, {
-          displayName: 'Regular',
-          name: 'regular',
-          'default': 0xb0b0b0,
-          regular: true,
-          noIcon: true
-        }, {
-          displayName: 'Friend',
-          name: 'friend',
-          'default': 0xb0b0b0,
-          regular: true,
-          noIcon: true
-        }, {
-          displayName: 'Subscriber',
-          name: 'subscriber',
-          'default': 0xc59840,
-          regular: true
-        }, {
-          displayName: 'Resident DJ',
-          name: 'dj',
-          'default': 0xac76ff,
-          staff: true
-        }, {
-          displayName: 'Bouncer',
-          name: 'bouncer',
-          'default': 0xac76ff,
-          staff: true
-        }, {
-          displayName: 'Manager',
-          name: 'manager',
-          'default': 0xac76ff,
-          staff: true
-        }, {
-          displayName: '(Co-) Host',
-          name: 'host',
-          'default': 0xac76ff,
-          staff: true
-        }, {
-          displayName: 'Brand Ambassador',
-          name: 'ambassador',
-          'default': 0x89be6c
-        }, {
-          displayName: 'Admin',
-          name: 'admin',
-          'default': 0x42a5dc
-        }
-      ],
-      settingsExtra: function($wrapper){
-        var cc, visible, scope, i, role, c, ref$, ref1$, ref2$, isDefault, roleName, $row, $cp, $cpDialog, this$ = this;
-        cc = this;
-        this.colors = import$(clone$(this._settings.global), this._settings.perRoom[getRoomSlug()]);
-        visible = false;
-        $wrapper.append($('<button>').text("change custom colours").click(function(){
-          if (visible) {
-            this$.$el.fadeOut();
-            visible = false;
-          } else {
-            this$.$el.fadeIn();
-            visible = true;
-          }
-        }));
-        this.$el = $('<div class=p0ne-cc-settings>').hide().appendTo($body);
-        scope = this._settings.global;
-        this.rolesHashmap = {};
-        i = this.roles.length;
-        while (role = this.roles[--i]) {
-          this.rolesHashmap[role.name] = role;
-          if (!(c = scope[role.name] || ((ref$ = roomTheme._data) != null ? (ref1$ = ref$.colors) != null ? (ref2$ = ref1$.chat) != null ? ref2$[role.name] : void 8 : void 8 : void 8))) {
-            c = "#" + role['default'].toString(16);
-            isDefault = true;
-          }
-          $("<div data-role=" + role.name + " class='p0ne-cc-row from-" + role.name + "" + (role.staff ? ' from-staff' : '') + "" + (scope[role.name] ? '' : ' p0ne-cc-default') + "'>" + (role.noIcon
-            ? ''
-            : '<i class=\'icon icon-chat-' + role.name + '\'></i>') + "<span class=name>" + role.displayName + "</span><i class='icon icon-clear-input'></i></div>").css({
-            color: c
-          }).appendTo(this.$el);
-        }
-        this.$cp = $cp = $('<div>').ColorPicker({
-          onChange: function(hsb, hex, rgb){
-            var c;
-            c = "#" + hex;
-            scope[roleName] = c;
-            $row.css({
-              color: c
-            }).removeClass('p0ne-cc-default');
-            cc.updateCSS();
-          }
-        });
-        $cpDialog = $("#" + this.$cp.data('colorpickerId'));
-        this.$el.on('click', '.icon-clear-input', function(){
-          var $row, name, ref$, ref1$, ref2$;
-          $row = $(this).parent();
-          name = $row.data('role');
-          $row.css({
-            color: ((ref$ = roomTheme._data) != null ? (ref1$ = ref$.colors) != null ? (ref2$ = ref1$.chat) != null ? ref2$[name] : void 8 : void 8 : void 8) || "#" + cc.rolesHashmap[name]['default'].toString(16)
-          }).addClass('p0ne-cc-default');
-          delete scope[name];
-          cc.updateCSS();
-          return false;
-        }).on('click', '.p0ne-cc-row', function(){
-          var ref$, ref1$, ref2$, offset;
-          $row = $(this);
-          roleName = $row.data('role');
-          $cp.ColorPickerSetColor(scope[roleName] || ((ref$ = roomTheme._data) != null ? (ref1$ = ref$.colors) != null ? (ref2$ = ref1$.chat) != null ? ref2$[roleName] : void 8 : void 8 : void 8) || "#" + cc.rolesHashmap[roleName]['default'].toString(16)).ColorPickerShow();
-          console.log("[colorpicker]", $cpDialog[0], $row.offset());
-          offset = $row.offset();
-          $cpDialog.css({
-            left: offset.left,
-            top: offset.top + 24
-          });
-        });
-        $('<label class=p0ne-css-override-you><input type=checkbox class=checkbox> "You" overrides other rules</label>').attr('checked', !yellowMod.disabled).appendTo(this.$el).find('input').on('click', function(e){
-          console.log("[custom colors] force 'you' Override:", this.checked);
-          if (this.checked) {
-            yellowMod.enable();
-          } else {
-            yellowMod.disable();
-          }
-        });
-        this.updateCSS();
-      },
-      updateCSS: function(){
-        var styles, scope, i$, ref$, len$, role, color, name;
-        styles = "";
-        scope = this._settings.global;
-        for (i$ = 0, len$ = (ref$ = this.roles).length; i$ < len$; ++i$) {
-          role = ref$[i$];
-          if (color = scope[role.name]) {
-            name = role.name;
-            if (role.regularOnly) {
-              name = "regular.from-" + name;
-            }
-            styles += "/* " + role.name + " => " + color + " */\n";
-            if (!role.noIcon) {
-              styles += "#app #user-lists .icon-chat-" + role.name + " + .name,\n#app #waitlist .icon-chat-" + role.name + " + span,\n#app #user-rollover .icon-chat-" + role.name + " + span,\n";
-            }
-            styles += "#app #chat .from-" + name + (role.regularOnly ? '.from-regular' : '') + " .un,\n#app .p0ne-name." + role.name + (role.regularOnly ? '.regular' : '') + "\n{\n    color: " + color + " !important;\n}\n";
-          }
-        }
-        this.css('customColors', styles);
-        yellowMod.update();
-      },
-      disable: function(){
-        var ref$;
-        if (this.$cp) {
-          this.$cp.ColorPickerHide();
-          $("#" + this.$cp.data('colorpickerId')).remove();
-          this.$cp.remove();
-        }
-        if ((ref$ = this.$el) != null) {
-          ref$.remove();
         }
       }
     });
@@ -8851,7 +9136,7 @@ window.compareVersions = function(a, b){
         this.$playbackBackground = $('#playback .background img');
         this.playbackBackgroundVanilla = this.$playbackBackground.attr('src');
         addListener(roomSettings, 'data', this.applyTheme = function(d){
-          var cc, styles, role, ref$, color, colorMap, k, selector, rule, attrs, v, i$, len$, ref1$, name, url, x$, key, text, lang;
+          var cc, styles, role, ref$, color, colorMap, k, selector, rule, attrs, v, i$, len$, ref1$, name, url, x$, key, text, base, endKey;
           console.log(getTime() + " [roomTheme] loading theme");
           this$.clear(d.images.background, false);
           this$._data = d;
@@ -8868,11 +9153,6 @@ window.compareVersions = function(a, b){
                   d.colors.chat.dj = color;
                 }
                 styles += "/* " + role + " => " + color + " */\n#user-lists .icon-chat-" + role + " + .name,\n.from-" + role + " .from, #waitlist .icon-chat-" + role + " + span,\n#user-rollover .icon-chat-" + role + " + span, .p0ne-name." + role + " {\n        color: " + color + " !important;\n}\n";
-                if (role === 'you') {
-                  if (typeof yellowMod != 'undefined' && yellowMod !== null) {
-                    yellowMod.update();
-                  }
-                }
               }
             }
             colorMap = {
@@ -8962,13 +9242,21 @@ window.compareVersions = function(a, b){
           if (d.text) {
             for (key in ref$ = d.text.plugDJ) {
               text = ref$[key];
-              for (lang in Lang[key]) {
-                replace(Lang[key], lang, fn$);
+              base = Lang;
+              key = key.split('.');
+              endKey = key.pop();
+              for (i$ = 0, len$ = key.length; i$ < len$; ++i$) {
+                key = key[i$];
+                if (!(base = base[key])) {
+                  break;
+                }
+              }
+              if (base) {
+                replace(base, endKey, fn$);
               }
             }
           }
           css('roomTheme', styles);
-          yellowMod.update();
           this$.styles = styles;
           function fn$(){
             return text;
@@ -9026,66 +9314,12 @@ window.compareVersions = function(a, b){
       displayName: 'Song Notifications',
       help: 'Shows notifications for playing songs in the chat.\nBesides the songs\' name, it also features a thumbnail and some extra buttons.\n\nBy clicking on the song\'s or author\'s name, a search on plug.dj for that name will be started, to easily find similar tracks.\n\nBy hovering the notification and clicking "description" the songs description will be loaded.\nYou can click anywhere on it to close it again.',
       persistent: ['lastMedia', '$div'],
-      setup: function(arg$, arg1$, arg2$, module_){
-        var addListener, $create, $createPersistent, css, $lastNotif, that, $description, this$ = this;
-        addListener = arg$.addListener, $create = arg$.$create, $createPersistent = arg$.$createPersistent, css = arg$.css;
-        $lastNotif = $();
+      setup: function(arg$, arg1$, module_){
+        var addListener, $create, css, that, $description, this$ = this;
+        addListener = arg$.addListener, $create = arg$.$create, this.$createPersistent = arg$.$createPersistent, css = arg$.css;
+        this.$lastNotif = $();
         this.$div || (this.$div = $cms().find('.p0ne-song-notif:last'));
-        this.callback = function(d){
-          var media, score, ref$, html, time, mediaURL, duration, e;
-          try {
-            media = d.media;
-            if ((media != null ? media.id : void 8) !== this$.lastMedia) {
-              if (score = (ref$ = d.lastPlay) != null ? ref$.score : void 8) {
-                /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
-                this$.$div.removeClass('song-current').find('.song-stats').html("<div class=score><div class='item positive'><i class='icon icon-history-positive'></i> " + score.positive + "</div><div class='item grabs'><i class='icon icon-history-grabs'></i> " + score.grabs + "</div><div class='item negative'><i class='icon icon-history-negative'></i> " + score.negative + "</div><div class='item listeners'><i class='icon icon-history-listeners'></i> " + ((users != null ? users.length : void 8) || API.getUsers().length) + "</div></div>");
-                this$.lastMedia = null;
-                $lastNotif = this$.$div;
-              }
-            } else {
-              return;
-            }
-            if (!media) {
-              return;
-            }
-            this$.lastMedia = media.id;
-            if (typeof chat != 'undefined' && chat !== null) {
-              chat.lastType = 'p0ne-song-notif';
-            }
-            this$.$div = $createPersistent("<div class='update p0ne-song-notif song-current' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
-            html = "";
-            time = getTime();
-            if (media.format === 1) {
-              mediaURL = "http://youtube.com/watch?v=" + media.cid;
-            } else {
-              mediaURL = "https://soundcloud.com/search?q=" + encodeURIComponent(media.author + ' - ' + media.title);
-            }
-            duration = mediaTime(media.duration);
-            console.logImg(media.image.replace(/^\/\//, 'https://')).then(function(){
-              console.log(time + " [DJ_ADVANCE] " + d.dj.username + " is playing '" + media.author + " - " + media.title + "' (" + duration + ")", d);
-            });
-            html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + media.image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> --><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + getTimestamp() + "<div class='song-stats'></div><div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
-            this$.$div.html(html);
-            this$.$div.find('.song-title').text(d.media.title).prop('title', d.media.title);
-            this$.$div.find('.song-author').text(d.media.author);
-            this$.$div.find('.song-dj').text(d.dj.username).data('uid', d.dj.id);
-            if (media.format === 2 && p0ne.SOUNDCLOUD_KEY) {
-              this$.$div.addClass('loading');
-              mediaLookup(media).then(function(d){
-                var that;
-                this$.$div.removeClass('loading').data('description', d.description).find('.song-open').attr('href', d.url);
-                if (d.download) {
-                  this$.$div.addClass('downloadable').find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
-                }
-              });
-            }
-            appendChat(this$.$div);
-          } catch (e$) {
-            e = e$;
-            console.error("[p0ne.notif]", e);
-          }
-        };
-        addListener(API, 'advance', this.callback);
+        addListener(API, 'advance', bind$(this, 'callback'));
         if (_$context) {
           addListener(_$context, 'room:joined', function(){
             this$.callback({
@@ -9102,7 +9336,7 @@ window.compareVersions = function(a, b){
           } else {
             modID = "";
           }
-          $lastNotif.find('.timestamp').after($("<div class='song-skipped un' " + modID + ">").text(modUsername));
+          this$.$lastNotif.find('.timestamp').after($("<div class='song-skipped un' " + modID + ">").text(modUsername));
         });
         loadStyle(p0ne.host + "/css/p0ne.notif.css?r=18");
         if (that = API.getMedia()) {
@@ -9247,12 +9481,74 @@ window.compareVersions = function(a, b){
         this.showDescription = showDescription;
         this.hideDescription = hideDescription;
       },
+      callback: function(d){
+        var media, score, ref$, html, author, title, mediaURL, image, duration, this$ = this;
+        media = d.media;
+        if ((media != null ? media.id : void 8) !== this.lastMedia) {
+          if (this.$div && (score = (ref$ = d.lastPlay) != null ? ref$.score : void 8)) {
+            /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
+            this.$div.removeClass('song-current').find('.song-stats').html("<div class=score><div class='item positive'><i class='icon icon-history-positive'></i> " + score.positive + "</div><div class='item grabs'><i class='icon icon-history-grabs'></i> " + score.grabs + "</div><div class='item negative'><i class='icon icon-history-negative'></i> " + score.negative + "</div><div class='item listeners'><i class='icon icon-history-listeners'></i> " + ((typeof users != 'undefined' && users !== null ? users.length : void 8) || API.getUsers().length) + "</div></div>");
+            this.lastMedia = null;
+            this.$lastNotif = this.$div;
+          }
+        }
+        if (!media) {
+          return;
+        }
+        this.lastMedia = media.id;
+        if (typeof chat != 'undefined' && chat !== null) {
+          chat.lastType = 'p0ne-song-notif';
+        }
+        this.$div = this.$createPersistent("<div class='update p0ne-song-notif song-current' data-id='" + media.id + "' data-cid='" + media.cid + "' data-format='" + media.format + "'>");
+        html = "";
+        author = htmlUnescape(media.author);
+        title = htmlUnescape(media.title);
+        if (media.format === 1) {
+          mediaURL = "http://youtube.com/watch?v=" + media.cid;
+        } else {
+          mediaURL = "https://soundcloud.com/search?q=" + encodeURIComponent(author + ' - ' + title);
+        }
+        image = httpsify(media.image);
+        duration = mediaTime(media.duration);
+        console.logImg(image, 120, media.format === 1 ? 90 : 120).then(function(){
+          console.log(getTime() + " [DJ_ADVANCE] " + d.dj.username + " plays '" + author + " - " + title + "' (" + duration + ")", d);
+        });
+        html += "<div class='song-thumb-wrapper'><img class='song-thumb' src='" + image + "' /><span class='song-duration'>" + duration + "</span><div class='song-add btn'><i class='icon icon-add'></i></div><a class='song-open btn' href='" + mediaURL + "' target='_blank'><i class='icon icon-chat-popout'></i></a><!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> --></div>" + getTimestamp() + "<div class='song-stats'></div><div class='song-dj un'></div><b class='song-title'></b><span class='song-author'></span><div class='song-description-btn'>Description</div>";
+        this.$div.html(html);
+        this.$div.find('.song-title').text(title).prop('title', title);
+        this.$div.find('.song-author').text(author);
+        this.$div.find('.song-dj').text(d.dj.username).data('uid', d.dj.id);
+        appendChat(this.$div);
+        if (media.format === 2) {
+          this.$div.addClass('loading');
+          mediaLookup(media).then(function(d){
+            var that;
+            this$.$div.removeClass('loading').data('description', d.description).find('.song-open').attr('href', d.url);
+            if (d.download) {
+              this$.$div.addClass('downloadable').find('.song-download').attr('href', d.download).attr('title', formatMB(d.downloadSize / 1000000) + " " + ((that = d.downloadFormat) ? '(.' + that + ')' : ''));
+            }
+          });
+        }
+      },
       disable: function(){
         if (typeof this.hideDescription == 'function') {
           this.hideDescription();
         }
       }
     });
+    chatCommands.commands.songinfo = {
+      description: "forces a song notification to be shown, even if the module is disabled",
+      callback: function(){
+        var that, ref$;
+        if (that = ((ref$ = window.songNotif) != null ? ref$.callback : void 8) && API.getMedia()) {
+          that.image = httpsify(that.image);
+          window.songNotif.callback({
+            media: that,
+            dj: API.getDJ()
+          });
+        }
+      }
+    };
     /*@source p0ne.song-info.ls */
     /**
      * plug_p0ne songInfo
@@ -9368,7 +9664,7 @@ window.compareVersions = function(a, b){
         $('<a>').addClass('p0ne-song-info-upload-title').appendTo($meta).attr('href', d.url).attr('target', '_blank').attr('title', (media.format === 1 ? 'open video on YouTube' : 'open Song on SoundCloud') + "").text(d.title);
         $('<br>').appendTo($meta);
         $('<span>').addClass('p0ne-song-info-date').appendTo($meta).text(getDateTime(new Date(d.uploadDate)));
-        $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text("duration: " + mediaTime(+d.duration));
+        $('<span>').addClass('p0ne-song-info-duration').appendTo($meta).text("duration " + mediaTime(+d.duration));
         if (media.format === 1 && d.restriction) {
           if (d.restriction.allowed) {
             $('<span>').addClass('p0ne-song-info-blocked').appendTo(this.$el).text("exclusively for " + humanList(d.restriction.allowed) + (d.restriction.allowed.length > 100 ? '(' + d.restriction.allowed.length + '/249)' : ''));
@@ -9431,40 +9727,44 @@ window.compareVersions = function(a, b){
     }
     console.time("[p0ne custom avatars] loaded SockJS");
     require(['sockjs'], function(SockJS){
+      var i$, ref$, ref1$, len$, ev;
       console.groupCollapsed("[p0ne custom avatars]");
       console.timeEnd("[p0ne custom avatars] loaded SockJS");
-      requireHelper('users', function(it){
-        var ref$, ref1$;
-        return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
-      });
-      window.userID || (window.userID = API.getUser().id);
-      if (users != null) {
-        window.user_ || (window.user_ = users.get(userID));
-      }
-      window.sleep || (window.sleep = function(delay, fn){
-        return setTimeout(fn, delay);
-      });
-      requireHelper('InventoryDropdown', function(it){
-        return it.selected;
-      });
-      requireHelper('avatarAuxiliaries', function(it){
-        return it.getAvatarUrl;
-      });
-      requireHelper('Avatar', function(it){
-        return it.AUDIENCE;
-      });
-      requireHelper('myAvatars', function(m){
-        var i$, ref$, ref1$, len$, ev;
-        if (m.comparator === 'id') {
-          for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref1$ = user_._events) != null ? ref1$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
-            ev = ref$[i$];
-            if (ev.ctx === m) {
-              return true;
-            }
+      if (!window.p0ne) {
+        requireHelper('users', function(it){
+          var ref$, ref1$;
+          return ((ref$ = it.models) != null ? (ref1$ = ref$[0]) != null ? ref1$.attributes.avatarID : void 8 : void 8) && !('isTheUserPlaying' in it) && !('lastFilter' in it);
+        });
+        window.userID || (window.userID = API.getUser().id);
+        if (typeof users != 'undefined' && users !== null) {
+          window.user_ || (window.user_ = users.get(userID));
+        }
+        window.sleep || (window.sleep = function(delay, fn){
+          return setTimeout(fn, delay);
+        });
+        requireHelper('InventoryDropdown', function(it){
+          return it.selected;
+        });
+        requireHelper('avatarAuxiliaries', function(it){
+          return it.getAvatarUrl;
+        });
+        requireHelper('Avatar', function(it){
+          return it.AUDIENCE;
+        });
+        for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref1$ = user_._events) != null ? ref1$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+          ev = ref$[i$];
+          if (ev.ctx.comparator === 'id') {
+            window.myAvatars = ev.ctx;
+            break;
           }
         }
-        return false;
-      });
+        if (requireHelper('InventoryAvatarPage', function(a){
+          var ref$;
+          return ((ref$ = a.prototype) != null ? ref$.className : void 8) === 'avatars' && a.prototype.eventName;
+        })) {
+          window.InventoryDropdown = new InventoryAvatarPage().dropDown.constructor;
+        }
+      }
       window.Lang = require('lang/Lang');
       window.Cells = requireAll(function(m){
         var ref$;
@@ -9475,7 +9775,7 @@ window.compareVersions = function(a, b){
       ####################################*/
       user.avatarID = API.getUser().avatarID;
       module('customAvatars', {
-        require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars'],
+        require: ['users', 'Lang', 'avatarAuxiliaries', 'Avatar', 'myAvatars', 'InventoryDropdown'],
         optional: ['user_', '_$context'],
         displayName: 'Custom Avatars',
         settings: 'base',
@@ -9644,11 +9944,10 @@ window.compareVersions = function(a, b){
           });
           replace(InventoryDropdown.prototype, 'draw', function(d_){
             return function(){
-              var html, categories, curAvatarID, curCategory, i$, ref$, len$, avi, category;
+              var html, categories, curAvatarID, i$, ref$, len$, avi, curCategory, category;
               html = "";
               categories = {};
               curAvatarID = API.getUser().avatarID;
-              curCategory = 'base';
               for (i$ = 0, len$ = (ref$ = myAvatars.models).length; i$ < len$; ++i$) {
                 avi = ref$[i$];
                 categories[avi.get('category')] = true;
@@ -9656,6 +9955,7 @@ window.compareVersions = function(a, b){
                   curCategory = avi.get('category');
                 }
               }
+              curCategory || (curCategory = (ref$ = myAvatars.models[0]) != null ? ref$.get('category') : void 8);
               for (category in categories) {
                 html += "<div class=row data-value='" + category + "'><span>" + Lang.userAvatars[category] + "</span></div>";
               }
@@ -9815,7 +10115,7 @@ window.compareVersions = function(a, b){
         },
         connectAttemps: 1,
         connect: function(url, reconnecting, reconnectWarning){
-          var reconnect, user, oldBlurb, newBlurb, this$ = this;
+          var reconnect, close_, user, oldBlurb, newBlurb, this$ = this;
           if (!reconnecting && this.socket) {
             if (url === this.socket.url && this.socket.readyState === 1) {
               return;
@@ -9878,12 +10178,11 @@ window.compareVersions = function(a, b){
             }
             this$.socket.trigger(type, data);
           };
-          this.replace(this.socket, 'close', function(close_){
-            return function(){
-              this.trigger('close');
-              close_.apply(this, arguments);
-            };
-          });
+          close_ = this.socket.close;
+          this.socket.close = function(){
+            this.trigger('close');
+            close_.apply(this, arguments);
+          };
           user = API.getUser();
           oldBlurb = user.blurb || "";
           newBlurb = oldBlurb.replace(/🐎\w{6}/g, '');
@@ -10086,7 +10385,7 @@ window.compareVersions = function(a, b){
           base: true
         }
       },
-      setup: function(arg$, p0neSettings, arg1$, oldModule){
+      setup: function(arg$, p0neSettings, oldModule){
         var $create, addListener, groupToggles, ref$, $ppM, $ppI, $ppW, $ppS, $ppP, i$, module, this$ = this;
         $create = arg$.$create, addListener = arg$.addListener;
         this.$create = $create;
@@ -10141,6 +10440,9 @@ window.compareVersions = function(a, b){
           $this = $(this);
           if (p0neSettings._settings.groupToggles[$this.data('group')]) {
             $this.css({
+              height: 0
+            });
+            $this.css({
               height: this.scrollHeight
             });
           }
@@ -10160,6 +10462,35 @@ window.compareVersions = function(a, b){
           } else {
             module.disable();
           }
+        }));
+        addListener($ppW, 'click', '.p0ne-settings-panel-icon', throttle(200, function(e){
+          var $this, module, offsetLeft;
+          $this = $(this).closest('.p0ne-settings-item');
+          module = $this.data('module');
+          if (!module._$settingsPanel) {
+            module._$settingsPanel = {
+              open: false,
+              wrapper: $('<div class=p0ne-settings-panel-wrapper>').appendTo($ppM),
+              $el: $('<div class=p0ne-settings-panel>')
+            };
+            module._$settingsPanel.$el.appendTo(module._$settingsPanel.wrapper);
+            module.settingsPanel(module._$settingsPanel.$el, module);
+          }
+          offsetLeft = $ppW.width();
+          if (module._$settingsPanel.open) {
+            module._$settingsPanel.wrapper.animate({
+              left: offsetLeft - module._$settingsPanel.$el.width()
+            }, function(){
+              return module._$settingsPanel.wrapper.hide();
+            });
+          } else {
+            module._$settingsPanel.wrapper.show().css({
+              left: offsetLeft - module._$settingsPanel.$el.width()
+            }).animate({
+              left: offsetLeft
+            });
+          }
+          e.preventPropagation();
         }));
         addListener($ppW, 'mouseover', '.p0ne-settings-has-more', function(){
           var $this, module, l, maxT, h, t, tt, ref$, diff;
@@ -10185,7 +10516,7 @@ window.compareVersions = function(a, b){
             left: l
           }).stop().fadeIn();
           $ppP.find('.p0ne-settings-popup-triangle').css({
-            top: t
+            top: 14 > t ? 14 : t
           });
         });
         addListener($ppW, 'mouseout', '.p0ne-settings-has-more', function(){
@@ -10290,6 +10621,9 @@ window.compareVersions = function(a, b){
               icons += "<div class=p0ne-settings-" + k + "></div>";
             }
           }
+          if (module.settingsPanel) {
+            icons += "<div class=p0ne-settings-panel-icon><i class='icon icon-settings-white'></i></div>";
+          }
           if (icons.length) {
             icons = "<div class=p0ne-settings-icons>" + icons + "</div>";
             itemClasses += ' p0ne-settings-has-more';
@@ -10352,6 +10686,8 @@ window.compareVersions = function(a, b){
               });
               if (autofocus) {
                 module._$settingsExtra.find('input').focus();
+              } else {
+                module._$settings.parent().scrollTop(0);
               }
             });
           }
@@ -10489,11 +10825,11 @@ window.compareVersions = function(a, b){
           lastDeletedCid = c;
         });
         replace_$Listener('chat:delete', function(){
-          (function(cid){
+          return function(cid){
             if (cid !== lastDeletedCid) {
               markAsDeleted(cid);
             }
-          });
+          };
         });
         function markAsDeleted(cid, moderator){
           var ref$, $msg, isLast, t, uid, ref1$, ref2$, d, cm;
@@ -10558,7 +10894,7 @@ window.compareVersions = function(a, b){
         instantWarn: false,
         maxMehs: 3
       },
-      setup: function(arg$, arg1$, arg2$, m_){
+      setup: function(arg$, arg1$, m_){
         var addListener, users, current, lastAdvance, this$ = this;
         addListener = arg$.addListener;
         if (m_) {
@@ -10577,17 +10913,25 @@ window.compareVersions = function(a, b){
         });
         lastAdvance = 0;
         addListener(API, 'advance', function(d){
-          var k, ref$, v, troll, ref1$;
+          var cid, ref$, v, troll, i$, len$, ref1$;
           d = Date.now();
-          for (k in ref$ = current) {
-            v = ref$[k];
+          for (cid in ref$ = current) {
+            v = ref$[cid];
             if (v === -1) {
-              users[k] || (users[k] = 0);
-              if (++users[k] > this$._settings.maxMehs && (troll = getUser(k))) {
-                appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll) + " meh'd the past " + plural(users[k], 'song') + "!</div></div>"));
+              users[cid] || (users[cid] = 0);
+              if (++users[cid] > this$._settings.maxMehs && (troll = getUser(cid))) {
+                appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(troll) + " meh'd the past " + plural(users[cid], 'song') + "!</div></div>"));
               }
-            } else if (d > lastAdvance + 10000 && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== k) {
-              delete users[k];
+            } else if (d > lastAdvance + 10000) {
+              delete users[cid];
+            }
+          }
+          if (d > lastAdvance + 10000) {
+            for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
+              cid = ref$[i$].cid;
+              if (!current[cid] && ((ref1$ = d.lastPlay) != null ? ref1$.dj.id : void 8) !== cid) {
+                delete users[cid];
+              }
             }
           }
           current = {};
@@ -10640,23 +10984,34 @@ window.compareVersions = function(a, b){
       settings: 'moderation',
       displayName: "Show Idle Time",
       help: 'This module shows how long users have been inactive in the User- and Waitlist-Panel.\n"Being active"',
-      lastActivity: {},
       _settings: {
+        lastActivity: {},
         highlightOver: 43 .min
       },
-      setup: function(arg$, arg1$, arg2$, m_){
-        var addListener, $create, replace, settings, start, i$, ref$, len$, user, ref1$, key$, lastActivity, $waitlistBtn, $afkCount, chatHidden, lastAfkCount, d, noActivityYet, fn, Constr;
+      setup: function(arg$, arg1$, m_){
+        var addListener, $create, replace, settings, start, lastActivity, ref$, i$, ref1$, len$, user, key$, $waitlistBtn, $afkCount, chatHidden, lastAfkCount, afkCount, fn, d, noActivityYet, Constr;
         addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
         settings = this._settings;
-        this.start = start = Date.now();
+        start = Date.now();
         if (m_) {
-          this.lastActivity = m_.lastActivity || {};
+          console.log("m_ =", m_);
+          this.start = m_.start;
+          lastActivity = m_._settings.lastActivity || {};
+        } else {
+          console.log("args", arguments);
+          this.start = start;
+          if (((ref$ = this._settings.lastActivity) != null ? ref$[0] : void 8) + 60000 > Date.now()) {
+            lastActivity = this._settings.lastActivity;
+          } else {
+            lastActivity = {};
+          }
         }
-        for (i$ = 0, len$ = (ref$ = API.getUsers()).length; i$ < len$; ++i$) {
-          user = ref$[i$];
-          (ref1$ = this.lastActivity)[key$ = user.id] || (ref1$[key$] = start);
+        this.lastActivity = lastActivity;
+        for (i$ = 0, len$ = (ref1$ = API.getUsers()).length; i$ < len$; ++i$) {
+          user = ref1$[i$];
+          lastActivity[key$ = user.id] || (lastActivity[key$] = start);
         }
-        lastActivity = this.lastActivity;
+        start = this.start;
         $waitlistBtn = $('#waitlist-button').append($afkCount = $create('<div class=p0ne-toolbar-count>'));
         addListener(API, 'socket:skip socket:grab', function(id){
           updateUser(id);
@@ -10665,7 +11020,9 @@ window.compareVersions = function(a, b){
           updateUser(u.id);
         });
         addListener(API, 'chat', function(u){
-          updateUser(u.uid);
+          if (!/afk/i.test(u.message)) {
+            updateUser(u.uid);
+          }
         });
         addListener(API, 'socket:gifted', function(e){
           updateUser(e.s);
@@ -10686,8 +11043,8 @@ window.compareVersions = function(a, b){
           });
         }
         lastAfkCount = 0;
-        this.timer = repeat(60000, function(){
-          var afkCount, d, usersToCheck, that, i$, len$, u;
+        this.timer = repeat(60000, fn = function(){
+          var d, usersToCheck, that, i$, len$, u;
           if (chatHidden) {
             forceRerender();
           } else {
@@ -10713,15 +11070,20 @@ window.compareVersions = function(a, b){
             }
           }
         });
+        fn();
         d = 0;
-        for (i$ = 0, len$ = (ref$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
+        for (i$ = 0, len$ = (ref1$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
           fn = i$;
-          Constr = ref$[i$];
+          Constr = ref1$[i$];
           replace(Constr.prototype, 'render', fn$);
         }
         function updateUser(uid){
           var i$, ref$, ref1$, len$, r, results$ = [];
-          lastActivity[uid] = Date.now();
+          if (Date.now() - lastActivity[uid] > settings.highlightOver) {
+            afkCount--;
+            $afkCount.text(afkCount);
+          }
+          lastActivity[0] = lastActivity[uid] = Date.now();
           for (i$ = 0, len$ = (ref$ = (typeof userList != 'undefined' && userList !== null ? (ref1$ = userList.listView) != null ? ref1$.rows : void 8 : void 8) || (app != null ? app.room.waitlist.rows : void 8)).length; i$ < len$; ++i$) {
             r = ref$[i$];
             if (r.model.id === uid) {
@@ -10741,7 +11103,7 @@ window.compareVersions = function(a, b){
         forceRerender();
         function fn$(r_){
           return function(isUpdate){
-            var ago, time, noActivityYet, $span;
+            var ago, time, noActivityYet, this$ = this;
             r_.apply(this, arguments);
             if (!d) {
               d = Date.now();
@@ -10752,7 +11114,11 @@ window.compareVersions = function(a, b){
             }
             ago = d - lastActivity[this.model.id];
             if (lastActivity[this.model.id] <= start) {
-              time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
+              if (ago < 120000) {
+                time = noActivityYet || (noActivityYet = "? ");
+              } else {
+                time = noActivityYet || (noActivityYet = ">" + humanTime(ago, true));
+              }
             } else if (ago < 60000) {
               time = "<1m";
             } else if (ago < 120000) {
@@ -10760,17 +11126,19 @@ window.compareVersions = function(a, b){
             } else {
               time = humanTime(ago, true);
             }
-            $span = $('<span class=p0ne-last-activity>').text(time);
+            if (this.$afk) {
+              this.$afk.removeClass('p0ne-last-activity-warn');
+            } else {
+              this.$afk = $('<span class=p0ne-last-activity>').appendTo(this.$el);
+            }
+            this.$afk.text(time);
             if (ago > settings.highlightOver) {
-              $span.addClass('p0ne-last-activity-warn');
+              this.$afk.addClass('p0ne-last-activity-warn');
             }
             if (isUpdate) {
-              $span.addClass('p0ne-last-activity-update');
-            }
-            this.$el.append($span);
-            if (isUpdate) {
+              this.$afk.addClass('p0ne-last-activity-update');
               requestAnimationFrame(function(){
-                $span.removeClass('p0ne-last-activity-update');
+                this$.$afk.removeClass('p0ne-last-activity-update');
               });
             }
           };
@@ -10788,6 +11156,9 @@ window.compareVersions = function(a, b){
         }
       }
     });
+    /*####################################
+    #           FORCE SKIP BTN           #
+    ####################################*/
     module('forceSkipButton', {
       moderator: true,
       setup: function(arg$, m){
@@ -11083,7 +11454,7 @@ window.compareVersions = function(a, b){
             var u;
             u = getUser(uid);
             console.info(getTime() + " [logGrabbers] " + formatUser(u, user.isStaff) + " grabbed this song");
-            grabbers[uid] = u.un;
+            grabbers[uid] = u.username;
             hasGrabber = true;
             return g_.call(this, uid);
           };
@@ -11131,17 +11502,17 @@ window.compareVersions = function(a, b){
       },
       chatLog: API.chatLog,
       getAdmins: function(){
-        return users != null ? users.filter(function(it){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(it){
           return it.get('gRole') === 5;
         }) : void 8;
       },
       getAmbassadors: function(){
-        return users != null ? users.filter(function(u){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(u){
           var ref$;
           0 < (ref$ = u.get('gRole')) && ref$ < 5;
         }) : void 8;
       },
-      getAudience: users != null ? users.getAudience : void 8,
+      getAudience: typeof users != 'undefined' && users !== null ? users.getAudience : void 8,
       getBannedUsers: function(){
         throw Error('unimplemented');
       },
@@ -11173,7 +11544,7 @@ window.compareVersions = function(a, b){
         return playlists;
       },
       getStaff: function(){
-        return users != null ? users.filter(function(u){
+        return typeof users != 'undefined' && users !== null ? users.filter(function(u){
           return u.get('role');
         }) : void 8;
       },
@@ -11294,7 +11665,7 @@ window.compareVersions = function(a, b){
           isNotObj = (ref$ = typeof v) !== 'object' && ref$ !== 'function';
           for (id in ref$ = require.s.contexts._.defined) {
             m2 = ref$[id];
-            if (m2 && m2[k] && (k !== 'requireID' && k !== 'cid' && k !== 'id')) {
+            if (m2 && m2[k] && (k !== 'requireID' && k !== 'cid' && k !== 'id' && k !== 'length')) {
               keys++;
               if (isNotObj && m2[k] === v) {
                 keysExact++;
@@ -11901,7 +12272,11 @@ window.compareVersions = function(a, b){
     #              RULESKIP              #
     ####################################*/
     module('forceSkipButtonRuleskip', {
-      require: ['songNotif'],
+      displayName: "Ruleskip Button",
+      settings: 'pony',
+      description: "Makes the Skip button show a ruleskip list instead.\n(you can still instaskip)",
+      screenshot: 'https://i.imgur.com/jGwYsn3.png',
+      moderator: true,
       setup: function(arg$){
         var addListener, replace, $create, css, $rulelist, visible, fn;
         addListener = arg$.addListener, replace = arg$.replace, $create = arg$.$create, css = arg$.css;
@@ -11909,7 +12284,7 @@ window.compareVersions = function(a, b){
         visible = false;
         fn = addListener(API, 'p0ne:moduleEnabled', function(m){
           if (m.name === 'forceSkipButton') {
-            $rulelist = $create('<ul class="p0ne-skip-ruleskip"><li data-rule=insta><b>insta skip</b></li><li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li><li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li><li data-rule=20><b>!ruleskip 20</b> (alts)</li><li data-rule=13><b>!ruleskip 13</b> (NSFW)</li><li  data-rule=5><b>!ruleskip  5</b> (too long)</li><li  data-rule=4><b>!ruleskip  4</b> (history)</li><li  data-rule=3><b>!ruleskip  3</b> (low efford mix)</li><li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li><li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li></ul>').appendTo(m.$btn);
+            $rulelist = $create('<ul class=p0ne-skip-ruleskip><li data-rule=insta><b>insta skip</b></li><li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li><li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li><li data-rule=20><b>!ruleskip 20</b> (alts)</li><li data-rule=13><b>!ruleskip 13</b> (NSFW)</li><li  data-rule=5><b>!ruleskip  5</b> (too long)</li><li  data-rule=4><b>!ruleskip  4</b> (history)</li><li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li><li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li><li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li></ul>').appendTo(m.$btn);
             replace(m, 'onClick', function(){
               return function(e){
                 var num;
@@ -11956,17 +12331,20 @@ window.compareVersions = function(a, b){
       _settings: {
         highlightUnplayed: false
       },
-      setup: function(arg$, lookup){
+      CACHE_DURATION: 1 .h,
+      setup: function(arg$, fimstats){
         var addListener, $create, replace, $el, that, ref$, ref1$, ref2$, $yourNextMedia, this$ = this;
         addListener = arg$.addListener, $create = arg$.$create, replace = arg$.replace;
         css('fimstats', '.p0ne-fimstats {position: absolute;left: 0;right: 345px;bottom: 54px;height: 1em;padding: 5px 0;font-size: .9em;color: #12A9E0;background: rgba(0,0,0, 0.4);text-align: center;z-index: 6;transition: opacity .2s ease-out;}.video-only .p0ne-fimstats {bottom: 116px;padding-top: 0px;background: rgba(0,0,0, 0.8);}.p0ne-fimstats-field {display: block;position: absolute;width: 100%;padding: 0 5px;box-sizing: border-box;}.p0ne-fimstats-last { text-align: left; }.p0ne-fimstats-plays, .p0ne-fimstats-once, .p0ne-fimstats-first-notyet { text-align: center; }.p0ne-fimstats-first { text-align: right; }.p0ne-fimstats-field::before, .p0ne-fimstats-field::after,.p0ne-fimstats-first-time, .p0ne-fimstats-last-time, .p0ne-fimstats-once-time {color: #ddd;}#dialog-container .p0ne-fimstats {position: fixed;bottom: 0;left: 0;right: 345px;background: rgba(0,0,0, 0.8);}#dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }.p0ne-fimstats-first-notyet::before { content: "first played just now!"; color: #12A9E0 }.p0ne-fimstats-once::before { content: "once played by: "; }.p0ne-fimstats-last::before { content: "last played by: "; }.p0ne-fimstats-last-time::before,.p0ne-fimstats-first-time::before,.p0ne-fimstats-once-time::before { content: "("; }.p0ne-fimstats-last-time::after,.p0ne-fimstats-first-time::after,.p0ne-fimstats-once-time::after { content: ")"; }.p0ne-fimstats-plays::before { content: "played: "; }.p0ne-fimstats-plays::after { content: " times"; }.p0ne-fimstats-first::before { content: "first played by: "; }.p0ne-fimstats-first-time,.p0ne-fimstats-last-time,.p0ne-fimstats-once-time {font-size: 0.8em;display: inline;position: static;margin-left: 5px;}.p0ne-fimstats-unplayed {color: lime;}');
         $el = $create('<span class=p0ne-fimstats>').appendTo('#room');
         addListener(API, 'advance', this.updateStats = function(d){
-          d || (d = {
-            media: API.getMedia()
-          });
+          var ref$, id;
+          d == null && (d = API.getMedia());
+          if (d != null && ((ref$ = d.lastPlay) != null && ref$.media)) {
+            delete this$.cache[id = d.lastPlay.media.format + ":" + d.lastPlay.media.cid];
+          }
           if (d.media) {
-            this$.currentSong = lookup(d.media).then(function(res){
+            fimstats(d.media).then(function(res){
               $el.html(res.html);
             }).fail(function(err){
               $el.html(err.html);
@@ -11981,7 +12359,7 @@ window.compareVersions = function(a, b){
               var ref$;
               if ((ref$ = d.dialog.options) != null && ref$.media) {
                 console.log("[fimstats]", d.dialog.options.media);
-                lookup(d.dialog.options.media).then(function(d){
+                fimstats(d.dialog.options.media).then(function(d){
                   $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
                 });
               }
@@ -11990,7 +12368,7 @@ window.compareVersions = function(a, b){
         }
         if (that = app != null ? (ref$ = app.dialog) != null ? (ref1$ = ref$.dialog) != null ? (ref2$ = ref1$.options) != null ? ref2$.media : void 8 : void 8 : void 8 : void 8) {
           console.log("[fimstats]", that);
-          lookup(that.toJSON()).then(function(d){
+          fimstats(that.toJSON()).then(function(d){
             $('#dialog-preview').after($create('<div class=p0ne-fimstats>').html(d.html));
           });
         }
@@ -12007,8 +12385,10 @@ window.compareVersions = function(a, b){
         if (app != null && (typeof playlists != 'undefined' && playlists !== null)) {
           $yourNextMedia = $('#your-next-media');
           this.checkUnplayed = function(){
-            if (playlists.activeMedia.length > 0) {
-              lookup(playlists.activeMedia[0]).then(function(d){
+            $yourNextMedia.removeClass('p0ne-fimstats-unplayed');
+            if (fimstats._settings.highlightUnplayed && playlists.activeMedia.length > 0) {
+              console.log("[fimstats] checking next song", playlists.activeMedia[0]);
+              fimstats(playlists.activeMedia[0]).then(function(d){
                 if (d.unplayed) {
                   $yourNextMedia.addClass('p0ne-fimstats-unplayed');
                 }
@@ -12018,9 +12398,7 @@ window.compareVersions = function(a, b){
           replace(app.footer.playlist, 'updateMeta', function(uM_){
             return function(){
               if (playlists.activeMedia.length > 0) {
-                if (fimstats._settings.highlightUnplayed) {
-                  fimstats.checkUnplayed();
-                }
+                fimstats.checkUnplayed();
                 uM_.apply(this, arguments);
               } else {
                 clearTimeout(this.updateMetaBind);
@@ -12030,38 +12408,60 @@ window.compareVersions = function(a, b){
           replace(app.footer.playlist, 'updateMetaBind', function(){
             return bind$(app.footer.playlist, 'updateMeta');
           });
-          if (this._settings.highlightUnplayed) {
-            this.checkUnplayed();
-          }
+          this.checkUnplayed();
+        } else {
+          console.warn("[fimstats] failed to load requirements for checking next song. next song check disabled.");
         }
         this.updateStats();
       },
       checkUnplayed: function(){},
-      lastMedia: {},
+      cache: {},
       module: function(media){
-        var def;
+        var id, def, this$ = this;
         media == null && (media = API.getMedia());
         $('#p0ne-menu').css({
           bottom: 54
         });
-        def = $.Deferred();
         if (media.attributes && media.toJSON) {
           media = media.toJSON();
         }
-        if (this.lastMedia.cid === media.cid && this.lastMedia.format === media.format) {
-          return this.lastDeferred;
+        if (this.cache[id = media.format + ":" + media.cid]) {
+          clearTimeout(this.cache[id].timeoutID);
+          this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
+            var ref$, ref1$;
+            return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
+          });
+          return this.cache[id];
         } else {
-          this.lastMedia = media;
-          this.lastDeferred = def;
+          def = $.Deferred();
+          this.cache[id] = def.promise();
+          this.cache[id].timeoutID = sleep(this.CACHE_DURATION, function(){
+            var ref$, ref1$;
+            return ref1$ = (ref$ = this$.cache)[id], delete ref$[id], ref1$;
+          });
         }
-        $.getJSON("https://fimstats.anjanms.com/_/media/" + media.format + "/" + media.cid + "?key=" + p0ne.FIMSTATS_KEY).then(function(d){
+        $.getJSON("https://fimstats.anjanms.com/_/media/" + media.format + "/" + media.cid).then(function(d){
+          var k, v, k2, v2;
           d = d.data[0];
+          for (k in d) {
+            v = d[k];
+            if (typeof v === 'string') {
+              d[k] = sanitize(v);
+            } else {
+              for (k2 in v) {
+                v2 = v[k2];
+                if (typeof v2 === 'string') {
+                  v[k2] = sanitize(v2);
+                }
+              }
+            }
+          }
           if (d.firstPlay.time !== d.lastPlay.time) {
-            d.text = "last played by " + d.lastPlay.user + " \xa0 - (" + d.plays + "x) - \xa0 first played by " + d.firstPlay.user;
-            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=" + d.lastPlay.id + ">" + sanitize(d.lastPlay.user) + "<span class=p0ne-fimstats-last-time>" + ago(d.lastPlay.time * 1000) + "</span></span><span class='p0ne-fimstats-field p0ne-fimstats-plays'>" + d.plays + "</span><span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=" + d.firstPlay.id + ">" + sanitize(d.firstPlay.user) + "<span class=p0ne-fimstats-first-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
+            d.text = "last played by " + d.lastPlay.user.username + " \xa0 - (" + d.plays + "x) - \xa0 first played by " + d.firstPlay.user.username;
+            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=" + d.lastPlay.id + ">" + d.lastPlay.user.username + "<span class=p0ne-fimstats-last-time>" + ago(d.lastPlay.time * 1000) + "</span></span><span class='p0ne-fimstats-field p0ne-fimstats-plays'>" + d.plays + "</span><span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=" + d.firstPlay.id + ">" + d.firstPlay.user.username + "<span class=p0ne-fimstats-first-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
           } else {
-            d.text = "once played by " + d.firstPlay.user;
-            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-once'>" + sanitize(d.firstPlay.user) + "<span class=p0ne-fimstats-once-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
+            d.text = "once played by " + d.firstPlay.user.username;
+            d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-once'>" + d.firstPlay.user.username + "<span class=p0ne-fimstats-once-time>" + ago(d.firstPlay.time * 1000) + "</span></span>";
           }
           def.resolve(d);
         }).fail(function(d, arg$, status){
@@ -12075,7 +12475,7 @@ window.compareVersions = function(a, b){
             def.reject(d);
           }
         });
-        return def.promise();
+        return this.cache[id];
         function sanitize(str){
           return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
@@ -12101,6 +12501,75 @@ window.compareVersions = function(a, b){
       },
       disable: function(){
         $('#your-next-media').removeClass('p0ne-fimstats-unplayed');
+      }
+    });
+    module('ponifiedLang', {
+      require: ['Lang'],
+      disabled: true,
+      displayName: "Ponified Text",
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(Lang.roles, 'host', function(){
+          return "Alicorn Princess";
+        });
+        replace(Lang.roles, 'cohost', function(){
+          return "Alicorn";
+        });
+        replace(Lang.roles, 'dj', function(){
+          return "Horse Famous";
+        });
+        replace(Lang.permissions, 'cohosts', function(){
+          return "Add/Remove Alicorns";
+        });
+        replace(Lang.permissions, 'dj', function(){
+          return "Set Horse Famous Ponies";
+        });
+        replace(Lang.roles, 'none', function(){
+          return "Mudpony";
+        });
+        replace(Lang.moderation, 'ban', function(){
+          return "sent %NAME% to the moon for a thousand years.";
+        });
+        replace(Lang.messages, 'minChatLevel', function(){
+          return "This community restricts chat to ponies who are level %LEVEL% and above.";
+        });
+        replace(Lang.permissions, 'ban', function(){
+          return "Ban Ponies.";
+        });
+        replace(Lang.permissions, 'unban', function(){
+          return "Unban Ponies.";
+        });
+        replace(Lang.tooltips, 'headersUsers', function(){
+          return "Ponies";
+        });
+        replace(Lang.tooltips, 'usersRoom', function(){
+          return "Ponies who are here right now";
+        });
+        replace(Lang.tooltips, 'usersBans', function(){
+          return "Ponies who have been banned";
+        });
+        replace(Lang.tooltips, 'usersIgnored', function(){
+          return "Ponies who you have ignored";
+        });
+        replace(Lang.tooltips, 'usersMutes', function(){
+          return "Ponies who have been muted";
+        });
+        replace(Lang.tooltips, 'chatLevel', function(){
+          return "Restrict chat to ponies who are this level or above";
+        });
+        replace(Lang.userList, 'roomTitle', function(){
+          return "Ponies here now";
+        });
+        replace(Lang.chat, 'help', function(){
+          return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr><strong>Bot Commands:</strong><br>!randgame &nbsp; <em>Pony Adventure</em><br/>!power &nbsp; <em>Random Power</em><br/>!hug (@user) &nbsp; <em>hug somepony</em><br/>!1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>!rule <number> &nbsp; <em>List a Rule</em><br/>!songinfo &nbsp; <em>Songstats</em><br/>!dc &nbsp; <em>be put back if you dc'd</em><br/>!eta &nbsp; <em>ETA til you dj</em><br/>!weird &nbsp; <em>Is it weirdday?</em><br/>";
+        });
+        replace(Lang.search, 'youtube', function(){
+          return "Search YouTube for ponies";
+        });
+        replace(Lang.search, 'soundcloud', function(){
+          return "Search SoundCloud for ponies";
+        });
       }
     });
     /*@source p0ne.bpm.ls */
@@ -12429,6 +12898,90 @@ function clone$(it){
 }
 function bind$(obj, key, target){
   return function(){ return (target || obj)[key].apply(obj, arguments) };
+}
+function deepEq$(x, y, type){
+  var toString = {}.toString, hasOwnProperty = {}.hasOwnProperty,
+      has = function (obj, key) { return hasOwnProperty.call(obj, key); };
+  var first = true;
+  return eq(x, y, []);
+  function eq(a, b, stack) {
+    var className, length, size, result, alength, blength, r, key, ref, sizeB;
+    if (a == null || b == null) { return a === b; }
+    if (a.__placeholder__ || b.__placeholder__) { return true; }
+    if (a === b) { return a !== 0 || 1 / a == 1 / b; }
+    className = toString.call(a);
+    if (toString.call(b) != className) { return false; }
+    switch (className) {
+      case '[object String]': return a == String(b);
+      case '[object Number]':
+        return a != +a ? b != +b : (a == 0 ? 1 / a == 1 / b : a == +b);
+      case '[object Date]':
+      case '[object Boolean]':
+        return +a == +b;
+      case '[object RegExp]':
+        return a.source == b.source &&
+               a.global == b.global &&
+               a.multiline == b.multiline &&
+               a.ignoreCase == b.ignoreCase;
+    }
+    if (typeof a != 'object' || typeof b != 'object') { return false; }
+    length = stack.length;
+    while (length--) { if (stack[length] == a) { return true; } }
+    stack.push(a);
+    size = 0;
+    result = true;
+    if (className == '[object Array]') {
+      alength = a.length;
+      blength = b.length;
+      if (first) {
+        switch (type) {
+        case '===': result = alength === blength; break;
+        case '<==': result = alength <= blength; break;
+        case '<<=': result = alength < blength; break;
+        }
+        size = alength;
+        first = false;
+      } else {
+        result = alength === blength;
+        size = alength;
+      }
+      if (result) {
+        while (size--) {
+          if (!(result = size in a == size in b && eq(a[size], b[size], stack))){ break; }
+        }
+      }
+    } else {
+      if ('constructor' in a != 'constructor' in b || a.constructor != b.constructor) {
+        return false;
+      }
+      for (key in a) {
+        if (has(a, key)) {
+          size++;
+          if (!(result = has(b, key) && eq(a[key], b[key], stack))) { break; }
+        }
+      }
+      if (result) {
+        sizeB = 0;
+        for (key in b) {
+          if (has(b, key)) { ++sizeB; }
+        }
+        if (first) {
+          if (type === '<<=') {
+            result = size < sizeB;
+          } else if (type === '<==') {
+            result = size <= sizeB
+          } else {
+            result = size === sizeB;
+          }
+        } else {
+          first = false;
+          result = size === sizeB;
+        }
+      }
+    }
+    stack.pop();
+    return result;
+  }
 }
 function in$(x, xs){
   var i = -1, l = xs.length >>> 0;
