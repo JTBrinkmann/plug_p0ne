@@ -22,7 +22,7 @@ module \bpm, do
     module: (str) ->
         if not str
             console.error "bpm(null)"
-        return @bpm str 
+        return @bpm str
 
     setup: ({addListener, $create}, {_settings}) ->
         host = window.p0ne?.host or "https://cdn.p0ne.com"
@@ -170,14 +170,14 @@ module \bpm, do
         #== main BPM plugin ==
         @bpm = (str) ->
             console.error "bpm(null) [2]" if not str
-            str .replace EMOTE_REGEXP, (_, parts, altText) ->
+            str .replace EMOTE_REGEXP, (all, parts, altText) ->
                 parts .= split '-'
                 name = parts.0
                 info = lookup_core_emote name, altText
                 if not info
-                    return _
+                    return all
                 else
-                    return convert_emote_element info, parts, _
+                    return convert_emote_element info, parts, all
 
         #== integration ==
         addListener (window._$context || API), \chat:plugin, (msg) ->

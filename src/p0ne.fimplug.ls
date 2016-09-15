@@ -48,7 +48,7 @@ module \forceSkipButtonRuleskip, do
                     <li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li>
                     <li data-rule=20><b>!ruleskip 20</b> (alts)</li>
                     <li data-rule=13><b>!ruleskip 13</b> (NSFW)</li>
-                    <li  data-rule=5><b>!ruleskip  5</b> (too long)</li>
+                    <li  data-rule=6><b>!ruleskip  6</b> (too long)</li>
                     <li  data-rule=4><b>!ruleskip  4</b> (history)</li>
                     <li  data-rule=3><b>!ruleskip  3</b> (low effort mix)</li>
                     <li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li>

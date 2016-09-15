@@ -115,7 +115,9 @@
 /*== p0ne FX ==*/
     .p0ne-fx-blink {
         text-shadow: 0 0 7px #fff, 0 0 1px #fff;
-        transition: none;
+    }
+    .p0ne-fx-off-blink {
+        transition: text-shadow 3s ease-out;
     }
     
 /*== p0ne-notification ==*/
@@ -734,8 +736,10 @@
         max-height: 100%;
         z-index: 999998;
         position: absolute;
-        background: #222;
-    }
+        background: #1c1f25;
+    
+        transition: opacity .2s ease-out;
+}
     .p0ne-settings {
         min-width: 300px;
         /* background: #222; */
@@ -759,24 +763,33 @@
         font-size: 15px;
     }
     .p0ne-settings-item:hover {
-        background: #2a2a2a;
+        background: #111317;
     }
 
     .p0ne-settings-icons {
         position: relative;
         height: 44px;
-        margin-top: -30px;
+        margin-top: -25px;
     }
     .p0ne-settings-help::before {
         content: "?";
-        width: 15px;
-        height: 15px;
+        display: block;
+        width: 30px;
+        height: 30px;
         text-align: center;
         float: right;
         border-radius: 10px;
         margin-right: 5px;
         color: #666;
-        font-size: 0.8em;
+        font-size: 22px;
+        font-weight: bold;
+    }
+    .p0ne-settings-panel-icon .icon {
+        right: 25px;
+        transition: transform .2s ease-out;
+    }
+    .p0ne-settings-panel-icon .icon-settings-white:hover {
+        transform: rotate(90deg);
     }
     .p0ne-settings-more {
         float: right;
@@ -795,7 +808,7 @@
         top: 0;
         left: 100%;
         margin: 10px 0 0 10px;
-        background: #222;
+        background: #1c1f25;
         padding: 10px;
         border-radius: 15px;
         width: 450px;
@@ -805,7 +818,7 @@
     .p0ne-settings-popup-triangle {
         content: " ";
         border: 10px solid transparent;
-        border-right-color: #222;
+        border-right-color: #1c1f25;
         border-left: none;
         display: block;
         width: 0;
@@ -821,15 +834,20 @@
         min-height: 30px;
         transition: height 400ms ease-out;
     }
-    .p0ne-settings-group.closed {
-        height: 40px;
+
+    .p0ne-settings-group.closed .p0ne-settings-extra,
+    .p0ne-settings-group.closed .p0ne-settings-item {
+        display: none !important;
     }
+
     .p0ne-settings-summary {
         height: 30px;
         padding-top: 10px;
         font-size: 21px;
         cursor: pointer;
-    }
+    
+        text-transform: uppercase;
+}
     .p0ne-settings-showall .p0ne-settings-summary {
         height: 22px;
         font-size: 18px;
@@ -933,6 +951,8 @@
         position: absolute;
     
         z-index: 2;
+        background: #1c1f25;
+        box-shadow: inset 2px 0 5px rgba(0,0,0, .3);
 }
 
 
@@ -1478,10 +1498,10 @@
 /*== VIP Settings ==*/
     .p0ne-settings-input {
         width: 90%;
-        background: #333;
+        background: #111317;
         border: none;
         box-sizing: border-box;
-        margin-left: 5%;
+        margin-left: 5px;
         font-size: 1.1em;
         color: white;
         padding: 3px 10px;
@@ -1537,7 +1557,7 @@
     }
 
 /*== Chat Commands ==*/
-    .p0ne-help-command { color: #BBB; }
+    .p0ne-help-command { color: #BBB; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
     .p0ne-help-command b { color: #FFF; }
 
 /*== Chat Commands ==*/
@@ -1546,3 +1566,155 @@
       position: relative;
       height: 100% !important;
     }
+
+
+
+
+/*== Experimental ==*/
+.p0ne-settings-debug-2 {
+  height: auto;
+  top: 54px;
+  bottom: 54px;
+  left: 0px;
+  position: fixed;
+  right: 345px;
+  min-width: 805px;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-group {
+  width: 150px;
+  height: auto;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-summary {
+  padding: 10px 15px;
+  font-size: 16px;
+  background: rgb(28, 31, 37);
+  height: auto;
+  text-transform: capitalize;
+}
+.p0ne-settings-debug-2 .p0ne-settings-summary::before {
+	display: none;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-group.open .p0ne-settings-summary {
+  background: rgb(50, 35, 76);
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-group.closed .p0ne-settings-items {
+  display: none;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-items {
+  position: absolute;
+  top: 0px;
+  left: 150px;
+  right: 10px;
+  bottom: 0px;
+  background: rgb(17, 19, 23);
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-item {
+  width: 400px;
+  padding-left: 15px;
+  box-shadow: rgb(40, 44, 53) 0px -17px 0px -16px;
+  height: 30px;
+  font-size: 18px;
+}
+
+.p0ne-settings-debug-2 .checkbox {
+  float: right;
+  display: block;
+  -webkit-appearance: inherit;
+  background: rgb(40, 44, 53);
+  margin-top: 0;
+}
+
+.p0ne-settings-debug-2 .togglebox {
+  display: none;
+}
+.p0ne-settings-group.closed .p0ne-settings-extra, .p0ne-settings-group.closed .p0ne-settings-item {
+  display: none !important;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-group {
+  width: 150px;
+  height: auto !important;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-extra {
+  color: rgb(187, 187, 187);
+  padding-left: 30px;
+}
+
+.p0ne-settings-debug-2 .checkbox::before,
+.p0ne-settings-debug-2 .checkbox::after {
+  color: white;
+  display: inline-block;
+  width: 45px;
+  text-align: center;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+.p0ne-settings-debug-2 .checkbox::before {
+  content: 'ON';
+}
+.p0ne-settings-debug-2 .checkbox:checked::before {
+  background: #009CDD;
+}
+.p0ne-settings-debug-2 .checkbox::after {
+  content: 'OFF';
+  background: #F04F30;
+}
+.p0ne-settings-debug-2 .checkbox:checked::after {
+  background: transparent;
+}
+.p0ne-settings-debug-2 .p0ne-settings-panel-icon .icon {
+    right: 120px;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-popup {
+  border-radius: 0px;
+  left: 580px !important;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  top: 0 !important;
+  margin: 0;
+  background: transparent;
+}
+.p0ne-settings-debug-2 .p0ne-settings-popup-triangle {
+  display: none;
+}
+.p0ne-settings-debug-2 .p0ne-settings-popup h3 {
+  font-size: 20px;
+  border-bottom: 1px solid #555;
+  margin-bottom: 10px;
+  padding-bottom: 2px;
+  margin-right: 20px;
+  margin-left: -10px;
+  padding-left: 10px;
+}
+
+.p0ne-settings-debug-2 .p0ne-settings-footer {
+  width: 150px;
+  margin: 0;
+  height: auto;
+  bottom: 0;
+  position: absolute;
+}
+.p0ne-settings-debug-2 .p0ne-settings-version {
+  float: none;
+}
+,
+.p0ne-settings-debug-2 .p0ne-settings-help-btn,
+.p0ne-settings-debug-2 .p0ne-settings-expert-toggle {
+    display: none;
+}
+
+.p0ne-settings-debug-2 + .p0ne-cc-settings {
+  left: 575px !important;
+  top: 0;
+  bottom: 0;
+  z-index: 999999;
+}

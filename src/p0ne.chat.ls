@@ -209,10 +209,6 @@ module \chatPlugin, do
             msg.classes = {}; msg.addClass = addClass; msg.removeClass = removeClass
             msg.originalMessage = msg.message
 
-            _$context .trigger \chat:plugin, msg
-            API .trigger \chat:plugin, msg
-
-
             # p0ne.chatLinkPlugins
             if msg.wasAtBottom
                 onload = 'onload="chatScrollDown()"'
@@ -220,8 +216,8 @@ module \chatPlugin, do
                 onload = ''
             msg.message .= replace /<a (.+?)>((https?:\/\/)(?:www\.)?(([^\/]+).+?))<\/a>/gi, (all,pre,completeURL,protocol,url, domain, offset)->
                 domain .= toLowerCase!
-                for ctx in [_$context, API] when ctx._events[\chat:image]
-                    for plugin in ctx._events[\chat:image]
+                for ctx in [_$context, API] when ctx._events[\p0ne:chat:link]
+                    for plugin in ctx._events[\p0ne:chat:link]
                         try
                             if plugin.callback.call plugin.ctx, {all,pre,completeURL,protocol,domain,url, offset,  onload,onerror,msg}
                                 return that
@@ -235,9 +231,13 @@ module \chatPlugin, do
                             console.error "[p0ne] error while processing chat link plugin", plugin, err.stack
                 return all
 
+            # general chat plugins
+            _$context .trigger \p0ne:chat:plugin, msg
+            API .trigger \p0ne:chat:plugin, msg
+
         addListener _$context, \chat:receive, (e) !->
             e.$el = getChat(e) .addClass Object.keys(e.classes ||{}).join(' ')
-            e.addClass e.$el~addClass; e.removeClass e.$el~removeClass
+            e.addClass = e.$el~addClass; e.removeClass = e.$el~removeClass
         addClassesCB = _$context._events[\chat:receive][*-1]
 
         addListener _$context, \popout:open, !->
@@ -290,13 +290,13 @@ module \chatMessageClasses, do
                             fromRole = "from-#{r.substr 10}"
                         else
                             fromRole = \from-regular
-                    if $ this .find \.subscriber
+                    if $ this .find \.subscriber .length
                         fromRole += " from-subscriber"
                     $this .addClass "fromID-#{uid} #fromRole"
         catch err
             console.error "[chatMessageClasses] couldn't convert old messages", err.stack
 
-        addListener (window._$context || API), \chat:plugin, ({type, uid}:message) !-> if uid
+        addListener (window._$context || API), \p0ne:chat:plugin, ({type, uid}:message) !-> if uid
             message.addClass "fromID-#uid"
 
 
@@ -326,7 +326,7 @@ module \unreadChatNotif, do
         $chatButton = $ \#chat-button
             .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
         @bottomMsg = $cm! .children! .last!
-        addListener _$context, \chat:plugin, (message) !->
+        addListener _$context, \p0ne:chat:plugin, (message) !->
             message.wasAtBottom ?= chatIsAtBottom!
             if not $chatButton.hasClass \selected and not PopoutView?.chat?
                 $chatButton.addClass \p0ne-toolbar-highlight
@@ -401,7 +401,7 @@ module \chatOthersMentions, do
     settings: \chat
     displayName: 'Highlight @mentions for others'
     setup: ({addListener}) !->
-        addListener _$context, \chat:plugin, ({type, uid}:message) !-> if uid
+        addListener _$context, \p0ne:chat:plugin, ({type, uid}:message) !-> if uid
             res = ""; lastI = 0
             for mention in getMentions(message, true) when mention.id != userID or type == \emote
                 res += "
@@ -435,7 +435,7 @@ module \chatInlineImages, do
         filterTags: <[ nsfw suggestive gore spoiler questionable no-inline noinline ]>
     regexpCache: {}
     setup: ({addListener}) !->
-        addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
+        addListener API, \p0ne:chat:link, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) !~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
             if img = @inlineify ...
                 if not msg.hasFilterWord?
@@ -443,7 +443,6 @@ module \chatInlineImages, do
                     msgLC = msg.message.toLowerCase!
                     for tag in @_settings.filterTags when msgLC.has tag
                         msg.hasFilterWord = tag
-                        msg.message .= replaceSansHTML (@regexpCache[tag] ||= //#{escapeRegExp tag}//ig), "<span class=p0ne-img-filterword>$&</span>"
                         console.warn "[inline-img] message contains \"#tag\", images will not be converted"
                         break
 
@@ -460,7 +459,8 @@ module \chatInlineImages, do
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
             else
                 return false
-
+        addListener API, \p0ne:chat:plugin, (msg) !~> if msg.hasFilterWord
+            msg.message .= replaceSansHTML (@regexpCache[msg.hasFilterWord] ||= //#{escapeRegExp msg.hasFilterWord}//ig), "<span class=p0ne-img-filterword>$&</span>"
     # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
     #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
     regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
@@ -496,7 +496,7 @@ module \chatInlineImages, do
 
     forceHTTPSDomains: <[ i.imgur.com deviantart.com ]>
     plugins:
-        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
+        \imgur.com :       [/^(?:i\.|m\.|edge\.|www\.)*imgur\.com\/(?:r\/[\w]+\/)*(?!gallery)(?!removalrequest)(?!random)(?!memegen)([\w]{5,8})(?:#\d+)?[sbtmlh]?(?:\.(?:jpe?g|gif|png|gifv|webm))?$/, "i.imgur.com/$1.gif", \https://] # from RedditEnhancementSuite
         \prntscr.com :     [/^(prntscr.com\/\w+)(?:\/direct\/)?/, "$1/direct", \https://]
         \gyazo.com :       [/^gyazo.com\/\w+/, "$&/raw"]
         \dropbox.com :     [/^dropbox.com(\/s\/[a-z0-9]*?\/[^\/\?#]*\.(?:jpg|jpeg|gif|png|webp|apng))/, "dl.dropboxusercontent.com$1"]
@@ -700,7 +700,7 @@ module \chatYoutubeThumbnails, do
             console.log "[p0ne_yt_preview]", "stopped"
             #ToDo hide YT-options
 
-        addListener API, \chat:image, ({pre, url, onload}) !->
+        addListener API, \p0ne:chat:link, ({pre, url, onload}) !->
         yt = YT_REGEX .exec(url)
         if yt and (yt = yt.1)
             console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
@@ -730,7 +730,7 @@ module \customChatNotificationTrigger, do
     disabled: true
     require: <[ chatPlugin _$context ]>
     setup: ({addListener}) !->
-        @test = addListener _$context, \chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
+        @test = addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
             mentioned = false
             mentions = {}
             if @hasUsernameTrigger

@@ -58,7 +58,7 @@ module \animatedUI, do
                     sleep 0ms, !~> @$el.addClass \opaque
 
         replace Dialog, \close, (close_) !-> return !->
-            @$el.removeClass \opaque
+            @$el?.removeClass \opaque
             @animate = $.noop
             sleep 200ms, !~> close_.call this
             return this
@@ -453,11 +453,7 @@ module \emojiPack, do
     help: '''
         Replace all emojis with the one from Google (for Android Lollipop).
 
-        Emojis are are the little images that show up e.g. when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>
-
-        <small>
-        Note: :yellow_heart: <span class="emoji emoji-1f49b"></span> and :green_heart: <span class="emoji emoji-1f49a"></span> look neither yellow nor green with this emoji pack.
-        </small>
+        Emojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>
     '''
     screenshot: 'https://i.imgur.com/Ef94Csn.png'
     _settings:
@@ -468,6 +464,56 @@ module \emojiPack, do
     setup: ({loadStyle}) !->
         loadStyle "#{p0ne.host}/css/temp.#{@_settings.pack}-emoji.css"
 
+
+/*####################################
+#         CUSTOM BACKGROUND          #
+####################################*/
+module \customBackground, do
+    displayName: 'Custom Background'
+    settings: \look&feel
+    help: '''
+        This module lets you change the background image of plug.dj
+
+        e.g. a nice collection of background images can be found here <a href="https://imgur.com/a/8RIiu" target=_blank>https://imgur.com/a/8RIiu</a>
+    '''
+    _settings:
+        background: "https://i.imgur.com/k9zVa92.png"
+        booth: "https://i.imgur.com/tzlDl3L.png"
+        scalable: false
+    disabled: true
+    setup: ({@css}) !->
+        @updateCSS!
+        #ToDo: scalable backgrounds, blurred chat
+
+    updateCSS: !->
+        if isURL(@_settings.background)
+            if @_settings.scalable
+                @css \customBackground, """
+                    \#app { background: url(#{@_settings.background}) fixed center center / cover !important; }\n
+                    .room-background { display: none !important; }\n
+                """
+            else
+                @css \customBackground, """
+                    \#app { background: transparent !important }\n
+                    \#app .app-right { background: rgba(0,0,0, 0.8) !important; }
+                    \#app \#avatars-container::before { content: "" !important; }
+                    \#app .room-background { background-image: url(#{@_settings.background}) !important; display: block !important; }\n
+                """
+        else
+            css \customBackground, ""
+
+    settingsExtra: ($el) !->
+        customBackground = this
+        $input = $ "<input class=p0ne-settings-input>"
+            .val @_settings.background
+            .on \input, !->
+                customBackground._settings.background = @value
+                customBackground.updateCSS!
+            .on \focus, !->
+                p0ne.modules.p0neSettings?.$ppW .css opacity: 0.7
+            .on \blur, !->
+                p0ne.modules.p0neSettings?.$ppW .css opacity: ""
+            .appendTo $el
 
 /*####################################
 #               CENSOR               #

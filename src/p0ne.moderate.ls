@@ -175,7 +175,7 @@ module \warnOnMehers, do
         addListener API, \voteUpdate, (d) !~>
             current[d.user.id] = d.vote
             if d.vote == -1 and d.user.uid != userID
-                console.error "#{formatUser d.user, true} meh'd this song"
+                console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
                     appendChat $ "
                         <div class='cm system'>
@@ -296,7 +296,7 @@ module \afkTimer, do
         addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
         addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
         addListener API, 'chat', (u) !->
-            if not /\[afk\]/i.test(u.message) and not u.uid == IDs.MadPacman
+            if not /\[afk\]/i.test(u.message)
                 updateUser u.uid
         addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi

@@ -125,9 +125,13 @@ jQuery.fn <<<<
                     cb!
         return this
     p0neFx: (effect) !->
-        @addClass "p0ne-fx-#effect"
-        <~! requestAnimationFrame
-        @removeClass "p0ne-fx-#effect"
+        if @length
+            @removeClass "p0ne-fx-off-#effect"
+            @addClass "p0ne-fx-#effect"
+            requestAnimationFrame !~>
+                @removeClass "p0ne-fx-#effect"
+                @addClass "p0ne-fx-off-#effect"
+        return this
     /*binaryGuess: (checkFn) !->
         # returns element with index `n` for which:
         # if checkFn(element) for all elements in this from 0 to `n` all returns false,
@@ -331,6 +335,10 @@ window <<<<
             return
                 if 0 <= num < 10 then "0#num"
                 else             then "#num"
+    padHex: (str, digits=2) !->
+        while str.length < digits
+            str = "0#str"
+        return str
 
     generateID: !-> return (~~(Math.random!*0xFFFFFF)) .toString(16).toUpperCase!
 
@@ -474,7 +482,8 @@ window <<<<
             if window.floodAPI_counter >= 15 /* 20 requests in 10s will trigger socket:floodAPI. This should leave us enough buffer in any case */
                 sleep 1_000ms, delay
             else
-                window.floodAPI_counter++; sleep 10_000ms, !-> window.floodAPI_counter--
+                # note: playlist changes will return 503 errors after ca. 15 requests per 10 seconds (plus some delay) so we'll add some more delay to ensure stability
+                window.floodAPI_counter++; sleep 15_000ms, !-> window.floodAPI_counter--
                 req = $.ajax options
                     .then def.resolve, def.reject, def.progress
                 def.abort = req.abort
@@ -711,14 +720,21 @@ window <<<<
                     &key=#{p0ne.YOUTUBE_V3_KEY}"
                     .fail fail
                     .success ({items}) !->
+                        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
+                            0        /* placeholder */,
+                            31104000 /* year   (360*24*60*60) */,
+                            2592000  /* month  (30*24*60*60) */,
+                            604800   /* week   (24*60*60*7) */,
+                            86400    /* day    (24*60*60) */,
+                            3600     /* hour   (60*60) */,
+                            60       /* minute (60) */,
+                            1        /* second (1) */
+                        ]
                         for d in items
                             duration = 0
-                            if /PT(?:(\d+)H)(?:(\d+)M)(?:(\d+)S)/.exec d.contentDetails.duration
-                                duration = +that.3 || 0
-                                if that.1
-                                    duration += +that.1 * 3600
-                                if that.2
-                                    duration += +that.2 * 60
+                            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec d.contentDetails.duration
+                                for t, i in that when +t
+                                    duration += t * multiplicators[i]
                             addResult queries.1[d.id], d.id, do
                                     format:       1
                                     data:         d
@@ -1484,16 +1500,15 @@ window <<<<
         else
             return "#{~~diff} #{<[ seconds minutes hours days years ]>[c]}"
     # show a timespan (in s) in a format like "mm:ss" or "hh:mm:ss" etc
-    mediaTime: (~~dur) !->
+    mediaTime: (dur) !->
         return "-#{mediaTime -dur}" if dur < 0
-        b=[60to_min, 60to_h, 24to_days, 360.25to_years]; c=0
-        res = pad dur%60
-        while dur = ~~(dur / b[c++])
-            res = "#{pad dur % b[c]}:#res"
-        if res.length == 2
-            return "00:#res"
-        else
-            return res
+        # usually the user would rather read 580 hours as "580:00:00" instead of "24:04:00:00"
+        m=0
+        if dur >= 60
+            m = ~~(dur / 60); dur %= 60
+            if m >= 60
+                h = ~~(m / 60); m %= 60
+        return "#{if h then pad(h)+":" else ''}#{pad(m)}:#{pad(~~dur)}"
 
     # create string saying how long ago a given timestamp (in ms since epoche) is
     ago: (d) !->
@@ -1507,7 +1522,10 @@ window <<<<
         return "#{it.toFixed(2)}MB"
 
     getRank: (user, defaultToGhost) !-> # returns the name of a rank of a user
-        user = getUser(user) if typeof user != \object
+        if user <= 5
+            user = role: user
+        else if typeof user != \object
+            user = getUser(user)
         if not user or user.role == -1
             return if defaultToGhost then \ghost else \regular
         else if user.gRole

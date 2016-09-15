@@ -34,6 +34,7 @@ module \p0neSettings, do
 
         #= add "simple" settings =
         @$vip = $ "<div class=p0ne-settings-vip>" .appendTo $ppS
+        @$vip.items = @$vip
 
         @toggleMenu groupToggles.p0neSettings
 
@@ -54,30 +55,76 @@ module \p0neSettings, do
 
 
         do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
-            for group, $el of @groups when @_settings.groupToggles[group]
+            for group, $el of @groups # when @_settings.groupToggles[group]
                 $el .trigger \p0ne:resize
 
 
+        #= DEBUG =
+        debugMode = 0
+        debugClosingDur = 500ms
 
         #= add DOM event listeners =
         # slide settings-menu in/out
-        $ppI .click !~> @toggleMenu!
+        $ppI .click !~>
+            if @toggleMenu!
+                #DEBUG
+                $ppW .removeClass "p0ne-settings-debug-#{debugMode}"
+                debugMode := (debugMode + 1) % 3
+                $ppI .children! .text debugMode
+                $ppW .addClass "p0ne-settings-debug-#{debugMode}"
+
+                if debugMode == 2
+                    debugClosingDur := 0ms
+                    @$vip.hide!
+                    $ppP .appendTo $ppW
+                else
+                    debugClosingDur := 500ms
+                    @$vip.show!
+                    $ppP .appendTo $ppM
+
+                for group, $el of @groups when @_settings.groupToggles[group]
+                    if not keepOpen
+                        $el .removeClass \open .css height: 30px
+                    else
+                        keepOpen = group
+                if not keepOpen
+                    keepOpen = \base
+                    @groupToggles.base = true
+                    @groups.base .find \.p0ne-settings-summary .click!
+
+                sleep debugClosingDur, !~>
+                    for group, $el of @groups when @_settings.groupToggles[group]
+                        if not groupToggles[group] and group != keepOpen
+                            groupToggles[group] = false
+                            $el .addClass \closed
 
         # toggle groups
         addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
             $s = $ this .parent!
-            if $s.hasClass \open # close
-                groupToggles[$s.data \group] = false
+            group = $s.data \group
+            if $s.hasClass \open    and debugMode != 2 # close
+                groupToggles[group] = false
                 $s
                     .removeClass \open
                     .css height: 30px
                     #.stop! .animate height: 30px, \slow
+                sleep 500ms, !-> if not groupToggles[group]
+                    $s .addClass \closed
             else
-                groupToggles[$s.data \group] = true
+                groupToggles[group] = true
                 $s
                     .addClass \open
+                    .removeClass \closed
                     #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
                     .trigger \p0ne:resize
+                if debugMode != 0 #DEBUG
+                    $s = $s .siblings(\.open) .removeClass \open .css height: 30px
+                    sleep debugClosingDur, !->
+                        $s.each !->
+                            $this = $(this)
+                            group = $this.data \group
+                            groupToggles[group] = false
+                            $this .addClass \closed
             e.preventDefault!
 
         addListener $ppW, \p0ne:resize, \.p0ne-settings-group, (e) !->
@@ -85,7 +132,7 @@ module \p0neSettings, do
             if p0neSettings._settings.groupToggles[$this.data \group]
                 $this .css height: 0 # reset scrollHeight
                 $this .css height: @scrollHeight # make group as large as content
-            $this .scrollTop 0
+            #$this .scrollTop 0
 
         addListener $ppW, \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
@@ -245,7 +292,7 @@ module \p0neSettings, do
                             left: @$ppW.width! - module._$settingsPanel.$el.width!
                             -> $(this).hide!
                     module._$settingsPanel.open = false
-        @groupToggles.p0neSettings = state
+        return @groupToggles.p0neSettings = state
 
 
     groups: {}
@@ -274,12 +321,15 @@ module \p0neSettings, do
                 $s = @groups[module.settings] = $ '<div class=p0ne-settings-group>'
                     .data \group, module.settings
                     .append do
-                        $ '<div class=p0ne-settings-summary>' .text module.settings.toUpperCase!
+                        $ '<div class=p0ne-settings-summary>' .text module.settings #.toUpperCase!
                     .insertBefore @$ppInfo
+                $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
                 if @_settings.groupToggles[module.settings]
                     $s .addClass \open
                 else
-                    $s .css height: 30px
+                    $s
+                        .addClass \closed
+                        .css height: 30px
 
                 if module.settings == \moderation
                     $s .addClass \p0ne-settings-group-moderation
@@ -302,7 +352,7 @@ module \p0neSettings, do
                 "
                 .data \module, module
 
-            if module_?._$settings?.parent! .is $s
+            if module_?._$settings?.parent!.parent! .is $s
                 module_._$settings
                     .after do
                         module._$settings .addClass \updated
@@ -311,7 +361,7 @@ module \p0neSettings, do
                     module._$settings .removeClass \updated
                 @loadSettingsExtra false, module, module_ if not module.disabled
             else
-                module._$settings .appendTo $s
+                module._$settings .appendTo $s.items
 
                 # render extra settings element if module is enabled
                 @loadSettingsExtra false, module if not module.disabled
