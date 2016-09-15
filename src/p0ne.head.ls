@@ -16,10 +16,17 @@
  *               "If it wasn't THAT broken, I wouldn't have had as much fun in coding plug_p0ne"
  *                   --Brinkie Pie (2015)
  *
- * Not happy with plug_p0ne? contact me (the developer) at brinkiepie^gmail.com
+ * The following 3rd party scripts are used:
+ *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
+ *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
+ *     - Stefan Petre's Color Picker http://www.eyecon.ro/colorpicker/ (Dual licensed under the MIT and GPL licenses)
+ * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
+ *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
+ *
+ * Not happy with plug_p0ne? contact me (the developer) at brinkiepie@gmail.com
  * great alternative plug.dj scripts are
- *     - TastyPlug (relatively lightweight but does a great job - https://fungustime.pw/tastyplug/ )
- *     - RCS (Radiant Community Script - https://radiant.dj/rcs )
+ *     - TastyPlug (relatively lightweight but does a good job - https://fungustime.pw/tastyplug/ )
+ *     - RCS (best alternative I could recommend - https://radiant.dj/rcs )
  *     - plugCubed (does a lot of things, but breaks on plug.dj updates - https://plugcubed.net/ )
  *     - plugplug (lightweight as heck - https://bitbucket.org/mateon1/plugplug/ )
  */
@@ -29,11 +36,10 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.8
-    lastCompatibleVersion: \1.7.0 /* see below */
+    version: \1.8.0
+    lastCompatibleVersion: \1.8.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
-    YOUTUBE_KEY: \AI39si6XYixXiaG51p_o0WahXtdRYFCpMJbgHVRKMKCph2FiJz9UCVaLdzfltg1DXtmEREQVFpkTHx_0O_dSpHR5w0PTVea4Lw # for obsolete V2
     YOUTUBE_V3_KEY: \AIzaSyDaWL9emnR9R_qBWlDAYl-Z_h4ZPYBDjzk
     FIMSTATS_KEY: \4983a7f2-b253-4300-8b18-6e7c57db5e2e
 

@@ -53,27 +53,29 @@ require <[ sockjs ]>, (SockJS) !->
     console.groupCollapsed "[p0ne custom avatars]"
     console.timeEnd "[p0ne custom avatars] loaded SockJS"
     # users
-    requireHelper \users, (it) !->
-        return it.models?.0?.attributes.avatarID
-            and \isTheUserPlaying not of it
-            and \lastFilter not of it
-    window.userID ||= API.getUser!.id
-    window.user_ ||= users.get(userID) if users?
-    #=======================
+    if not window.p0ne
+        requireHelper \users, (it) !->
+            return it.models?.0?.attributes.avatarID
+                and \isTheUserPlaying not of it
+                and \lastFilter not of it
+        window.userID ||= API.getUser!.id
+        window.user_ ||= users.get(userID) if users?
+        #=======================
 
 
-    # auxiliaries
-    window.sleep ||= (delay, fn) !-> return setTimeout fn, delay
+        # auxiliaries
+        window.sleep ||= (delay, fn) !-> return setTimeout fn, delay
 
-    requireHelper \InventoryDropdown, (.selected)
-    requireHelper \avatarAuxiliaries, (.getAvatarUrl)
-    requireHelper \Avatar, (.AUDIENCE)
-    #requireHelper \AvatarList, (._byId?.admin01)
-    requireHelper \myAvatars, (m) !->
-        if m.comparator == \id
-            for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx == m
-                return true
-        return false
+        requireHelper \InventoryDropdown, (.selected)
+        requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+        requireHelper \Avatar, (.AUDIENCE)
+        #requireHelper \AvatarList, (._byId?.admin01)
+        for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx.comparator == \id
+            window.myAvatars = ev.ctx
+            break
+
+        if requireHelper \InventoryAvatarPage, ((a) -> a::?.className == 'avatars' && a::eventName)
+            window.InventoryDropdown = new InventoryAvatarPage().dropDown.constructor
 
     window.Lang = require \lang/Lang
 
@@ -85,7 +87,7 @@ require <[ sockjs ]>, (SockJS) !->
     ####################################*/
     user.avatarID = API.getUser!.avatarID
     module \customAvatars, do
-        require: <[ users Lang avatarAuxiliaries Avatar myAvatars ]>
+        require: <[ users Lang avatarAuxiliaries Avatar myAvatars InventoryDropdown ]>
         optional: <[ user_ _$context ]>
         displayName: 'Custom Avatars'
         settings: \base
@@ -264,11 +266,11 @@ require <[ sockjs ]>, (SockJS) !->
                 html = ""
                 categories = {}
                 curAvatarID = API.getUser!.avatarID
-                curCategory = \base
                 for avi in myAvatars.models
                     categories[avi.get \category] = true
                     if avi.id == curAvatarID
                         curCategory = avi.get \category
+                curCategory ||= myAvatars.models.0?.get \category
 
                 for category of categories
                     html += "
@@ -458,9 +460,10 @@ require <[ sockjs ]>, (SockJS) !->
 
                 @socket.trigger type, data
 
-            @replace @socket, \close, (close_) !-> return !->
-                    @trigger \close
-                    close_ ...
+            close_ = @socket.close
+            @socket.close = !->
+                @trigger \close
+                close_ ...
 
             # replace old authTokens
             user = API.getUser!

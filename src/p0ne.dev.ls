@@ -129,7 +129,7 @@ module \logGrabbers, do
         replace votes, \grab, (g_) !-> return (uid) !->
             u = getUser(uid)
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
-            grabbers[uid] = u.un
+            grabbers[uid] = u.username
             hasGrabber := true
             return g_.call(this, uid)
         addListener API, \advance, !->
@@ -255,7 +255,7 @@ window <<<<
             keys = 0
             keysExact = 0
             isNotObj = typeof v not in <[ object function ]>
-            for id, m2 of require.s.contexts._.defined when m2 and m2[k] and k not in <[ requireID cid id ]>
+            for id, m2 of require.s.contexts._.defined when m2 and m2[k] and k not in <[ requireID cid id length ]>
                 keys++
                 keysExact++ if isNotObj and m2[k] == v
 

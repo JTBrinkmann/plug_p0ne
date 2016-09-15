@@ -102,7 +102,7 @@ module \disableChatDelete, do
             markAsDeleted(c, users.get(mi)?.get(\username) || mi)
             lastDeletedCid := c
         #addListener \early, _$context, \chat:delete, !-> return (cid) !->
-        replace_$Listener \chat:delete, !-> (cid) !->
+        replace_$Listener \chat:delete, !-> return (cid) !->
             markAsDeleted(cid) if cid != lastDeletedCid
 
         function markAsDeleted cid, moderator
@@ -165,7 +165,7 @@ module \warnOnMehers, do
     _settings:
         instantWarn: false
         maxMehs: 3
-    setup: ({addListener},,, m_) !->
+    setup: ({addListener},, m_) !->
         if m_
             @users = m_.users
         users = @users
@@ -187,20 +187,23 @@ module \warnOnMehers, do
         lastAdvance = 0
         addListener API, \advance, (d) !~>
             d = Date.now!
-            for k,v of current
+            for cid,v of current
                 if v == -1
-                    users[k] ||= 0
-                    if ++users[k] > @_settings.maxMehs and troll = getUser(k)
+                    users[cid] ||= 0
+                    if ++users[cid] > @_settings.maxMehs and troll = getUser(cid)
                         # note: the user (`troll`) may have left during this song
                         appendChat $ "
                             <div class='cm system'>
                                 <div class=box><i class='icon icon-chat-system'></i></div>
                                 <div class='msg text'>
-                                    #{formatUserHTML troll} meh'd the past #{plural users[k], 'song'}!
+                                    #{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!
                                 </div>
                             </div>"
-                else if d > lastAdvance + 10_000ms and d.lastPlay?.dj.id != k
-                    delete users[k]
+                else if d > lastAdvance + 10_000ms
+                    delete users[cid]
+            if d > lastAdvance + 10_000ms
+                for {cid} in API.getUsers! when not current[cid] and d.lastPlay?.dj.id != cid
+                    delete users[cid]
             current := {}
             lastAdvance := d
 
@@ -259,18 +262,31 @@ module \afkTimer, do
         This module shows how long users have been inactive in the User- and Waitlist-Panel.
         "Being active"
     '''
-    lastActivity: {}
     _settings:
+        lastActivity: {}
         highlightOver: 43.min
-    setup: ({addListener, $create, replace},,,m_) !->
+
+    setup: ({addListener, $create, replace},, m_) !->
         # initialize users
         settings = @_settings
-        @start = start = Date.now!
+        start = Date.now!
         if m_
-            @lastActivity = m_.lastActivity ||{}
+            console.log "m_ =", m_
+            @start = m_.start
+            lastActivity = m_._settings.lastActivity ||{}
+        else
+            console.log "args", arguments
+            @start = start
+            if @_settings.lastActivity?.0 + 60_000ms > Date.now!
+                lastActivity = @_settings.lastActivity
+            else
+                lastActivity = {}
+        @lastActivity = lastActivity
+
         for user in API.getUsers!
-            @lastActivity[user.id] ||= start
-        lastActivity = @lastActivity
+            lastActivity[user.id] ||= start
+        start = @start
+
 
         $waitlistBtn = $ \#waitlist-button
             .append $afkCount = $create '<div class=p0ne-toolbar-count>'
@@ -278,7 +294,7 @@ module \afkTimer, do
         # set up event listeners to update the lastActivity time
         addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
         addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
-        addListener API, 'chat', (u) !-> updateUser u.uid
+        addListener API, 'chat', (u) !-> if not /afk/i.test(u.message) then updateUser u.uid
         addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
@@ -292,12 +308,13 @@ module \afkTimer, do
 
         # regularly update the AFK list / count
         lastAfkCount = 0
-        @timer = repeat 60_000ms, !->
+        var afkCount
+        @timer = repeat 60_000ms, fn=!->
             if chatHidden
                 forceRerender!
             else
                 # update AFK user count
-                afkCount = 0
+                afkCount := 0
                 d = Date.now!
                 usersToCheck = API.getWaitList!
                 usersToCheck[*] = that if API.getDJ!
@@ -312,6 +329,7 @@ module \afkTimer, do
                         #$waitlistBtn .removeClass \p0ne-toolbar-highlight
                         $afkCount .clear!
                     lastAfkCount := afkCount
+        fn!
 
         # UI
         d = 0
@@ -325,25 +343,36 @@ module \afkTimer, do
                     d := 0; noActivityYet := null
                 ago = d - lastActivity[@model.id]
                 if lastActivity[@model.id] <= start
-                    time = noActivityYet ||= ">#{humanTime(ago, true)}"
+                    if ago < 120_000ms
+                        time = noActivityYet ||= "? "
+                    else
+                        time = noActivityYet ||= ">#{humanTime(ago, true)}"
                 else if ago < 60_000ms
                     time = "<1m"
                 else if ago < 120_000ms
                     time = "<2m"
                 else
                     time = humanTime(ago, true)
-                $span = $ '<span class=p0ne-last-activity>' .text time
-                $span .addClass \p0ne-last-activity-warn if ago > settings.highlightOver
-                $span .addClass \p0ne-last-activity-update if isUpdate
-                @$el .append $span
+
+                if @$afk
+                    @$afk .removeClass 'p0ne-last-activity-warn'
+                else
+                    @$afk = $ '<span class=p0ne-last-activity>'
+                        .appendTo @$el
+                @$afk .text time
+                @$afk .addClass \p0ne-last-activity-warn if ago > settings.highlightOver
                 if isUpdate
-                    <-! requestAnimationFrame
-                    $span .removeClass \p0ne-last-activity-update
+                    @$afk .addClass \p0ne-last-activity-update
+                    <~! requestAnimationFrame
+                    @$afk .removeClass \p0ne-last-activity-update
 
 
 
         function updateUser uid
-            lastActivity[uid] = Date.now!
+            if Date.now! - lastActivity[uid] > settings.highlightOver
+                afkCount--
+                $afkCount .text afkCount
+            lastActivity.0 = lastActivity[uid] = Date.now!
             # waitlist.rows defaults to [], so no need to ||[]
             for r in userList?.listView?.rows || app?.room.waitlist.rows when r.model.id == uid
                 r.render true
@@ -365,6 +394,9 @@ module \afkTimer, do
             r.render!
 
 
+/*####################################
+#           FORCE SKIP BTN           #
+####################################*/
 module \forceSkipButton, do
     moderator: true
     setup: ({$create}, m) !->

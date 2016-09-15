@@ -23,7 +23,7 @@ module \updateUserData, do
         for user in users.models
             user.set \joinedRoom, -1
         addListener API, \userJoin, ({id}) !->
-            users.get(id).set \joinedRoom, Date.now!
+            users.get(id)? .set \joinedRoom, Date.now!
 
 module \throttleOnFloodAPI, do
     setup: ({addListener}) !->
@@ -45,36 +45,52 @@ module \PopoutListener, do
             _$context?.trigger \popout:open, PopoutView._window, PopoutView
             API.trigger \popout:open, PopoutView._window, PopoutView
         replace PopoutView, \clear, (c_) !-> return !->
-            c_ ...
+            console.log "[popout:clear]", this, this.clear_ == c_, c_
+            if not @chat
+                # silently fail
+                #appendChat do
+                #    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: no this.chat - blame adblock?"
+                #        .on \click, !-> console.error new Error().stack
+                return
+            try
+                c_ ...
+            catch err
+                appendChat do
+                    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: #{err.message}"
+                        .on \click, !-> console.error err.messageAndStack
+                window.error = err
             _$context?.trigger \popout:close, PopoutView._window, PopoutView
             API.trigger \popout:close, PopoutView._window, PopoutView
 
 module \chatDomEvents, do
     require: <[ backbone ]>
-    optional: <[ PopoutView PopoutListener ]>
+    optional: <[ chat PopoutView PopoutListener ]>
     persistent: <[ _events ]>
+    _events: []
     setup: ({addListener}) !->
-        cm = $cm!
-        @_events = []
+        cm = chat?.$chatMessages || $ \#chat-messages
         @on = !->
             @_events[*] = arguments
-            cm.on .apply cm, arguments
+            cm .on.apply cm, arguments
+            PopoutView.chat.$el .on.apply PopoutView.chat.$el, arguments if PopoutView.chat
         @off = !->
             isAnyMatch = false
-            for cb, i in @_events
-                isMatch = true
-                for arg, o in arguments when cb[o] != arg[o]
-                    isMatch = false
-                if isMatch
+            i = -1
+            while cb = @_events[++i]
+                for ,o in arguments when cb[o] != arguments[o]
+                    break
+                else
                     isAnyMatch = true
-                    @_events.removeItem(i)
+                    @_events.remove(i--)
             cm .off.apply cm, arguments if isAnyMatch
         @once = (type, callback) !-> @on type, !-> @off(type, callback); callback ...
 
         addListener API, \popout:open, !~>
-            cm = PopoutView.chat
+            cm = PopoutView.chat.$el
+            console.log "[chatDomEvents] popup opened", @_events
             for cb in @_events
                 #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
+                console.log "[chatDomEvents] adding listener", cm, cb
                 cm .on .apply cm, cb
 
 module \grabMedia, do
@@ -159,15 +175,15 @@ module \p0neCSS, do
     $popoutEl: $!
     styles: {}
     urlMap: {}
-    persistent: <[ styles ]>
-    setup: ({addListener, $create}) !->
+    persistent: <[ styles ]> # urlMap gets transferred in setup()
+    setup: ({addListener, $create},,p0neCSS_) !->
         @$el = $create \<style> .appendTo \head
         {$el, $popoutEl, styles, urlMap} = this
-        addListener API, \popout:open, (_window, PopoutView) !->
+        cb = addListener API, \popout:open, (_window, PopoutView) !->
             $popoutEl := $el .clone!
                 .loadAll PopoutView.resizeBind
                 .appendTo _window.document.head
-        PopoutView.render! if PopoutView?._window
+        cb! if PopoutView?._window
 
         export @getCustomCSS = (inclExternal) !->
             if inclExternal
@@ -240,3 +256,15 @@ module \p0neCSS, do
             $popoutEl .remove!
             Layout?.onResize!
             PopoutView.resizeBind! if PopoutView?._window
+
+        if p0neCSS_
+            res = ""
+            for n,css of styles
+                res += "/*== #n ==*/\n#css\n\n"
+            if res
+                $el       .first! .text res
+                $popoutEl .first! .text res
+
+            for url, i of p0neCSS_.urlMap
+                @loadStyle url
+                @urlMap[url] = i

@@ -109,7 +109,7 @@ module \songInfo, do
         $ \<span> .addClass \p0ne-song-info-date        .appendTo $meta
             .text getDateTime new Date(d.uploadDate)
         $ \<span> .addClass \p0ne-song-info-duration    .appendTo $meta
-            .text "duration: #{mediaTime +d.duration}"
+            .text "duration #{mediaTime +d.duration}"
         if media.format == 1 and d.restriction
             if d.restriction.allowed
                 $ \<span> .addClass \p0ne-song-info-blocked     .appendTo @$el

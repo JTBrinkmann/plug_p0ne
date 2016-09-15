@@ -28,115 +28,27 @@ module \songNotif, do
         You can click anywhere on it to close it again.
     '''
     persistent: <[ lastMedia $div ]>
-    setup: ({addListener, $create, $createPersistent, css},,,module_) !->
-        $lastNotif = $!
+    setup: ({addListener, $create, @$createPersistent, css},, module_) !->
+        @$lastNotif = $!
         @$div ||= $cms! .find \.p0ne-song-notif:last
-        @callback = (d) !~>
-            try
-                media = d.media
-                if media?.id != @lastMedia
-                    if score = d.lastPlay?.score
-                        /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
-                        @$div
-                            .removeClass \song-current
-                            .find \.song-stats
-                                .html "
-                                <div class=score>
-                                    <div class='item positive'>
-                                        <i class='icon icon-history-positive'></i> #{score.positive}
-                                    </div>
-                                    <div class='item grabs'>
-                                        <i class='icon icon-history-grabs'></i> #{score.grabs}
-                                    </div>
-                                    <div class='item negative'>
-                                        <i class='icon icon-history-negative'></i> #{score.negative}
-                                    </div>
-                                    <div class='item listeners'>
-                                        <i class='icon icon-history-listeners'></i> #{users?.length || API.getUsers!.length}
-                                    </div>
-                                </div>
-                                "
-                        @lastMedia := null; $lastNotif := @$div
-                else
-                    return
-                if not media
-                    return
-
-                @lastMedia := media.id
-                chat?.lastType = \p0ne-song-notif
-
-                @$div := $createPersistent "<div class='update p0ne-song-notif song-current' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
-                html = ""
-                time = getTime!
-                if media.format == 1  # YouTube
-                    mediaURL = "http://youtube.com/watch?v=#{media.cid}"
-                else # if media.format == 2 # SoundCloud
-                    # note: this gets replaced by a proper link as soon as data is available
-                    mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent media.author+' - '+media.title}"
-
-                duration = mediaTime media.duration
-                console.logImg media.image.replace(/^\/\//, 'https://') .then !->
-                    console.log "#time [DJ_ADVANCE] #{d.dj.username} is playing '#{media.author} - #{media.title}' (#duration)", d
-
-                html += "
-                    <div class='song-thumb-wrapper'>
-                        <img class='song-thumb' src='#{media.image}' />
-                        <span class='song-duration'>#duration</span>
-                        <div class='song-add btn'><i class='icon icon-add'></i></div>
-                        <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
-                        <!-- <div class='song-skip btn right'><i class='icon icon-skip'></i></div> -->
-                        <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
-                    </div>
-                    #{getTimestamp!}
-                    <div class='song-stats'></div>
-                    <div class='song-dj un'></div>
-                    <b class='song-title'></b>
-                    <span class='song-author'></span>
-                    <div class='song-description-btn'>Description</div>
-                "
-                @$div.html html
-                @$div .find \.song-title .text d.media.title .prop \title, d.media.title
-                @$div .find \.song-author .text d.media.author
-                @$div .find \.song-dj
-                    .text d.dj.username
-                    .data \uid, d.dj.id
-
-                if media.format == 2sc and p0ne.SOUNDCLOUD_KEY # SoundCloud
-                    @$div .addClass \loading
-                    mediaLookup media
-                        .then (d) !~>
-                            @$div
-                                .removeClass \loading
-                                .data \description, d.description
-                                .find \.song-open .attr \href, d.url
-                            if d.download
-                                @$div
-                                    .addClass \downloadable
-                                    .find \.song-download
-                                        .attr \href, d.download
-                                        .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
-
-                appendChat @$div
-            catch e
-                console.error "[p0ne.notif]", e
 
         #$create \<div>
         #    .addClass \playback-thumb
         #    .insertBefore $ '#playback .background'
 
-        addListener API, \advance, @callback
+        addListener API, \advance, @~callback
         if _$context
             addListener _$context, \room:joined, !~>
                 @callback media: API.getMedia!, dj: API.getDJ!
 
         #== add skip listeners ==
-        addListener API, \modSkip, (modUsername) !->
+        addListener API, \modSkip, (modUsername) !~>
             console.info "[API.modSkip]", modUsername
             if getUser(modUsername)
                 modID = "data-uid='#{that.id}'"
             else
                 modID = ""
-            $lastNotif .find \.timestamp
+            @$lastNotif .find \.timestamp
                 .after do
                     $ "<div class='song-skipped un' #modID>"
                         .text modUsername
@@ -283,5 +195,98 @@ module \songNotif, do
         @showDescription = showDescription
         @hideDescription = hideDescription
 
+
+    callback: (d) !->
+        media = d.media
+        if media?.id != @lastMedia
+            if @$div and score = d.lastPlay?.score
+                /*@security HTML injection shouldn't be an issue, unless the score attributes are oddly manipulated */
+                @$div
+                    .removeClass \song-current
+                    .find \.song-stats
+                        .html "
+                        <div class=score>
+                            <div class='item positive'>
+                                <i class='icon icon-history-positive'></i> #{score.positive}
+                            </div>
+                            <div class='item grabs'>
+                                <i class='icon icon-history-grabs'></i> #{score.grabs}
+                            </div>
+                            <div class='item negative'>
+                                <i class='icon icon-history-negative'></i> #{score.negative}
+                            </div>
+                            <div class='item listeners'>
+                                <i class='icon icon-history-listeners'></i> #{users?.length || API.getUsers!.length}
+                            </div>
+                        </div>
+                        "
+                @lastMedia = null; @$lastNotif = @$div
+        if not media
+            return
+
+        @lastMedia := media.id
+        chat?.lastType = \p0ne-song-notif
+
+        @$div := @$createPersistent "<div class='update p0ne-song-notif song-current' data-id='#{media.id}' data-cid='#{media.cid}' data-format='#{media.format}'>"
+        html = ""
+        author = htmlUnescape media.author
+        title = htmlUnescape media.title
+        if media.format == 1  # YouTube
+            mediaURL = "http://youtube.com/watch?v=#{media.cid}"
+        else # if media.format == 2 # SoundCloud
+            # note: this gets replaced by a proper link as soon as data is available
+            mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent author+' - '+title}"
+
+        image = httpsify media.image
+        duration = mediaTime media.duration
+        console.logImg image, 120px, (if media.format == 1 then 90px else 120px)
+            .then !->
+                console.log "#{getTime!} [DJ_ADVANCE] #{d.dj.username} plays '#{author} - #{title}' (#duration)", d
+        html += "
+            <div class='song-thumb-wrapper'>
+                <img class='song-thumb' src='#image' />
+                <span class='song-duration'>#duration</span>
+                <div class='song-add btn'><i class='icon icon-add'></i></div>
+                <a class='song-open btn' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+                <!-- <div class='song-download btn right'><i class='icon icon-###'></i></div> -->
+            </div>
+            #{getTimestamp!}
+            <div class='song-stats'></div>
+            <div class='song-dj un'></div>
+            <b class='song-title'></b>
+            <span class='song-author'></span>
+            <div class='song-description-btn'>Description</div>
+        "
+        @$div.html html
+        @$div .find \.song-title .text title .prop \title, title
+        @$div .find \.song-author .text author
+        @$div .find \.song-dj
+            .text d.dj.username
+            .data \uid, d.dj.id
+
+        appendChat @$div
+        if media.format == 2 # SoundCloud
+            @$div .addClass \loading
+            mediaLookup media
+                .then (d) !~>
+                    @$div
+                        .removeClass \loading
+                        .data \description, d.description
+                        .find \.song-open .attr \href, d.url
+                    if d.download
+                        @$div
+                            .addClass \downloadable
+                            .find \.song-download
+                                .attr \href, d.download
+                                .attr \title, "#{formatMB(d.downloadSize / 1_000_000to_mb)} #{if d.downloadFormat then '(.'+that+')' else ''}"
+
+
     disable: !->
         @hideDescription?!
+
+chatCommands.commands.songinfo =
+    description: "forces a song notification to be shown, even if the module is disabled"
+    callback: !->
+        if window.songNotif?.callback and API.getMedia!
+            that.image = httpsify that.image
+            window.songNotif.callback media: that, dj: API.getDJ!
