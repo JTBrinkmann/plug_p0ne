@@ -30,12 +30,14 @@
 .app-right .friends, .pop-menu ul, #history-button,
 /*.popout #vote #woot, .popout #vote #grab, .popout #vote #meh,*/
 #user-rollover .meta, #footer-user,
-#dialog-ban-user .duration .toggle, #dialog-mute-user .duration .toggle {
+#dialog-ban-user .duration .toggle, #dialog-mute-user .duration .toggle,
+#video-only-dj {
     background: transparent !important;
 }
 
 /* slightly opaque background */
-#playlist-panel .row:hover, #search-bar, #filter-bar, .youtube-input,
+#playlist-panel .playlist-media-item:hover, #playlist-panel .playlist-media-first-item:hover,
+#playlist-panel .playlist-media-last-item:hover, #search-bar, #filter-bar, .youtube-input,
 #chat .emote, #chat .message, #user-menu, #user-inventory>.avatars .top, #user-rollover .info,
 .user-content.profile .notifications .row, .dialog .dialog-body .divider, .experience .xp .bar,
 #user-settings .container button, .dropdown, #volume .slider,
@@ -50,10 +52,11 @@
 #playlist-panel .row.selected, #search, #playlist-menu,
 #room-info .welcome, .user-content.profile .meta .blurb .box,
 .user-content.profile .meta .blurb>input, #footer-user.open-status .image,
-#footer-user.open-user .info, #dj-button, #vote .crowd-response, #search-suggestion li:hover,
+#footer-user.open-user .info, #dj-button, #search-suggestion li:hover,
 #search-suggestion li.selected, #footer-user .back span, #app-menu .item:hover,
 #user-friends .list .row .buttons button, #friends-button .request-count,
-.pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio, #video-only-dj {
+.pop-menu .bar, .popout #meta, .dialog.choice li.selected, .choice .radio,
+#vote /*, #video-only-dj*/ {
     background: rgba(0,0,0,0.4) !important;
 }
 
@@ -216,6 +219,9 @@
 #footer {
     background: linear-gradient(to bottom,rgba(16, 92, 107, .2) 0,rgba(0, 0, 0, .8) 100%);
 }
+#playlist-button {
+  background: linear-gradient(to bottom,#7000FF 0,#000000 100%);
+}
 
 /*#history-button, #app-menu .button, #plugcubed, .popout .header::before*/
 .header-panel-button.selected {
@@ -246,10 +252,16 @@
     z-index: 3;
     box-shadow: 0 0 2px #000;
 }
+#media-panel .header .import-button {
+    text-align: left;
+}
 #app-menu, #app #plugcubed, .header-panel-button { /* make them transparent for a clean look*/
     background: transparent !important;
     box-shadow: none !important;
     border: none;
+}
+#app-menu .button i {
+  background: url(https://plug.unnoen.com/images/ponydj.png);
 }
 #app-menu.open {
     background: rgba(20, 20, 20, 0.85098) url(https://i.imgur.com/tJ6bT3m.png) center bottom no-repeat !important;
@@ -557,21 +569,28 @@
 
 
 /*= vote buttons =*/
-#vote .crowd-response { margin-right: 0; }
-#meh.selected  { background: #c42e3b !important; box-shadow: +3px 0 20px #c42e3b !important;}
+#vote {
+    width: auto !important;
+    border-radius: 0 0 4px 4px;
+}
+.video-only #dj-button { width: 231px; height: 62px; }
+.video-only #vote { padding-top: 1px;}
+#vote .crowd-response { margin-right: 0; background: transparent }
 #woot.selected { background: #90ad2f !important; box-shadow: -3px 0 20px #90ad2f !important;}
+#meh.selected  { background: #c42e3b !important; box-shadow: +3px 0 20px #c42e3b !important;}
 #grab.selected { background: #aa74ff !important; box-shadow:  0   0 20px #aa74ff !important;}
+
 
 
 /*== smaller playlist rows ==*/
 /* (for when you have more than just a few playlists ;D) */
-#playlist-menu .menu .row {
+#playlist-menu .menu .row, .pop-menu.grab li {
     height: 25px;
 }
-#playlist-menu .menu .row .activate-button {
+#playlist-menu .menu .row .activate-button, .pop-menu.grab li {
     top: -5px;
 }
-#playlist-menu .menu .row .name, #playlist-menu .menu .row .count {
+#playlist-menu .menu .row .name, #playlist-menu .menu .row .count, .pop-menu.grab li {
     top: 0;
 }
 #playlist-menu .row .spinner {
@@ -588,7 +607,7 @@
     bottom: 54px !important;
     height: auto !important;
 }
-#playlist-panel .media-list .jspPane {
+#playlist-panel .media-list .jspPane, .playlist-overlay-help {
     margin-top: 55px;
     padding-bottom: 100px !important;
 }
@@ -718,16 +737,29 @@
     right: 352px;
 }
 
-/*== song-info ==*/
-.song-thumb-wrapper {
-    border-bottom-left-radius: 10px;
-    border-top-left-radius: 10px;
+
+/*= message hover =*/
+/*#chat .cm::before {
+    content: " ";
+    display: block;
+    background: #FFF;
+    position: absolute;
+    height: 100%;
+    left: 0;
+    width: 0;
+    transition: width 300ms ease-out;
 }
+#chat .cm {
+    position: relative;
+}
+#chat .cm:hover::before {
+    width: 3px;
+    transition: width 200ms ease-out 50ms;
+}*/
+
+
 
 /*== fix FiMplug room theme ==*/
-.icon-chat-bouncer {
-    background-position: 0 -2px;
-}
 #playback .background img {
     background-position: top left, bottom right;
 }
@@ -749,3 +781,4 @@
     background: rgba(47, 115, 107, 0.7) !important;
     border-left: #04C9B2 3px solid !important;
 }
+

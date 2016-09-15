@@ -1,1166 +1,1363 @@
-/*== p0ne-notification ==*/
-#chat .p0ne-notif-loaded {
-    color: #A7F;
-    text-align: center;
-    font-size: 1.2em;
-    padding-right: 6px;
-}
-#chat-messages .cm .timestamp {
-    display: inline;
-    opacity: 0;
-}
-#chat-messages .message .timestamp,
-#chat-messages .mention .timestamp,
-#chat-messages .emote .timestamp,
-#chat-messages .cm:hover .timestamp {
-    opacity: 1;
-}
-
-.p0ne-icon-small {
-    position: relative;
-    display: inline-block;
-}
-
-/*== Join/Leave Notifications ==*/
-#chat #chat-messages .p0ne-notif-joinleave {
-    font-weight: bold;
-    min-height: 18px;
-    width: 339px; /* #chat.width @padding-right -   - = 345px - 6px */
-    /* note: padding-right was moved into the width to fix stuff */
-    padding-left: 10px;
-}
-#chat .p0ne-notif-join {
-    color: #5AB;
-}
-#chat .p0ne-notif-leave {
-    color: #579;
-}
-/*.p0ne-notif-joinleave .badge-box {
-    display: none;
-}*/
-.p0ne-notif-joinleave .flag {
-    margin-bottom: -3px;
-    opacity: .5;
-}
-.p0ne-notif-joinleave .icon {
-    position: static;
-    display: inline-block;
-    margin-bottom: -4px;
-    width: 13px;
-}
-/*== Playlist Icon View ==*/
-.playlist-icon-view .media-list img {
-    margin: 0;
-    width: 150px;
-    height: 115px;
-    position: absolute;
-    float: none;
-}
-.playlist-icon-view .media-list .row {
-    position: static;
-    float: left;
-    width: 150px;
-    height: 175px;
-    margin: 5px;
-    border: none;
-    box-shadow: 0 0 0 black, 0 0 0 black;
-    transition: box-shadow .1s ease-out, transform .1s ease-out;
-    border-bottom: none !important;
-}
-.playlist-icon-view .media-list .row:hover {
-    transform: scale(1.05);
-    box-shadow: 0 5px 10px black, 0 0 10px black;
-    overflow: visible;
-}
-.playlist-icon-view .media-list .meta {
-    left: 0;
-    margin: 0;
-    width: 100%;
-    /* text-align: center;
-    text-shadow:
-       #000 0px 0px 1px,
-       #000 0px 0px 1px,
-       #000 0px 0px 1px,
-       #000 0px 0px 1px,
-       #000 0px 0px 2px,
-       #000 0px 0px 5px,
-       #000 0px 0px 7px; */
-    border-bottom: none;
-    height: 60px;
-    top: 115px;
-}
-.playlist-icon-view .media-list .meta span {
-    position: static;
-    display: block;
-    padding: 0 5px;
-    width: auto;
-    top: 0;
-    font-size: 13px;
-    font-weight: bold;
-    line-height: 13px;
-    white-space: pre;
-}
-.playlist-icon-view .media-list .meta .author {
-    color: #ccc;
-    font-size: 12px;
-    height: 14px;
-    line-height: 13px;
-    margin: 2px 0;
-    left: 0;
-    text-align: center;
-}
-.playlist-icon-view .media-list .in-history .meta .author {
-    color: #f46b40;
-}
-.playlist-icon-view .media-list .meta .title,
-.playlist-icon-view .history .meta .author {
-    white-space: normal;
-    max-height: 50px;
-}
-.playlist-icon-view .media-list .meta .duration,
-.playlist-icon-view .history .meta .timestamp {
-    bottom: 0;
-    font-size: 12px;
-    position: absolute;
-    top: -17px;
-    right: 0;
-    background: rgba(0,0,0,0.7);
-    color: #aaa;
-    height: 15px;
-    width: auto;
-    left: auto;
-    padding: 0 5px;
-}
-.playlist-icon-view #media-panel .actions {
-    position: static;
-    width: 150px;
-    margin-top: -62px;
-    background: transparent !important;
-    height: 30px;
-    text-align: right;
-}
-.playlist-icon-view .media-list .actions div {
-    width: 30px;
-    height: 30px;
-    background: rgba(0,0,0, 0.6);
-    float: none;
-    display: inline-block;
-    margin-right: -4px;
-}
-.playlist-icon-view #history-panel .actions div {
-    width: 54px;
-    height: 54px;
-}
-.playlist-icon-view .media-list .actions div:hover,
-.playlist-icon-view .media-list .selected {
-    background: rgba(0,0,0, 0.3) !important;
-}
-.playlist-icon-view .media-list .playlist-media-item:hover {
-    background: rgba(0,0,0, 0.5) !important;
-}
-.playlist-icon-view .media-list .actions i {
-    top: 0;
-    left: 0;
-}
-.playlist-icon-view .media-list .title,
-.playlist-icon-view .history .meta .name {
-    left: 0;
-    width: 100%;
-    text-align: center;
-}
-
-
-
-/* fix drag and drop */
-.playlist-icon-view #media-panel .drag-row-line {
-    display: none !important;
-}
-.playlist-icon-view #media-panel .drag-over .row.hover {
-    transform: translateX(10px);
-}
-.playlist-icon-view #media-panel .drag-over .row.hover::before,
-.playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
-    content: " ";
-    position: absolute;
-    height: 100%;
-    width: 10px;
-}
-.playlist-icon-view #media-panel .drag-over .row.hover::before {
-    left: -10px;
-    border-left: 2px solid rgba(255,255,255, .5);
-}
-.playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::before {
-    content: none;
-}
-.playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
-    right: -10px;
-    top: 0;
-    border-right: 2px solid rgba(255,255,255, .5);
-}
-.playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover {
-    transform: translateX(-10px);
-}
-
-.playlist-icon-view #media-panel .drag-over .row.now-playing.hover {
-    transform: none;
-}
-
-
-
-
-/* History / Recently Played */
-.playlist-icon-view .history .score {
-    left: 0;
-    top: -74px;
-    position: relative;
-    width: auto;
-    text-align: justify;
-    padding: 0 3px;
-    background: rgba(0,0,0, 0.8);
-    height: 14px;
-    font-size: 11px;
-    transition: top .3s ease-out;
-}
-.playlist-icon-view .history .row:hover .score {
-    top: -62px;
-}
-.playlist-icon-view .history .score .item {
-    margin-right: 0;
-    display: inline-block;
-    float: none;
-}
-.playlist-icon-view .history .score::after {
-    display: inline-block;
-    width: 100%;
-    content: " ";
-}
-.playlist-icon-view .history .score .icon {
-    top: -1px;
-}
-.playlist-icon-view .history .actions {
-    background: rgba(0,0,0, 0.6) !important;
-}
-.playlist-icon-view .history .add {
-    background: transparent !important;
-}
-.playlist-icon-view #dialog-restricted-media .meta {
-    margin: 0;
-    border: none;
-}
-.playlist-icon-view #dialog-restricted-media .title {
-    font-size: 14px;
-}
-
-/*= Playlist-View-Icon =*/
-.playlist-view-button {
-    right: 160px;
-    /* top: 11px; */
-    width: 54px;
-}
-.playlist-view-button > .icon {
-    top: 12px;  left: 12px;
-}
-#playlist-activate-button {
-    right: 200px;
-}
-
-
-
-
-/*== Censor ==*/
-/* (for screenshotting) */
-.censored #playlist-menu .menu .container, .censored #your-next-media > span, .censored #footer .bar-button .section span, .censored #footer-user .ep, .censored #footer-user .points, .censored .pop-menu li {
-    -webkit-filter: blur(5px);
-    filter: url('data:image/svg+xml,<svg version="1.1" xmlns="http://www.w3.org/2000/svg"><filter id="blur"><feGaussianBlur stdDeviation="4"/></filter></svg>#blur');
-    filter: blur(5px);
-    font-family: wingdings;
-    font-style: italic;
-    letter-spacing: -2px;
-}
-.censored #your-next-media {
-    font-size: 14px;
-}
-.censored #footer-user .bar {
-    visibility: hidden;
-}
-
-
-
-
-
-
-/*== Animated Popup ==*/
-/* this requires JS to work */
-.dialog {
-    opacity: .2;
-    transition: opacity .2s ease-out, transform .2s ease-out;
-    transform: scale(1.2);
-}
-#dialog-container.dragged #dialog-preview {
-    left: 40%;
-    top: 20%;
-}
-.dialog.opaque {
-    opacity: 1;
-    transform: scale(1);
-}
-#dialog-container {
-    right: 345px !important;
-    position: absolute;
-    bottom: -15px;
-    /* left: 0; */
-}
-
-
-/*== deleted messages ==*/
-#chat-messages .deleted {
-    opacity: .6;
-}
-#chat-messages .cm .delete-timestamp {
-    display: block !important;
-    color: #B00;
-    padding-right: 6px;
-    float: none;
-    text-align: right;
-}
-
-
-
-
-/* song-info */
-.p0ne-song-info {
-    position: absolute;
-    background: #222;
-    color: #aaa;
-    z-index: 3;
-    top: 54px;
-    left: 495px;
-    right: 345px;
-    min-width: 300px;
-    bottom: 200px;
-    padding: 0 10px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    max-height: 0;
-    transition: max-height .7s ease-out;
-    z-index: 6;
-}
-/* .plugCubed + .p0ne-song-info { seems to work just fine }*/
-.p0ne-song-info.expanded {
-    max-height: 100%;
-}
-.p0ne-song-info-meta {
-    text-align: center;
-    margin-top: 10px;
-}
-.p0ne-song-info-author, .p0ne-song-info-title {
-    font-size: 1.2em;
-    color: #ccc !important;
-    font-weight: bold;
-    cursor: pointer;
-}
-.p0ne-song-info-author::before {
-    content: url(https://cdn.plug.dj/_/static/images/favicon.6fa715a1b19195dc7d65e668ce2c118afbbd4634.ico);
-    float: left;
-}
-.p0ne-song-info-author::after, .p0ne-song-info-uploader::after {
-    content: ' - ';
-    margin: 0 10px;
-}
-.p0ne-song-info-uploader, .p0ne-song-info-upload-title {
-    text-decoration: none;
-    color: #aaa;
-}
-.p0ne-song-info-uploader::before {
-    content: url(https://youtube.com/favicon.ico);
-    float: left;
-}
-.soundcloud .p0ne-song-info-uploader::before {
-    content: url(https://soundcloud.com/favicon.ico);
-}
-.p0ne-song-info-date {
-    float: left;
-}
-.p0ne-song-info-duration {
-    float: right;
-    margin-bottom: 1em;
-}
-.p0ne-song-info-blocked {
-    clear: both;
-    color: red;
-    display: block;
-}
-.p0ne-song-info-description {
-    color: #eee;
-    margin-top: 1em;
-    border-top: 1px solid #111;
-    padding-top: 1em;
-    margin-bottom: 10px;
-    clear: both;
-}
-.p0ne-song-info-description a {
-    color: #00DDDD;
-    text-decoration: none;
-}
-.p0ne-song-info-description a:visited {
-    color: #009cdd;
-}
-
-
-.ponified {
-    border-bottom: 1px dotted #444;
-}
-
-
-
-
-
-
-
-/*== Legacy-Chat (since Christmas 2014 Update) ==*/
-#chat .cm .un {
-    display: inline-block;
-}
-.legacy-chat #chat .text::before {
-    content: " ";
-    float: right;
-    display: inline-block;
-    width: 52px;
-    height: 1px;
-    /* background: red; */
-}
-.legacy-chat #chat .badge-box {
-    display: none;
-}
-.legacy-chat #chat .moderation .badge-box {
-    display: block;
-    top: -10px;
-    height: 30px;
-    position: absolute;
-}
-.legacy-chat #chat .moderation .msg {
-    margin-left: 20px;
-}
-.legacy-chat #chat .cm {
-    min-height: 27px !important;
-}
-.legacy-chat #chat .msg {
-    padding-left: 20px;
-}
-.legacy-chat #chat .timestamp {
-    position: absolute;
-    right: 3px;
-}
-.legacy-chat #chat .cm .from,
-.legacy-chat #chat .text {
-    display: inline;
-    position: static;
-    vertical-align: middle;
-}
-.legacy-chat .from.gift {
-    display: block !important;
-    margin-left: 5px
-}
-.legacy-chat #chat .from .icon {
-    position: absolute;
-    left: 2px;
-    margin-top: 5px;
-}
-.legacy-chat #chat .text {
-    margin-left: 5px;
-    width: 320px;
-}
-
-
-
-
-/*== p0ne settings ==*/
-#room-meta {
-    left: 50px !important;
-    width: auto !important;
-    right: 345px !important;
-}
-#now-playing-bar {
-    width: auto !important;
-    right: 0;
-}
-
-#p0ne-menu {
-    position: absolute;
-    left: 0;
-    top: 54px;
-    bottom: 54px;
-}
-
-.p0ne-icon {
-    margin-left: 55px;
-    width: 53px;
-    height: 53px;
-
-    font-size: 32px;
-    text-align: center;
-    line-height: 37px;
-    cursor: pointer;
-    font-family: arial;
-    position: absolute;
-    top: -50px;
-    z-index: 20;
-}
-.p0ne-icon-sub {
-    font-size: .5em;
-    position: relative;
-    top: -20px;
-    left: 9px;
-    color: #12A9E0;
-    font-weight: bold;
-}
-#p0ne-menu + #plugcubed { left: 100px; }
-#plugcubed + #p0ne-menu .p0ne-icon { left: 50px; }
-
-
-
-.p0ne-settings-wrapper {
-    overflow-y: auto;
-    max-height: 100%;
-    z-index: 999998;
-    position: absolute;
-}
-.p0ne-settings {
-    min-width: 300px;
-    background: #222;
-    padding-bottom: 10px;
-}
-
-.p0ne-settings-item {
-    display: block;
-    height: 24px;
-    font-size: 16px;
-    cursor: pointer;
-    vertical-align: top;
-    white-space: nowrap;
-    padding: 10px 5px;
-}
-.p0ne-settings-item:hover {
-    background: #2a2a2a;
-}
-
-.p0ne-settings-icons {
-    /* position: absolute; */
-    right: 0;
-    /* width: 100%; */
-    height: 44px;
-    margin-top: -30px;
-}
-
-.p0ne-settings-icons {}
-.p0ne-settings-help::before {
-    content: "?";
-    width: 15px;
-    height: 15px;
-    text-align: center;
-    float: right;
-    border-radius: 10px;
-    margin-right: 5px;
-    color: #888;
-}
-.p0ne-settings-more {
-    float: right;
-    height: 100%;
-    width: 20px;
-    /*background: #444;*/
-    color: #aaa;
-    font-size: 25px;
-    text-align: center;
-}
-.p0ne-settings-more::before {
-    content: "»";
-}
-.p0ne-settings-popup {
-    position: absolute;
-    top: 0;
-    left: 100%;
-    margin: 10px 0 0 10px;
-    background: #222;
-    padding: 10px;
-    border-radius: 15px;
-    width: 450px;
-    transition: top .2s ease-out;
-    z-index: 99999999
-}
-.p0ne-settings-popup-triangle {
-    content: " ";
-    border: 10px solid transparent;
-    border-right-color: #222;
-    border-left: none;
-    display: block;
-    width: 0;
-    position: absolute;
-    left: -10px;
-    top: 50%;
-    margin-top: -12px;
-}
-
-.p0ne-settings-group {
-    height: 40px;
-    overflow-y: hidden;
-    padding-right: 16px;
-}
-.p0ne-settings-summary {
-    height: 30px;
-    padding-top: 10px;
-    font-size: 1.5em;
-    cursor: pointer;
-}
-.p0ne-settings-summary::before {
-    content: " ";
-    border: 7px solid transparent;
-    border-left: 10px solid #ccc;
-    display: inline-block;
-    margin-left: 10px;
-    transition: transform .5s ease-out;
-}
-.p0ne-settings-group.open .p0ne-settings-summary::before {
-    transform: rotate(90deg) translate(3px, 5px);
-}
-
-.p0ne-settings-popup > img {
-    max-height: 350px;
-    max-width: 100%;
-}
-
-/*= moderator settings =*/
-.p0ne-settings-group-moderation {
-    display: none;
-}
-
-.user-is-moderator .p0ne-settings-group-moderation {
-    display: none;
-}
-
-
-
-
-/*= userlist meh icon =*/
-#user-lists .list.room .user .icon-meh {
-    top: -1px;
-    right: 9px;
-    left: auto;
-}
-/*== userlist DJ icon ==*/
-#user-lists .list.room .user .icon-current-dj {
-    top: 0 !important;
-    left: auto !important;
-    right: 10px;
-    transform: scale(.8);
-}
-
-
-/*== waitlist ETA ==*/
-#dj-button.eta span {
-    vertical-align: top;
-
-    margin-top: 12px;
-}
-#dj-button.eta .p0ne-eta {
-    margin-top: -23px;
-
-    font-size: 1.2em;
-    color: #aaa;
-}
-
-/*== chat inline images ==*/
-.p0ne-img {
-    max-width: 95%;
-    max-height: 300px;
-}
-.p0ne-img-large {
-    position: absolute;
-    z-index: 6;
-    cursor: pointer;
-    box-shadow: 0 0 35px black, 0 0 5px black;
-}
-
-
-/*== friendlist & waitlist user popup ==*/
-#waitlist .name,
-#waitlist .image,
-.app-right>.friends .name,
-.app-right>.friends .image {
-    cursor: pointer;
-}
-
-/* DJ chat icon */
-#chat .from-current-dj .timestamp::before {
-    content: ' ';
-    background-position: -280px 0px;
-    transform: scale(.8);
-    width: 30px;
-    height: 25px;
-    position: static;
-    display: inline-block;
-    margin-top: -3px;
-    margin-bottom: -7px;
-    /* background-image: url('https://cdn.plug.dj/_/static/images/icons.a5944b90bea8ba5c50062d8ac2d70d1c4ed83269.png'); */
-    /* background-position: -280px 0px; */};
-}
-.legacy-chat #chat .from-current-dj .text::before {
-    width: 55px;
-}
-
-
-
-/*== unread ==*/
-#chat .unread, #chat .unread-visible {
-    border-left: 2px solid orange;
-}
-
-#chat .unread .msg, #chat .unread-visible .msg {
-    left: -3px;
-}
-#chat-messages.has-unread {
-    border-bottom: 2px solid orange;
-}
-
-#header-panel-bar .p0ne-toolbar-highlight {
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(255, 165, 0, 0) 27px, rgba(255, 165, 0, 0.1) 40px, rgba(255, 165, 0, .5) 53px, transparent 100%) !important;
-    color: orange;
-}
-.p0ne-toolbar-count {
-    text-align: left;
-    padding-left: 50px;
-    display: none;
-}
-.p0ne-toolbar-highlight .p0ne-toolbar-count {
-    display: block;
-}
-#waitlist-button .p0ne-toolbar-count {
-    text-align: right;
-    padding-right: 10px;
-    color: orange;
-    display: block;
-}
-
-
-/*== mentionOther == */
-.mention-other {
-    font-weight: bold;
-}
-.mention-other.mention-none {
-    color: #bbb;
-}
-.mention-other.mention-staff {
-    color: #c9f;
-}
-
-.mention-other.mention-admin {
-    color: #4ad;
-}
-
-.mention-other.mention-ambassador {
-    color: #8b6;
-}
-
-
-
-
-/*== fancy togglebox ==*/
-.togglebox {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    -ms-appearance: none;
-    -o-appearance: none;
-    appearance: none;
-    height: 23px;
-    width: 35px;
-    position: relative;
-    display: inline-block;
-    border-radius: 11.5px;
-    vertical-align: top;
-    cursor: pointer;
-    outline: 0;
-    z-index: 0;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background-color: #555;
-    transition-duration: 600ms;
-    transition-timing-function: ease-in-out;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-}
-.togglebox::before {
-    height: 19px;
-    width: 31px;
-    content: ' ';
-    position: absolute;
-    left: 2px;
-    top: 2px;
-    background-color: #444;
-    border-radius: 9.5px;
-    z-index: 1;
-    transition-duration: 300ms;
-    transform: scale(1);
-}
-.togglebox::after {
-    height: 19px;
-    width: 19px;
-    content: ' ';
-    position: absolute;
-    border-radius: 9.5px;
-    background: #ffffff;
-    z-index: 2;
-    top: 2px;
-    left: 3px;
-    box-shadow: 0px 0px 1px 0px rgba(0, 0, 0, 0.25), 0px 4px 11px 0px rgba(0, 0, 0, 0.08), -1px 3px 3px 0px rgba(0, 0, 0, 0.14);
-    transition: transform 300ms, width 280ms;
-    transform: translateX(0);
-    transition-timing-function: cubic-bezier(0.42, 0.8, 0.58, 1.2);
-}
-.checkbox:checked + .togglebox::after {
-    transform: translateX(14px);
-    left: auto;
-}
-.togglebox:active::after {
-    width: 21.875px;
-}
-.checkbox:checked + .togglebox::before, .togglebox:active::before {
-    transform: scale(0);
-}
-
-.togglebox {
-    background-color: #555;
-}
-.togglebox::before {
-    background-color: #444;
-}
-.togglebox::after {
-    background: #ffffff;
-}
-.checkbox:checked + .togglebox {
-    background-color: #2AA1C6;
-    background-image: linear-gradient(-180deg,#2AA1C6 0%, #2ba0c5 100%);
-}
-
-.p0ne-settings .togglebox {
-    margin-bottom: 0;
-    margin-right: 5px;
-}
-
-.p0ne-settings .checkbox {
-    display: none;
-}
-
-
-
-/*== AFK Timers ==*/
-.p0ne-last-activity {
-    color: #aaa;
-  
-    position: absolute;
-    font-size: .8em;
-    bottom: 0;
-    text-shadow: none;
-    transition: text-shadow 3s linear;
-}
-#waitlist .p0ne-last-activity,
-#user-lists .p0ne-last-activity {
-    right: 40px;
-}
-.p0ne-last-activity-update {
-    text-shadow: 0 0 7px #fff, 0 0 1px #fff;
-    transition: none;
-}
-.p0ne-last-activity-warn {
-    color: #D29074;
-}
-
-
-/*== Stream Settings ==*/
-#playback .button.p0ne-stream-select {
-    background: rgba(28,31,37,.7) !important;
-}
-
-#playback-controls .p0ne-stream-select .box {
-    width: 100%;
-    text-align: center;
-    white-space: normal;
-    font-size: 1.4em;
-    top: 0;
-    height: 56px;
-}
-
-.p0ne-stream-buttons {
-    box-sizing: border-box;
-    /* text-align: justify; */
-    height: 35px;
-    margin-top: -7px;
-    /* padding-left: 10px; */
-    /* padding-right: 10px; */
-    position: absolute;
-    width: 100%;
-    bottom: 0;
-}
-
-.p0ne-stream-fancy {
-    display: inline-block;
-    width: 100%;
-    height: 2px;
-    position: relative;
-}
-
-#playback-controls .p0ne-stream-select .box .icon {
-    float: none !important;
-    width: 30px;
-    display: inline-block;
-    margin: 0 !important;
-    z-index: 1;
-    position: absolute;
-    transform: translateX(-50%);
-    opacity: 0.3;
-}
-#playback-controls .p0ne-stream-select .icon.enabled {
-    opacity: 1;
-}
-#playback-controls .icon-stream-off {
-    left: 80%;
-}
-
-#playback-controls .icon-stream-audio {
-    left: 50%;
-}
-
-#playback-controls .icon-stream-video {
-    left: 20%;
-}
-/*~ active bubble ~*/
-.p0ne-stream-fancy::before, .p0ne-stream-fancy::after {
-    content: " ";
-    display: block;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: rgba(150, 150, 150, .5);
-    position: absolute;
-    left: 20%;
-    z-index: 0;
-    transition: left .3s ease-out .1s, margin-left .3s ease-out .1s;
-    transform: translateX(-50%);
-    bottom: -12px;
-}
-.p0ne-stream-fancy::after {
-    background: #ccc;
-}
-.p0ne-stream-video .p0ne-stream-fancy::before, .p0ne-stream-video .p0ne-stream-fancy::after,
-.p0ne-stream-select .enabled.icon-stream-video:hover ~ .p0ne-stream-fancy::before { left: 20%; }
-.p0ne-stream-audio .p0ne-stream-fancy::before, .p0ne-stream-audio .p0ne-stream-fancy::after,
-.p0ne-stream-select .enabled.icon-stream-audio:hover ~ .p0ne-stream-fancy::before { left: 50%; }
-.p0ne-stream-off   .p0ne-stream-fancy::before, .p0ne-stream-off   .p0ne-stream-fancy::after,
-.p0ne-stream-select .enabled.icon-stream-off:hover   ~ .p0ne-stream-fancy::before { left: 80%; }
-
-
-/* bypass YT */
-#playback-container .media {
-    display: block;
-    width: 100%;
-    height: 100%;
-    /* background: #000; */
-}
-.p0ne-yt-unblock #p0ne-stream-label {
-    white-space: pre;
-    font-size: .8em;
-}
-
-.p0ne-yt-unblock-loading {
-    position: absolute;
-    top: 50%;
-    text-align: center;
-    width: 100%;
-}
-
-
-/*== automute button ==*/
-#playback-controls .button .box {
-    white-space: normal;
-    text-align: center;
-}
-#playback-controls .p0ne-automute .box {
-    top: 0;
-    font-size: 1.5em;
-}
-.p0ne-automute-notif {
-    width: 330px;
-    padding-left: 5px;
-    display: block;
-}
-.p0ne-automute-added {
-    color: #080;
-}
-.p0ne-automute-removed {
-    color: #D60;
-}
-
+/**
+ * plug_p0ne CSS styles
+ * This file includes CSS styles required by plug_p0ne modules
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+ */
+
+/** ~ Overview ~
+ * flags
+ * p0ne-notifications
+ * Join/Leave Notifications
+ * AFK Autoresponse
+ * Playlist Icon View
+ * Animated Popup
+ * deleted messages
+ * Legacy-Chat
+ * p0ne settings
+ * waitlist ETA
+ * chat inline images
+ * friendlist & waitlist user popup
+ * Unread Chat Notification
+ * mentionOther
+ * fancy togglebox
+ * AFK Timers
+ * Stream Settings
+ * automute button
+ * Votelist
+ * ETA Timer
+ * fix >1080p
+ * Legacy Footer
+ * Censor
+ * VIP Settings
+ */
 
 /*== flags ==*/
-.flag {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-}
-.flag-bg { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/bg.png') } /* Bulgarian */
-.flag-cs { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/cs.png') } /* Czech */
-.flag-de { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/de.png') } /* German */
-.flag-da { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/da.png') } /* Danish */
-.flag-en { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/en.png') } /* English */
-.flag-es { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/es.png') } /* Spanish */
-.flag-fi { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fi.png') } /* Finnish */
-.flag-fr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fr.png') } /* French */
-.flag-hr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/hr.png') } /* Croatian */
-.flag-it { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/it.png') } /* Italian */
-.flag-ms { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/ms.png') } /* Malay */
-.flag-nl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/nl.png') } /* Dutch */
-.flag-pl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pl.png') } /* Polish */
-.flag-pt { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pt.png') } /* Portuguese */
-.flag-sk { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sk.png') } /* Slovak */
-.flag-sl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sl.png') } /* Slovenian */
-.flag-sr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sr.png') } /* Slovenian */
-.flag-zh { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/zh.png') } /* Chinese */
+    .flag {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+    }
+    .flag-bg { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/bg.png') } /* Bulgarian */
+    .flag-cs { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/cs.png') } /* Czech */
+    .flag-de { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/de.png') } /* German */
+    .flag-da { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/da.png') } /* Danish */
+    .flag-en { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/en.png') } /* English */
+    .flag-es { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/es.png') } /* Spanish */
+    .flag-fi { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fi.png') } /* Finnish */
+    .flag-fr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fr.png') } /* French */
+    .flag-hr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/hr.png') } /* Croatian */
+    .flag-it { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/it.png') } /* Italian */
+    .flag-ms { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/ms.png') } /* Malay */
+    .flag-nl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/nl.png') } /* Dutch */
+    .flag-pl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pl.png') } /* Polish */
+    .flag-pt { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pt.png') } /* Portuguese */
+    .flag-sk { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sk.png') } /* Slovak */
+    .flag-sl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sl.png') } /* Slovenian */
+    .flag-sr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sr.png') } /* Slovenian */
+    .flag-zh { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/zh.png') } /* Chinese */
 
-/*== votelist ==*/
-.p0ne-votelist {
-    position: absolute;
-  
-    bottom: 100%;
-    background: #222;
-    padding: 5px;
-    white-space: pre;
+/*== p0ne-notification ==*/
+    #chat .p0ne-notif-loaded {
+        color: #A7F;
+        text-align: center;
+        font-size: 1.2em;
+        padding-right: 6px;
+    }
+    #chat-messages .cm .timestamp {
+        display: inline;
+        opacity: 0;
+    }
+    #chat-messages .message .timestamp,
+    #chat-messages .mention .timestamp,
+    #chat-messages .emote .timestamp,
+    #chat-messages .cm:hover .timestamp {
+        opacity: 1;
+    }
+
+    .p0ne-icon-small {
+        position: relative;
+        display: inline-block;
+    }
+
+
+    #chat-messages .p0ne-notif {
+        padding: 0;
+    }
+
+    .p0ne-notif .msg {
+        padding: 2px;
+    }
+
+/*== Join/Leave Notifications ==*/
+    #chat .cm.p0ne-notif-joinleave {
+        font-weight: bold;
+        overflow: hidden;
+        min-height: 18px;
+        width: 339px; /* #chat.width @padding-right -   - = 345px - 6px */
+        /* note: padding-right was moved into the width to fix stuff */
+        padding-left: 10px;
+    }
+    #chat .p0ne-notif-join, #chat .p0ne-notif-refresh {
+        color: #5AB;
+    }
+    #chat .p0ne-notif-leave, #chat .p0ne-notif-instaleave {
+        color: #579;
+    }
+    .p0ne-notif-joinleave .flag {
+        margin-bottom: -3px;
+        opacity: .5;
+    }
+    .p0ne-notif-joinleave .icon {
+        position: static;
+        display: inline-block;
+        margin-bottom: -4px;
+        width: 13px;
+    }
+    .p0ne-notif-join,
+    .p0ne-notif-leave,
+    .p0ne-notif-refresh,
+    .p0ne-notif-instaleave {
+        clear: both;
+    }
+    .p0ne-notif-join::before,
+    .p0ne-notif-leave::before,
+    .p0ne-notif-refresh::before,
+    .p0ne-notif-instaleave::before {
+        display: block;
+        font-size: 1.4em;
+        float: left;
+        padding-right: 5px;
+    }
+
+    .p0ne-notif-join::before { content: "+ "; margin-top: -3px; }
+    .p0ne-notif-leave::before { content: "- "; margin-top: -4px; }
+    .p0ne-notif-refresh::before { content: "↺ "; margin-top: -2px; }
+    .p0ne-notif-instaleave::before { content: "⇄ "; margin-top: -2px; }
+
+/*== AFK Autoresponse ==*/
+    .p0ne-afk-button {
+        height: 100%;
+        text-align: center;
+        padding-top: 12px;
+        background: #222;
+        position: relative;
+        z-index: 2;
+        font-size: 1.3em;
+        cursor: pointer;
+    }
+
+/*== Playlist Icon View ==*/
+    .playlist-icon-view .media-list img {
+        margin: 0;
+        width: 150px;
+        height: 115px;
+        position: absolute;
+        float: none;
+    }
+    .playlist-icon-view .media-list .row {
+        width: 100%;
+        margin: 0;
+    }
+    .playlist-icon-view .media-list .playlist-media-item,
+    .playlist-icon-view .media-list .playlist-media-first-item,
+    .playlist-icon-view .media-list .playlist-media-last-item {
+        position: static;
+        float: left;
+        width: 150px;
+        height: 175px;
+        margin: 5px;
+        border: none;
+        box-shadow: 0 0 0 black, 0 0 0 black;
+        transition: box-shadow .1s ease-out, transform .1s ease-out;
+        border-bottom: none !important;
+    }
+    .playlist-icon-view .media-list .playlist-media-item:hover,
+    .playlist-icon-view .media-list .playlist-media-first-item:hover,
+    .playlist-icon-view .media-list .playlist-media-last-item:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 10px black, 0 0 10px black;
+        overflow: visible;
+    }
+    .playlist-icon-view .media-list .meta {
+        left: 0;
+        margin: 0;
+        width: 100%;
+        /* text-align: center;
+        text-shadow:
+           #000 0px 0px 1px,
+           #000 0px 0px 1px,
+           #000 0px 0px 1px,
+           #000 0px 0px 1px,
+           #000 0px 0px 2px,
+           #000 0px 0px 5px,
+           #000 0px 0px 7px; */
+        border-bottom: none;
+        height: 60px;
+        top: 115px;
+    }
+    .playlist-icon-view .media-list .meta span {
+        position: static;
+        display: block;
+        padding: 0 5px;
+        width: auto;
+        top: 0;
+        font-size: 13px;
+        font-weight: bold;
+        line-height: 13px;
+        white-space: pre;
+    }
+    .playlist-icon-view .media-list .meta .author {
+        color: #ccc;
+        font-size: 12px;
+        height: 14px;
+        line-height: 13px;
+        margin: 2px 0;
+        left: 0;
+        text-align: center;
+    }
+    .playlist-icon-view .media-list .in-history .meta .author {
+        color: #f46b40;
+    }
+    .playlist-icon-view .media-list .meta .title,
+    .playlist-icon-view .history .meta .author {
+        white-space: normal;
+        max-height: 50px;
+    }
+    .playlist-icon-view .media-list .meta .duration,
+    .playlist-icon-view .history .meta .timestamp {
+        bottom: 0;
+        font-size: 12px;
+        position: absolute;
+        top: -17px;
+        right: 0;
+        background: rgba(0,0,0,0.7);
+        color: #aaa;
+        height: 15px;
+        width: auto;
+        left: auto;
+        padding: 0 5px;
+    }
+    .playlist-icon-view #media-panel .actions {
+        position: static;
+        width: 150px;
+        top: -62px;
+        height: 30px;
+        text-align: justify;
+        background: rgba(0,0,0, 0.6) !important;
+    
+        position: relative;
+}
+    .playlist-icon-view #media-panel .actions::after {
+        content: " ";
+        display: inline-block;
+    
+        width: 100%;
+}
+    .playlist-icon-view .media-list .actions div {
+        width: 25px;
+        height: 30px;
+        float: none;
+        display: inline-block;
+    }
+    .playlist-icon-view #history-panel .actions div {
+        width: 54px;
+        height: 54px;
+    }
+    .playlist-icon-view .media-list .actions div:hover,
+    .playlist-icon-view .media-list .selected {
+        background: rgba(0,0,0, 0.3) !important;
+    }
+    .playlist-icon-view .media-list .playlist-media-item:hover {
+        background: rgba(0,0,0, 0.5) !important;
+    }
+    .playlist-icon-view .media-list .actions i {
+        top: 0;
+        left: 0;
+    }
+    .playlist-icon-view .media-list .title,
+    .playlist-icon-view .history .meta .name {
+        left: 0;
+        width: 100%;
+        text-align: center;
+    }
+
+
+
+    /* fix drag and drop */
+    .playlist-icon-view #media-panel .drag-row-line {
+        display: none !important;
+    }
+    .playlist-icon-view #media-panel .drag-over .row.hover {
+        transform: translateX(10px);
+    }
+    .playlist-icon-view #media-panel .drag-over .row.hover::before,
+    .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
+        content: " ";
+        position: absolute;
+        height: 100%;
+        width: 10px;
+    }
+    .playlist-icon-view #media-panel .drag-over .row.hover::before {
+        left: -10px;
+        border-left: 2px solid rgba(255,255,255, .5);
+    }
+    .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::before {
+        content: none;
+    }
+    .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover::after {
+        right: -10px;
+        top: 0;
+        border-right: 2px solid rgba(255,255,255, .5);
+    }
+    .playlist-icon-view #media-panel .drag-over.p0ne-drop-right .row.hover {
+        transform: translateX(-10px);
+    }
+
+    .playlist-icon-view #media-panel .drag-over .row.now-playing.hover {
+        transform: none;
+    }
+
+
+
+
+    /* History / Recently Played */
+    .playlist-icon-view .history .score {
+        left: 0;
+        top: -74px;
+        position: relative;
+        width: auto;
+        text-align: justify;
+        padding: 0 3px;
+        background: rgba(0,0,0, 0.8);
+        height: 14px;
+        font-size: 11px;
+        transition: top .3s ease-out;
+    }
+    .playlist-icon-view .history .row:hover .score {
+        top: -62px;
+    }
+    .playlist-icon-view .history .score .item {
+        margin-right: 0;
+        display: inline-block;
+        float: none;
+    }
+    .playlist-icon-view .history .score::after {
+        display: inline-block;
+        width: 100%;
+        content: " ";
+    }
+    .playlist-icon-view .history .score .icon {
+        top: -1px;
+    }
+    .playlist-icon-view .history .actions {
+        background: rgba(0,0,0, 0.6) !important;
+    }
+    .playlist-icon-view .history .add {
+        background: transparent !important;
+    }
+    .playlist-icon-view #dialog-restricted-media .meta {
+        margin: 0;
+        border: none;
+    }
+    .playlist-icon-view #dialog-restricted-media .title {
+        font-size: 14px;
+    }
+
+    /*= Playlist-View-Icon =*/
+    .playlist-view-button {
+        right: 160px;
+        /* top: 11px; */
+        width: 54px;
+    }
+    .playlist-view-button > .icon {
+        top: 12px;  left: 12px;
+    }
+    #playlist-activate-button {
+        right: 200px;
+    }
+
+/*== Animated Popup ==*/
+    /* this requires JS to work */
+    .dialog {
+        opacity: .2;
+        transition: opacity .2s ease-out, transform .2s ease-out;
+        transform: scale(1.2);
+    }
+    #dialog-container.dragged #dialog-preview {
+        left: 40%;
+        top: 20%;
+    }
+    .dialog.opaque {
+        opacity: 1;
+        transform: scale(1);
+    }
+    #dialog-container {
+        right: 345px !important;
+        position: absolute;
+        bottom: -15px;
+        /* left: 0; */
+    }
+
+/*== deleted messages ==*/
+    #chat-messages .deleted {
+        opacity: .6;
+    }
+    #chat-messages .cm .delete-timestamp {
+        display: block !important;
+        color: #B00;
+        padding-right: 6px;
+        float: none;
+        text-align: right;
+    }
+
+
+
+
+    /* song-info */
+    .p0ne-song-info {
+        position: absolute;
+        background: #222;
+        color: #aaa;
+        z-index: 3;
+        top: 54px;
+        left: 495px;
+        right: 345px;
+        min-width: 300px;
+        bottom: 200px;
+        padding: 0 10px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        max-height: 0;
+        transition: max-height .7s ease-out;
+        z-index: 90;
+    
+}
+    /* .plugCubed + .p0ne-song-info { seems to work just fine }*/
+    .p0ne-song-info.expanded {
+        max-height: 100%;
+    }
+    .p0ne-song-info-meta {
+        text-align: center;
+        margin-top: 10px;
+    }
+    .p0ne-song-info-author, .p0ne-song-info-title {
+        font-size: 1.2em;
+        color: #ccc !important;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .p0ne-song-info-author::before {
+        content: url(https://cdn.plug.dj/_/static/images/favicon.6fa715a1b19195dc7d65e668ce2c118afbbd4634.ico);
+        float: left;
+    }
+    .p0ne-song-info-author::after, .p0ne-song-info-uploader::after {
+        content: ' - ';
+        margin: 0 10px;
+    }
+    .p0ne-song-info-uploader, .p0ne-song-info-upload-title {
+        text-decoration: none;
+        color: #aaa;
+    }
+    .p0ne-song-info-uploader::before {
+        content: url(https://youtube.com/favicon.ico);
+        float: left;
+    }
+    .soundcloud .p0ne-song-info-uploader::before {
+        content: url(https://soundcloud.com/favicon.ico);
+    }
+    .p0ne-song-info-date {
+        float: left;
+    }
+    .p0ne-song-info-duration {
+        float: right;
+        margin-bottom: 1em;
+    }
+    .p0ne-song-info-blocked {
+        clear: both;
+        color: red;
+        display: block;
+    }
+    .p0ne-song-info-description {
+        color: #eee;
+        margin-top: 1em;
+        border-top: 1px solid #111;
+        padding-top: 1em;
+        margin-bottom: 10px;
+        clear: both;
+    }
+    .p0ne-song-info-description a {
+        color: #00DDDD;
+        text-decoration: none;
+    }
+    .p0ne-song-info-description a:visited {
+        color: #009cdd;
+    }
+
+
+    .ponified {
+        border-bottom: 1px dotted #444;
+    }
+
+/*== Legacy-Chat (since Christmas 2014 Update) ==*/
+    #chat .cm .un {
+        display: inline-block;
+    }
+    .legacy-chat #chat .text::before {
+        content: " ";
+        float: right;
+        display: inline-block;
+        width: 52px;
+        height: 1px;
+        /* background: red; */
+    }
+    .legacy-chat #chat .badge-box {
+        display: none;
+    }
+    .legacy-chat #chat .moderation .badge-box {
+        display: block;
+        top: -10px;
+        height: 30px;
+        position: absolute;
+    }
+    .legacy-chat #chat .moderation .msg {
+        margin-left: 20px;
+    }
+    .legacy-chat #chat .cm {
+        min-height: 27px !important;
+    }
+    .legacy-chat #chat .msg {
+        padding-left: 20px;
+    }
+    .legacy-chat #chat .timestamp {
+        position: absolute;
+        right: 3px;
+    }
+    .legacy-chat #chat .cm .from,
+    .legacy-chat #chat .text {
+        display: inline;
+        position: static;
+        vertical-align: middle;
+    }
+    .legacy-chat .from.gift {
+        display: block !important;
+        margin-left: 5px
+    }
+    .legacy-chat #chat .from .icon {
+        position: absolute;
+        left: 2px;
+        margin-top: 5px;
+    }
+    .legacy-chat #chat .text {
+        margin-left: 5px;
+        width: 320px;
+    }
+    
+
+    .legacy-chat #chat .p0ne-notif-joinleave .un {
+        padding-left: 5px;
+    }
+    .legacy-chat #chat .p0ne-notif .from::before {
+        content: "! ";
+        color: #DB182E;
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-left: -12px;
+        margin-right: 3px;
+    }
+
+/*== p0ne settings ==*/
+    #room-meta {
+        left: 50px !important;
+        width: auto !important;
+        right: 345px !important;
+    }
+    #now-playing-bar {
+        width: auto !important;
+        right: 0;
+    }
+
+    #p0ne-menu {
+        position: absolute;
+        left: 0;
+        top: 54px;
+        bottom: 54px;
+    }
+
+    #p0ne-menu>.p0ne-icon {
+        position: absolute;
+        width: 53px;
+        top: -50px;
+        margin-left: 55px;
+        font-size: 32px;
+        cursor: pointer;
+    }
+    .p0ne-icon {
+        width: 2em;
+        height: 1.5em;
+        font-size: 1em;
+        text-align: center;
+        line-height: 1.2em;
+        font-family: arial;
+        z-index: 20;
+        display: inline-block;
+    }
+    .p0ne-icon-sub {
+        font-size: .5em;
+        position: relative;
+        top: -1.2em;
+        left: .6em;
+        color: #12A9E0;
+        font-weight: bold;
+    }
+    #p0ne-menu + #plugcubed { left: 100px; }
+    #plugcubed + #p0ne-menu .p0ne-icon { left: 50px; }
+
+
+
+    .p0ne-settings-wrapper {
+        overflow-y: auto;
+        max-height: 100%;
+        z-index: 999998;
+        position: absolute;
+    
+        background: #222;
+}
+    .p0ne-settings {
+        min-width: 300px;
+        /* background: #222; */
+        /* padding-bottom: 10px; */
+    }
+
+    .p0ne-settings-item {
+        display: block;
+        height: 24px;
+        font-size: 16px;
+        cursor: pointer;
+        vertical-align: top;
+        white-space: nowrap;
+        padding: 10px 5px;
+    
+        transition: padding-bottom .2s ease-out;
+    }
+    .p0ne-settings-item:hover {
+        background: #2a2a2a;
+    }
+
+    .p0ne-settings-icons {
+        /* position: absolute; */
+        right: 0;
+        /* width: 100%; */
+        height: 44px;
+        margin-top: -30px;
+    }
+
+    .p0ne-settings-icons {}
+    .p0ne-settings-help::before {
+        content: "?";
+        width: 15px;
+        height: 15px;
+        text-align: center;
+        float: right;
+        border-radius: 10px;
+        margin-right: 5px;
+        color: #666;
+        font-size: 0.8em;
+    }
+    .p0ne-settings-more {
+        float: right;
+        height: 100%;
+        width: 20px;
+        /*background: #444;*/
+        color: #aaa;
+        font-size: 25px;
+        text-align: center;
+    }
+    .p0ne-settings-more::before {
+        content: "»";
+    }
+    .p0ne-settings-popup {
+        position: absolute;
+        top: 0;
+        left: 100%;
+        margin: 10px 0 0 10px;
+        background: #222;
+        padding: 10px;
+        border-radius: 15px;
+        width: 450px;
+        transition: top .2s ease-out;
+        z-index: 99999999
+    }
+    .p0ne-settings-popup-triangle {
+        content: " ";
+        border: 10px solid transparent;
+        border-right-color: #222;
+        border-left: none;
+        display: block;
+        width: 0;
+        position: absolute;
+        left: -10px;
+        top: 50%;
+        margin-top: -12px;
+    }
+
+    .p0ne-settings-group {
+        height: 40px;
+        overflow-y: hidden;
+        min-height: 40px;
+    }
+    .p0ne-settings-summary {
+        height: 30px;
+        padding-top: 10px;
+        font-size: 1.5em;
+        cursor: pointer;
+    
+}
+    .p0ne-settings-summary::before {
+        content: " ";
+        border: 7px solid transparent;
+        border-left: 10px solid #ccc;
+        display: inline-block;
+        margin-left: 10px;
+        transition: transform .5s ease-out;
+    }
+    .p0ne-settings-group.open .p0ne-settings-summary::before {
+        transform: rotate(90deg) translate(3px, 5px);
+    }
+
+    .p0ne-settings-popup > img {
+        max-height: 350px;
+        max-width: 100%;
+    
+        display: block;
 }
 
-.p0ne-votelist .un.none {
-    padding-left: 19px;
+    /*= settings extra */
+    .p0ne-settings-has-extra.p0ne-settings-item-enabled {
+        padding-bottom: 0;
+    }
+
+    .p0ne-settings-extra {
+        padding-bottom: 5px;
+    }
+    .p0ne-settings-input-label {
+        color: #aaa;
+        padding-left: 25px;
+        padding-right: 10px;
+    }
+
+
+    /*= moderator settings =*/
+    .p0ne-settings-group-moderation {
+        display: none;
+    }
+
+    .user-is-moderator .p0ne-settings-group-moderation {
+        display: none;
+    }
+
+    /*= Settings Footer  =*/
+    .p0ne-settings-footer {
+        margin-top: 5px;
+        border-top: 1px solid #333;
+        padding-top: 1px;
+        margin-left: 5%;
+        height: 1.7em;
+        width: 90%;
+    
+        overflow: hidden;
 }
 
+    .p0ne-settings-footer .p0ne-icon,
+    .p0ne-settings-version {
+        float: left;
+    }
+
+    .p0ne-settings-expert-toggle, .p0ne-settings-help-btn {
+        float: right;    
+        color: #999;
+        cursor: not-allowed;
+        /* cursor: pointer; */
+    }
+    .p0ne-settings-expert-toggle:hover, .p0ne-settings-help-btn:hover {
+        text-decoration: underline;
+    }
+
+    .p0ne-settings-expert-toggle {
+        margin-right: 15px;
+    }
+
+
+
+
+    /*= userlist meh icon =*/
+    #user-lists .list.room .user .icon-meh {
+        top: -1px;
+        right: 9px;
+        left: auto;
+    }
+
+/*== userlist DJ icon ==*/
+    #user-lists .list.room .user .icon-current-dj {
+        top: 0 !important;
+        left: auto !important;
+        right: 10px;
+        transform: scale(.8);
+    }
+
+/*== waitlist ETA ==*/
+    #dj-button.eta span {
+        vertical-align: top;
+
+        margin-top: 12px;
+    }
+    #dj-button.eta .p0ne-eta {
+        margin-top: -23px;
+
+        font-size: 1.2em;
+        color: #aaa;
+    }
+
+/*== chat inline images ==*/
+    .p0ne-img {
+        max-width: 95%;
+        max-height: 300px;
+    }
+    .p0ne-img-large {
+        /* position: absolute; */
+        z-index: 6;
+        cursor: pointer;
+        box-shadow: 0 0 35px black, 0 0 5px black;
+        margin: 10px;
+        box-sizing: border-box;
+        max-width: 100%;
+        max-height: 100%;
+    
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .p0ne-img-large-open {
+        max-width: 100%;
+        max-height: 100%;
+        transition: left 200ms ease-out, top 200ms ease-out, max-height 200ms ease-out, max-width 200ms ease-out;
+    }
+
+/*== friendlist & waitlist user popup ==*/
+    #waitlist .name,
+    #waitlist .image,
+    .app-right>.friends .name,
+    .app-right>.friends .image {
+        cursor: pointer;
+    }
+
+    /* DJ chat icon */
+    #chat .from-current-dj .timestamp::before {
+        content: ' ';
+        background-position: -280px 0px;
+        transform: scale(.8);
+        width: 30px;
+        height: 25px;
+        position: static;
+        display: inline-block;
+        margin-top: -3px;
+        margin-bottom: -7px;
+        /* background-image: url('https://cdn.plug.dj/_/static/images/icons.a5944b90bea8ba5c50062d8ac2d70d1c4ed83269.png'); */
+        /* background-position: -280px 0px; */};
+    }
+    .legacy-chat #chat .from-current-dj .text::before {
+        width: 55px;
+    }
+
+/*== Unread Chat Notification ==*/
+    #chat .unread, #chat .unread-visible {
+        border-left: 2px solid orange;
+    }
+
+    #chat .unread .msg, #chat .unread-visible .msg {
+        left: -3px;
+    }
+    #chat-messages.has-unread {
+        border-bottom: 2px solid orange;
+    }
+
+    #header-panel-bar .p0ne-toolbar-highlight {
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(255, 165, 0, 0) 27px, rgba(255, 165, 0, 0.1) 40px, rgba(255, 165, 0, .5) 53px, transparent 100%) !important;
+        color: orange;
+    }
+    .p0ne-toolbar-count {
+        text-align: left;
+        padding-left: 50px;
+        display: none;
+    }
+    .p0ne-toolbar-highlight .p0ne-toolbar-count {
+        display: block;
+    }
+    #waitlist-button .p0ne-toolbar-count {
+        text-align: right;
+        padding-right: 10px;
+        color: orange;
+        display: block;
+    }
+
+/*== mentionOther == */
+    .mention-other {
+        font-weight: bold;
+    }
+    .mention-other.mention-none {
+        color: #bbb;
+    }
+    .mention-other.mention-staff {
+        color: #c9f;
+    }
+
+    .mention-other.mention-admin {
+        color: #4ad;
+    }
+
+    .mention-other.mention-ambassador {
+        color: #8b6;
+    }
+
+/*== fancy togglebox ==*/
+    .togglebox {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        -ms-appearance: none;
+        -o-appearance: none;
+        appearance: none;
+        height: 23px;
+        width: 35px;
+        position: relative;
+        display: inline-block;
+        border-radius: 11.5px;
+        vertical-align: top;
+        cursor: pointer;
+        outline: 0;
+        z-index: 0;
+        margin: 0;
+        padding: 0;
+        border: none;
+        background-color: #555;
+        transition-duration: 600ms;
+        transition-timing-function: ease-in-out;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+    }
+    .togglebox::before {
+        height: 19px;
+        width: 31px;
+        content: ' ';
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        background-color: #444;
+        border-radius: 9.5px;
+        z-index: 1;
+        transition-duration: 300ms;
+        transform: scale(1);
+    }
+    .togglebox::after {
+        height: 19px;
+        width: 19px;
+        content: ' ';
+        position: absolute;
+        border-radius: 9.5px;
+        background: #ffffff;
+        z-index: 2;
+        top: 2px;
+        left: 3px;
+        box-shadow: 0px 0px 1px 0px rgba(0, 0, 0, 0.25), 0px 4px 11px 0px rgba(0, 0, 0, 0.08), -1px 3px 3px 0px rgba(0, 0, 0, 0.14);
+        transition: transform 300ms, width 280ms;
+        transform: translateX(0);
+        transition-timing-function: cubic-bezier(0.42, 0.8, 0.58, 1.2);
+    }
+    .checkbox:checked + .togglebox::after {
+        transform: translateX(14px);
+        left: auto;
+    }
+    .togglebox:active::after {
+        width: 21.875px;
+    }
+    .checkbox:checked + .togglebox::before, .togglebox:active::before {
+        transform: scale(0);
+    }
+
+    .togglebox {
+        background-color: #555;
+    }
+    .togglebox::before {
+        background-color: #444;
+    }
+    .togglebox::after {
+        background: #ffffff;
+    }
+    .checkbox:checked + .togglebox {
+        background-color: #2AA1C6;
+        background-image: linear-gradient(-180deg,#2AA1C6 0%, #2ba0c5 100%);
+    }
+
+    .p0ne-settings .togglebox {
+        margin-bottom: 0;
+        margin-right: 5px;
+    }
+
+    .p0ne-settings .checkbox {
+        display: none;
+    }
+
+/*== AFK Timers ==*/
+    .p0ne-last-activity {
+        color: #aaa;
+      
+        position: absolute;
+        font-size: .8em;
+        bottom: 0;
+        text-shadow: none;
+        transition: text-shadow 3s linear;
+    }
+    #waitlist .p0ne-last-activity,
+    #user-lists .p0ne-last-activity {
+        right: 40px;
+    }
+    .p0ne-last-activity-update {
+        text-shadow: 0 0 7px #fff, 0 0 1px #fff;
+        transition: none;
+    }
+    .p0ne-last-activity-warn {
+        color: #D29074;
+    }
+
+/*== Stream Settings ==*/
+    #playback .button.p0ne-stream-select {
+        background: rgba(28,31,37,.7) !important;
+    }
+
+    #playback-controls .p0ne-stream-select .box {
+        width: 100%;
+        text-align: center;
+        white-space: normal;
+        font-size: 1.4em;
+        top: 0;
+        height: 56px;
+    }
+
+    .p0ne-stream-buttons {
+        box-sizing: border-box;
+        /* text-align: justify; */
+        height: 35px;
+        margin-top: -7px;
+        /* padding-left: 10px; */
+        /* padding-right: 10px; */
+        position: absolute;
+        width: 100%;
+        bottom: 0;
+    }
+
+    .p0ne-stream-fancy {
+        display: inline-block;
+        width: 100%;
+        height: 2px;
+        position: relative;
+    }
+
+    #playback-controls .p0ne-stream-select .box .icon {
+        float: none !important;
+        width: 30px;
+        display: inline-block;
+        margin: 0 !important;
+        z-index: 1;
+        position: absolute;
+        transform: translateX(-50%);
+        opacity: 0.3;
+    }
+    #playback-controls .p0ne-stream-select .icon.enabled {
+        opacity: 1;
+    }
+    #playback-controls .icon-stream-off {
+        left: 80%;
+    }
+
+    #playback-controls .icon-stream-audio {
+        left: 50%;
+    }
+
+    #playback-controls .icon-stream-video {
+        left: 20%;
+    }
+    /*~ active bubble ~*/
+    .p0ne-stream-fancy::before, .p0ne-stream-fancy::after {
+        content: " ";
+        display: block;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(150, 150, 150, .5);
+        position: absolute;
+        left: 20%;
+        z-index: 0;
+        transition: left .3s ease-out .1s, margin-left .3s ease-out .1s;
+        transform: translateX(-50%);
+        bottom: -12px;
+    }
+    .p0ne-stream-fancy::after {
+        background: #ccc;
+    }
+    .p0ne-stream-video .p0ne-stream-fancy::before, .p0ne-stream-video .p0ne-stream-fancy::after,
+    .p0ne-stream-select .enabled.icon-stream-video:hover ~ .p0ne-stream-fancy::before { left: 20%; }
+    .p0ne-stream-audio .p0ne-stream-fancy::before, .p0ne-stream-audio .p0ne-stream-fancy::after,
+    .p0ne-stream-select .enabled.icon-stream-audio:hover ~ .p0ne-stream-fancy::before { left: 50%; }
+    .p0ne-stream-off   .p0ne-stream-fancy::before, .p0ne-stream-off   .p0ne-stream-fancy::after,
+    .p0ne-stream-select .enabled.icon-stream-off:hover   ~ .p0ne-stream-fancy::before { left: 80%; }
+
+
+    /* bypass YT */
+    #playback-container .media {
+        display: block;
+        width: 100%;
+        height: 100%;
+        /* background: #000; */
+    }
+    .p0ne-yt-unblock #p0ne-stream-label {
+        white-space: pre;
+        font-size: .8em;
+    }
+
+    .p0ne-yt-unblock-loading {
+        position: absolute;
+        top: 50%;
+        text-align: center;
+        width: 100%;
+    }
+
+/*== automute button ==*/
+    #playback-controls .button .box {
+        white-space: normal;
+        text-align: center;
+    }
+    #playback-controls .p0ne-automute .box {
+        top: 0;
+        font-size: 1.5em;
+    }
+    .p0ne-automute-notif {
+        width: 330px;
+        padding-left: 5px;
+        display: block;
+    }
+    .p0ne-automute-added {
+        color: #080;
+    }
+    .p0ne-automute-removed {
+        color: #D60;
+    }
+
+/*== Votelist ==*/
+    .p0ne-votelist {
+        position: absolute;
+      
+        bottom: 100%;
+        background: #222;
+        padding: 5px;
+        white-space: nowrap;
+    }
+
+    .p0ne-votelist .un.none {
+        padding-left: 19px;
+    }
+
+    .video-only .p0ne-votelist {
+        margin-left: 82px;
+    }
+    .p0ne-votelist .icon {
+      top: 3px;
+    }
 
 /*== ETA Timer ==*/
-.p0ne-eta {
-    position: absolute;
-    right: 355px;
-    font-size: 18px;
-    padding-top: 15px;
-    padding-bottom: 15px;
-}
-.p0ne-eta-text   {
-    color: #888;
-}
+    .p0ne-eta {
+        position: absolute;
+        right: 355px;
+        font-size: 18px;
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+    .p0ne-eta-text   {
+        color: #888;
+    }
 
 /*== fix >1080p ==*/
-.p0ne-fix-hires #avatars-container {
-    top: auto !important;
-    bottom: 10%;
-}
+    .p0ne-fix-hires #avatars-container {
+        top: auto !important;
+        bottom: 10%;
+    }
 
-.p0ne-fix-hires #dj-button,
-.p0ne-fix-hires #vote {
-    top: auto !important;
-    bottom: 10%;
-    margin-bottom: 50px;
+    .p0ne-fix-hires #dj-button,
+    .p0ne-fix-hires #vote {
+        top: auto !important;
+        bottom: 10%;
+        margin-bottom: 50px;
+    }
+    .p0ne-fix-hires #room:not(.video-only) #vote {
+        width: auto !important;
+        right: auto !important;
+    
+        border-radius: 0 0 4px 4px;
 }
+    .p0ne-fix-hires .video-only #vote {
+        right: 345px !important;
+    }
+    .p0ne-fix-hires .video-only #dj-button,
+    .p0ne-fix-hires .video-only  #vote {
+        bottom: 0;
+        margin-bottom: 0;
+    }
 
 /*== Legacy Footer ==*/
-.legacy-footer #footer-user .buttons .button {
-    display: none;
-    width: 330px;
-    position: static;
-    height: 54px;
-    float: none;
-    background: #222;
-    text-align: left;
-    padding-left: 15px;
-}
-.legacy-footer #footer-user .buttons .button {
-    display: block;
-}
+    .legacy-footer #footer-user .buttons .button {
+        display: none;
+        width: 330px;
+        position: static;
+        height: 54px;
+        float: none;
+        background: #222;
+        text-align: left;
+        padding-left: 15px;
+    }
+    .legacy-footer #footer-user .buttons .button {
+        display: block;
+    }
 
-.legacy-footer #footer-user .info {
-    display: block;
-    top: 0;
-    background: transparent;
-    cursor: pointer;
-}
-.legacy-footer #footer-user.menu .info,
-.legacy-footer #footer-user.showing .info {
-    visibility: hidden;
-}
-.legacy-footer #footer-user.menu .back {
-    display: block;
-}
-.legacy-footer #footer-user .info .meta {
-    left: 60px
-}
-
-
-.legacy-footer #footer-user .info .name {
-    left: 64px;
-}
+    .legacy-footer #footer-user .info {
+        display: block;
+        top: 0;
+        background: transparent;
+        cursor: pointer;
+    }
+    .legacy-footer #footer-user.menu .info,
+    .legacy-footer #footer-user.showing .info {
+        visibility: hidden;
+    }
+    .legacy-footer #footer-user.menu .back {
+        display: block;
+    }
+    .legacy-footer #footer-user .info .meta {
+        left: 60px
+    }
 
 
-.legacy-footer #footer-user .buttons .inventory {
-    display: block !important;
-    position: absolute;
-    width: 60px;
-    box-shadow: none;
-    padding-left: 0;
-    background: transparent;
-    bottom: 0;
-}
-.legacy-footer #footer-user.menu .buttons .inventory {
-    visibility: hidden;
-}
-
-.legacy-footer #footer-user.online .info .meta .bar {
-    width: 130px;
-}
-
-.legacy-footer #footer-user .info .meta .label {
-    display: none;
-}
-
-.legacy-footer #footer-user .level .value::before {
-    content: "Lv ";
-    color: #808691;
-}
-
-.legacy-footer #footer-user .buttons::before {
-    content: " ";
-    display: block;
-    height: 54px;
-}
-.legacy-footer #footer-user .buttons {
-    max-height: 0;
-    bottom: 0;
-    height: auto;
-    top: auto;
-    transition: max-height .3s ease-out;
-    overflow: hidden;
-    padding-bottom: 54px;
-}
-.legacy-footer #footer-user.menu .buttons {
-    max-height: 500px;
-}
+    .legacy-footer #footer-user .info .name {
+        left: 64px;
+    }
 
 
-.legacy-footer #footer-user .buttons .button::after {
-    font-size: 18px;
-    padding-left: 10px;
-    top: 2px;
-}
-.legacy-footer #footer-user .badge::after { content: "Badges"; }
-.legacy-footer #footer-user .profile::after { content: "Profile"; }
-.legacy-footer #footer-user .store::after { content: "Shop"; }
-.legacy-footer #footer-user .played::after { content: "Personal History"; }
-.legacy-footer #footer-user .settings::after { content: "Settings"; }
+    .legacy-footer #footer-user .buttons .inventory {
+        display: block !important;
+        position: absolute;
+        width: 60px;
+        box-shadow: none;
+        padding-left: 0;
+        background: transparent;
+        bottom: 0;
+    }
 
-.legacy-footer #footer-user .buttons .button.notify .count {
-  margin-right: 20px;
-  float: right;
-  position: static;
-}
+    .legacy-footer #footer-user.menu .inventory {
+        background: #222;
+        position: static;
+        width: 330px;
+    }
+    .legacy-footer #footer-user.menu .inventory .image {
+        margin: 0;
+        
+        display: inline-block;
+        margin-bottom: -20px;
+        margin-left: -2px;
+        margin-right: -13px;
+    }
+    /*.legacy-footer #footer-user.menu .buttons .inventory {
+        visibility: hidden;
+    }*/
+
+    .legacy-footer #footer-user.online .info .meta .bar {
+        width: 130px;
+    }
+
+    .legacy-footer #footer-user .info .meta .label {
+        display: none;
+    }
+
+    .legacy-footer #footer-user .level .value::before {
+        content: "Lv ";
+        color: #808691;
+    }
+
+    .legacy-footer #footer-user .buttons::before {
+        content: " ";
+        display: block;
+        height: 54px;
+    }
+    .legacy-footer #footer-user .buttons {
+        max-height: 0;
+        bottom: 0;
+        height: auto;
+        top: auto;
+        transition: max-height .3s ease-out;
+        overflow: hidden;
+        padding-bottom: 54px;
+    }
+    .legacy-footer #footer-user.menu .buttons {
+        max-height: 500px;
+    }
+
+
+    .legacy-footer #footer-user .buttons .button::after {
+        font-size: 18px;
+        padding-left: 10px;
+        top: 2px;
+    }
+    .legacy-footer #footer-user .inventory::after { content: "Avatars"; }
+    .legacy-footer #footer-user .badge::after     { content: "Badges"; }
+    .legacy-footer #footer-user .profile::after   { content: "Profile"; }
+    .legacy-footer #footer-user .store::after     { content: "Shop"; }
+    .legacy-footer #footer-user .played::after    { content: "Personal History"; }
+    .legacy-footer #footer-user .settings::after  { content: "Settings"; }
+
+    .legacy-footer #footer-user .buttons .button.notify .count {
+        margin-right: 20px;
+        float: right;
+        position: static;
+    }
+
+/*== Censor ==*/
+    /* (for screenshotting) */
+    .censored #playlist-menu .menu .container, .censored #your-next-media > span, .censored #footer .bar-button .section span, .censored #footer-user .ep, .censored #footer-user .points, .censored .pop-menu li {
+        -webkit-filter: blur(5px);
+        filter: url('data:image/svg+xml,<svg version="1.1" xmlns="http://www.w3.org/2000/svg"><filter id="blur"><feGaussianBlur stdDeviation="4"/></filter></svg>#blur');
+        filter: blur(5px);
+        font-family: wingdings;
+        font-style: italic;
+        letter-spacing: -2px;
+    }
+    .censored #your-next-media {
+        font-size: 14px;
+    }
+    .censored #footer-user .bar {
+        visibility: hidden;
+    }
+
+/*== VIP Settings ==*/
+    .p0ne-settings-input {
+        width: 90%;
+        background: #333;
+        border: none;
+        box-sizing: border-box;
+        margin-left: 5%;
+        font-size: 1.1em;
+        color: white;
+        padding: 3px 10px;
+        box-shadow: inset 0 0 0 1px #444;
+        transition: box-shadow .2s ease-out;
+    }
+    .p0ne-settings-input:focus {
+        box-shadow: inset 0 0 0 1px #009cdd;
+    }

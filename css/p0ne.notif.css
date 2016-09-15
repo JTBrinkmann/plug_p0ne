@@ -1,5 +1,10 @@
-/*@author jtbrinkmann aka. Brinkie Pie */
-/*@license https://creativecommons.org/licenses/by-nc/4.0/ */
+/**
+ * CSS styles for the plug_p0ne module p0ne.notif
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+ */
 .p0ne-song-notif {
 	border-left: #1c2 3px solid;
 	box-sizing: border-box;  width: 100% !important;
@@ -14,7 +19,7 @@
 	border-left: #db182e 3px solid;
 }
 
-.p0ne-song-notif::before {
+.song-current .song-stats::before {
 	content: "next song played by:";
 	color: #aaa;
 }
@@ -32,13 +37,11 @@
 .song-thumb {
     max-height: 90px;
     max-width: 120px;
-    /* display: inline-block; */
-    /* vertical-align: middle; */
 }
 .song-duration {
     position: absolute;
     right: 0px;
-    bottom: 3px;
+    bottom: 0;
     background: rgba(0,0,0,.6);
     padding: 1px 1px 0px 4px;
     font-size: .9em;
@@ -127,9 +130,6 @@
 	font-weight: 700;
 }
 #chat .p0ne-song-notif .icon-clear-input {
-	/* position: absolute; */
-	/* left: 125px; */
-	/* top: 60px !important; */
 	cursor: pointer;
 	right: 0;
 }
@@ -149,19 +149,20 @@
 	border-bottom: 1px solid #999;
 }
 
-.song-stats {
-	height: 1.5em;
-	overflow: hidden;
-	font-size: 12px;
-	text-align: justify;
-	clear: both;
-	padding-left: 10px;
-	padding-right: 25px;
+.p0ne-song-notif .score .item {
+    float: left;
+    margin-right: 10px;
+    margin-left: 10px;
 }
-.song-stats::after { /* to fix justify layout */
-	display: inline-block;
-	width: 100%;
-	content: " ";
+
+.p0ne-song-notif .score .icon {
+    margin-left: -15px;
+}
+
+.p0ne-song-notif .score {
+    position: absolute;
+    top: 69px;
+    right: 0;
 }
 #chat-messages .song-stats .icon {
 	left: auto;
@@ -171,28 +172,27 @@
 	display: inline-block;
 }
 
+/*== p0ne.notif skip notification ==*/
 .song-skipped {
-	text-align: center;
+	/* text-align: center; */
 	color: red;
-	font-size: 14px;
+	font-size: 1em;
 	font-weight: bold;
+	height: 1.2em;
+	/* overflow: hidden; */
+	overflow: hidden;    text-overflow: ellipsis;    white-space: nowrap;
 }
-.song-skipped-by::before, .song-skipped-reason::before {
-	font-size: 12px;
+.song-skipped::before {
+	font-size: 0.9em;
 	font-weight: normal;
-}
-.song-skipped-by::before {
-	content: "skipped by:";
+	content: "skipped by: ";
 }
 .song-skipped-reason::before {
 	content: "reason:";
 }
-/* video thumbnail in #playback */
+
+/*== video thumbnail in #playback ==*/
 #playback-container {
-	/*position: absolute;
-	width: 100%;
-	height: 100%;
-	z-index: 1;*/
 	background-position: center;
 	background-size: cover;
 	background-repeat: no-repeat;
