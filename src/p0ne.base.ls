@@ -327,7 +327,7 @@ module \afkAutorespond, do
         addListener API, \chat, (msg) !~>
             if msg.uid and msg.uid != userID and not timeout and isMention(msg, true) and not msg.message.has \!disable
                 # it is neglected that a non-staff might send a @mentioning message with "!disable"
-                API.sendChat "[AFK] #{@_settings.message || @DEFAULT_MSG}"
+                API.sendChat "#{@_settings.emote || ''}[AFK] #{@_settings.message || @DEFAULT_MSG}"
                 timeout := true
                 sleep @_settings.timeout, !-> timeout := false
             else if msg.uid == userID
@@ -339,10 +339,17 @@ module \afkAutorespond, do
             .appendTo \#footer-user
 
     settingsExtra: ($el) !->
+        afkAutorespond = this
         $input = $ "<input class=p0ne-settings-input placeholder=\"#{@DEFAULT_MSG}\">"
             .val @_settings.message
-            .on \input, !~>
-                @_settings.message = $input.val!
+            .on \input, !->
+                val = @value
+                if val.startsWith "/me " or val.startsWith "/em "
+                    afkAutorespond._settings.emote = val.substr(0,4)
+                    val .= substr 4
+                else
+                    delete afkAutorespond._settings.emote
+                afkAutorespond._settings.message = val
             .appendTo $el
 
 

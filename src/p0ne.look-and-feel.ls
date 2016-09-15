@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=47"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=48"
 
 /*
 window.moduleStyle = (name, d) !->
@@ -38,7 +38,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=28"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=29"
 
 
 /*####################################
@@ -59,6 +59,7 @@ module \animatedUI, do
 
         replace Dialog, \close, (close_) !-> return !->
             @$el.removeClass \opaque
+            @animate = $.noop
             sleep 200ms, !~> close_.call this
             return this
 

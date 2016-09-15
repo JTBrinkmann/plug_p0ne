@@ -38,14 +38,14 @@ module \bpm, do
 
         $create "
             <div id='bpm-resources'>
-                <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
-                <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
-                <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
-                <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/bpmotes.css?last-update=2015-02-15' type='text/css'>
+                <link rel='stylesheet' href='#host/css/emote-classes.css?last-update=2015-06-02' type='text/css'>
+                <link rel='stylesheet' href='#host/css/combiners-nsfw.css?last-update=2015-01-30' type='text/css'>
+                <link rel='stylesheet' href='#host/css/gif-animotes.css?last-update=2015-06-02' type='text/css'>
                 #{if \webkitAnimation of document.body.style
-                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css?last-update=2015-03-09' type='text/css'>"
                 else
-                    "<link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-pure.css?last-update=2015-03-09' type='text/css'>"
                 }
             </div>
         "

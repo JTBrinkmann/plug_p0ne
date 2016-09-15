@@ -77,9 +77,11 @@ module \chatDomEvents, do
             isAnyMatch = false
             i = -1
             while cb = @_events[++i]
+                hasMatch = true
                 for ,o in arguments when cb[o] != arguments[o]
+                    hasMatch = false
                     break
-                else
+                if hasMatch
                     isAnyMatch = true
                     @_events.remove(i--)
             cm .off.apply cm, arguments if isAnyMatch

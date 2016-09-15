@@ -13,24 +13,23 @@ module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
     setup: ({$create, addListener}, p0neSettings, oldModule) !->
-        @$create = $create
-
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
 
         #= create DOM elements =
         $ppM = $create "<div id=p0ne-menu>" # (only the root needs to be created with $create)
             .insertAfter \#app-menu
-        $ppI = $create "<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>"
+        $ppI = $ "<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>"
             .appendTo $ppM
         $ppW = @$ppW = $ "<div class=p0ne-settings-wrapper>"
             .appendTo $ppM
-        $ppS = $create "<div class='p0ne-settings noselect'>"
+        $ppS = $ "<div class='p0ne-settings noselect'>"
             .appendTo $ppW
-        $ppP = $create "<div class=p0ne-settings-popup>"
+        $ppP = $ "<div class=p0ne-settings-popup>"
             .appendTo $ppM
             .fadeOut 0
 
         #debug
+        $ppS .addClass \p0ne-settings-showall
         #@<<<<{$ppP, $ppM, $ppI}
 
         #= add "simple" settings =
@@ -51,6 +50,7 @@ module \p0neSettings, do
         #= add toggles for existing modules =
         for ,module of p0ne.modules when not module.loading
             @addModule module
+            module._$settingsPanel?.wrapper .appendTo $ppM
 
 
         do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
@@ -70,8 +70,8 @@ module \p0neSettings, do
                 groupToggles[$s.data \group] = false
                 $s
                     .removeClass \open
-                    .css height: 40px
-                    #.stop! .animate height: 40px, \slow
+                    .css height: 30px
+                    #.stop! .animate height: 30px, \slow
             else
                 groupToggles[$s.data \group] = true
                 $s
@@ -80,7 +80,7 @@ module \p0neSettings, do
                     .trigger \p0ne:resize
             e.preventDefault!
 
-        addListener $body, \p0ne:resize, \.p0ne-settings-group, (e) !->
+        addListener $ppW, \p0ne:resize, \.p0ne-settings-group, (e) !->
             $this = $ this
             if p0neSettings._settings.groupToggles[$this.data \group]
                 $this .css height: 0 # reset scrollHeight
@@ -99,14 +99,24 @@ module \p0neSettings, do
                 module.enable!
             else
                 module.disable!
-        addListener $ppW, \click, \.p0ne-settings-panel-icon, throttle 200ms, (e) !->
+        panelIconTimeout = 0
+        addListener $ppW, \click, \.p0ne-settings-panel-icon, (e) !->
+            e.stopImmediatePropagation!
+            e.preventDefault!
+
+            # throttle
+            return if panelIconTimeout
+            panelIconTimeout := sleep 200ms, ->
+                panelIconTimeout := 0
+
             $this = $ this .closest \.p0ne-settings-item
             module = $this .data \module
+            console.log "[p0ne-settings-panel-icon] clicked", panelIconTimeout, !!module._$settingsPanel, module._$settingsPanel?.open, module._$settingsPanel?.wrapper
             if not module._$settingsPanel
                 module._$settingsPanel =
                     open: false
                     wrapper: $ '<div class=p0ne-settings-panel-wrapper>' .appendTo $ppM
-                    $el: $ '<div class=p0ne-settings-panel>'
+                    $el: $ "<div class='p0ne-settings-panel p0ne-settings-panel-#{module.name .toLowerCase!}'>"
                 module._$settingsPanel.$el .appendTo module._$settingsPanel.wrapper
                 module.settingsPanel(module._$settingsPanel.$el, module)
 
@@ -115,13 +125,14 @@ module \p0neSettings, do
                 module._$settingsPanel.wrapper
                     .animate do
                         left: offsetLeft - module._$settingsPanel.$el.width!
-                        -> module._$settingsPanel.wrapper.hide!
+                        -> $(this).hide!
+                module._$settingsPanel.open = false
             else # open panel
                 module._$settingsPanel.wrapper
                     .show!
                     .css left: offsetLeft - module._$settingsPanel.$el.width!
                     .animate left: offsetLeft
-            e.preventPropagation!
+                module._$settingsPanel.open = true
 
         addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
             $this = $ this
@@ -228,6 +239,12 @@ module \p0neSettings, do
             @$ppW.slideDown!
         else
             @$ppW.slideUp!
+            for ,module of p0ne.modules when module._$settingsPanel?.open # close panel
+                    module._$settingsPanel.wrapper
+                        .animate do
+                            left: @$ppW.width! - module._$settingsPanel.$el.width!
+                            -> $(this).hide!
+                    module._$settingsPanel.open = false
         @groupToggles.p0neSettings = state
 
 
@@ -262,7 +279,7 @@ module \p0neSettings, do
                 if @_settings.groupToggles[module.settings]
                     $s .addClass \open
                 else
-                    $s .css height: 40px
+                    $s .css height: 30px
 
                 if module.settings == \moderation
                     $s .addClass \p0ne-settings-group-moderation

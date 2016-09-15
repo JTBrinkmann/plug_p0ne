@@ -12,7 +12,7 @@
 module \forceSkipButtonRuleskip, do
     displayName: "Ruleskip Button"
     settings: \pony
-    description: """
+    help: """
         Makes the Skip button show a ruleskip list instead.
         (you can still instaskip)
     """
@@ -316,47 +316,3 @@ module \fimstats, do
     disable: !->
         $ \#your-next-media .removeClass \p0ne-fimstats-unplayed
 
-
-module \ponifiedLang, do
-    require: <[ Lang ]>
-    disabled: true
-    displayName: "Ponified Text"
-    setup: ({replace}) !->
-        # roles
-        replace Lang.roles, \host, !-> return "Alicorn Princess"
-        replace Lang.roles, \cohost, !-> return "Alicorn"
-        replace Lang.roles, \dj, !-> return "Horse Famous"
-        replace Lang.permissions, \cohosts, !-> return "Add/Remove Alicorns"
-        replace Lang.permissions, \dj, !-> return "Set Horse Famous Ponies"
-        replace Lang.roles, \none, !-> return "Mudpony"
-        replace Lang.moderation, \ban, !-> return "sent %NAME% to the moon for a thousand years."
-
-        # ponies
-        replace Lang.messages, \minChatLevel, !-> return "This community restricts chat to ponies who are level %LEVEL% and above."
-        replace Lang.permissions, \ban, !-> return "Ban Ponies."
-        replace Lang.permissions, \unban, !-> return "Unban Ponies."
-        replace Lang.tooltips, \headersUsers, !-> return "Ponies"
-        replace Lang.tooltips, \usersRoom, !-> return "Ponies who are here right now"
-        replace Lang.tooltips, \usersBans, !-> return "Ponies who have been banned"
-        replace Lang.tooltips, \usersIgnored, !-> return "Ponies who you have ignored"
-        replace Lang.tooltips, \usersMutes, !-> return "Ponies who have been muted"
-        replace Lang.tooltips, \chatLevel, !-> return "Restrict chat to ponies who are this level or above"
-        replace Lang.userList, \roomTitle, !-> return "Ponies here now"
-
-        # Bot Commands
-        replace Lang.chat, \help, !-> return "<strong>Chat Commands:</strong><br/>/em &nbsp; <em>Emote</em><br/>/me &nbsp; <em>Emote</em><br/>/clear &nbsp; <em>Clear Chat History</em><hr>
-            <strong>Bot Commands:</strong><br>
-            !randgame &nbsp; <em>Pony Adventure</em><br/>
-            !power &nbsp; <em>Random Power</em><br/>
-            !hug (@user) &nbsp; <em>hug somepony</em><br/>
-            !1v1 (@user) &nbsp; <em>1v1 somepony</em><br/>
-            !rule <number> &nbsp; <em>List a Rule</em><br/>
-            !songinfo &nbsp; <em>Songstats</em><br/>
-            !dc &nbsp; <em>be put back if you dc'd</em><br/>
-            !eta &nbsp; <em>ETA til you dj</em><br/>
-            !weird &nbsp; <em>Is it weirdday?</em><br/>
-            "
-
-        # misc
-        replace Lang.search, \youtube, !-> return "Search YouTube for ponies"
-        replace Lang.search, \soundcloud, !-> return "Search SoundCloud for ponies"

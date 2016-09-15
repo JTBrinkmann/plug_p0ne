@@ -9,6 +9,7 @@
 
 /** ~ Overview ~
  * flags
+ * p0ne FX
  * p0ne-notifications
  * Join/Leave Notifications
  * AFK Autoresponse
@@ -37,6 +38,7 @@
  * warnOnMehers
  * custom chat notification trigger words
  * Autowoot voteskip-block warning
+ * etc
  */
 
 /*== flags ==*/
@@ -110,6 +112,12 @@
         height: 16px;
     }
 
+/*== p0ne FX ==*/
+    .p0ne-fx-blink {
+        text-shadow: 0 0 7px #fff, 0 0 1px #fff;
+        transition: none;
+    }
+    
 /*== p0ne-notification ==*/
     #chat .p0ne-notif-loaded {
         color: #A7F;
@@ -668,6 +676,9 @@
     .legacy-chat #chat .p0ne-notif .from .un {
         color: #E43347;
     }
+    .legacy-chat #chat .delete-button {
+        padding: 0 10px;
+    }
 
 /*== p0ne settings ==*/
     #room-meta {
@@ -734,13 +745,18 @@
     .p0ne-settings-item {
         display: block;
         height: 24px;
+        padding: 10px 5px;
         font-size: 16px;
         cursor: pointer;
         vertical-align: top;
         white-space: nowrap;
-        padding: 10px 5px;
-
         transition: padding-bottom .2s ease-out;
+    }
+    .p0ne-settings-showall .p0ne-settings-item {
+        display: block;
+        height: 19px;
+        padding: 7px 5px;
+        font-size: 15px;
     }
     .p0ne-settings-item:hover {
         background: #2a2a2a;
@@ -800,10 +816,10 @@
     }
 
     .p0ne-settings-group {
-        overflow-y: hidden;
-        min-height: 40px;
-        transition: height 400ms ease-out;
         height: 40px;
+        overflow-y: hidden;
+        min-height: 30px;
+        transition: height 400ms ease-out;
     }
     .p0ne-settings-group.closed {
         height: 40px;
@@ -811,9 +827,12 @@
     .p0ne-settings-summary {
         height: 30px;
         padding-top: 10px;
-        font-size: 1.5em;
+        font-size: 21px;
         cursor: pointer;
-
+    }
+    .p0ne-settings-showall .p0ne-settings-summary {
+        height: 22px;
+        font-size: 18px;
     }
     .p0ne-settings-summary::before {
         content: " ";
@@ -863,9 +882,9 @@
         margin-top: 5px;
         border-top: 1px solid #333;
         padding-top: 1px;
-        margin-left: 5%;
+        margin-left: 15px;
         height: 1.7em;
-        width: 90%;
+        margin-right: 15px;
 
         overflow: hidden;
     }
@@ -889,10 +908,36 @@
         margin-right: 15px;
     }
 
+    .p0ne-settings .togglebox {
+        margin-bottom: 0;
+        margin-right: 5px;
+        top: 2px;
+    }
+
+    .p0ne-settings .checkbox {
+        display: none;
+    }
+
+    .p0ne-settings-showall .togglebox {
+        height: 18px;
+    }
+    .p0ne-settings-showall .togglebox::before,
+    .p0ne-settings-showall .togglebox::after {
+        height: 14px;
+    }
+    .p0ne-settings-showall .p0ne-settings .togglebox {
+        top: 2px;
+    }
+
+    .p0ne-settings-panel-wrapper {
+        position: absolute;
+    
+        z-index: 2;
+}
 
 
 
-    /*= userlist meh icon =*/
+/*= userlist meh icon =*/
     #user-lists .list.room .user .icon-meh {
         top: -1px;
         right: 9px;
@@ -945,6 +990,10 @@
         transition: left 200ms ease-out, top 200ms ease-out, max-height 200ms ease-out, max-width 200ms ease-out;
     }
 
+    #chat .text a.p0ne-img-failed, .p0ne-img-filterword {
+        color: #FF5422;
+    }
+
 /*== friendlist & waitlist user popup ==*/
     #waitlist .name,
     #waitlist .image,
@@ -969,9 +1018,6 @@
     }
     .legacy-chat #chat .from-current-dj .text::before {
         width: 55px;
-    }
-    #chat .text a.p0ne-img-failed {
-        color: #FF5422;
     }
 
 /*== Unread Chat Notification ==*/
@@ -1029,16 +1075,11 @@
 
 /*== fancy togglebox ==*/
     .togglebox {
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        -ms-appearance: none;
-        -o-appearance: none;
-        appearance: none;
         height: 23px;
         width: 35px;
         position: relative;
         display: inline-block;
-        border-radius: 11.5px;
+        border-radius: 12px;
         vertical-align: top;
         cursor: pointer;
         outline: 0;
@@ -1095,15 +1136,6 @@
         transform: scale(0);
     }
 
-    .p0ne-settings .togglebox {
-        margin-bottom: 0;
-        margin-right: 5px;
-    }
-
-    .p0ne-settings .checkbox {
-        display: none;
-    }
-
 /*== AFK Timers ==*/
     .p0ne-last-activity {
         color: #aaa;
@@ -1117,10 +1149,6 @@
     #waitlist .p0ne-last-activity,
     #user-lists .p0ne-last-activity {
         right: 40px;
-    }
-    .p0ne-last-activity-update {
-        text-shadow: 0 0 7px #fff, 0 0 1px #fff;
-        transition: none;
     }
     .p0ne-last-activity-warn {
         color: #D29074;
@@ -1469,49 +1497,7 @@
     }
 
 /*== Custom Colors ==*/
-    .p0ne-cc-settings {
-        position: absolute;
-        top: 290px;
-        right: 345px;
-        width: 240px;
-        min-height: 370px;
-        padding: 5px 30px 10px 20px;
-        z-index: 12;
-        background: #222;
-    
-    }
-    .p0ne-cc-name {
-        position: relative;
-        padding: 1px 5px 3px 20px;
-    }
-    .p0ne-cc-row.selected {
-        background: #333;
-    }
-
-    .p0ne-cc-row .name {
-        cursor: pointer;
-        padding-left: 19px;
-    }
-
-    .p0ne-cc-row .icon {
-        top: 5px;
-        cursor: pointer;
-    }
-    .p0ne-cc-users .p0ne-cc-row .icon {
-        height: 15px;
-        width: 15px;
-    }
-
-    .p0ne-cc-row .icon.p0ne-cc-clear-icon {
-        top: -3px;
-        right: -25px;
-        height: 30px;
-        width: 30px;
-    }
-
-    .p0ne-cc-default .icon-clear-input {
-        display: none;
-    }
+/*…*/
 
 /*== warnOnMehers ==*/
     .p0ne-settings-extra .max-mehs {
@@ -1551,5 +1537,12 @@
     }
 
 /*== Chat Commands ==*/
-.p0ne-help-command { color: #BBB; }
-.p0ne-help-command b { color: #FFF; }
+    .p0ne-help-command { color: #BBB; }
+    .p0ne-help-command b { color: #FFF; }
+
+/*== Chat Commands ==*/
+    /* fix playlist not showing */
+    .media-list .jspContainer {
+      position: relative;
+      height: 100% !important;
+    }
