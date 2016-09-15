@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=41"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=44"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -38,7 +38,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=24"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=26"
 
 
 /*####################################
@@ -104,7 +104,7 @@ module \playlistIconView, do
             newCellsPerRow = ~~((@$el.width! - 10px) / CELL_WIDTH)
             newVisibleRows = Math.ceil(2rows + @$el.height!/CELL_HEIGHT) * newCellsPerRow
             if newVisibleRows != @visibleRows or newCellsPerRow != @cellsPerRow
-                console.log "[pIV resize]", newVisibleRows, newCellsPerRow
+                #console.log "[pIV resize]", newVisibleRows, newCellsPerRow
                 @visibleRows = newVisibleRows
                 @cellsPerRow = newCellsPerRow
                 delete @currentRow
@@ -116,7 +116,7 @@ module \playlistIconView, do
                 @firstRow = top * @cellsPerRow
                 lastRow = @firstRow + @visibleRows <? @collection.length
                 if @currentRow != @firstRow
-                    console.log "[scroll]", @firstRow, lastRow, @visibleRows
+                    #console.log "[scroll]", @firstRow, lastRow, @visibleRows
                     @currentRow = @firstRow
                     @$firstRow.height top * CELL_HEIGHT
                     @$lastRow.height do
@@ -138,7 +138,10 @@ module \playlistIconView, do
             @pl.$el
                 .off \jsp-scroll-y, @pl.scrollBind
                 .on \jsp-scroll-y, replace(@pl, \scrollBind, ~> return @pl~onScroll)
-            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, ~> return  @pl.onResize # is bound
+
+            # opening playlist drawer animation fix
+            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, ~> return ~>
+                @pl.onResize! if @pl.$el
 
             # to force rerender
             delete @pl.currentRow
@@ -149,7 +152,7 @@ module \playlistIconView, do
 
         #= fix search =
         replace searchManager, \_search, -> return ->
-            limit = pl?.visibleRows || 50
+            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
             console.log "[_search]", @lastQuery, @page, limit
             if @lastFormat == 1
                 searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)

@@ -161,7 +161,7 @@ window.module = (name, data) !->
                 disabledModules[name] = false if not module.modDisabled
                 try
                     setup.call module, helperFNs, module, data, module
-                    API.trigger \p0ne:moduleEnabled, module
+                    trigger \moduleEnabled
                     console.info "#{getTime!} [#name] enabled", setup != null
                 catch err
                     console.error "#{getTime!} [#name] error while re-enabling", err.stack
@@ -195,7 +195,7 @@ window.module = (name, data) !->
                     if not newModule
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
-                        API.trigger \p0ne:moduleDisabled, module
+                        trigger \moduleDisabled
                         console.info "#{getTime!} [#name] disabled"
                         dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
@@ -205,7 +205,7 @@ window.module = (name, data) !->
                     delete window[name]
                 delete p0ne.dependencies[name]
                 return this
-        module.trigger = (target, ...args) !-> # FOR DEBUGGING
+        module.trigger ||= (target, ...args) !-> # FOR DEBUGGING
             for listener in cbs.listeners ||[] when listener.target == target
                 #console.log "\thas same target"
                 isMatch = true
@@ -267,6 +267,26 @@ window.module = (name, data) !->
         if settingsPerCommunity
             roomSlug = getRoomSlug!
             disabledModules = p0ne.disabledModules._rooms[roomSlug]
+            module._updateRoom = ->
+                module.disable!
+                roomSlug = getRoomSlug!
+                module_ = module
+                disabledModules = p0ne.disabledModules._rooms[roomSlug]
+                module.disabled = disabledModules[name]
+                def = $.Deferred!
+                module.loading = def.promise!
+
+                settingsKey = "p0ne__#{roomSlug}_#name"
+                dataLoad settingsKey, _settings, (err, module._settings) !->
+                    if err
+                        # play it cool (defaulting is magic)
+                        console.warn "[p0ne] error loading room settings for #name", err
+
+                    def.resolve module # resolve module.loading
+                    delete module.loading
+
+                    # trigger events
+                    console.info "#{getTime!} [#name] new room settings loaded"
         else
             disabledModules = p0ne.disabledModules
 
@@ -284,10 +304,7 @@ window.module = (name, data) !->
         if module_?._settings # use _settings from previous module
             module._settings = module_._settings
         else if _settings
-            if settingsPerCommunity
-                settingsKey = "p0ne__#{roomSlug}_#name"
-            else
-                settingsKey = "p0ne_#name"
+            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#name" else "p0ne_#name"
             dependenciesLoading++
             dataLoad settingsKey, _settings, (err, module._settings) !->
                 if err
@@ -318,7 +335,6 @@ window.module = (name, data) !->
         #   before noticing a missing/failed requirement)
         if --dependenciesLoading == 0 == failedRequirements.length
             # run setup
-            time = getTime!
             delete module.loading
             if module.disabled
                 if module.modDisabled
@@ -332,22 +348,28 @@ window.module = (name, data) !->
                     setup?.call module, helperFNs, module, data, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#time [#name] error initializing", e.stack
+                    console.error "#{getTime!} [#name] error initializing", e.stack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
                     delete window[name]
-            delete module.loading
 
             # trigger events
             if module_
-                API.trigger \p0ne:moduleUpdated, module, module_
-                console.info "#time [#name] updated#wasDisabled", "color: orange"
+                trigger \moduleUpdated
+                console.info "#{getTime!} [#name] updated#wasDisabled", "color: orange"
             else
-                API.trigger \p0ne:moduleLoaded, module
-                console.info "#time [#name] initialized#wasDisabled", "color: orange"
+                trigger \moduleLoaded
+                console.info "#{getTime!} [#name] initialized#wasDisabled", "color: orange"
 
     function loadingFailed
-        # if a dependency fails to load
+        # if any dependency fails to load
         def?.reject module # reject module.loading
         delete module.loading
         delete window[name]
+
+    function trigger type
+        if _$context?
+            _$context.trigger "p0ne:#type", module, module_
+            #_$context.trigger "p0ne:#type:#name", module, module_
+        API.trigger "p0ne:#type", module, module_
+        #API.trigger "p0ne:#type:#name", module, module_

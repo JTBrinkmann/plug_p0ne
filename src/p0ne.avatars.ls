@@ -65,11 +65,15 @@ require <[ sockjs ]>, (SockJS) ->
     # auxiliaries
     window.sleep ||= (delay, fn) -> return setTimeout fn, delay
 
+    requireHelper \InventoryDropdown, (.selected)
     requireHelper \avatarAuxiliaries, (.getAvatarUrl)
     requireHelper \Avatar, (.AUDIENCE)
     #requireHelper \AvatarList, (._byId?.admin01)
-    requireHelper \myAvatars, (.comparator == \id) # (_) -> _.comparator == \id and _._events?.reset and (!_.length || _.models[0].attributes.type == \avatar)
-    requireHelper \InventoryDropdown, (.selected)
+    requireHelper \myAvatars, (m) !->
+        if m.comparator == \id
+            for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx == m
+                return true
+        return false
 
     window.Lang = require \lang/Lang
 
@@ -267,15 +271,16 @@ require <[ sockjs ]>, (SockJS) ->
                         <div class="row" data-value="#category"><span>#{Lang.userAvatars[category]}</span></div>
                     """
 
-                @$el.html """
-                    <dl class="dropdown">
-                        <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
-                        <dd>#html</dd>
-                    </dl>
-                """
+                @$el
+                    .html """
+                        <dl class="dropdown">
+                            <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
+                            <dd>#html</dd>
+                        </dl>
+                    """
 
-                $ \dt   .on \click, (e) ~> @onBaseClick e
-                $ \.row .on \click, (e) ~> @onRowClick  e
+                    .on \click, \dt,   @~onBaseClick
+                    .on \click, \.row, @~onRowClick
                 @select InventoryDropdown.selected
 
                 @$el.show!
@@ -395,7 +400,7 @@ require <[ sockjs ]>, (SockJS) ->
                     else
                         console.warn "[p0ne custom avatars] invalid ppCAS server"
 
-            @connect 'https://p0ne.com/_'
+            @connect 'https://ppcas.p0ne.com/_'
 
 
         connectAttemps: 1
@@ -407,7 +412,8 @@ require <[ sockjs ]>, (SockJS) ->
             reconnect = true
 
             if reconnectWarning
-                setTimeout (~> if @connectAttemps==0 then chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"), 10_000ms
+                sleep 10_000ms, ~> if @connectAttemps==0
+                    chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
             @socket = new SockJS(url)
             @socket.url = url
@@ -445,7 +451,7 @@ require <[ sockjs ]>, (SockJS) ->
             # replace old authTokens
             user = API.getUser!
             oldBlurb = user.blurb || ""
-            newBlurb = oldBlurb .replace /🐎\w{4}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
+            newBlurb = oldBlurb .replace /🐎\w{6}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
             if oldBlurb != newBlurb
                 @changeBlurb newBlurb, do
                     success: ~>
@@ -459,7 +465,7 @@ require <[ sockjs ]>, (SockJS) ->
                 else if user.blurb.length >= 72
                     newBlurb = "#{user.blurb.substr(0, 71)}… 🐎#authToken"
                 else
-                    newBlurb = "#{user.blurb} #authToken"
+                    newBlurb = "#{user.blurb} 🐎#authToken"
 
                 @blurbIsChanged = true
                 @changeBlurb newBlurb, do
@@ -561,7 +567,8 @@ require <[ sockjs ]>, (SockJS) ->
                 success: options.success
                 error: options.error
 
-            #setTimeout (-> @socket.emit \reqAuthToken if @connectAttemps), 5_000ms
+            #sleep 5_000ms, -> if @connectAttemps
+            #   @socket.emit \reqAuthToken
 
         disable: ->
             @changeBlurb @oldBlurb if @blurbIsChanged

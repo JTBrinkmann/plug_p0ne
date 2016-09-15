@@ -90,7 +90,6 @@ module \fixMediaThumbnails, do
 module \fixGhosting, do
     displayName: 'Fix Ghosting'
     require: <[ PlugAjax ]>
-    optional: <[ login ]>
     settings: \fixes
     settingsMore: !-> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
@@ -148,7 +147,7 @@ module \fixGhosting, do
                                 chatWarn "the room capacity is reached :/", "fixGhosting"
                             | \notAuthorized =>
                                 chatWarn "you got logged out", "fixGhosting"
-                                login?!
+                                #login?!
                             | otherwise =>
                                 switch statusCode
                                 | 401 =>
@@ -285,6 +284,30 @@ module \fixNoPlaylistCycle, do
         * /
 */
 
+module \fixStuckDJButton, do
+    settings: \fixes
+    displayName: 'Fix Stuck DJ Button'
+    require: <[ _$context ]>
+    setup: ({addListener}) ->
+        var fixTimeout
+        $djbtn = $ \#dj-button
+        hasSpinner = $djbtn.find \.spinner .length != 0
+        addListener _$context, \djButton:update, ->
+            if $djbtn.find \.spinner .length == 0
+                hasSpinner := false
+                clearTimeout fixTimeout
+            else if not hasSpinner
+                hasSpinner := true
+                fixTimeout = sleep 10_000ms, ->
+                    getRoomState! .then (d) ->
+                        d = d.data.0
+                        if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
+                            if app?.room.djButton
+                                app.room.djButton.hideSpinner!
+                            else # pseudo djButton.hideSpinner()
+                                $djbtn .find \.spinner .remove!
+                                $djbtn .find \.icon .show!
+
 
 module \zalgoFix, do
     settings: \fixes
@@ -300,35 +323,6 @@ module \zalgoFix, do
             }
         '
 
-
-module \fixInHistoryHighlight, do
-    settings: \fixes
-    displayName: '☢ Fix InHistory'
-    help: '''
-        [WORK IN PROGRESS]
-        This fixes the bug that unless you change to another playlist, some songs don't show up as "in history" in your playlist (have red text)
-    '''
-    require: <[ app ]>
-    setup: ({addListener}) !->
-        playlist = app.footer.playlist.playlist.media
-        addListener API, \advance, (d) !-> if d.dj and d.dj.id != user.id
-            if playlist.list.rowHash?[d.media.cid]
-                id = d.media.id
-                for row, i in playlist.list.rows ||[] when row.model.id == id
-                    if not row.$el .hasClass \in-history
-                        # no need for a `let` because the loop will terminate anyways
-
-                        console.log "[☢ Fix InHistory]", d, id, playlist.list.rowHash[d.media.cid], row
-                        sleep 5_000ms, !->
-                            if row.$el .hasClass \in-history
-                                chatWarn "fixed itself", '☢ fixInHistoryHighlight'
-                            else
-                                chatWarn 'fixed by plug_p0ne', '☢ fixInHistoryHighlight'
-                                console.info "#{getTime!} [fixInHistoryHighlight] fixed", row
-                                row.$el .addClass \in-history
-                    else #DEBUG
-                        chatWarn "was already fixed", '☢ fixInHistoryHighlight'
-                    break
 
 
 module \warnOnAdblockPopoutBlock, do

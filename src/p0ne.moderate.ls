@@ -12,43 +12,31 @@
 module \enableModeratorModules, do
     require: <[ user_ ]>
     setup: ({addListener}) ->
-        prevRole = user_.attributes.role
+        prevRole = user_.get \role
         $body.addClass \user-is-staff if user.isStaff
 
-        addListener user_, \change:role, (user, newRole) ->
+        addListener user_, \change:role, (user_, newRole) ->
+            console.log "[p0ne] change:role from #prevRole to #newRole"
             if newRole > 1 and prevRole < 2
-                for m in p0ne.modules when m.modDisabled
+                console.info "[p0ne] enabling moderator modules"
+                for ,m of p0ne.modules when m.modDisabled
+                    console.log "[p0ne moderator] enabling", m.name
                     m.enable!
                     m.modDisabled = false
                 $body.addClass \user-is-staff
-                user.isStaff = true
-            else
-                for m in p0ne.modules when m.moderator and not m.modDisabled
+                user_.isStaff = true
+            else if newRole < 2 and prevRole > 1
+                console.info "[p0ne] disabling moderator modules"
+                for ,m of p0ne.modules when m.moderator    and not m.disabled
+                    console.log "[p0ne moderator] disabling", m.name
                     m.modDisabled = true
                     m.disable!
                 $body.removeClass \user-is-staff
-                user.isStaff = true
+                user_.isStaff = false
+            prevRole := newRole
     disable: ->
         $body.removeClass \user-is-staff
 
-
-/*####################################
-#             YELLOW MOD             #
-####################################*/
-module \yellowMod, do
-    displayName: 'Yellow Name as Staff'
-    moderator: true
-    settings: \moderation
-    setup: ({css}) ->
-        id = API.getUser! .id
-        css \yellowMod, "
-            \#chat .fromID-#id .un,
-            .user[data-uid='#id'] .name > span {
-                color: \#ffdd6f !important;
-            }
-        "
-            # \#chat .from-#id .from,
-            # \#chat .fromID-#id .from,
 
 
 /*####################################
@@ -130,6 +118,7 @@ module \disableChatDelete, do
                 $msg .addClass \deleted if cid == uid or not getUser(uid)?.gRole
                 d = $createPersistent getTimestamp!
                     .addClass \delete-timestamp
+                    .removeClass \timestamp
                     .appendTo $msg
                 d .text "deleted #{if moderator then 'by '+moderator else ''} #{d.text!}"
                 cm = $cm!
@@ -191,7 +180,7 @@ module \warnOnMehers, do
                         <div class='cm system'>
                             <div class=box><i class='icon icon-chat-system'></i></div>
                             <div class='msg text'>
-                                #{formatUserHTML troll, true} meh'd the past #{plural users[k], 'song'}!
+                                #{formatUserHTML d.user, true} meh'd this song!
                             </div>
                         </div>"
 
@@ -214,6 +203,45 @@ module \warnOnMehers, do
                     delete users[k]
             current := {}
             lastAdvance := d
+
+    settingsExtra: ($el) !->
+        warnOnMehers = this
+        var resetTimer
+        $ "
+            <form>
+                <label><input type=radio name=max-mehs value=on #{if @_settings.instantWarn then \checked else ''}> alert instantly</label><br>
+                <label>
+                    <input type=radio name=max-mehs value=off #{if @_settings.instantWarn then '' else \checked}> alert after <input type=number value='#{@_settings.maxMehs}' class=max-mehs> consequitive mehs
+                </label>
+            </form>"
+            .append do
+                $warning = $ '<div class=warning>'
+            .on \click, \input:radio, !->
+                if @checked
+                    warnOnMehers._settings.instantWarn = (@value == \on)
+                    console.log "#{getTime!} [warnOnMehers] updated instantWarn to #{warnOnMehers._settings.instantWarn}"
+            .on \input, \.max-mehs, !->
+                val = ~~@value # note: invalid numbers (NaN) get floored to 0
+                if val > 1
+                    warnOnMehers._settings.maxMehs = val
+                    if resetTimer
+                        $warning .fadeOut!
+                        clearTimeout resetTimer
+                        resetTimer := 0
+                    if warnOnMehers._settings.instantWarn
+                        $ this .parent! .click!
+                    console.log "#{getTime!} [warnOnMehers] updated maxMehs to #val"
+                else
+                    $warning
+                        .fadeIn!
+                        .text "please enter a valid number >1"
+                    resetTimer := sleep 2.min, !->
+                        @value = warnOnMehers._settings.maxMehs
+                        resetTimer := 0
+                    console.warn "#{getTime!} [warnOnMehers] invalid input for maxMehs", @value
+            .appendTo $el
+        $el .css do
+            paddingLeft: 15px
 
 
 /*####################################

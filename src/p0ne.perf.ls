@@ -146,6 +146,7 @@ module \perfEmojify, do
         replace emoticons, \emojify, !-> return (str) !->
             lastWasEmote = false
             return str
+                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
                 .replace /:(.*?)(?=:)|:(.*)$/g, (_, emote, post) !~>
                     if (p = typeof post != \string) and not lastWasEmote and @map[emote]
                         lastWasEmote := true
@@ -154,7 +155,6 @@ module \perfEmojify, do
                         lastWasEmote_ = lastWasEmote
                         lastWasEmote := false
                         return "#{if lastWasEmote_ then '' else ':'}#{if p then emote else post}"
-                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
 
         replace emoticons, \lookup, !-> return (str) !->
             # walk through the trie, letter by letter of the input

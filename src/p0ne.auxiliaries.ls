@@ -101,10 +101,41 @@ jQuery.fn <<<<
         return this
     loadAll: (cb) !-> # adds an event listener for when all elements are loaded
         remaining = @length
-        return if not cb or not remaining
-        @load !->
-            if --remaining == 0
-                cb!
+        if not cb or not remaining
+            _.defer cb!
+        else
+            @load !->
+                if --remaining == 0
+                    cb!
+        return this
+    binaryGuess: (checkFn) !->
+        # returns element with index `n` for which:
+        # if checkFn(element) for all elements in this from 0 to `n` all returns false,
+        # and for all elements in this from `n` to the last one returns true
+        # returns an empty jQuery object if there is no matching `n`
+        # (i.e. checkFn(element) returns false for all elements, or this object is empty)
+        # example use case: find the first item that is visible in a scrollable list
+
+        step = @length
+        if step == 0 or not checkFn @[step-1], step, @[step-1] # test this.length and last element
+            return $!
+        else if checkFn.call @0, 0, @0 # test first element
+            return @first!
+
+        i = @length - 1
+        goingUp = true
+        do
+            step = ~~(step / 2)
+            if checkFn.call @[i], i, @[i]
+                goingUp = false
+                i = Math.floor(i - step)
+            else
+                goingUp = true
+                i = Math.ceil(i + step)
+                console.log "going up to #i (#step)"
+        while step > 0
+        i++ if goingUp
+        return @eq i
 
 $.easing <<<<
     easeInQuad: (p) !->
@@ -230,16 +261,16 @@ dataSave.interval = setInterval dataSave, 15.min
 # But if another room is joined (or the room's settings change), it should be executed again.
 #
 # To create a plug_p0ne module as a DataEmitter, use `module(moduleName, { module: new DataEmitter(moduleName), … })`
-class DataEmitter extends {prototype: Backbone.Events}
+export class DataEmitter extends {prototype: Backbone.Events}
     (@_name) ->
-    _name: 'unnamed StateEmitter'
+    _name: 'unnamed DataEmitter'
     set: (newData) ->
         if @_data != newData
             @_data = newData
             @trigger \data, @_data
     clear: ->
         delete @_data
-        @_trigger \cleared
+        @trigger \cleared
 
     on: (type, fn, context) ->
         super ...
@@ -492,6 +523,11 @@ window <<<<
     leave: !->
         return $ '#dj-button.is-leave' .click! .length != 0
 
+    $wootBtn: $ \#woot
+    woot: -> $wootBtn .click!
+    $mehBtn: $ \#meh
+    meh: -> $mehBtn .click!
+
     ytItags: do !->
         resolutions = [ 72p, 144p, 240p,  360p, 480p, 720p, 1080p, 1440p, 2160p, 2304p, 3072p, 4320p ]
         list =
@@ -623,8 +659,8 @@ window <<<<
                             cid:          cid
                             uploader:
                                 name:     d.snippet.channelTitle
-                                id:       d.snippet.channelID
-                                url:      "https://www.youtube.com/channel/#{d.snippet.channelID}"
+                                id:       d.snippet.channelId
+                                url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
                             image:        "https://i.ytimg.com/vi/#cid/0.jpg"
                             title:        d.snippet.title
                             uploadDate:   d.snippet.publishedAt
@@ -936,7 +972,7 @@ window <<<<
                                                     #width: height && $representation .attr \width
                                                     #resolution: height && "#{height}p"
                                                 if audioOnly and ~~m.size > ~~bestVideo.size and (window.chrome or mimeType != \audio/webm)
-                                                        bestVideo := m
+                                                    bestVideo := m
                                         if bestVideo
                                             files.preferredDownload = bestVideo
                                             files.status = 0
@@ -1082,6 +1118,14 @@ window <<<<
             return humanList res # both lines seperate for performance optimization
         data[attr] = mentions
         return mentions
+
+    isMessageVisible: ($msg) !->
+        if typeof msg == \string
+            $msg = getChat($msg)
+        if $msg?.length
+            return $cm!.height! > $msg .offset!.top > 101px
+        else
+            return false
 
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
@@ -1266,7 +1310,7 @@ window <<<<
     formatUser: (user, showModInfo) !->
         user .= toJSON! if user.toJSON
         info = getRank(user)
-        if info == \none
+        if info == \regular
             info = ""
         else
             info = " #info"
@@ -1295,7 +1339,7 @@ window <<<<
             fromClass = ""
 
         # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
-        return "#rank<span class='un#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
+        return "#rank<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
 
     formatUserSimple: (user) !->
         return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
@@ -1361,10 +1405,10 @@ window <<<<
             else
                 return \ambassador
         else
-            return <[ none rdj bouncer manager cohost host ]>[role || 0]
+            return <[ regular dj bouncer manager cohost host ]>[role || 0]
     getRankIcon: (user) !->
         rank = getRank(user)
-        return rank != \none && "<i class='icon icon-chat-#{if rank == \rdj then \dj else rank} p0ne-icon-small'></i>" ||''
+        return rank != \regular && "<i class='icon icon-chat-#rank p0ne-icon-small'></i>" ||''
 
     parseURL: (href) !->
         href ||= "//"
@@ -1376,7 +1420,7 @@ window <<<<
     getIcon: do !->
         # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
         # if you plan to use it over and over again, use fn.enableCaching()
-        $icon = $ '<i class=icon>'
+        $icon = $ "<i class=icon><!-- this is used by plug_p0ne's getIcon() --></i>"
                 .css visibility: \hidden
                 .appendTo \body
         fn = (className) !->
@@ -1409,8 +1453,9 @@ window <<<<
         # is kept uptodate in updateUserData in p0ne.auxiliary-modules
     getRoomSlug: !->
         return room?.get?(\slug) || decodeURIComponent location.pathname.substr(1)
-userID = user?.id # API.getUser! will fail when used on the Dashboard if no room has been visited before
-user.isStaff = user and user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
+
+woot.click = woot
+meh.click = meh
 
 # load cached requireIDs
 (err, data) <- dataLoadAll {p0ne_requireIDs: {}, p0ne_disabledModules: {_rooms: {}}}
@@ -1492,13 +1537,18 @@ for cb in (room?._events?[\change:name] || _$context?._events?[\show:room] || La
 #= user_ =
 # the internal user-object
 if requireHelper \user_, (.canModChat) #(._events?.'change:username')
-    window.users = user_.collection # it's the most reliable methode of getting `users`
-    window.user = user_.toJSON!
-    window.userID = user.id
+    export users = user_.collection # it's the most reliable methode of getting `users`
+    export user = user_.toJSON!
+if user || user = window.user
+    # API.getUser! will fail when used on the Dashboard if no room has been visited before
+    export userID = user.id
+    user.isStaff = user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
+
 
 #= underscore =
 # this should already be global, but let's be sure to avoid stuff breaking
-window._ = _ = require \underscore
+# (because apparently at some point it did)
+export _ = require \underscore
 
 #= Lang =
 window.Lang = require \lang/Lang
