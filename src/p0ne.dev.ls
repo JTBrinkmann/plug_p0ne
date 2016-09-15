@@ -12,7 +12,7 @@
 #        FIX CONSOLE SPAMMING        #
 ####################################*/
 module \fixConsoleSpamming, do
-    setup: ({replace}) ->
+    setup: ({replace}) !->
         /* this fixes a bug in plug.dj. Version 1.2.6.6390 (2015-02-15)
          * which spams the console with console.info(undefined)
          * everytime the socket receives a message.
@@ -20,7 +20,7 @@ module \fixConsoleSpamming, do
          * it will create many empty messages in the console
          * (https://i.imgur.com/VBzw2ek.png screenshot from Firefox' Web Console)
         */
-        replace console, \info, (info_) -> return ->
+        replace console, \info, (info_) !-> return !->
             info_ ... if arguments.length
 
 /*####################################
@@ -28,10 +28,10 @@ module \fixConsoleSpamming, do
 ####################################*/
 module \sandboxBackboneEvents, do
     optional: <[ _$context ]>
-    setup: ({replace}) ->
+    setup: ({replace}) !->
         #= wrap API/_$context event trigger in a try-catch =
         slice = Array::slice
-        replace Backbone.Events, \trigger, -> return (type) ->
+        replace Backbone.Events, \trigger, !-> return (type) !->
             if @_events
                 args = slice.call(arguments, 1); [a,b,c]=args
                 while true # run once for the specified event and once for "all"
@@ -51,11 +51,11 @@ module \sandboxBackboneEvents, do
                     args.unshift(type); [a,b,c]=args
                     type = \all
 
-        replace API, \_name, -> return \API
-        replace API, \trigger, -> return Backbone.Events.trigger
+        replace API, \_name, !-> return \API
+        replace API, \trigger, !-> return Backbone.Events.trigger
         if _$context?
-            replace _$context, \_name, -> return \_$context
-            replace _$context, \trigger, -> return Backbone.Events.trigger
+            replace _$context, \_name, !-> return \_$context
+            replace _$context, \trigger, !-> return Backbone.Events.trigger
 
 /*####################################
 #           LOG EVERYTHING           #
@@ -73,7 +73,7 @@ module \logEventsToConsole, do
     '''
     disabledByDefault: true
     logAll: false
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         logEventsToConsole = this
         if _$context?
             ctx = _$context
@@ -81,7 +81,7 @@ module \logEventsToConsole, do
         else
             ctx = API
             chatEvnt = \chat
-        addListener \early, ctx, chatEvnt, (data) ->
+        addListener \early, ctx, chatEvnt, (data) !->
             message = cleanMessage data.message
             if data.un
                 name = data.un .replace(/\u202e/g, '\\u202e') |> collapseWhitespace
@@ -95,23 +95,23 @@ module \logEventsToConsole, do
             else
                 console.log "#{getTime!} [CHAT] %c#message", 'color: #36F'
 
-        addListener API, \userJoin, (user) ->
+        addListener API, \userJoin, (user) !->
             console.log "#{getTime!} + [JOIN]", user.id, formatUser(user, true), user
-        addListener API, \userLeave, (user) ->
+        addListener API, \userLeave, (user) !->
             name = htmlUnescape(user.username) .replace(/\u202e/g, '\\u202e')
             console.log "#{getTime!} - [LEAVE]", user.id, formatUser(user, true), user
 
 
         #= log (nearly) all _$context events
         return if not window._$context
-        addListener _$context, \all, -> return (type, args) ->
+        addListener _$context, \all, !-> return (type, args) !->
             group = type.substr(0, type.indexOf ":")
             if group not in <[ socket tooltip djButton chat sio playback playlist notify drag audience anim HistorySyncEvent user ShowUserRolloverEvent ]> and type not in <[ ChatFacadeEvent:muteUpdate PlayMediaEvent:play userPlaying:update context:update ]> or logEventsToConsole.logAll
                 console.log "#{getTime!} [#type]", args
             else if group == \socket and type not in <[ socket:chat socket:vote socket:grab socket:earn ]>
                 console.log "#{getTime!} [#type]", args
 
-        addListener _$context, \PlayMediaEvent:play, (data) ->
+        addListener _$context, \PlayMediaEvent:play, (data) !->
             #data looks like {type: "PlayMediaEvent:play", media: n.hasOwnProperty.i, startTime: "1415645873000,0000954135", playlistID: 5270414, historyID: "d38eeaec-2d26-4d76-8029-f64e3d080463"}
 
             console.log "#{getTime!} [SongInfo]", "playlist: #{data.playlistID}", "historyID: #{data.historyID}"
@@ -123,53 +123,58 @@ module \logEventsToConsole, do
 ####################################*/
 module \logGrabbers, do
     require: <[ votes ]>
-    setup: ({addListener, replace}) ->
+    setup: ({addListener, replace}) !->
         grabbers = {}
-        replace votes, \grab, (g_) -> return (uid) ->
+        hasGrabber = false
+        replace votes, \grab, (g_) !-> return (uid) !->
             u = getUser(uid)
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
             grabbers[uid] = u.un
-            g_.call(this, uid)
-        addListener API, \advance, ->
-            console.log "[logGrabbers] the last song was grabbed by #{humanList [name for ,name of grabbers]}"
-            grabbers := {}
+            hasGrabber := true
+            return g_.call(this, uid)
+        addListener API, \advance, !->
+            if grabbers
+                console.log "[logGrabbers] the last song was grabbed by #{humanList [name for ,name of grabbers]}"
+                grabbers := {}
+            else
+                hasGrabber := false
 
 /*####################################
 #             DEV TOOLS              #
 ####################################*/
 module \InternalAPI, do
     optional: <[ users playlists user_ app  ]>
-    setup: ->
+    setup: !->
         for k,v of API
             if not @[k]
                 @[k] = v
             else if @[k] == \user
                 let k=k
-                    @[k] = -> getUserInternal(API[k]!?.id)
+                    @[k] = !-> getUserInternal(API[k]!?.id)
         this <<<< Backbone.Events
     chatLog: API.chatLog
-    getAdmins: -> return users?.filter (.get(\gRole) == 5)
-    getAmbassadors: -> return users?.filter (u) -> 0 < u.get(\gRole) < 5
+    getAdmins: !-> return users?.filter (.get(\gRole) == 5)
+    getAmbassadors: !-> return users?.filter (u) !-> 0 < u.get(\gRole) < 5
     getAudience: users?.getAudience
-    getBannedUsers: -> ...
-    getDJ: -> return getUserInternal(API.getDJ!?.id)
-    getHistory: -> return roomHistory
-    getHost: -> return getUserInternal(API.getHost!?.id)
-    getMedia: -> return currentMedia?.get \media
-    getNextMedia: -> return playlists?.activeMedia.0
-    getUser: -> return user_
-    getUsers: -> return users
+    getBannedUsers: !-> ...
+    getDJ: !-> return getUserInternal(API.getDJ!?.id)
+    getHistory: !-> return roomHistory
+    getHost: !-> return getUserInternal(API.getHost!?.id)
+    getMedia: !-> return currentMedia?.get \media
+    getNextMedia: !-> return playlists?.activeMedia.0
+    getUser: !-> return user_
+    getUsers: !-> return users
     getPlaylist: window.getActivePlaylist
-    getPlaylists: -> return playlists
-    getStaff: -> return users?.filter (u) -> return u.get(\role) # > 1 or u.get(\gRole)
-    getWaitList: -> return app?.room.waitlist
+    getPlaylists: !-> return playlists
+    getStaff: !-> return users?.filter (u) !-> return u.get(\role) # > 1 or u.get(\gRole)
+    getWaitList: !-> return app?.room.waitlist
 
 
 /*####################################
 #           DOWNLOAD LINK            #
 ####################################*/
 module \downloadLink, do
-    setup: ({css}) ->
+    setup: ({css}) !->
         icon = getIcon \icon-arrow-down
         css \downloadLink, "
             .p0ne-downloadlink::before {
@@ -183,7 +188,7 @@ module \downloadLink, do
                 background-image: #{icon.image};
             }
         "
-    module: (name, filename, dataOrURL) ->
+    module: (name, filename, dataOrURL) !->
         if not dataOrURL
             dataOrURL = filename; filename = name
         if dataOrURL and not isURL(dataOrURL)
@@ -205,30 +210,30 @@ module \downloadLink, do
 ####################################*/
 window <<<<
     roomState: !-> ajax \GET, \rooms/state
-    export_: (name) -> return (data) !-> console.log "[export] #name =",data; window[name] = data
-    searchEvents: (regx) ->
+    export_: (name) !-> return (data) !-> console.log "[export] #name =",data; window[name] = data
+    searchEvents: (regx) !->
         regx = new RegExp(regx, \i) if regx not instanceof RegExp
         return [k for k of _$context?._events when regx.test k]
 
 
-    listUsers: ->
+    listUsers: !->
         res = ""
         for u in API.getUsers!
             res += "#{u.id}\t#{u.username}\n"
         console.log res
-    listUsersByAge: ->
-        a = API.getUsers! .sort (a,b) ->
+    listUsersByAge: !->
+        a = API.getUsers! .sort (a,b) !->
             a = +a.joined.replace(/\D/g,'')
             b = +b.joined.replace(/\D/g,'')
             return (a > b && 1) || (a == b && 0) || -1
 
+        res = ""
         for u in a
-            console.log u.joined.replace(/T|\..+/g, ' '), u.username
-    joinRoom: (slug) ->
-        ajax \POST, \rooms/join, {slug}
+            res += "#{u.joined.replace(/T|\..+/g, ' ')}\t#{u.username}\n"
+        console.log res
 
 
-    findModule: (test) ->
+    findModule: (test) !->
         if typeof test == \string and window.l
             test = l(test)
         res = []
@@ -239,7 +244,9 @@ window <<<<
                 res[*] = module
         return res
 
-    requireHelperHelper: (module) ->
+    requireHelperHelper: (module) !->
+        /* this function will try to find a nice requireHelper rule for the given plug.dj module
+         * the output is a function shorthand in LiveScript */
         if typeof module == \string
             module = require(module)
         return false if not module
@@ -275,7 +282,7 @@ window <<<<
         if typeof ignoreWarnings == \function
             cb = ignoreWarnings; ignoreWarnings = false
         else if not cb
-            cb = (slug, err) -> console[err && \error || \log] "username '#username': ", err || slug
+            cb = (slug, err) !-> console[err && \error || \log] "username '#username': ", err || slug
 
         if not ignoreWarnings
             if username.length < 2
@@ -289,12 +296,13 @@ window <<<<
             else
                 ignoreWarnings = true
         if ignoreWarnings
-            return $.getJSON "https://plug.dj/_/users/validate/#{encodeURIComponent username}", (d) ->
+            return $.getJSON "https://plug.dj/_/users/validate/#{encodeURIComponent username}", (d) !->
                 cb(d && d.data.0?.slug)
 
-    getRequireArg: (haystack, needle) ->
-        # this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
-        # e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
+    getRequireArg: (haystack, needle) !->
+        /* this is a helper function to be used in the console to quickly find a module ID corresponding to a parameter and vice versa in the head of a javascript requirejs.define call
+         * e.g. getRequireArg('define( "da676/a5d9e/a7e5a/a3e8f/fa06c", [ "jquery", "underscore", "backbone", "da676/df0c1/fe7d6", "da676/ae6e4/a99ef", "da676/d8c3f/ed854", "da676/cba08/ba3a9", "da676/cba08/ee33b", "da676/cba08/f7bde", "da676/cba08/d0509", "da676/eb13a/b058e/c6c93", "da676/eb13a/b058e/c5cd2", "da676/eb13a/f86ef/bff93", "da676/b0e2b/f053f", "da676/b0e2b/e9c55", "da676/a5d9e/d6ba6/f3211", "hbs!templates/room/header/RoomInfo", "lang/Lang" ], function( e, t, n, r, i, s, o, u, a, f, l, c, h, p, d, v, m, g ) {', 'u') ==> "da676/cba08/ee33b"
+        */
         [a, b] = haystack.split "], function("
         a .= substr(a.indexOf('"')).split('", "')
         b .= substr(0, b.indexOf(')')).split(', ')
@@ -307,7 +315,7 @@ window <<<<
 
 
 
-    logOnce: (base, event) ->
+    logOnce: (base, event) !->
         if not event
             event = base
             if -1 != event.indexOf \:
@@ -316,7 +324,7 @@ window <<<<
                 base = API
         base.once \event, logger(event)
 
-    usernameToSlug: (un) ->
+    usernameToSlug: (un) !->
         /* note: this is NOT really accurate! */
         lastCharWasLetter = false
         res = ""
@@ -337,19 +345,19 @@ window <<<<
         # some more characters get collapsed
         # some characters get converted to \u####
 
-    reconnectSocket: ->
+    reconnectSocket: !->
         _$context .trigger \force:reconnect
-    ghost: ->
-        $.get '/'
+    ghost: !->
+        return $.get '/'
 
 
-    getAvatars: ->
+    getAvatars: !->
         API.once \p0ne:avatarsloaded, logger \AVATARS
-        $.get $("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr(\src) .then (d) ->
-          if d.match /manifest.*/
-            API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
+        $.get $("script[src^='https://cdn.plug.dj/_/static/js/avatars.']").attr(\src) .then (d) !->
+            if d.match /manifest.*/
+                API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
 
-    parseYTGetVideoInfo: (d, onlyStripHTML) ->
+    parseYTGetVideoInfo: (d, onlyStripHTML) !->
         #== Parser ==
         # useful for debugging mediaDownload()
         if typeof d == \object
@@ -383,10 +391,12 @@ window <<<<
         else
             return d
 
-if not window.chrome # little fix for non-WebKit browsers to allow copying data to the clipboard
+if not window.chrome
+    # little fix for non-WebKit browsers to allow copying data to the clipboard
+    # on WebKit browsers like Google Chrome, you can use `copy("string")` in the console
     $.getScript "https://cdn.p0ne.com/script/zclip/jquery.zclip.min.js"
-        .then ->
-            window.copy = (str, title) ->
+        .then !->
+            window.copy = (str, title) !->
                 appendChat $ "<button class='cm p0ne-notif'> copy #{title ||''}</button>"
                     .zclip do
                         path: "https://cdn.p0ne.com/script/zclip/ZeroClipboard.swf"
@@ -394,7 +404,7 @@ if not window.chrome # little fix for non-WebKit browsers to allow copying data 
                     #$ '<div class="cm p0ne-notif">'
                     #.append do
             console.info "[copy polyfill] loaded polyfill for copy() with zclip"
-        .fail ->
+        .fail !->
             console.warn "[copy polyfill] failed to load zclip!"
 
 
@@ -403,7 +413,7 @@ if not window.chrome # little fix for non-WebKit browsers to allow copying data 
 ####################################*/
 module \renameUser, do
     require: <[ users ]>
-    module: (idOrName, newName) ->
+    module: (idOrName, newName) !->
         u = users.get(idOrName)
         if not u
             idOrName .= toLowerCase!
@@ -421,9 +431,12 @@ module \renameUser, do
         rup[id] = newName
 
 
-do ->
+do !->
+    # for easily checking _$context events using your console's autocomplete
+    # of course, with the recent WebKit update this isn't really necessary for WebKit users
+    # https://i.imgur.com/GOeF0Ma.png
     window._$events =
-        _update: ->
+        _update: !->
             for k,v of _$context?._events
                 @[k.replace(/:/g,'_')] = v
     _$events._update!
@@ -434,15 +447,10 @@ do ->
 ####################################*/
 module \export_, do
     require: <[ downloadLink ]>
-    exportRCS: ->
-        # $ '.p0ne-downloadlink' .remove!
-        for k,v of localStorage
-            downloadLink "plugDjChat '#k'", k.replace(/plugDjChat-(.*?)T(\d+):(\d+):(\d+)\.\d+Z/, "$1 $2.$3.$4.html"), v
-
-    exportPlaylists: ->
+    exportPlaylists: !->
         # $ '.p0ne-downloadlink' .remove!
         for let pl in playlists
-            $.get "/_/playlists/#{pl.id}/media" .then (data) ->
+            $.get "/_/playlists/#{pl.id}/media" .then (data) !->
                 downloadLink "playlist '#{pl.name}'",  "#{pl.name}.txt", data
 
 
@@ -450,7 +458,7 @@ module \export_, do
 /*####################################
 #              COPY CHAT             #
 ####################################*/
-window.copyChat = (copy) ->
+window.copyChat = (copy) !->
     $ '#chat-messages img' .fixSize!
     host = p0ne.host
     res = """
@@ -496,3 +504,14 @@ window.copyChat = (copy) ->
         </body>
     """
     copy res
+
+/*
+module \_$contextUpdateEvent, do
+    require: <[ _$context ]>
+    setup: ({replace}) !->
+        for fn in <[ on off onEarly ]>
+            replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
+                fn_ ...
+                _$context .trigger \context:update, type, cb, context
+                return this
+*/

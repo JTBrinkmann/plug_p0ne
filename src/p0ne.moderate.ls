@@ -11,11 +11,11 @@
 ####################################*/
 module \enableModeratorModules, do
     require: <[ user_ ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         prevRole = user_.get \role
         $body.addClass \user-is-staff if user.isStaff
 
-        addListener user_, \change:role, (user_, newRole) ->
+        addListener user_, \change:role, (user_, newRole) !->
             console.log "[p0ne] change:role from #prevRole to #newRole"
             if newRole > 1 and prevRole < 2
                 console.info "[p0ne] enabling moderator modules"
@@ -34,7 +34,7 @@ module \enableModeratorModules, do
                 $body.removeClass \user-is-staff
                 user_.isStaff = false
             prevRole := newRole
-    disable: ->
+    disable: !->
         $body.removeClass \user-is-staff
 
 
@@ -46,8 +46,8 @@ module \warnOnHistory, do
     displayName: 'Warn on History'
     moderator: true
     settings: \moderation
-    setup: ({addListener}) ->
-        addListener API, \advance, (d) ~> if d.media
+    setup: ({addListener}) !->
+        addListener API, \advance, (d) !~> if d.media
             hist = API.getHistory!
             inHistory = 0; skipped = 0
             # note: the CIDs of YT and SC songs should not be able to cause conflicts
@@ -78,7 +78,7 @@ module \disableChatDelete, do
     moderator: true
     displayName: 'Show deleted messages'
     settings: \moderation
-    setup: ({replace_$Listener, addListener, $createPersistent, css}) ->
+    setup: ({replace_$Listener, addListener, $createPersistent, css}) !->
         css \disableChatDelete, '
             .deleted {
                 border-left: 2px solid red;
@@ -98,11 +98,11 @@ module \disableChatDelete, do
         $body .addClass \p0ne-showDeletedMessages
 
         lastDeletedCid = null
-        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) ->
+        addListener _$context, \socket:chatDelete, ({{c,mi}:p}) !->
             markAsDeleted(c, users.get(mi)?.get(\username) || mi)
             lastDeletedCid := c
-        #addListener \early, _$context, \chat:delete, -> return (cid) ->
-        replace_$Listener \chat:delete, -> (cid) ->
+        #addListener \early, _$context, \chat:delete, !-> return (cid) !->
+        replace_$Listener \chat:delete, !-> (cid) !->
             markAsDeleted(cid) if cid != lastDeletedCid
 
         function markAsDeleted cid, moderator
@@ -127,7 +127,7 @@ module \disableChatDelete, do
                 if isLast
                     chat.lastType = \p0ne-deleted
 
-    disable: ->
+    disable: !->
         $body .removeClass \p0ne-showDeletedMessages
 
 
@@ -138,13 +138,13 @@ module \chatDeleteOwnMessages, do
     moderator: true
     #displayName: 'Delete Own Messages'
     #settings: \moderation
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         $cm! .find "fromID-#{userID}"
             .addClass \deletable
             .append do
                 $ '<div class="delete-button">Delete</div>'
                     .click delCb
-        addListener API, \chat, ({cid, uid}:message) -> if uid == userID
+        addListener API, \chat, ({cid, uid}:message) !-> if uid == userID
             getChat(cid)
                 .addClass \deletable
                 .append do
@@ -165,13 +165,13 @@ module \warnOnMehers, do
     _settings:
         instantWarn: false
         maxMehs: 3
-    setup: ({addListener},,, m_) ->
+    setup: ({addListener},,, m_) !->
         if m_
             @users = m_.users
         users = @users
 
         current = {}
-        addListener API, \voteUpdate, (d) ~>
+        addListener API, \voteUpdate, (d) !~>
             current[d.user.id] = d.vote
             if d.vote == -1 and d.user.uid != userID
                 console.error "#{formatUser d.user, true} meh'd this song"
@@ -185,7 +185,7 @@ module \warnOnMehers, do
                         </div>"
 
         lastAdvance = 0
-        addListener API, \advance, (d) ~>
+        addListener API, \advance, (d) !~>
             d = Date.now!
             for k,v of current
                 if v == -1
@@ -209,9 +209,11 @@ module \warnOnMehers, do
         var resetTimer
         $ "
             <form>
-                <label><input type=radio name=max-mehs value=on #{if @_settings.instantWarn then \checked else ''}> alert instantly</label><br>
                 <label>
-                    <input type=radio name=max-mehs value=off #{if @_settings.instantWarn then '' else \checked}> alert after <input type=number value='#{@_settings.maxMehs}' class=max-mehs> consequitive mehs
+                    <input type=radio name=max-mehs value=on #{if @_settings.instantWarn then \checked else ''}> alert instantly
+                </label><br>
+                <label>
+                    <input type=radio name=max-mehs value=off #{if @_settings.instantWarn then '' else \checked}> alert after <input type=number value='#{@_settings.maxMehs}' class='p0ne-settings-input max-mehs'> consequitive mehs
                 </label>
             </form>"
             .append do
@@ -260,7 +262,7 @@ module \afkTimer, do
     lastActivity: {}
     _settings:
         highlightOver: 43.min
-    setup: ({addListener, $create},,,m_) ->
+    setup: ({addListener, $create, replace},,,m_) !->
         # initialize users
         settings = @_settings
         @start = start = Date.now!
@@ -274,23 +276,23 @@ module \afkTimer, do
             .append $afkCount = $create '<div class=p0ne-toolbar-count>'
 
         # set up event listeners to update the lastActivity time
-        addListener API, 'socket:skip socket:grab', (id) -> updateUser id
-        addListener API, 'userJoin socket:nameChanged', (u) -> updateUser u.id
-        addListener API, 'chat', (u) -> updateUser u.uid
-        addListener API, 'socket:gifted', (e) -> updateUser e.s/*ender*/
-        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) -> updateUser u.mi
-        addListener API, 'userLeave', (u) -> delete lastActivity[u.id]
+        addListener API, 'socket:skip socket:grab', (id) !-> updateUser id
+        addListener API, 'userJoin socket:nameChanged', (u) !-> updateUser u.id
+        addListener API, 'chat', (u) !-> updateUser u.uid
+        addListener API, 'socket:gifted', (e) !-> updateUser e.s/*ender*/
+        addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
+        addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
 
         chatHidden = $cm!.parent!.css(\display) == \none
         if _$context? and (app? or userList?)
-            addListener _$context, 'show:users show:waitlist', ->
+            addListener _$context, 'show:users show:waitlist', !->
                 chatHidden := true
-            addListener _$context, \show:chat, ->
+            addListener _$context, \show:chat, !->
                 chatHidden := false
 
         # regularly update the AFK list / count
         lastAfkCount = 0
-        @timer = repeat 60_000ms, ->
+        @timer = repeat 60_000ms, !->
             if chatHidden
                 forceRerender!
             else
@@ -315,11 +317,12 @@ module \afkTimer, do
         d = 0
         var noActivityYet
         for Constr, fn in [RoomUserRow, WaitlistRow]
-            replace Constr::, \render, (r_) -> return (isUpdate) ->
+            replace Constr::, \render, (r_) !-> return (isUpdate) !->
                 r_ ...
                 if not d
                     d := Date.now!
-                    requestAnimationFrame -> d := 0; noActivityYet := null
+                    <-! requestAnimationFrame
+                    d := 0; noActivityYet := null
                 ago = d - lastActivity[@model.id]
                 if lastActivity[@model.id] <= start
                     time = noActivityYet ||= ">#{humanTime(ago, true)}"
@@ -334,7 +337,8 @@ module \afkTimer, do
                 $span .addClass \p0ne-last-activity-update if isUpdate
                 @$el .append $span
                 if isUpdate
-                    requestAnimationFrame -> $span .removeClass \p0ne-last-activity-update
+                    <-! requestAnimationFrame
+                    $span .removeClass \p0ne-last-activity-update
 
 
 
@@ -351,12 +355,20 @@ module \afkTimer, do
 
         forceRerender!
 
-    disable: ->
+    disable: !->
         clearInterval @timer
         $ \#waitlist-button
             .removeClass \p0ne-toolbar-highlight
-    disableLate: ->
+        #$ '.app-right .p0ne-last-activity' .remove!
+    disableLate: !->
         for r in app?.room.waitlist.rows || userList?.listView?.rows ||[]
             r.render!
 
 
+module \forceSkipButton, do
+    moderator: true
+    setup: ({$create}, m) !->
+        @$btn = $create '<div class=p0ne-skip-btn><i class="icon icon-skip"></i></div>'
+            .insertAfter \#playlist-panel
+            .click @~onClick
+    onClick: API.moderateForceSkip

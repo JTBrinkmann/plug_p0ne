@@ -121,7 +121,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replaceSansHTML @regexp, (_, pronoun, s, possessive, i) ~>
+        msg.message .= replaceSansHTML @regexp, (_, pronoun, s, possessive, i) !~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -220,17 +220,17 @@ module \ponify, do
         wink:           "https://i.imgur.com/9fo7ZW3.png"
 
 
-    setup: ({addListener, replace, css}) ->
+    setup: ({addListener, replace, css}) !->
         @regexp = //
             \b(an?\s+)?(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
         //gi
-        addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
+        addListener API, \chat:plugin, @~ponifyMsg
         if emoticons?
             aEM = {}<<<<emoticons.autoEmoteMap
             for emote, {name, url} of @autoEmotiponies
                 aEM[emote] = name
                 @emotiponies[name] = url
-            replace emoticons, \autoEmoteMap, -> return aEM
+            replace emoticons, \autoEmoteMap, !-> return aEM
 
             m = ^^emoticons.map
             ponyCSS = """
@@ -249,7 +249,7 @@ module \ponify, do
                     m[emote] = "#emote ponimoticon" # hax to add .ponimoticon class
                 ponyCSS += ".emoji-#emote { background: url(#url) }\n"
             css \ponify, ponyCSS
-            replace emoticons, \map, -> return m
+            replace emoticons, \map, !-> return m
             emoticons.update?!
-    disable: ->
+    disable: !->
         emoticons.update?!

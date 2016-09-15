@@ -12,7 +12,7 @@
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
-    setup: ({$create, addListener},,,oldModule) !->
+    setup: ({$create, addListener}, p0neSettings,, oldModule) !->
         @$create = $create
 
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
@@ -52,9 +52,11 @@ module \p0neSettings, do
         for ,module of p0ne.modules when not module.loading
             @addModule module
 
-        requestAnimationFrame !~>
+
+        do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
             for group, $el of @groups when @_settings.groupToggles[group]
                 $el .trigger \p0ne:resize
+
 
 
         #= add DOM event listeners =
@@ -65,21 +67,24 @@ module \p0neSettings, do
         addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
             $s = $ this .parent!
             if $s.hasClass \open # close
+                groupToggles[$s.data \group] = false
                 $s
                     .removeClass \open
                     .css height: 40px
                     #.stop! .animate height: 40px, \slow
-                groupToggles[$s.data \group] = false
             else
+                groupToggles[$s.data \group] = true
                 $s
                     .addClass \open
                     #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
                     .trigger \p0ne:resize
-                groupToggles[$s.data \group] = true
             e.preventDefault!
 
         addListener $body, \p0ne:resize, \.p0ne-settings-group, (e) !->
-            $ this .css height: @scrollHeight
+            $this = $ this
+            if p0neSettings._settings.groupToggles[$this.data \group]
+                $this .css height: @scrollHeight
+            $this .scrollTop 0
 
         addListener $ppW, \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
@@ -137,7 +142,7 @@ module \p0neSettings, do
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
-            @settingsExtra true, module
+            @loadSettingsExtra true, module
             if @_settings.groupToggles[module.settings]
                 requestAnimationFrame !~>
                     @groups[module.settings] .trigger \p0ne:resize
@@ -159,11 +164,9 @@ module \p0neSettings, do
             module_._$settingsExtra?
                 .stop!
                 .slideUp !->
-                    $ this .remove!
-
-            if @_settings.groupToggles[module.settings]
-                requestAnimationFrame !~>
-                    @groups[module.settings] .trigger \p0ne:resize
+                    $ this
+                        .trigger \p0ne:resize
+                        .remove!
 
         addListener $body, \click, \#app-menu, !~> @toggleMenu false
         if _$context?
@@ -256,25 +259,24 @@ module \p0neSettings, do
                 "
                 .data \module, module
 
-            if not module.disabled
-                if module_?._$settings?.parent! .is $s
-                    module_._$settings
-                        .after do
-                            module._$settings .addClass \updated
-                        .remove!
-                    sleep 2_000ms, !->
-                        module._$settings .removeClass \updated
-                    @settingsExtra false, module, module_ if not module.disabled
-                else
-                    module._$settings .appendTo $s
+            if module_?._$settings?.parent! .is $s
+                module_._$settings
+                    .after do
+                        module._$settings .addClass \updated
+                    .remove!
+                sleep 2_000ms, !->
+                    module._$settings .removeClass \updated
+                @loadSettingsExtra false, module, module_ if not module.disabled
+            else
+                module._$settings .appendTo $s
 
-                    # render extra settings element if module is enabled
-                    @settingsExtra false, module if not module.disabled
-
+                # render extra settings element if module is enabled
+                @loadSettingsExtra false, module if not module.disabled
 
 
 
-    settingsExtra: (autofocus, module, module_) !->
+
+    loadSettingsExtra: (autofocus, module, module_) !->
         try
             module_?._$settingsExtra? .remove!
             if module.settingsExtra
@@ -285,9 +287,12 @@ module \p0neSettings, do
                 # using rAF because otherwise jQuery calculates the height incorrectly
                 requestAnimationFrame !~>
                     module._$settingsExtra
-                        .slideDown!
+                        .slideDown ->
+                            module._$settingsExtra .trigger \p0ne:resize
                     if autofocus
                         module._$settingsExtra .find \input .focus!
         catch err
             console.error "[#{module.name}] error while processing settingsExtra", err.stack
-            module._$settingsExtra? .remove!
+            module._$settingsExtra?
+                .remove!
+            @groups[module.settings] .trigger \p0ne:resize

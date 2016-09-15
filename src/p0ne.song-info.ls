@@ -21,7 +21,7 @@ module \songInfo, do
         A panel with the song's description and links to the artist and song.
         Click on the now-playing-bar (in the top-center of the page) to open it.
     '''
-    setup: ({addListener, $create, css}) ->
+    setup: ({addListener, $create, css}) !->
         @$create = $create
         css \songInfo, '
             #now-playing-bar {
@@ -31,7 +31,7 @@ module \songInfo, do
 
         @$el = $create \<div> .addClass \p0ne-song-info .appendTo \body
         @loadBind = @~load
-        addListener $(\#now-playing-bar), \click, (e) ~>
+        addListener $(\#now-playing-bar), \click, (e) !~>
             $target = $ e.target
             return if  $target .closest \#history-button .length or $target .closest \#volume .length
             if not @visible # show
@@ -50,11 +50,11 @@ module \songInfo, do
             @visible = not @visible
 
         return if not _$context
-        addListener _$context,  'show:user show:history show:dashboard dashboard:disable', ~> if @visible
+        addListener _$context,  'show:user show:history show:dashboard dashboard:disable', !~> if @visible
             @visible = false
             @$el .removeClass \expanded
             API.off \advance, @loadBind
-    load: ({media}, isRetry) ->
+    load: ({media}, isRetry) !->
         console.log "[song-info]", media
         if @lastMediaID == media.id
             @showInfo media
@@ -62,18 +62,18 @@ module \songInfo, do
             @lastMediaID = media.id
             @mediaData = null
             mediaLookup media, do
-                fail: (err) ~>
+                fail: (err) !~>
                     console.error "[song-info]", err
                     if isRetry
                         @$el .html "error loading, retrying…"
                         load {media}, true
                     else
                         @$el .html "Couldn't load song info, sorry =("
-                success: (@mediaData) ~>
+                success: (@mediaData) !~>
                     console.log "[song-info] got data", @mediaData
                     @showInfo media
             API.once \advance, @loadBind
-    showInfo: (media) ->
+    showInfo: (media) !->
         return if @lastMediaID != media.id or @disabled # skip if another song is already playing
         d = @mediaData
 
@@ -87,11 +87,11 @@ module \songInfo, do
             $meta.addClass \soundcloud
 
         $ \<span> .addClass \p0ne-song-info-author      .appendTo $meta
-            .click -> mediaSearch media.author
+            .click !-> mediaSearch media.author
             .attr \title, "search for '#{media.author}'"
             .text media.author
         $ \<span> .addClass \p0ne-song-info-title       .appendTo $meta
-            .click -> mediaSearch media.title
+            .click !-> mediaSearch media.title
             .attr \title, "search for '#{media.title}'"
             .text media.title
         $ \<br>                                         .appendTo $meta
@@ -123,5 +123,5 @@ module \songInfo, do
         $ \<div> .addClass \p0ne-song-info-description  .appendTo @$el
             .html formatPlainText(d.description)
         #$ \<ul> .addClass \p0ne-song-info-remixes      #ToDo
-    disable: ->
+    disable: !->
         @$el? .remove!

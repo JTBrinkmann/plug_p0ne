@@ -367,17 +367,11 @@ module \streamSettings, do
         replace Playback::, \onPlaybackEnter, !-> return !->
             if currentMedia.get(\media)
                 @$controls .show!
-        replace Playback::, \onSnoozeClick, (snooze) !->
-            fn = !->
-                if not isSnoozed!
-                    changeStream \off, "Snoozed"
-                    @reset!
-            fn.vanilla = snooze.vanilla || snooze
-            if snooze.vanilla
-                window.snooze = snooze.vanilla
-            else
-                window.snooze = _.bind snooze, this
-            return fn
+        replace Playback::, \onSnoozeClick, !-> return !->
+            if not isSnoozed!
+                changeStream \off, "Snoozed"
+                @reset!
+        window.snooze = !-> changeStream \off, "Snoozed"
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do
@@ -405,6 +399,7 @@ module \streamSettings, do
             revert Playback::, \onRemainingChange
 
             # update events with bound listeners
+            window.snooze = playback~onSnoozeClick
             replaceListener _$context, \change:streamDisabled, Playback, !-> return playback~onMediaChange
             replaceListener currentMedia, \change:media, Playback, !-> return playback~onMediaChange
             replaceListener currentMedia, \change:volume, Playback, !-> return playback~onVolumeChange

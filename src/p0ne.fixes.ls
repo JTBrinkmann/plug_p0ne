@@ -54,7 +54,7 @@ replaced with:
 /*
 module \fixPseudoAdvance, do
     require: <[ socketEvents ]>
-    setup: ({replace}) ->
+    setup: ({replace}) !->
         var lastHistoryID
         replace socketEvents, \advance, (a_) !-> return (data) !->
             if lastHistoryID != data.h
@@ -288,18 +288,18 @@ module \fixStuckDJButton, do
     settings: \fixes
     displayName: 'Fix Stuck DJ Button'
     require: <[ _$context ]>
-    setup: ({addListener}) ->
+    setup: ({addListener}) !->
         var fixTimeout
         $djbtn = $ \#dj-button
         hasSpinner = $djbtn.find \.spinner .length != 0
-        addListener _$context, \djButton:update, ->
+        addListener _$context, \djButton:update, !->
             if $djbtn.find \.spinner .length == 0
                 hasSpinner := false
                 clearTimeout fixTimeout
             else if not hasSpinner
                 hasSpinner := true
-                fixTimeout = sleep 10_000ms, ->
-                    getRoomState! .then (d) ->
+                fixTimeout = sleep 10_000ms, !->
+                    getRoomState! .then (d) !->
                         d = d.data.0
                         if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
                             if app?.room.djButton

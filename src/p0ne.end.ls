@@ -1,4 +1,4 @@
-_.defer ->
+_.defer !->
     remaining = 1
     for name, m of p0ne.modules when m.loading
         remaining++

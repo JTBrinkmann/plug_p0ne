@@ -16,7 +16,7 @@
 }
 /* blurred background */
 #history-panel, .popout, #chatlog, .app-right, #playlist-panel, #playlist-panel .actions, #user-rollover, #footer-user .back,
-#dashboard, .pop-menu, .p0ne-song-info {
+#dashboard, .pop-menu, .p0ne-song-info, #user-view {
     background: url(https://i.imgur.com/cWuL5f4.png) fixed center center / cover !important;
 }
 
@@ -29,7 +29,7 @@
 .dialog-body, #search-suggestion ul, #search-suggestion li, #app-menu .list,
 .app-right .friends, .pop-menu ul, #history-button,
 /*.popout #vote #woot, .popout #vote #grab, .popout #vote #meh,*/
-#user-rollover .meta, #footer-user,
+#user-rollover .meta, #footer-user, #user-menu,
 #dialog-ban-user .duration .toggle, #dialog-mute-user .duration .toggle,
 #video-only-dj {
     background: transparent !important;
@@ -38,13 +38,11 @@
 /* slightly opaque background */
 #playlist-panel .playlist-media-item:hover, #playlist-panel .playlist-media-first-item:hover,
 #playlist-panel .playlist-media-last-item:hover, #search-bar, #filter-bar, .youtube-input,
-#chat .emote, #chat .message, #user-menu, #user-inventory>.avatars .top, #user-rollover .info,
+#chat .emote, #chat .message, #user-inventory>.avatars .top, #user-rollover .info,
 .user-content.profile .notifications .row, .dialog .dialog-body .divider, .experience .xp .bar,
-#user-settings .container button, .dropdown, #volume .slider,
-.input-background, .search, #user-friends .list .row, .app-right .group,
-.pop-menu li:hover, .user-content .grid .cell:hover>.top,
-#user-inventory, #user-store, #user-friends, #user-settings,
-#history-panel .history {
+#user-settings .container button, .dropdown, #volume .slider, .input-background, .search,
+#user-friends .list .row, .app-right .group, .pop-menu li:hover, .user-content .grid .cell:hover>.top,
+#history-panel .history, .subscribe-button {
     background: rgba(0,0,0,0.2) !important;
 }
 
@@ -116,7 +114,7 @@
 
 /*= small, unsorted adjustments */
 #user-view {
-    background: linear-gradient(to bottom, rgb(44, 26, 97) 0, rgb(5, 82, 98) 100%) !important;
+    /* background: linear-gradient(to bottom, hsl(255, 58%, 20%) 0, hsl(190, 90%, 15%) 100%) !important; */
 }
 .communities .host {
     margin-top: -85px !important;
@@ -200,7 +198,8 @@
     border-radius: 90px;
     transition: border-radius 0.2s ease-out;
 }
-#user-inventory>.avatars .grid .cell:hover>.top, #user-inventory>.avatars .my-avatars .grid .cell.selected .top {
+#user-inventory .cell:hover>.top, #user-inventory .cell.selected .top,
+#user-store .cell:hover>.top, #user-store .cell.selected .top {
     border-radius: 12px
 }
 #user-friends .list .row {
@@ -511,6 +510,12 @@
     border-top: 1px solid rgba(0,0,0,0.5);
 }
 
+/* fix flashing when changing the panel */
+#user-inventory, #user-inventory, #user-inventory,
+#user-store, #user-store, #user-store {
+    left: 220px;
+}
+
 #user-view .tab-menu {
     left: 4px !important;
     background: transparent;
@@ -726,13 +731,21 @@
 }
 
 
-
-
-
-
+/*== fix user-rollover position ==*/
 #user-rollover.chat {
     left: auto !important;
     right: 352px;
+}
+
+/*== skip button ==*/
+.p0ne-skip-btn {
+    background: transparent;
+    transition: background .2s ease-out;
+}
+.p0ne-skip-btn:hover {
+    background: rgba(255,0,0, 0.2);
+    box-shadow: inset 0 0 6px rgba(255,0,0, 0.5);
+    border-radius: 5px;
 }
 
 
@@ -768,8 +781,9 @@
 #chat .fromID-3463504 .un {
     color: #04C9B2 !important;
 }
-#chat .fromID-3463504 .icon {
-    background: url(https://plug.unnoen.com/images/ranks/Host.png) !important;
+#chat .fromID-3463504 .icon-chat-host {
+  background-image: url(https://plug.unnoen.com/images/ranks/CoHost.png);
+  background-position: 0 0;
 }
 #chat .fromID-3463504.mention {
     background: rgba(47, 115, 107, 0.7) !important;

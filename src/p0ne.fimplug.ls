@@ -6,36 +6,85 @@
  * @copyright (c) 2015 J.-T. Brinkmann
  */
 
-/*not really implemented yet*/
-/*
-module \songNotifRuleskip, do
+/*####################################
+#              RULESKIP              #
+####################################*/
+module \forceSkipButtonRuleskip, do
     require: <[ songNotif ]>
-    setup: ({replace, addListener}) ->
-        replace songNotif, \skip, -> return ($notif) ->
-            songNotif.showDescription $notif, """
-                <span class="ruleskip-btn ruleskip-1" data-rule=1>!ruleskip 1 MLP-related only</span>
-                <span class="ruleskip-btn" data-rule=2>!ruleskip 2 Loops / Pictures</span>
-                <span class="ruleskip-btn" data-rule=3>!ruleskip 3 low-efford mixes</span>
-                <span class="ruleskip-btn" data-rule=4>!ruleskip 4 history</span>
-                <span class="ruleskip-btn" data-rule=6>!ruleskip 6 &gt;10min</span>
-                <span class="ruleskip-btn" data-rule=13>!ruleskip 13 clop/porn/gote</span>
-                <span class="ruleskip-btn" data-rule=14>!ruleskip 14 episode / not music</span>
-                <span class="ruleskip-btn" data-rule=23>!ruleskip 23 WD-only</span>
-            """
-        addListener chatDomEvents, \click, \.ruleskip-btn, (btn) ->
-            songNotif.hideDescription!
-            if num = $ btn .data \rule
-                API.sendChat "!ruleskip #num"
-*/
+    setup: ({addListener, replace, $create, css}) !->
+        css \forceSkipButtonRuleskip, '
+            .p0ne-skip-ruleskip {
+                position: absolute;
+                right: 0;
+                bottom: 54px;
+                width: 250px;
+                list-style: none;
+                line-height: 2em;
+                display: none;
+            }
+            .p0ne-skip-ruleskip li {
+                padding: 5px;
+                background: #222;
+            }
+            .p0ne-skip-ruleskip li:hover {
+                background: #444;
+            }
+        '
+        var $rulelist
+        visible = false
+        fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.name == \forceSkipButton
+            $rulelist := $create '
+                <ul class="p0ne-skip-ruleskip">
+                    <li data-rule=insta><b>insta skip</b></li>
+                    <li data-rule=30><b>!ruleskip 30</b> (WD-only &gt; brony artist)</li>
+                    <li data-rule=23><b>!ruleskip 23</b> (WD-only &gt; weird)</li>
+                    <li data-rule=20><b>!ruleskip 20</b> (alts)</li>
+                    <li data-rule=13><b>!ruleskip 13</b> (NSFW)</li>
+                    <li  data-rule=5><b>!ruleskip  5</b> (too long)</li>
+                    <li  data-rule=4><b>!ruleskip  4</b> (history)</li>
+                    <li  data-rule=3><b>!ruleskip  3</b> (low efford mix)</li>
+                    <li  data-rule=2><b>!ruleskip  2</b> (loop / slideshow)</li>
+                    <li  data-rule=1><b>!ruleskip  1</b> (nonpony)</li>
+                </ul>
+            ' .appendTo m.$btn
+
+            replace m, \onClick, !-> return (e) !->
+                if visible
+                    if num = $ e.target .closest \li .data \rule
+                        if num == \insta
+                            API.moderateForceSkip!
+                        else
+                            API.sendChat "!ruleskip #num"
+                    m.$btn .find \.icon:first .addClass \icon-skip .removeClass \icon-arrow-down
+                    $rulelist .fadeOut!
+                    visible := false
+                else if $ e.target .is '.p0ne-skip-btn, .p0ne-skip-btn>.icon'
+                    m.$btn .find \.icon:first .removeClass \icon-skip .addClass \icon-arrow-down
+                    $rulelist .fadeIn!
+                    visible := true
+
+            console.log "[forceSkipButton] 'fimplug !ruleskip list' patch applied"
+
+        addListener \early (window._$context || API), \advance, !-> if visible
+            # trying to attach the lister as early as possible to prevent accidental double-skips
+            visible := false
+            $rulelist .fadeOut!
+            $ \.p0ne-skip-btn>.icon:first .addClass \icon-skip .removeClass \icon-arrow-down
+
+        if forceSkipButton?
+            fn(forceSkipButton)
+
 
 /*####################################
 #              FIMSTATS              #
 ####################################*/
 module \fimstats, do
     settings: \pony
-    optional: <[ _$context ]>
+    optional: <[ _$context app playlists ]>
     disabled: true
-    setup: ({addListener, $create}, lookup) ->
+    _settings:
+        highlightUnplayed: false
+    setup: ({addListener, $create, replace}, lookup) !->
         css \fimstats, '
             .p0ne-fimstats {
                 position: absolute;
@@ -73,8 +122,10 @@ module \fimstats, do
                 color: #ddd;
             }
             #dialog-container .p0ne-fimstats {
-                bottom: 16px;
-                width: 100%;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 345px;
                 background: rgba(0,0,0, 0.8);
             }
             #dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }
@@ -100,81 +151,140 @@ module \fimstats, do
                 position: static;
                 margin-left: 5px;
             }
+
+            .p0ne-fimstats-unplayed {
+                color: lime;
+            }
         '
         $el = $create '<span class=p0ne-fimstats>' .appendTo \#room
-        addListener API, \advance, @updateStats = (d) ->
+        addListener API, \advance, @updateStats = (d) !~>
             d ||= media: API.getMedia!
             if d.media
-                lookup d.media
-                    .then (d) ->
-                        $el .html d.html
-                    .fail (err) ->
+                @currentSong = lookup d.media
+                    .then (res) !->
+                        $el .html res.html
+                    .fail (err) !->
                         $el .html err.html
 
             else
                 $el.html ""
         if _$context?
-            addListener _$context, \ShowDialogEvent:show, (d) -> #\PreviewEvent:preview, (d) ->
-                _.defer -> if d.dialog.options?.media
+            addListener _$context, \ShowDialogEvent:show, (d) !-> #\PreviewEvent:preview, (d) !->
+                _.defer !-> if d.dialog.options?.media
                     console.log "[fimstats]", d.dialog.options.media
-                    lookup d.dialog.options.media.toJSON!
-                        .then (d) ->
+                    lookup d.dialog.options.media
+                        .then (d) !->
                             $ \#dialog-preview .after do
-                                $ '<div class=p0ne-fimstats>' .html d.html
+                                $create '<div class=p0ne-fimstats>' .html d.html
         if app?.dialog?.dialog?.options?.media
             console.log "[fimstats]", that
             lookup that.toJSON!
-                .then (d) ->
+                .then (d) !->
                     $ \#dialog-preview .after do
-                        $ '<div class=p0ne-fimstats>' .html d.html
+                        $create '<div class=p0ne-fimstats>' .html d.html
 
         # prevent the p0ne settings from overlaying the ETA
         console.info "[fimstats] prevent p0neSettings overlay", $(\#p0ne-menu).css bottom: 54px + 21px
-        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) -> if m.name == \p0neSettings
+        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) !-> if m.name == \p0neSettings
             $ \#p0ne-menu .css bottom: 54px + 21px
+
+        # show stats for next song in playlist
+        if app? and playlists?
+            $yourNextMedia = $ \#your-next-media
+
+            @checkUnplayed = !->
+                if playlists.activeMedia.length > 0
+                    #console.log "[fimstats] next song", playlists.activeMedia.0
+                    lookup playlists.activeMedia.0 .then (d) !->
+                        if d.unplayed
+                            $yourNextMedia .addClass \p0ne-fimstats-unplayed
+
+            replace app.footer.playlist, \updateMeta, (uM_) !-> return !->
+                if playlists.activeMedia.length > 0
+                    if fimstats._settings.highlightUnplayed
+                        fimstats.checkUnplayed!
+                    uM_ ...
+                else
+                    clearTimeout @updateMetaBind
+            replace app.footer.playlist, \updateMetaBind, !-> return app.footer.playlist~updateMeta
+
+            # apply immediately
+            if @_settings.highlightUnplayed
+                @checkUnplayed!
 
         # show stats for current song
         @updateStats!
 
-    module: (media) ->
+    checkUnplayed: !-> # Dummy function in case we cannot get `playlists` (which is required)
+
+    lastMedia: {}
+    module: (media=API.getMedia!) !->
         $ \#p0ne-menu .css bottom: 54px
         def = $.Deferred!
+        if media.attributes and media.toJSON
+            media .= toJSON!
+        if @lastMedia.cid == media.cid and @lastMedia.format == media.format
+            return @lastDeferred
+        else
+            @lastMedia = media
+            @lastDeferred = def
         $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
-            .then (d,,res) ->
+            .then (d) !->
                 # note: `d.plays` (playcount) doesn't contain current play
                 d = d.data.0
                 # note: data is HTML escaped, but let's make sure
-                if res.responseText .hasAny ['<', '>']
-                    chatWarn do
-                        d.text = d.html = "fimstats data might contain malicious code (#{media.format}/#{media.cid})"
-                        "fimstats warning"
-                    def .reject!
-                    return
                 if d.firstPlay.time != d.lastPlay.time
                     d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{d.lastPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{sanitize d.lastPlay.user}
                             <span class=p0ne-fimstats-last-time>#{ago d.lastPlay.time*1000s_to_ms}</span>
                         </span>
                         <span class='p0ne-fimstats-field p0ne-fimstats-plays'>#{d.plays}</span>
-                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{sanitize d.firstPlay.user}
                             <span class=p0ne-fimstats-first-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>
                     "
                 else
                     d.text = "once played by #{d.firstPlay.user}"
                     d.html = "
-                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{d.firstPlay.user}
+                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{sanitize d.firstPlay.user}
                             <span class=p0ne-fimstats-once-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
                         </span>"
                 def.resolve d
-            .fail (d,,status) ->
+            .fail (d,,status) !->
                 if status == "Not Found"
                     d.text = "first played just now!"
                     d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>"
+                    d.unplayed = true
                     def.resolve d
                 #else if status == \Unauthorized
                 else
                     d.text = d.html = "error loading fimstats"
                     def.reject d
         return def.promise!
+
+        function sanitize str
+            return str .replace(/</g, '&lt;') .replace(/>/g, '&gt;')
+
+    settingsExtra: ($el) !->
+        fimstats = this
+        noReqMissing = app? or not playlists?
+        $ "
+            <form>
+                <label>
+                    <input type=checkbox class=p0ne-fimstats-unplayed-setting #{if @_settings.highlightUnplayed and noReqMissing then \checked else ''} #{if noReqMissing then '' else \disabled}> highlight next song if unplayed
+                </label>
+            </form>"
+            .appendTo do
+                $el .css paddingLeft: 15px
+        if noReqMissing
+            $el .on \click, \.p0ne-fimstats-unplayed-setting, !->
+                console.log "#{getTime!} [fimstats] updated highlightUnplayed to #{@checked}"
+                fimstats._settings.highlightUnplayed = @checked
+                if @checked
+                    fimstats.checkUnplayed!
+                else
+                    $ \#your-next-media .removeClass \p0ne-fimstats-unplayed
+
+    disable: !->
+        $ \#your-next-media .removeClass \p0ne-fimstats-unplayed
