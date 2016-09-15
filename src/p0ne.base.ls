@@ -197,7 +197,7 @@ module \autowoot, do
             # some number magic
             if @_settings.warnOnMehs and (score.negative > 2 * score.positive and score.negative > (lastScore.positive + lastScore.negative) / 4 and score.negative >= 5) and not hasMehWarning and API.getTimeRemaining! > 30s
                 timer2 := sleep 5_000ms, ->
-                    chatWarn "Many users meh'd this song, you may be stopping a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span>", "Autowoot", true
+                    chatWarn "Many users meh'd this song, you may be preventing a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span> if you dislike the song", "Autowoot", true
                     playChatSound!
                 hasMehWarning := true
 
@@ -792,6 +792,82 @@ module \waitlistUserPopup, do
             r_ ...
             @$ '.name, .image' .click @clickBind
 
+
+
+/*####################################
+#            BOOTH  ALERT            #
+####################################*/
+module \boothAlert, do
+    displayName: 'Booth Alert'
+    settings: \base
+    help: '''
+        Play a notification sound before you are about to play
+    '''
+    _settings:
+        warnOnPrevPlay: true # takes precedence
+        warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
+    setup: ({addListener}, {_settings},,module_) ->
+        var warnTimeout
+        @remainingStr = humanTime _settings.warnXMinBefore
+        isNext = false
+        fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', ->
+            if API.getWaitListPosition! == 0
+                if _settings.warnOnPrevPlay
+                    if not isNext
+                        isNext := true
+                        sleep 3_000ms, ->
+                            chatWarn "You are about to DJ next!", "Booth Alert"
+                            playChatSound!
+                else
+                    clearTimeout warnTimeout
+                    remaining = API.getTimeRemaining! *1000s_to_ms
+                    warnTimeout := sleep remaining - _settings.warnXMinBefore, ->
+                        if remaining > 0
+                            chatWarn "You are about to DJ in #{humanTime remaining}!", "Booth Alert"
+                        else
+                            chatWarn "You are about to DJ in #remainingStr!", "Booth Alert"
+                        playChatSound!
+            else
+                isNext := false
+        fn! if not module_
+    settingsExtra: ($el) ->
+        boothAlert = this
+        var resetTimer
+        $ "<form>
+                Show notification<br>
+                <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
+                <label>
+                    <input type=radio name=booth-alert value=off #{if @_settings.instantWarn then '' else \checked}> <input type=number value='#{~~(@._settings.warnXMinBefore * 60_000_00) / 100}' class=booth-alert><br>
+                    minute(s) before your play
+                </label>
+            </form>"
+            .append do
+                $warning = $ '<div class=warning>'
+            .on \click, \input:radio, !->
+                if @checked
+                    boothAlert._settings.warnOnPrevPlay = (@value == \on)
+                    console.log "#{getTime!} [boothAlert] updated warnOnPrevPlay to #{boothAlert._settings.warnOnPrevPlay}"
+            .on \input, \.booth-alert, !->
+                if @value > 0 #  # note: returns false for non-number inputs
+                    boothAlert._settings.warnXMinBefore = @value .min
+                    if resetTimer
+                        $warning .fadeOut!
+                        clearTimeout resetTimer
+                        resetTimer := 0
+                    if boothAlert._settings.warnOnPrevPlay
+                        $ this .parent! .click!
+                    console.log "#{getTime!} [boothAlert] updated to #{@value}ms"
+                else
+                    $warning
+                        .fadeIn!
+                        .text "please enter a valid number >0"
+                    resetTimer := sleep 2.min, !~>
+                        @value = ~~(boothAlert._settings.warnXMinBefore * 60_000_00) / 100
+                        resetTimer := 0
+                    console.warn "#{getTime!} [boothAlert] invalid input for X min", @value
+            .appendTo $el
+        $el .css do
+            paddingLeft: 15px
 
 
 /*####################################

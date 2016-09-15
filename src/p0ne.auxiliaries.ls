@@ -58,12 +58,20 @@ String::define \reverse, !->
         res += @[i]
     return res
 String::define \startsWith, (str) !->
-    i=0
-    while c = str[i]
-        return false if c != this[i++]
+    i=str.length
+    while i>0
+        return false if str[--i] != this[i]
     return true
 String::define \endsWith, (str) !->
-    return this.substr(@length - str.length) == str
+    i=str.length; o=@length - i
+    while i>0
+        return false if str[--i] != this[o+i]
+    return true
+String::define \replaceSansHTML, (rgx, rpl) !->
+    # this acts like .replace, but avoids HTML tags and their content
+    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) ->
+        return "#{pre .replace(rgx, rpl)}#post"
+
 for Constr in [String, Array]
     Constr::define \has, (needle) !-> return -1 != @indexOf needle
     Constr::define \hasAny, (needles) !->
@@ -71,9 +79,9 @@ for Constr in [String, Array]
             return true
         return false
 
-Number::defineGetter \s, !->   return this * 1_000s_to_ms
-Number::defineGetter \min, !-> return this * 60_000min_to_ms
-Number::defineGetter \h, !->   return this * 3_600_000h_to_ms
+Number::defineGetter \s,   !-> return this *     1_000s_to_ms
+Number::defineGetter \min, !-> return this *    60_000min_to_ms
+Number::defineGetter \h,   !-> return this * 3_600_000h_to_ms
 
 
 jQuery.fn <<<<
@@ -862,20 +870,6 @@ window <<<<
                                     console.error "[mediaDownload] video_info error #error! unkown error code", reason
 
                         if not audioOnly
-                            /*if get \adaptive_fmts
-                                for file in unescape(that.1) .split ","
-                                    url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
-                                    if file.match(/type=(.*?)%3B/)
-                                        mimeType = unescape that.1
-                                        filename = "#basename.#{mimeType.substr 6}"
-                                        if file.match(/size=(.*?)(?:&|$)/)
-                                            resolution = unescape(that.1)
-                                            size = resolution.split \x
-                                            size = size.0 * size.1
-                                            (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
-                                            if size > bestVideoSize
-                                                bestVideo = video
-                                                bestVideoSize = size*/
                             fmt_list_ = get \fmt_list
                             if get \url_encoded_fmt_stream_map
                                 for file in that .split ","
@@ -1186,7 +1180,9 @@ window <<<<
                 .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
                 .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
                 .replace /(lyrics|download|original|re-?upload)/gi, "<b>$1</b>"
-                .replace /(\s)((?:0x|#)[0-9a-fA-F]+|\d+)(\w*|%|\+)?(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
+                .replace /(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6"
+                .replace /(\s)(\d+)(\w*|%|\+)(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
+                .replace /(\s)(\d+)(\s)/g, "$1<b class='song-description-number'>$2</b>$3"
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"

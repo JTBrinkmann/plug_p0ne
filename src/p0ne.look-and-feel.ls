@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=44"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=45"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -38,7 +38,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=26"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=27"
 
 
 /*####################################
@@ -256,23 +256,32 @@ module \videoPlaceholderImage, do
     screenshot: 'https://i.imgur.com/TMHVsrN.gif'
     setup: ({addListener}) ->
         $room = $ \#room
-        #== add video thumbnail to #playback ==
+        maxresdefault = false
         $playbackImg = $ \#playback-container
         addListener API, \advance, updatePic
+        addListener $playbackImg, \fail, -> if maxresdefault
+            maxresdefault := false
+            img = "https://i.ytimg.com/vi/#{API.getMedia!.cid}/0.jpg"
+            console.warn "[Video Placeholder Image] maxresdefault.jpg failed to load, falling back to #img"
+            $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
+
         updatePic media: API.getMedia!
+
         function updatePic d
+            maxresdefault := false
             if not d.media
-                console.log "[Video Placeholder Image] hide", d
+                #console.log "[Video Placeholder Image] hide"
                 $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
             else if d.media.format == 1  # YouTube
                 if $room .hasClass \video-only
+                    maxresdefault := true
                     img = "https://i.ytimg.com/vi/#{d.media.cid}/maxresdefault.jpg"
                 else
                     img = "https://i.ytimg.com/vi/#{d.media.cid}/0.jpg"
-                console.log "[Video Placeholder Image] #img", d
+                #console.log "[Video Placeholder Image] #img"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
             else # SoundCloud
-                console.log "[Video Placeholder Image] #{d.media.image}", d
+                #console.log "[Video Placeholder Image] #{d.media.image}"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
     disable: ->
         $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none

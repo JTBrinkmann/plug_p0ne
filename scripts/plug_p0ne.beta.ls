@@ -40,7 +40,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.3
+    version: \1.7.5
     lastCompatibleVersion: \1.7.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1111,12 +1111,20 @@ String::define \reverse, !->
         res += @[i]
     return res
 String::define \startsWith, (str) !->
-    i=0
-    while c = str[i]
-        return false if c != this[i++]
+    i=str.length
+    while i>0
+        return false if str[--i] != this[i]
     return true
 String::define \endsWith, (str) !->
-    return this.substr(@length - str.length) == str
+    i=str.length; o=@length - i
+    while i>0
+        return false if str[--i] != this[o+i]
+    return true
+String::define \replaceSansHTML, (rgx, rpl) !->
+    # this acts like .replace, but avoids HTML tags and their content
+    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) ->
+        return "#{pre .replace(rgx, rpl)}#post"
+
 for Constr in [String, Array]
     Constr::define \has, (needle) !-> return -1 != @indexOf needle
     Constr::define \hasAny, (needles) !->
@@ -1124,9 +1132,9 @@ for Constr in [String, Array]
             return true
         return false
 
-Number::defineGetter \s, !->   return this * 1_000s_to_ms
-Number::defineGetter \min, !-> return this * 60_000min_to_ms
-Number::defineGetter \h, !->   return this * 3_600_000h_to_ms
+Number::defineGetter \s,   !-> return this *     1_000s_to_ms
+Number::defineGetter \min, !-> return this *    60_000min_to_ms
+Number::defineGetter \h,   !-> return this * 3_600_000h_to_ms
 
 
 jQuery.fn <<<<
@@ -1915,20 +1923,6 @@ window <<<<
                                     console.error "[mediaDownload] video_info error #error! unkown error code", reason
 
                         if not audioOnly
-                            /*if get \adaptive_fmts
-                                for file in unescape(that.1) .split ","
-                                    url = unescape that.1 if file.match(/url=(.*?)(?:&|$)/)
-                                    if file.match(/type=(.*?)%3B/)
-                                        mimeType = unescape that.1
-                                        filename = "#basename.#{mimeType.substr 6}"
-                                        if file.match(/size=(.*?)(?:&|$)/)
-                                            resolution = unescape(that.1)
-                                            size = resolution.split \x
-                                            size = size.0 * size.1
-                                            (files[resolution] ||= [])[*] = video = {url, size, mimeType, filename, resolution}
-                                            if size > bestVideoSize
-                                                bestVideo = video
-                                                bestVideoSize = size*/
                             fmt_list_ = get \fmt_list
                             if get \url_encoded_fmt_stream_map
                                 for file in that .split ","
@@ -2239,7 +2233,9 @@ window <<<<
                 .replace /(\s)(".*?")(\s)/g, "$1<i class='song-description-string'>$2</i>$3"
                 .replace /(\s)(\*\w+\*)(\s)/g, "$1<b>$2</b>$3"
                 .replace /(lyrics|download|original|re-?upload)/gi, "<b>$1</b>"
-                .replace /(\s)((?:0x|#)[0-9a-fA-F]+|\d+)(\w*|%|\+)?(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
+                .replace /(\s)(0x)([0-9a-fA-F]+)|(#)([\d\-]+)(\s)/g, "$1<i class='song-description-comment'>$2$4</i><b class='song-description-number'>$3$5</b>$6"
+                .replace /(\s)(\d+)(\w*|%|\+)(\s)/g, "$1<b class='song-description-number'>$2</b><i class='song-description-comment'>$3</i>$4"
+                .replace /(\s)(\d+)(\s)/g, "$1<b class='song-description-number'>$2</b>$3"
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
@@ -3981,7 +3977,7 @@ module \fixStuckDJ, do
                 @timer := sleep 10_000ms, fixStuckDJ
             success: (data) !~>
                 data.0.playback ||= {}
-                if m.id == data.0.playback.media
+                if m.id == data.0.playback?.media?.id
                     console.log "[fixNoAdvance] the same song is still playing."
                 else
                     # "manually" trigger socket event for DJ advance
@@ -5216,7 +5212,7 @@ module \autowoot, do
             # some number magic
             if @_settings.warnOnMehs and (score.negative > 2 * score.positive and score.negative > (lastScore.positive + lastScore.negative) / 4 and score.negative >= 5) and not hasMehWarning and API.getTimeRemaining! > 30s
                 timer2 := sleep 5_000ms, ->
-                    chatWarn "Many users meh'd this song, you may be stopping a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span>", "Autowoot", true
+                    chatWarn "Many users meh'd this song, you may be preventing a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span> if you dislike the song", "Autowoot", true
                     playChatSound!
                 hasMehWarning := true
 
@@ -5814,6 +5810,82 @@ module \waitlistUserPopup, do
 
 
 /*####################################
+#            BOOTH  ALERT            #
+####################################*/
+module \boothAlert, do
+    displayName: 'Booth Alert'
+    settings: \base
+    help: '''
+        Play a notification sound before you are about to play
+    '''
+    _settings:
+        warnOnPrevPlay: true # takes precedence
+        warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
+    setup: ({addListener}, {_settings},,module_) ->
+        var warnTimeout
+        @remainingStr = humanTime _settings.warnXMinBefore
+        isNext = false
+        fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', ->
+            if API.getWaitListPosition! == 0
+                if _settings.warnOnPrevPlay
+                    if not isNext
+                        isNext := true
+                        sleep 3_000ms, ->
+                            chatWarn "You are about to DJ next!", "Booth Alert"
+                            playChatSound!
+                else
+                    clearTimeout warnTimeout
+                    remaining = API.getTimeRemaining! *1000s_to_ms
+                    warnTimeout := sleep remaining - _settings.warnXMinBefore, ->
+                        if remaining > 0
+                            chatWarn "You are about to DJ in #{humanTime remaining}!", "Booth Alert"
+                        else
+                            chatWarn "You are about to DJ in #remainingStr!", "Booth Alert"
+                        playChatSound!
+            else
+                isNext := false
+        fn! if not module_
+    settingsExtra: ($el) ->
+        boothAlert = this
+        var resetTimer
+        $ "<form>
+                Show notification<br>
+                <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
+                <label>
+                    <input type=radio name=booth-alert value=off #{if @_settings.instantWarn then '' else \checked}> <input type=number value='#{~~(@._settings.warnXMinBefore * 60_000_00) / 100}' class=booth-alert><br>
+                    minute(s) before your play
+                </label>
+            </form>"
+            .append do
+                $warning = $ '<div class=warning>'
+            .on \click, \input:radio, !->
+                if @checked
+                    boothAlert._settings.warnOnPrevPlay = (@value == \on)
+                    console.log "#{getTime!} [boothAlert] updated warnOnPrevPlay to #{boothAlert._settings.warnOnPrevPlay}"
+            .on \input, \.booth-alert, !->
+                if @value > 0 #  # note: returns false for non-number inputs
+                    boothAlert._settings.warnXMinBefore = @value .min
+                    if resetTimer
+                        $warning .fadeOut!
+                        clearTimeout resetTimer
+                        resetTimer := 0
+                    if boothAlert._settings.warnOnPrevPlay
+                        $ this .parent! .click!
+                    console.log "#{getTime!} [boothAlert] updated to #{@value}ms"
+                else
+                    $warning
+                        .fadeIn!
+                        .text "please enter a valid number >0"
+                    resetTimer := sleep 2.min, !~>
+                        @value = ~~(boothAlert._settings.warnXMinBefore * 60_000_00) / 100
+                        resetTimer := 0
+                    console.warn "#{getTime!} [boothAlert] invalid input for X min", @value
+            .appendTo $el
+        $el .css do
+            paddingLeft: 15px
+
+
+/*####################################
 #         AVOID HISTORY PLAY         #
 ####################################*/
 module \avoidHistoryPlay, do
@@ -6007,7 +6079,7 @@ module \betterChatInput, do
             content = chat.$chatInputField .val!
             if content != (content = content.replace(/\n/g, "")) #.replace(/\s+/g, " "))
                 chat.$chatInputField .val content
-            if content.0 == \/ and content.1 == \m and content.2 == \e
+            if content.0 == \/ and (content.1 == \m and content.2 == \e or content.1 == \e and content.2 == \m)
                 if not wasEmote
                     wasEmote := true
                     chat.$chatInputField .addClass \p0ne-better-chat-emote
@@ -6286,28 +6358,41 @@ module \chatInlineImages, do
     _settings:
         filterTags: <[ nsfw suggestive gore spoiler no-inline noinline ]>
     setup: ({addListener}) ->
-        # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
-        #            <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
-        regDirect = /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
         addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
-            return if msg.message.toLowerCase!.hasAny @_settings.filterTags or msg.message[offset + all.length] == ";" or domain == \plug.dj
+            if img = @inlineify ...
+                msg.hasFilterWord ?= msg.message.toLowerCase!.hasAny @_settings.filterTags
+                if msg.hasFilterWord or msg.message[offset + all.length] == ";" or domain == \plug.dj
+                    console.info "[inline-img] filtered image", "#completeURL ==> #protocol#img"
+                    return "<a #{pre .replace /class=('|")?(\S+)/i, (,q,cl) !->
+                            return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
+                        } data-image-url='#img'>#completeURL</a>"
+                else
+                    console.log "[inline-img]", "#completeURL ==> #img"
+                    return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
+            else
+                return false
 
+    # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
+    #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
+    regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
+    inlineify: ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ->
             #= images =
             if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
                 [rgx, repl, forceProtocol] = that
-                img = url.replace(rgx, repl)
-                if img != url
-                    console.log "[inline-img]", "#completeURL ==> #protocol#img"
-                    return "<a #pre><img src='#{forceProtocol||protocol}#img' class=p0ne-img #onload #onerror></a>"
+                if url != (img = url.replace(rgx, repl))
+                    return "#{forceProtocol||protocol}#img"
 
             #= direct images =
-            if regDirect .test url
+            if @regDirect .test url
                 if domain in @forceHTTPSDomains
-                    completeURL .= replace 'http://', 'https://'
-                console.log "[inline-img]", "[direct] #completeURL"
-                return "<a #pre><img src='#completeURL' class=p0ne-img #onload #onerror></a>"
+                    return completeURL .replace 'http://', 'https://'
+                else
+                    return completeURL
+
+            #= no match =
             return false
+
     settingsExtra: ($el) ->
         $ '<span class=p0ne-settings-input-label>'
             .text "filter tags:"
@@ -6536,6 +6621,43 @@ module \chatYoutubeThumbnails, do
     lastID: ''
 */
 
+
+/*####################################
+#    CUSTOM NOTIFICATION TRIGGERS    #
+####################################*/
+module \customChatNotificationTrigger, do
+    displayName: 'Notification Trigger Words'
+    settings: \chat
+    _settings:
+        triggerwords: []
+    require: <[ chatPlugin _$context ]>
+    setup: ({addListener}) !->
+        addListener _$context, \chat:plugin, (d) ~> if d.uid != userID
+            mentioned = false
+            d.message .= replaceSansHTML @regexp, (,word) ->
+                mentioned := true
+                return "<span class=p0ne-trigger-word>#word</span>"
+            playChatSound! if mentioned
+        @updateRegexp!
+
+    updateRegexp: !->
+        @regexp = //
+            \b(#{@_settings.triggerwords .join '|'})\b
+        //gi
+
+    settingsExtra: ($el) !->
+        $ '<span class=p0ne-settings-input-label>'
+            .text "aliases (comma seperated):"
+            .appendTo $el
+        $input = $ '<input class="p0ne-settings-input">'
+            .val @_settings.triggerwords.join ", "
+            .on \input, ~>
+                @_settings.triggerwords = []; l=0
+                for word in $input.val!.split ","
+                    @_settings.triggerwords[l++] = $.trim(word)
+                @updateRegexp!
+            .appendTo $el
+
 /*@source p0ne.look-and-feel.ls */
 /**
  * plug_p0ne modules to add styles.
@@ -6549,7 +6671,7 @@ module \chatYoutubeThumbnails, do
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=44"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=45"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -6577,7 +6699,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=26"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=27"
 
 
 /*####################################
@@ -6795,23 +6917,32 @@ module \videoPlaceholderImage, do
     screenshot: 'https://i.imgur.com/TMHVsrN.gif'
     setup: ({addListener}) ->
         $room = $ \#room
-        #== add video thumbnail to #playback ==
+        maxresdefault = false
         $playbackImg = $ \#playback-container
         addListener API, \advance, updatePic
+        addListener $playbackImg, \fail, -> if maxresdefault
+            maxresdefault := false
+            img = "https://i.ytimg.com/vi/#{API.getMedia!.cid}/0.jpg"
+            console.warn "[Video Placeholder Image] maxresdefault.jpg failed to load, falling back to #img"
+            $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
+
         updatePic media: API.getMedia!
+
         function updatePic d
+            maxresdefault := false
             if not d.media
-                console.log "[Video Placeholder Image] hide", d
+                #console.log "[Video Placeholder Image] hide"
                 $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
             else if d.media.format == 1  # YouTube
                 if $room .hasClass \video-only
+                    maxresdefault := true
                     img = "https://i.ytimg.com/vi/#{d.media.cid}/maxresdefault.jpg"
                 else
                     img = "https://i.ytimg.com/vi/#{d.media.cid}/0.jpg"
-                console.log "[Video Placeholder Image] #img", d
+                #console.log "[Video Placeholder Image] #img"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#img)"
             else # SoundCloud
-                console.log "[Video Placeholder Image] #{d.media.image}", d
+                #console.log "[Video Placeholder Image] #{d.media.image}"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
     disable: ->
         $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none
@@ -7067,9 +7198,12 @@ module \customColors, do
         scope = @_settings.global
 
         @rolesHashmap = {}
-        for role in @roles
+        i = @roles.length
+        while role = @roles[--i]
             @rolesHashmap[role.name] = role
-            c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name] || "##{role.default.toString(16)}"
+            if not c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name]
+                c = "##{role.default.toString(16)}"
+                isDefault = true
             $ "
                 <div data-role=#{role.name} class='
                         p0ne-cc-row from-#{role.name}
@@ -7104,6 +7238,7 @@ module \customColors, do
                     .addClass \p0ne-cc-default
                 delete scope[name]
                 cc.updateCSS!
+                return false
             .on \click, \.p0ne-cc-row, ->
                 $row := $ this
                 roleName := $row .data \role
@@ -7156,7 +7291,7 @@ module \customColors, do
     disable: ->
         if @$cp
             @$cp .ColorPickerHide!
-            $ @$cp.data(\colorpickerId) .remove!
+            $ "##{@$cp.data(\colorpickerId)}" .remove!
             @$cp .remove!
         @$el?.remove!
 
@@ -8339,7 +8474,7 @@ require <[ sockjs ]>, (SockJS) ->
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
-    setup: ({$create, addListener},,,oldModule) ->
+    setup: ({$create, addListener},,,oldModule) !->
         @$create = $create
 
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
@@ -8379,29 +8514,36 @@ module \p0neSettings, do
         for ,module of p0ne.modules when not module.loading
             @addModule module
 
+        requestAnimationFrame !~>
+            for group, $el of @groups when @_settings.groupToggles[group]
+                $el .trigger \p0ne:resize
+
 
         #= add DOM event listeners =
         # slide settings-menu in/out
-        $ppI .click ~> @toggleMenu!
+        $ppI .click !~> @toggleMenu!
 
         # toggle groups
-        addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) ->
-          $s = $ this .parent!
-          if $s.data \open # close
-            $s
-                .data \open, false
-                .removeClass \open
-                .stop! .animate height: 40px, \slow /* magic number, height of the summary element */
-            groupToggles[$s.data \group] = false
-          else
-            $s
-                .data \open, true
-                .addClass \open
-                .stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
-            groupToggles[$s.data \group] = true
-          e.preventDefault!
+        addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
+            $s = $ this .parent!
+            if $s.hasClass \open # close
+                $s
+                    .removeClass \open
+                    .css height: 40px
+                    #.stop! .animate height: 40px, \slow
+                groupToggles[$s.data \group] = false
+            else
+                $s
+                    .addClass \open
+                    #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
+                    .trigger \p0ne:resize
+                groupToggles[$s.data \group] = true
+            e.preventDefault!
 
-        addListener $ppW, \click, \.checkbox, throttle 200ms, ->
+        addListener $body, \p0ne:resize, \.p0ne-settings-group, (e) !->
+            $ this .css height: @scrollHeight
+
+        addListener $ppW, \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
             $this = $ this
             enable = this .checked
@@ -8414,7 +8556,7 @@ module \p0neSettings, do
             else
                 module.disable!
 
-        addListener $ppW, \mouseover, \.p0ne-settings-has-more, ->
+        addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
             $this = $ this
             module = $this .data \module
             $ppP .html "
@@ -8441,42 +8583,56 @@ module \p0neSettings, do
                 .stop!.fadeIn!
             $ppP .find \.p0ne-settings-popup-triangle
                 .css top: t
-        addListener $ppW, \mouseout, \.p0ne-settings-has-more, ->
+        addListener $ppW, \mouseout, \.p0ne-settings-has-more, !->
             $ppP .stop!.fadeOut!
-        addListener $ppP, \mouseover, ->
+        addListener $ppP, \mouseover, !->
             $ppP .stop!.fadeIn!
-        addListener $ppP, \mouseout, ->
+        addListener $ppP, \mouseout, !->
             $ppP .stop!.fadeOut!
 
         # add p0ne.module listeners
-        addListener API, \p0ne:moduleLoaded, (module) ~> @addModule module
-        addListener API, \p0ne:moduleDisabled, (module_) ~>
-            module_._$settings?
-                .removeClass \p0ne-settings-item-enabled
-                .find \.checkbox
-                    .attr \checked, false
-            module_._$settingsExtra?
-                .stop!
-                .slideUp ->
-                    $ this .remove!
-        addListener API, \p0ne:moduleEnabled, (module) ~>
+        #= module INITALIZED =
+        addListener API, \p0ne:moduleLoaded, (module) !~> @addModule module
+
+        #= module ENABLED =
+        addListener API, \p0ne:moduleEnabled, (module) !~>
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
             @settingsExtra true, module
-        addListener API, \p0ne:moduleUpdated, (module, module_) ~>
+            if @_settings.groupToggles[module.settings]
+                requestAnimationFrame !~>
+                    @groups[module.settings] .trigger \p0ne:resize
+
+        #= module UPDATED =
+        addListener API, \p0ne:moduleUpdated, (module, module_) !~>
             if module.settings
                 @addModule module, module_
                 if module.help != module_.help and module._$settings?.is \:hover
                     # force update .p0ne-settings-popup (which displays the module.help)
                     module._$settings .mouseover!
 
-        addListener $body, \click, \#app-menu, ~> @toggleMenu false
+        #= module DISABLES =
+        addListener API, \p0ne:moduleDisabled, (module_) !~>
+            module_._$settings?
+                .removeClass \p0ne-settings-item-enabled
+                .find \.checkbox
+                    .attr \checked, false
+            module_._$settingsExtra?
+                .stop!
+                .slideUp !->
+                    $ this .remove!
+
+            if @_settings.groupToggles[module.settings]
+                requestAnimationFrame !~>
+                    @groups[module.settings] .trigger \p0ne:resize
+
+        addListener $body, \click, \#app-menu, !~> @toggleMenu false
         if _$context?
-            addListener _$context, 'show:user show:history show:dashboard dashboard:disable', ~> @toggleMenu false
+            addListener _$context, 'show:user show:history show:dashboard dashboard:disable', !~> @toggleMenu false
 
         # plugCubed compatibility
-        addListener $body, \click, \#plugcubed, ~>
+        addListener $body, \click, \#plugcubed, !~>
             @toggleMenu false
 
         # Firefox compatibility
@@ -8485,7 +8641,7 @@ module \p0neSettings, do
         # and/or the module icons to be overlayed by the scrollbar
         # to fix this, we add a padding to the .p0ne-settings-wrapper width the size of the scrollbar
         # it looks ugly, but it does the job
-        _.defer ->
+        _.defer !->
             d = $ \<div>
                 .css do
                     height: 100px, width: 100px, overflow: \auto
@@ -8495,14 +8651,14 @@ module \p0neSettings, do
             if \scrollLeftMax of d.0
                 scrollLeftMax = d.0.scrollLeftMax
             else
-                d.0.scrollLeft = 999px
+                d.0.scrollLeft = Number.POSITIVE_INFINITY
                 scrollLeftMax = d.0.scrollLeft
             if scrollLeftMax != 0px # on proper browsers, it should be 0
                 # on some browsers, `scrollLeftMax` should be the width of the scrollbar
                 $ppW .css paddingRight: scrollLeftMax
             d.remove!
 
-    toggleMenu: (state) ->
+    toggleMenu: (state) !->
         if state ?= not @groupToggles.p0neSettings
             @$ppW.slideDown!
         else
@@ -8537,11 +8693,17 @@ module \p0neSettings, do
                         $ '<div class=p0ne-settings-summary>' .text module.settings.toUpperCase!
                     .insertBefore @$ppInfo
                 if @_settings.groupToggles[module.settings]
-                    $s
-                        .data \open, true
-                        .addClass \open
+                    $s .addClass \open
+                else
+                    $s .css height: 40px
+
                 if module.settings == \moderation
                     $s .addClass \p0ne-settings-group-moderation
+
+                # (animatedly) open the settings group
+                if @_settings.groupToggles[module.settings]
+                    #.stop! .animate height: $s.children!.length * 44px, \slow
+                    $s .find \.p0ne-settings-summary .click!
             # otherwise we already created the settings group
 
             # create the module's settings element and append it to the settings group
@@ -8556,28 +8718,25 @@ module \p0neSettings, do
                 "
                 .data \module, module
 
-            if module_?._$settings?.parent! .is $s
-                module_._$settings
-                    .after do
-                        module._$settings
-                            .addClass \updated
-                    .remove!
-                sleep 2_000ms, ->
-                    module._$settings .removeClass \updated
-                @settingsExtra false, module, module_
-            else
-                module._$settings .appendTo $s
+            if not module.disabled
+                if module_?._$settings?.parent! .is $s
+                    module_._$settings
+                        .after do
+                            module._$settings .addClass \updated
+                        .remove!
+                    sleep 2_000ms, !->
+                        module._$settings .removeClass \updated
+                    @settingsExtra false, module, module_ if not module.disabled
+                else
+                    module._$settings .appendTo $s
 
-                # render extra settings element if module is enabled
-                if not module.disabled
-                    @settingsExtra false, module
-
-            # (animatedly) open the settings group
-            if @_settings.groupToggles[module.settings] and not module.settingsVip
-                $s .stop! .animate height: $s.children!.length * 44px, \slow
+                    # render extra settings element if module is enabled
+                    @settingsExtra false, module if not module.disabled
 
 
-    settingsExtra: (autofocus, module, module_) ->
+
+
+    settingsExtra: (autofocus, module, module_) !->
         try
             module_?._$settingsExtra? .remove!
             if module.settingsExtra
@@ -8586,7 +8745,7 @@ module \p0neSettings, do
                         .hide!
                         .insertAfter module._$settings
                 # using rAF because otherwise jQuery calculates the height incorrectly
-                requestAnimationFrame ~>
+                requestAnimationFrame !~>
                     module._$settingsExtra
                         .slideDown!
                     if autofocus
@@ -8833,7 +8992,7 @@ module \warnOnMehers, do
                     $warning
                         .fadeIn!
                         .text "please enter a valid number >1"
-                    resetTimer := sleep 2.min, !->
+                    resetTimer := sleep 2.min, !~>
                         @value = warnOnMehers._settings.maxMehs
                         resetTimer := 0
                     console.warn "#{getTime!} [warnOnMehers] invalid input for maxMehs", @value
@@ -9661,7 +9820,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replace @regexp, (_, pronoun, s, possessive, htmltag, i) ~>
+        msg.message .= replaceSansHTML @regexp, (_, pronoun, s, possessive, i) ~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -9695,7 +9854,7 @@ module \ponify, do
                     r += "'s "
 
             console.log "replaced '#s' with '#r'", msg.cid
-            return r+htmltag
+            return r
 
 
     /*== EMOTICONS ==*/
@@ -9763,7 +9922,6 @@ module \ponify, do
     setup: ({addListener, replace, css}) ->
         @regexp = //
             \b(an?\s+)?(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
-            ((?:<.+?</.+?>|$).*?) # avoid ponifying urls
         //gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
@@ -9850,6 +10008,11 @@ module \fimstats, do
                 z-index: 6;
                 transition: opacity .2s ease-out;
             }
+            .video-only .p0ne-fimstats {
+                bottom: 116px;
+                padding-top: 0px;
+                background: rgba(0,0,0, 0.8);
+            }
 
             .p0ne-fimstats-field {
                 display: block;
@@ -9901,11 +10064,9 @@ module \fimstats, do
             if d.media
                 lookup d.media
                     .then (d) ->
-                        $el
-                            .html d.html
+                        $el .html d.html
                     .fail (err) ->
-                        $el
-                            .html err.html
+                        $el .html err.html
 
             else
                 $el.html ""
@@ -9925,9 +10086,8 @@ module \fimstats, do
                         $ '<div class=p0ne-fimstats>' .html d.html
 
         # prevent the p0ne settings from overlaying the ETA
-        do addListener API, \p0ne:stylesLoaded, ->
-            $ \#p0ne-menu .css bottom: 54px + 21px
-        addListener API, \p0ne:moduleEnabled, (m) -> if m.name == \p0neSettings
+        console.info "[fimstats] prevent p0neSettings overlay", $(\#p0ne-menu).css bottom: 54px + 21px
+        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) -> if m.name == \p0neSettings
             $ \#p0ne-menu .css bottom: 54px + 21px
 
         # show stats for current song
@@ -9937,10 +10097,16 @@ module \fimstats, do
         $ \#p0ne-menu .css bottom: 54px
         def = $.Deferred!
         $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
-            .then (d) ->
+            .then (d,,res) ->
                 # note: `d.plays` (playcount) doesn't contain current play
                 d = d.data.0
-
+                # note: data is HTML escaped, but let's make sure
+                if res.responseText .hasAny ['<', '>']
+                    chatWarn do
+                        d.text = d.html = "fimstats data might contain malicious code (#{media.format}/#{media.cid})"
+                        "fimstats warning"
+                    def .reject!
+                    return
                 if d.firstPlay.time != d.lastPlay.time
                     d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
                     d.html = "

@@ -684,13 +684,24 @@
 }
 
 /*== playback controls ==*/
-
 #playback-controls .refresh {        background: linear-gradient(to bottom, rgba(  0, 181, 230, .7) 0, rgba(  0, 181, 230, .1) 100%) !important; }
 #playback-controls .hd {             background: linear-gradient(to bottom, rgba(  0, 230,  99, .7) 0, rgba(  0, 230,  99, .1) 100%) !important; }
 #playback-controls .snooze {         background: linear-gradient(to bottom, rgba(172, 118, 255, .7) 0, rgba(172, 118, 255, .1) 100%) !important; }
 #playback-controls .p3-fullscreen {  background: linear-gradient(to bottom, rgba( 28,  31,  37, .7) 0, rgba( 28,  31,  37, .1) 100%) !important; }
 
-/* transparent Chat Header */
+/*== remove playback border ==*/
+#playback .background>img[src^='https://cdn.plug.dj/'] {
+    width: 100% !important;
+    left: -11px !important;
+    height: 100% !important;
+    padding-bottom: 10px;
+    padding-right: 18px;
+    border: 2px solid #222;
+    border-top: none;
+    box-shadow: 0 0 25px #222, 0 0 5px #222;
+}
+
+/*== transparent Chat Header ==*/
 /*#chat-messages { // was bugging out the chat scroll
     bottom: 45px;
     padding-top: 46px;

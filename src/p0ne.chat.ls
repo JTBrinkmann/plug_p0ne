@@ -153,7 +153,7 @@ module \betterChatInput, do
             content = chat.$chatInputField .val!
             if content != (content = content.replace(/\n/g, "")) #.replace(/\s+/g, " "))
                 chat.$chatInputField .val content
-            if content.0 == \/ and content.1 == \m and content.2 == \e
+            if content.0 == \/ and (content.1 == \m and content.2 == \e or content.1 == \e and content.2 == \m)
                 if not wasEmote
                     wasEmote := true
                     chat.$chatInputField .addClass \p0ne-better-chat-emote
@@ -432,28 +432,41 @@ module \chatInlineImages, do
     _settings:
         filterTags: <[ nsfw suggestive gore spoiler no-inline noinline ]>
     setup: ({addListener}) ->
-        # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
-        #            <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
-        regDirect = /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
         addListener API, \chat:image, ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ~>
             # note: converting images with the domain plug.dj might allow some kind of exploit in the future
-            return if msg.message.toLowerCase!.hasAny @_settings.filterTags or msg.message[offset + all.length] == ";" or domain == \plug.dj
+            if img = @inlineify ...
+                msg.hasFilterWord ?= msg.message.toLowerCase!.hasAny @_settings.filterTags
+                if msg.hasFilterWord or msg.message[offset + all.length] == ";" or domain == \plug.dj
+                    console.info "[inline-img] filtered image", "#completeURL ==> #protocol#img"
+                    return "<a #{pre .replace /class=('|")?(\S+)/i, (,q,cl) !->
+                            return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
+                        } data-image-url='#img'>#completeURL</a>"
+                else
+                    console.log "[inline-img]", "#completeURL ==> #img"
+                    return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
+            else
+                return false
 
+    # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
+    #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
+    regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i
+    inlineify: ({all,pre,completeURL,protocol,domain,url, onload, onerror, msg, offset}) ->
             #= images =
             if @plugins[domain] || @plugins[domain.substr(1 + domain.indexOf(\.))]
                 [rgx, repl, forceProtocol] = that
-                img = url.replace(rgx, repl)
-                if img != url
-                    console.log "[inline-img]", "#completeURL ==> #protocol#img"
-                    return "<a #pre><img src='#{forceProtocol||protocol}#img' class=p0ne-img #onload #onerror></a>"
+                if url != (img = url.replace(rgx, repl))
+                    return "#{forceProtocol||protocol}#img"
 
             #= direct images =
-            if regDirect .test url
+            if @regDirect .test url
                 if domain in @forceHTTPSDomains
-                    completeURL .= replace 'http://', 'https://'
-                console.log "[inline-img]", "[direct] #completeURL"
-                return "<a #pre><img src='#completeURL' class=p0ne-img #onload #onerror></a>"
+                    return completeURL .replace 'http://', 'https://'
+                else
+                    return completeURL
+
+            #= no match =
             return false
+
     settingsExtra: ($el) ->
         $ '<span class=p0ne-settings-input-label>'
             .text "filter tags:"
@@ -681,3 +694,40 @@ module \chatYoutubeThumbnails, do
     frame: 1
     lastID: ''
 */
+
+
+/*####################################
+#    CUSTOM NOTIFICATION TRIGGERS    #
+####################################*/
+module \customChatNotificationTrigger, do
+    displayName: 'Notification Trigger Words'
+    settings: \chat
+    _settings:
+        triggerwords: []
+    require: <[ chatPlugin _$context ]>
+    setup: ({addListener}) !->
+        addListener _$context, \chat:plugin, (d) ~> if d.uid != userID
+            mentioned = false
+            d.message .= replaceSansHTML @regexp, (,word) ->
+                mentioned := true
+                return "<span class=p0ne-trigger-word>#word</span>"
+            playChatSound! if mentioned
+        @updateRegexp!
+
+    updateRegexp: !->
+        @regexp = //
+            \b(#{@_settings.triggerwords .join '|'})\b
+        //gi
+
+    settingsExtra: ($el) !->
+        $ '<span class=p0ne-settings-input-label>'
+            .text "aliases (comma seperated):"
+            .appendTo $el
+        $input = $ '<input class="p0ne-settings-input">'
+            .val @_settings.triggerwords.join ", "
+            .on \input, ~>
+                @_settings.triggerwords = []; l=0
+                for word in $input.val!.split ","
+                    @_settings.triggerwords[l++] = $.trim(word)
+                @updateRegexp!
+            .appendTo $el

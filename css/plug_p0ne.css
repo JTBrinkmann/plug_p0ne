@@ -32,35 +32,73 @@
  * Legacy Footer
  * Censor
  * VIP Settings
+ * Custom Colors
+ * warnOnMehers
+ * custom chat notification trigger words
+ * Autowoot voteskip-block warning
  */
 
 /*== flags ==*/
     .flag {
         display: inline-block;
         width: 16px;
-        height: 16px;
+        background: url(//ssl.gstatic.com/i18n/phonenumbers/phoneinputwidget/flags4.png) no-repeat 5px center;
+        height: 11px
     }
-    .flag-bg { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/bg.png') } /* Bulgarian */
-    .flag-cs { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/cs.png') } /* Czech */
-    .flag-de { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/de.png') } /* German */
-    .flag-da { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/da.png') } /* Danish */
-    .flag-en { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/en.png') } /* English */
-    .flag-es { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/es.png') } /* Spanish */
-    .flag-fi { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fi.png') } /* Finnish */
-    .flag-fr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fr.png') } /* French */
-    .flag-hr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/hr.png') } /* Croatian */
-    .flag-it { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/it.png') } /* Italian */
-    .flag-ms { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/ms.png') } /* Malay */
-    .flag-nl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/nl.png') } /* Dutch */
-    .flag-pl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pl.png') } /* Polish */
-    .flag-pt { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pt.png') } /* Portuguese */
-    .flag-sk { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sk.png') } /* Slovak */
-    .flag-sl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sl.png') } /* Slovenian */
-    .flag-sr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sr.png') } /* Slovenian */
-    .flag-zh { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/zh.png') } /* Chinese */
+    .flag-bg { background-position: 0px -2586px; } /* Bulgarian */
+    .flag-cs { background-position: 0px -2256px }  /* Czech */
+    .flag-de { background-position: 0px -2509px }  /* German */
+    .flag-da { background-position: 0px -1386px }  /* Danish */
+    .flag-en { background-position: 0px -55px;}    /* English */
+    .flag-es { background-position: 0px -1155px }  /* Spanish */
+    .flag-fi { background-position: 0px -1903px }  /* Finnish */
+    .flag-fr { background-position: 0px -1012px }  /* French */
+    .flag-hr { background-position: 0px -902px; }  /* Croatian */
+    .flag-it { background-position: 0px -143px }   /* Italian */
+    .flag-ms { background-position: 0px -1870px }  /* Malay */
+    .flag-nl { background-position: 0px -1441px }  /* Dutch */
+    .flag-pl { background-position: 0px -1177px }  /* Polish */
+    .flag-pt { background-position: 0px -517px }   /* Portuguese */
+    .flag-sk { background-position: 0px -1221px }  /* Slovak */
+    .flag-sr { background-position: 0px -2465px }  /* Serbian */
+    .flag-zh { background-position: 0px -825px; }  /* Chinese */
+
+    /*
+    .flag-bs { background-position: 0px -1474px; } /* Bosnian */
+    .flag-et { background-position: 0px -2410px }  /* Estonian * /
+    .flag-hu { background-position: 0px -682px }   /* Hungarian * /
+    .flag-ja { background-position: 0px -429px }   /* Japanese * /
+    .flag-ko { background-position: 0px -2245px }  /* Korean * /
+    .flag-no { background-position: 0px -836px }   /* Norwegian * /
+    .flag-ru { background-position: 0px -660px }   /* Russian * /
+    */
+
+    /*
+    .flag-bg { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/bg.png') } /* Bulgarian * /
+    .flag-cs { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/cs.png') } /* Czech * /
+    .flag-de { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/de.png') } /* German * /
+    .flag-da { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/da.png') } /* Danish * /
+    .flag-en { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/en.png') } /* English * /
+    .flag-es { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/es.png') } /* Spanish * /
+    .flag-fi { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fi.png') } /* Finnish * /
+    .flag-fr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/fr.png') } /* French * /
+    .flag-hr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/hr.png') } /* Croatian * /
+    .flag-it { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/it.png') } /* Italian * /
+    .flag-ms { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/ms.png') } /* Malay * /
+    .flag-nl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/nl.png') } /* Dutch * /
+    .flag-pl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pl.png') } /* Polish * /
+    .flag-pt { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/pt.png') } /* Portuguese * /
+    .flag-sk { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sk.png') } /* Slovak * /
+    .flag-sl { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sl.png') } /* Slovenian * /
+    .flag-sr { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/sr.png') } /* Slovenian * /
+    .flag-zh { background-image: url('https://cdn.p0ne.com/img/customicondesign_flags/zh.png') } /* Chinese * /
+    */
 
     /* pirate flag by Aha-Soft  */
-    .flag-pi { background-image: url('https://i.imgur.com/h04cOa9.png') } /* Pirate English */
+    .flag-pi {
+        background-image: url('https://i.imgur.com/h04cOa9.png');
+        height: 16px;
+    }
 
 /*== p0ne-notification ==*/
     #chat .p0ne-notif-loaded {
@@ -110,7 +148,7 @@
         color: #579;
     }
     .p0ne-notif-joinleave .flag {
-        margin-bottom: -3px;
+        margin-bottom: -2px;
         opacity: .5;
     }
     .p0ne-notif-joinleave .icon {
@@ -586,7 +624,7 @@
         display: block !important;
         margin-left: 5px
     }
-    .legacy-chat #chat .from .icon {
+    .legacy-chat #chat .from .icon:first-child {
         position: absolute;
         left: 2px;
         margin-top: 5px;
@@ -746,9 +784,14 @@
     }
 
     .p0ne-settings-group {
-        height: 40px;
         overflow-y: hidden;
         min-height: 40px;
+        transition: height 400ms ease-out;
+    
+        height: 40px;
+}
+    .p0ne-settings-group.closed {
+        height: 40px;
     }
     .p0ne-settings-summary {
         height: 30px;
@@ -911,6 +954,9 @@
     }
     .legacy-chat #chat .from-current-dj .text::before {
         width: 55px;
+    }
+    #chat .text .p0ne-img-failed {
+        color: #FF5422;
     }
 
 /*== Unread Chat Notification ==*/
@@ -1428,15 +1474,21 @@
 
     .p0ne-cc-row .name {
         padding-left: 20px;
+        cursor: pointer;
     }
 
     .p0ne-cc-row .icon {
         top: 5px;
+        cursor: pointer;
     }
 
     .p0ne-cc-row .icon-clear-input {
         top: -3px;
         right: -25px;
+    }
+
+    .p0ne-cc-default .icon-clear-input {
+        display: none;
     }
 
     .colorpicker {
@@ -1449,4 +1501,14 @@
     }
     .p0ne-settings-extra .warning {
         color: #FD0;
+    }
+
+/*== custom chat notification trigger words ==*/
+    .p0ne-trigger-word {
+        color: #ffdd6f;
+    }
+/*== Autowoot voteskip-block warning ==*/
+    .p0ne-autowoot-meh-btn {
+        font-weight: bold;
+        color: #Faa;
     }
