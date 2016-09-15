@@ -21,6 +21,12 @@
  *               "If it wasn't THAT broken, I wouldn't have had as much fun in coding plug_p0ne"
  *                   --Brinkie Pie (2015)
  *
+ * The following 3rd party scripts are used:
+ *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
+ *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
+ * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
+ *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
+ *
  * Not happy with plug_p0ne? contact me (the developer) at brinkiepie^gmail.com
  * great alternative plug.dj scripts are
  *     - TastyPlug (relatively lightweight but does a great job - https://fungustime.pw/tastyplug/ )
@@ -34,7 +40,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.7.1
+    version: \1.7.3
     lastCompatibleVersion: \1.7.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1011,6 +1017,39 @@ if( typeof module !== 'undefined' && module != null ) {
 ``
 
 
+/*@source colorpicker.min.js */
+``
+/**!
+ *
+ * Color picker
+ * Author: Stefan Petre www.eyecon.ro
+ * 
+ * Dual licensed under the MIT and GPL licenses
+ * 
+ */
+(function(c){var h=function(){var h=65,H={eventName:"click",onShow:function(){},onBeforeShow:function(){},onHide:function(){},onChange:function(){},onSubmit:function(){},color:"ff0000",livePreview:!0,flat:!1},k=function(a,b){var d=q(a);c(b).data("colorpicker").fields.eq(1).val(d.r).end().eq(2).val(d.g).end().eq(3).val(d.b).end()},r=function(a,b){c(b).data("colorpicker").fields.eq(4).val(a.h).end().eq(5).val(a.s).end().eq(6).val(a.b).end()},m=function(a,b){c(b).data("colorpicker").fields.eq(0).val(l(a)).end()},
+t=function(a,b){c(b).data("colorpicker").selector.css("backgroundColor","#"+l({h:a.h,s:100,b:100}));c(b).data("colorpicker").selectorIndic.css({left:parseInt(150*a.s/100,10),top:parseInt(150*(100-a.b)/100,10)})},u=function(a,b){c(b).data("colorpicker").hue.css("top",parseInt(150-150*a.h/360,10))},w=function(a,b){c(b).data("colorpicker").currentColor.css("backgroundColor","#"+l(a))},v=function(a,b){c(b).data("colorpicker").newColor.css("backgroundColor","#"+l(a))},I=function(a){a=a.charCode||a.keyCode||
+-1;if(a>h&&90>=a||32==a)return!1;!0===c(this).parent().parent().data("colorpicker").livePreview&&n.apply(this)},n=function(a){var b=c(this).parent().parent(),d;if(0<this.parentNode.className.indexOf("_hex")){d=b.data("colorpicker");var f=this.value,e=6-f.length;if(0<e){for(var g=[],h=0;h<e;h++)g.push("0");g.push(f);f=g.join("")}f=p(x(f));d.color=d=f}else 0<this.parentNode.className.indexOf("_hsb")?b.data("colorpicker").color=d=y({h:parseInt(b.data("colorpicker").fields.eq(4).val(),10),s:parseInt(b.data("colorpicker").fields.eq(5).val(),
+10),b:parseInt(b.data("colorpicker").fields.eq(6).val(),10)}):(d=b.data("colorpicker"),f=parseInt(b.data("colorpicker").fields.eq(1).val(),10),e=parseInt(b.data("colorpicker").fields.eq(2).val(),10),g=parseInt(b.data("colorpicker").fields.eq(3).val(),10),f={r:Math.min(255,Math.max(0,f)),g:Math.min(255,Math.max(0,e)),b:Math.min(255,Math.max(0,g))},d.color=d=p(f));a&&(k(d,b.get(0)),m(d,b.get(0)),r(d,b.get(0)));t(d,b.get(0));u(d,b.get(0));v(d,b.get(0));b.data("colorpicker").onChange.apply(b,[d,l(d),
+q(d)])},J=function(a){c(this).parent().parent().data("colorpicker").fields.parent().removeClass("colorpicker_focus")},K=function(){h=0<this.parentNode.className.indexOf("_hex")?70:65;c(this).parent().parent().data("colorpicker").fields.parent().removeClass("colorpicker_focus");c(this).parent().addClass("colorpicker_focus")},L=function(a){var b=c(this).parent().find("input").focus();a={el:c(this).parent().addClass("colorpicker_slider"),max:0<this.parentNode.className.indexOf("_hsb_h")?360:0<this.parentNode.className.indexOf("_hsb")?
+100:255,y:a.pageY,field:b,val:parseInt(b.val(),10),preview:c(this).parent().parent().data("colorpicker").livePreview};c(document).bind("mouseup",a,z);c(document).bind("mousemove",a,A)},A=function(a){a.data.field.val(Math.max(0,Math.min(a.data.max,parseInt(a.data.val+a.pageY-a.data.y,10))));a.data.preview&&n.apply(a.data.field.get(0),[!0]);return!1},z=function(a){n.apply(a.data.field.get(0),[!0]);a.data.el.removeClass("colorpicker_slider").find("input").focus();c(document).unbind("mouseup",z);c(document).unbind("mousemove",
+A);return!1},M=function(a){a={cal:c(this).parent(),y:c(this).offset().top};a.preview=a.cal.data("colorpicker").livePreview;c(document).bind("mouseup",a,B);c(document).bind("mousemove",a,C)},C=function(a){n.apply(a.data.cal.data("colorpicker").fields.eq(4).val(parseInt(360*(150-Math.max(0,Math.min(150,a.pageY-a.data.y)))/150,10)).get(0),[a.data.preview]);return!1},B=function(a){k(a.data.cal.data("colorpicker").color,a.data.cal.get(0));m(a.data.cal.data("colorpicker").color,a.data.cal.get(0));c(document).unbind("mouseup",
+B);c(document).unbind("mousemove",C);return!1},N=function(a){a={cal:c(this).parent(),pos:c(this).offset()};a.preview=a.cal.data("colorpicker").livePreview;c(document).bind("mouseup",a,D);c(document).bind("mousemove",a,E)},E=function(a){n.apply(a.data.cal.data("colorpicker").fields.eq(6).val(parseInt(100*(150-Math.max(0,Math.min(150,a.pageY-a.data.pos.top)))/150,10)).end().eq(5).val(parseInt(100*Math.max(0,Math.min(150,a.pageX-a.data.pos.left))/150,10)).get(0),[a.data.preview]);return!1},D=function(a){k(a.data.cal.data("colorpicker").color,
+a.data.cal.get(0));m(a.data.cal.data("colorpicker").color,a.data.cal.get(0));c(document).unbind("mouseup",D);c(document).unbind("mousemove",E);return!1},O=function(a){c(this).addClass("colorpicker_focus")},P=function(a){c(this).removeClass("colorpicker_focus")},Q=function(a){a=c(this).parent();var b=a.data("colorpicker").color;a.data("colorpicker").origColor=b;w(b,a.get(0));a.data("colorpicker").onSubmit(b,l(b),q(b),a.data("colorpicker").el)},G=function(a){var b,d,f=c("#"+c(this).data("colorpickerId"));
+f.data("colorpicker").onBeforeShow.apply(this,[f.get(0)]);var e=c(this).offset(),g="CSS1Compat"==document.compatMode;a=window.pageXOffset||(g?document.documentElement.scrollLeft:document.body.scrollLeft);b=window.pageYOffset||(g?document.documentElement.scrollTop:document.body.scrollTop);d=window.innerWidth||(g?document.documentElement.clientWidth:document.body.clientWidth);var h=e.top+this.offsetHeight,e=e.left;h+176>b+(window.innerHeight||(g?document.documentElement.clientHeight:document.body.clientHeight))&&
+(h-=this.offsetHeight+176);e+356>a+d&&(e-=356);f.css({left:e+"px",top:h+"px"});0!=f.data("colorpicker").onShow.apply(this,[f.get(0)])&&f.show();c(document).bind("mousedown",{cal:f},F);return!1},F=function(a){R(a.data.cal.get(0),a.target,a.data.cal.get(0))||(0!=a.data.cal.data("colorpicker").onHide.apply(this,[a.data.cal.get(0)])&&a.data.cal.hide(),c(document).unbind("mousedown",F))},R=function(a,b,d){if(a==b)return!0;if(a.contains)return a.contains(b);if(a.compareDocumentPosition)return!!(a.compareDocumentPosition(b)&
+16);for(b=b.parentNode;b&&b!=d;){if(b==a)return!0;b=b.parentNode}return!1},y=function(a){return{h:Math.min(360,Math.max(0,a.h)),s:Math.min(100,Math.max(0,a.s)),b:Math.min(100,Math.max(0,a.b))}},x=function(a){a=parseInt(-1<a.indexOf("#")?a.substring(1):a,16);return{r:a>>16,g:(a&65280)>>8,b:a&255}},p=function(a){var b={h:0,s:0,b:0},d=Math.min(a.r,a.g,a.b),c=Math.max(a.r,a.g,a.b),d=c-d;b.b=c;b.s=0!=c?255*d/c:0;b.h=0!=b.s?a.r==c?(a.g-a.b)/d:a.g==c?2+(a.b-a.r)/d:4+(a.r-a.g)/d:-1;b.h*=60;0>b.h&&(b.h+=360);
+b.s*=100/255;b.b*=100/255;return b},q=function(a){var b,d,c;b=Math.round(a.h);var e=Math.round(255*a.s/100);a=Math.round(255*a.b/100);if(0==e)b=d=c=a;else{var e=(255-e)*a/255,g=b%60*(a-e)/60;360==b&&(b=0);60>b?(b=a,c=e,d=e+g):120>b?(d=a,c=e,b=a-g):180>b?(d=a,b=e,c=e+g):240>b?(c=a,b=e,d=a-g):300>b?(c=a,d=e,b=e+g):360>b?(b=a,d=e,c=a-g):c=d=b=0}return{r:Math.round(b),g:Math.round(d),b:Math.round(c)}},S=function(a){var b=[a.r.toString(16),a.g.toString(16),a.b.toString(16)];c.each(b,function(a,c){1==c.length&&
+(b[a]="0"+c)});return b.join("")},l=function(a){return S(q(a))},T=function(){var a=c(this).parent(),b=a.data("colorpicker").origColor;a.data("colorpicker").color=b;k(b,a.get(0));m(b,a.get(0));r(b,a.get(0));t(b,a.get(0));u(b,a.get(0));v(b,a.get(0))};return{init:function(a){a=c.extend({},H,a||{});if("string"==typeof a.color)a.color=p(x(a.color));else if(void 0!=a.color.r&&void 0!=a.color.g&&void 0!=a.color.b)a.color=p(a.color);else if(void 0!=a.color.h&&void 0!=a.color.s&&void 0!=a.color.b)a.color=
+y(a.color);else return this;return this.each(function(){if(!c(this).data("colorpickerId")){var b=c.extend({},a);b.origColor=a.color;var d="collorpicker_"+parseInt(1E3*Math.random());c(this).data("colorpickerId",d);d=c('<div class="colorpicker"><div class="colorpicker_color"><div><div></div></div></div><div class="colorpicker_hue"><div></div></div><div class="colorpicker_new_color"></div><div class="colorpicker_current_color"></div><div class="colorpicker_hex"><input type="text" maxlength="6" size="6" /></div><div class="colorpicker_rgb_r colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_rgb_g colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_rgb_b colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_hsb_h colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_hsb_s colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_hsb_b colorpicker_field"><input type="text" maxlength="3" size="3" /><span></span></div><div class="colorpicker_submit"></div></div>').attr("id",
+d);b.flat?d.appendTo(this).show():d.appendTo(document.body);b.fields=d.find("input").bind("keyup",I).bind("change",n).bind("blur",J).bind("focus",K);d.find("span").bind("mousedown",L).end().find(">div.colorpicker_current_color").bind("click",T);b.selector=d.find("div.colorpicker_color").bind("mousedown",N);b.selectorIndic=b.selector.find("div div");b.el=this;b.hue=d.find("div.colorpicker_hue div");d.find("div.colorpicker_hue").bind("mousedown",M);b.newColor=d.find("div.colorpicker_new_color");b.currentColor=
+d.find("div.colorpicker_current_color");d.data("colorpicker",b);d.find("div.colorpicker_submit").bind("mouseenter",O).bind("mouseleave",P).bind("click",Q);k(b.color,d.get(0));r(b.color,d.get(0));m(b.color,d.get(0));u(b.color,d.get(0));t(b.color,d.get(0));w(b.color,d.get(0));v(b.color,d.get(0));b.flat?d.css({position:"relative",display:"block"}):c(this).bind(b.eventName,G)}})},showPicker:function(){return this.each(function(){c(this).data("colorpickerId")&&G.apply(this)})},hidePicker:function(){return this.each(function(){c(this).data("colorpickerId")&&
+c("#"+c(this).data("colorpickerId")).hide()})},setColor:function(a){if("string"==typeof a)a=p(x(a));else if(void 0!=a.r&&void 0!=a.g&&void 0!=a.b)a=p(a);else if(void 0!=a.h&&void 0!=a.s&&void 0!=a.b)a=y(a);else return this;return this.each(function(){if(c(this).data("colorpickerId")){var b=c("#"+c(this).data("colorpickerId"));b.data("colorpicker").color=a;b.data("colorpicker").origColor=a;k(a,b.get(0));r(a,b.get(0));m(a,b.get(0));u(a,b.get(0));t(a,b.get(0));w(a,b.get(0));v(a,b.get(0))}})}}}();c.fn.extend({ColorPicker:h.init,
+ColorPickerHide:h.hidePicker,ColorPickerShow:h.showPicker,ColorPickerSetColor:h.setColor})})(jQuery);
+
+``
+
+
 /*@source p0ne.auxiliaries.ls */
 /**
  * Auxiliary-functions for plug_p0ne
@@ -1057,6 +1096,14 @@ Array::define \unique, !->
         else
             res[l++] = el
     return res
+Array::define \joinWrapped, (pre, post, between) !->
+    return "" if @length == 0
+    pre ||= ''; post ||= ''; between ||= ''
+    res = "#pre#{@0}#post"
+    for i from 1 til @length
+        res += "#between#pre#{@[i]}#post"
+    return res
+
 String::define \reverse, !->
     res = ""
     i = @length
@@ -1107,10 +1154,41 @@ jQuery.fn <<<<
         return this
     loadAll: (cb) !-> # adds an event listener for when all elements are loaded
         remaining = @length
-        return if not cb or not remaining
-        @load !->
-            if --remaining == 0
-                cb!
+        if not cb or not remaining
+            _.defer cb!
+        else
+            @load !->
+                if --remaining == 0
+                    cb!
+        return this
+    binaryGuess: (checkFn) !->
+        # returns element with index `n` for which:
+        # if checkFn(element) for all elements in this from 0 to `n` all returns false,
+        # and for all elements in this from `n` to the last one returns true
+        # returns an empty jQuery object if there is no matching `n`
+        # (i.e. checkFn(element) returns false for all elements, or this object is empty)
+        # example use case: find the first item that is visible in a scrollable list
+
+        step = @length
+        if step == 0 or not checkFn @[step-1], step, @[step-1] # test this.length and last element
+            return $!
+        else if checkFn.call @0, 0, @0 # test first element
+            return @first!
+
+        i = @length - 1
+        goingUp = true
+        do
+            step = ~~(step / 2)
+            if checkFn.call @[i], i, @[i]
+                goingUp = false
+                i = Math.floor(i - step)
+            else
+                goingUp = true
+                i = Math.ceil(i + step)
+                console.log "going up to #i (#step)"
+        while step > 0
+        i++ if goingUp
+        return @eq i
 
 $.easing <<<<
     easeInQuad: (p) !->
@@ -1236,16 +1314,16 @@ dataSave.interval = setInterval dataSave, 15.min
 # But if another room is joined (or the room's settings change), it should be executed again.
 #
 # To create a plug_p0ne module as a DataEmitter, use `module(moduleName, { module: new DataEmitter(moduleName), … })`
-class DataEmitter extends {prototype: Backbone.Events}
+export class DataEmitter extends {prototype: Backbone.Events}
     (@_name) ->
-    _name: 'unnamed StateEmitter'
+    _name: 'unnamed DataEmitter'
     set: (newData) ->
         if @_data != newData
             @_data = newData
             @trigger \data, @_data
     clear: ->
         delete @_data
-        @_trigger \cleared
+        @trigger \cleared
 
     on: (type, fn, context) ->
         super ...
@@ -1498,6 +1576,11 @@ window <<<<
     leave: !->
         return $ '#dj-button.is-leave' .click! .length != 0
 
+    $wootBtn: $ \#woot
+    woot: -> $wootBtn .click!
+    $mehBtn: $ \#meh
+    meh: -> $mehBtn .click!
+
     ytItags: do !->
         resolutions = [ 72p, 144p, 240p,  360p, 480p, 720p, 1080p, 1440p, 2160p, 2304p, 3072p, 4320p ]
         list =
@@ -1629,8 +1712,8 @@ window <<<<
                             cid:          cid
                             uploader:
                                 name:     d.snippet.channelTitle
-                                id:       d.snippet.channelID
-                                url:      "https://www.youtube.com/channel/#{d.snippet.channelID}"
+                                id:       d.snippet.channelId
+                                url:      "https://www.youtube.com/channel/#{d.snippet.channelId}"
                             image:        "https://i.ytimg.com/vi/#cid/0.jpg"
                             title:        d.snippet.title
                             uploadDate:   d.snippet.publishedAt
@@ -1942,7 +2025,7 @@ window <<<<
                                                     #width: height && $representation .attr \width
                                                     #resolution: height && "#{height}p"
                                                 if audioOnly and ~~m.size > ~~bestVideo.size and (window.chrome or mimeType != \audio/webm)
-                                                        bestVideo := m
+                                                    bestVideo := m
                                         if bestVideo
                                             files.preferredDownload = bestVideo
                                             files.status = 0
@@ -2088,6 +2171,14 @@ window <<<<
             return humanList res # both lines seperate for performance optimization
         data[attr] = mentions
         return mentions
+
+    isMessageVisible: ($msg) !->
+        if typeof msg == \string
+            $msg = getChat($msg)
+        if $msg?.length
+            return $cm!.height! > $msg .offset!.top > 101px
+        else
+            return false
 
 
     htmlEscapeMap: {sp: 32, blank: 32, excl: 33, quot: 34, num: 35, dollar: 36, percnt: 37, amp: 38, apos: 39, lpar: 40, rpar: 41, ast: 42, plus: 43, comma: 44, hyphen: 45, dash: 45, period: 46, sol: 47, colon: 58, semi: 59, lt: 60, equals: 61, gt: 62, quest: 63, commat: 64, lsqb: 91, bsol: 92, rsqb: 93, caret: 94, lowbar: 95, lcub: 123, verbar: 124, rcub: 125, tilde: 126, sim: 126, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brkbar: 166, sect: 167, uml: 168, die: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, hibar: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, half: 189, frac34: 190, iquest: 191}
@@ -2272,7 +2363,7 @@ window <<<<
     formatUser: (user, showModInfo) !->
         user .= toJSON! if user.toJSON
         info = getRank(user)
-        if info == \none
+        if info == \regular
             info = ""
         else
             info = " #info"
@@ -2301,7 +2392,7 @@ window <<<<
             fromClass = ""
 
         # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
-        return "#rank<span class='un#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
+        return "#rank<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
 
     formatUserSimple: (user) !->
         return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
@@ -2367,10 +2458,10 @@ window <<<<
             else
                 return \ambassador
         else
-            return <[ none rdj bouncer manager cohost host ]>[role || 0]
+            return <[ regular dj bouncer manager cohost host ]>[role || 0]
     getRankIcon: (user) !->
         rank = getRank(user)
-        return rank != \none && "<i class='icon icon-chat-#{if rank == \rdj then \dj else rank} p0ne-icon-small'></i>" ||''
+        return rank != \regular && "<i class='icon icon-chat-#rank p0ne-icon-small'></i>" ||''
 
     parseURL: (href) !->
         href ||= "//"
@@ -2382,7 +2473,7 @@ window <<<<
     getIcon: do !->
         # note: this function doesn't cache results, as it's expected to not be used often (only in module setups)
         # if you plan to use it over and over again, use fn.enableCaching()
-        $icon = $ '<i class=icon>'
+        $icon = $ "<i class=icon><!-- this is used by plug_p0ne's getIcon() --></i>"
                 .css visibility: \hidden
                 .appendTo \body
         fn = (className) !->
@@ -2415,8 +2506,9 @@ window <<<<
         # is kept uptodate in updateUserData in p0ne.auxiliary-modules
     getRoomSlug: !->
         return room?.get?(\slug) || decodeURIComponent location.pathname.substr(1)
-userID = user?.id # API.getUser! will fail when used on the Dashboard if no room has been visited before
-user.isStaff = user and user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
+
+woot.click = woot
+meh.click = meh
 
 # load cached requireIDs
 (err, data) <- dataLoadAll {p0ne_requireIDs: {}, p0ne_disabledModules: {_rooms: {}}}
@@ -2498,13 +2590,18 @@ for cb in (room?._events?[\change:name] || _$context?._events?[\show:room] || La
 #= user_ =
 # the internal user-object
 if requireHelper \user_, (.canModChat) #(._events?.'change:username')
-    window.users = user_.collection # it's the most reliable methode of getting `users`
-    window.user = user_.toJSON!
-    window.userID = user.id
+    export users = user_.collection # it's the most reliable methode of getting `users`
+    export user = user_.toJSON!
+if user || user = window.user
+    # API.getUser! will fail when used on the Dashboard if no room has been visited before
+    export userID = user.id
+    user.isStaff = user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
+
 
 #= underscore =
 # this should already be global, but let's be sure to avoid stuff breaking
-window._ = _ = require \underscore
+# (because apparently at some point it did)
+export _ = require \underscore
 
 #= Lang =
 window.Lang = require \lang/Lang
@@ -2891,7 +2988,7 @@ window.module = (name, data) !->
                 disabledModules[name] = false if not module.modDisabled
                 try
                     setup.call module, helperFNs, module, data, module
-                    API.trigger \p0ne:moduleEnabled, module
+                    trigger \moduleEnabled
                     console.info "#{getTime!} [#name] enabled", setup != null
                 catch err
                     console.error "#{getTime!} [#name] error while re-enabling", err.stack
@@ -2925,7 +3022,7 @@ window.module = (name, data) !->
                     if not newModule
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
-                        API.trigger \p0ne:moduleDisabled, module
+                        trigger \moduleDisabled
                         console.info "#{getTime!} [#name] disabled"
                         dataUnload "p0ne/#name"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
@@ -2935,7 +3032,7 @@ window.module = (name, data) !->
                     delete window[name]
                 delete p0ne.dependencies[name]
                 return this
-        module.trigger = (target, ...args) !-> # FOR DEBUGGING
+        module.trigger ||= (target, ...args) !-> # FOR DEBUGGING
             for listener in cbs.listeners ||[] when listener.target == target
                 #console.log "\thas same target"
                 isMatch = true
@@ -2997,6 +3094,26 @@ window.module = (name, data) !->
         if settingsPerCommunity
             roomSlug = getRoomSlug!
             disabledModules = p0ne.disabledModules._rooms[roomSlug]
+            module._updateRoom = ->
+                module.disable!
+                roomSlug = getRoomSlug!
+                module_ = module
+                disabledModules = p0ne.disabledModules._rooms[roomSlug]
+                module.disabled = disabledModules[name]
+                def = $.Deferred!
+                module.loading = def.promise!
+
+                settingsKey = "p0ne__#{roomSlug}_#name"
+                dataLoad settingsKey, _settings, (err, module._settings) !->
+                    if err
+                        # play it cool (defaulting is magic)
+                        console.warn "[p0ne] error loading room settings for #name", err
+
+                    def.resolve module # resolve module.loading
+                    delete module.loading
+
+                    # trigger events
+                    console.info "#{getTime!} [#name] new room settings loaded"
         else
             disabledModules = p0ne.disabledModules
 
@@ -3014,10 +3131,7 @@ window.module = (name, data) !->
         if module_?._settings # use _settings from previous module
             module._settings = module_._settings
         else if _settings
-            if settingsPerCommunity
-                settingsKey = "p0ne__#{roomSlug}_#name"
-            else
-                settingsKey = "p0ne_#name"
+            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#name" else "p0ne_#name"
             dependenciesLoading++
             dataLoad settingsKey, _settings, (err, module._settings) !->
                 if err
@@ -3048,7 +3162,6 @@ window.module = (name, data) !->
         #   before noticing a missing/failed requirement)
         if --dependenciesLoading == 0 == failedRequirements.length
             # run setup
-            time = getTime!
             delete module.loading
             if module.disabled
                 if module.modDisabled
@@ -3062,25 +3175,31 @@ window.module = (name, data) !->
                     setup?.call module, helperFNs, module, data, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#time [#name] error initializing", e.stack
+                    console.error "#{getTime!} [#name] error initializing", e.stack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
                     delete window[name]
-            delete module.loading
 
             # trigger events
             if module_
-                API.trigger \p0ne:moduleUpdated, module, module_
-                console.info "#time [#name] updated#wasDisabled", "color: orange"
+                trigger \moduleUpdated
+                console.info "#{getTime!} [#name] updated#wasDisabled", "color: orange"
             else
-                API.trigger \p0ne:moduleLoaded, module
-                console.info "#time [#name] initialized#wasDisabled", "color: orange"
+                trigger \moduleLoaded
+                console.info "#{getTime!} [#name] initialized#wasDisabled", "color: orange"
 
     function loadingFailed
-        # if a dependency fails to load
+        # if any dependency fails to load
         def?.reject module # reject module.loading
         delete module.loading
         delete window[name]
+
+    function trigger type
+        if _$context?
+            _$context.trigger "p0ne:#type", module, module_
+            #_$context.trigger "p0ne:#type:#name", module, module_
+        API.trigger "p0ne:#type", module, module_
+        #API.trigger "p0ne:#type:#name", module, module_
 
 /*@source p0ne.auxiliary-modules.ls */
 /**
@@ -3215,6 +3334,23 @@ module \grabMedia, do
 
 
 /*####################################
+#            ROOM  HELPER            #
+####################################*/
+module \p0neModuleRoomSettingsLoader, do
+    require: <[ _$context ]>
+    setup: ({addListener}) ->
+        addListener _$context, \room:joining, ->
+            for ,m of p0ne.modules when m.settingsPerCommunity
+                m._updateRoom!
+        addListener _$context, \room:joined, ->
+            for ,m of p0ne.modules when m.settingsPerCommunity and not m.disabled
+                if m.loading
+                    m.loading .then ->
+                        m.enable!
+                else
+                    m.enable!
+
+/*####################################
 #             CUSTOM CSS             #
 ####################################*/
 module \p0neCSS, do
@@ -3250,7 +3386,7 @@ module \p0neCSS, do
                     throttled := false
                     res = ""
                     for n,css of styles
-                        res += "/* #n */\n#css\n\n"
+                        res += "/*== #n ==*/\n#css\n\n"
                     $el       .first! .text res
                     $popoutEl .first! .text res
 
@@ -3312,6 +3448,7 @@ module \_$contextUpdateEvent, do
             replace _$context, fn,  (fn_) !-> return (type, cb, context) !->
                 fn_ ...
                 _$context .trigger \context:update, type, cb, context
+                return this
 
 
 
@@ -3474,6 +3611,7 @@ module \perfEmojify, do
         replace emoticons, \emojify, !-> return (str) !->
             lastWasEmote = false
             return str
+                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
                 .replace /:(.*?)(?=:)|:(.*)$/g, (_, emote, post) !~>
                     if (p = typeof post != \string) and not lastWasEmote and @map[emote]
                         lastWasEmote := true
@@ -3482,7 +3620,6 @@ module \perfEmojify, do
                         lastWasEmote_ = lastWasEmote
                         lastWasEmote := false
                         return "#{if lastWasEmote_ then '' else ':'}#{if p then emote else post}"
-                .replace @regAutoEmote, (,pre,emote) !~> return "#pre:#{@autoEmoteMap[emote]}:"
 
         replace emoticons, \lookup, !-> return (str) !->
             # walk through the trie, letter by letter of the input
@@ -3660,7 +3797,21 @@ module \fixMediaReload, do
                 return this
             else
                 return s_.call this, a, b
+
+replaced with:
 */
+/*
+module \fixPseudoAdvance, do
+    require: <[ socketEvents ]>
+    setup: ({replace}) ->
+        var lastHistoryID
+        replace socketEvents, \advance, (a_) !-> return (data) !->
+            if lastHistoryID != data.h
+                # only trigger `advance()` if the historyID differs from the current one
+                lastHistoryID := data.h
+                return a_.call(this, data)
+*/
+
 
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
@@ -3688,7 +3839,6 @@ module \fixMediaThumbnails, do
 module \fixGhosting, do
     displayName: 'Fix Ghosting'
     require: <[ PlugAjax ]>
-    optional: <[ login ]>
     settings: \fixes
     settingsMore: !-> return $ '<toggle val=warnings>Show Warnings</toggle>'
     help: '''
@@ -3708,13 +3858,13 @@ module \fixGhosting, do
                 # to avoid problems, like auto-rejoining when closing the tab
                 rejoinRoom 'you left the room'
 
-        replace PlugAjax::, \onError, (oE_) !-> return (status, data) !->
-            if status == \notInRoom
+        replace PlugAjax::, \onError, (oE_) !-> return (code, e) !->
+            if e.status == \notInRoom
                 #or status == \notFound # note: notFound is only returned for valid URLs, actually requesting not existing files returns a 404 error instead; update: TOO RISKY!
                 queue[*] = this
                 rejoinRoom "got 'notInRoom' error from plug", true
             else
-                oE_ ...
+                oE_.call(this, e)
 
         export rejoinRoom = (reason, throttled) !->
                 if rejoining and throttled
@@ -3746,7 +3896,7 @@ module \fixGhosting, do
                                 chatWarn "the room capacity is reached :/", "fixGhosting"
                             | \notAuthorized =>
                                 chatWarn "you got logged out", "fixGhosting"
-                                login?!
+                                #login?!
                             | otherwise =>
                                 switch statusCode
                                 | 401 =>
@@ -3883,6 +4033,30 @@ module \fixNoPlaylistCycle, do
         * /
 */
 
+module \fixStuckDJButton, do
+    settings: \fixes
+    displayName: 'Fix Stuck DJ Button'
+    require: <[ _$context ]>
+    setup: ({addListener}) ->
+        var fixTimeout
+        $djbtn = $ \#dj-button
+        hasSpinner = $djbtn.find \.spinner .length != 0
+        addListener _$context, \djButton:update, ->
+            if $djbtn.find \.spinner .length == 0
+                hasSpinner := false
+                clearTimeout fixTimeout
+            else if not hasSpinner
+                hasSpinner := true
+                fixTimeout = sleep 10_000ms, ->
+                    getRoomState! .then (d) ->
+                        d = d.data.0
+                        if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
+                            if app?.room.djButton
+                                app.room.djButton.hideSpinner!
+                            else # pseudo djButton.hideSpinner()
+                                $djbtn .find \.spinner .remove!
+                                $djbtn .find \.icon .show!
+
 
 module \zalgoFix, do
     settings: \fixes
@@ -3898,35 +4072,6 @@ module \zalgoFix, do
             }
         '
 
-
-module \fixInHistoryHighlight, do
-    settings: \fixes
-    displayName: '☢ Fix InHistory'
-    help: '''
-        [WORK IN PROGRESS]
-        This fixes the bug that unless you change to another playlist, some songs don't show up as "in history" in your playlist (have red text)
-    '''
-    require: <[ app ]>
-    setup: ({addListener}) !->
-        playlist = app.footer.playlist.playlist.media
-        addListener API, \advance, (d) !-> if d.dj and d.dj.id != user.id
-            if playlist.list.rowHash?[d.media.cid]
-                id = d.media.id
-                for row, i in playlist.list.rows ||[] when row.model.id == id
-                    if not row.$el .hasClass \in-history
-                        # no need for a `let` because the loop will terminate anyways
-
-                        console.log "[☢ Fix InHistory]", d, id, playlist.list.rowHash[d.media.cid], row
-                        sleep 5_000ms, !->
-                            if row.$el .hasClass \in-history
-                                chatWarn "fixed itself", '☢ fixInHistoryHighlight'
-                            else
-                                chatWarn 'fixed by plug_p0ne', '☢ fixInHistoryHighlight'
-                                console.info "#{getTime!} [fixInHistoryHighlight] fixed", row
-                                row.$el .addClass \in-history
-                    else #DEBUG
-                        chatWarn "was already fixed", '☢ fixInHistoryHighlight'
-                    break
 
 
 module \warnOnAdblockPopoutBlock, do
@@ -3962,7 +4107,7 @@ module \chatEmojiPolyfill, do
                 ..textBaseline = \top
                 ..font = '32px Arial'
                 ..fillText '\ud83d\udc28', 0px, 0px # U+1F428 KOALA
-                if ..getImageData(offset, offset, 1, 1).data[0] !== 0
+                if ..getImageData(offset, offset, 1, 1).data[0] != 0
                     console.info "[chatPolyfixEmoji] emojicons appear to be natively supported. fix will not be applied"
                     @disable!
                 else
@@ -4335,7 +4480,7 @@ module \streamSettings, do
             mode: \off
             enable: !->
                 playback.$noDJ.show!
-                @$controls.hide!
+                playback.$controls.hide!
             disable: !->
                 playback.$noDJ.hide!
             updateVolume: $.noop
@@ -4433,11 +4578,16 @@ module \streamSettings, do
             if currentMedia.get(\media)
                 @$controls .show!
         replace Playback::, \onSnoozeClick, (snooze) !->
-            export @~snooze
-            return !->
+            fn = !->
                 if not isSnoozed!
                     changeStream \off, "Snoozed"
                     @reset!
+            fn.vanilla = snooze.vanilla || snooze
+            if snooze.vanilla
+                window.snooze = snooze.vanilla
+            else
+                window.snooze = _.bind snooze, this
+            return fn
         /*replace Playback::, \onRefreshClick, !-> return !->
             if currentMedia.get(\media) and restr = currentMedia.get \restricted
                 currentMedia.set do
@@ -4931,6 +5081,43 @@ module \autojoin, do
     displayName: "Autojoin"
     help: '''
         Automatically join the waitlist again after you DJ'd or if the waitlist gets unlocked.
+        It will disable itself, if you got removed from the waitlist by a moderator.
+    '''
+    settings: \base
+    settingsVip: true
+    disabled: true
+    disableCommand: true
+    optional: <[ _$context booth socketListeners ]>
+    setup: ({addListener}) ->
+        # initial autojoin
+        join! if API.getDJ!?.id != userID and API.getWaitListPosition! == -1
+
+        # autojoin on DJ advances, Waitlist changes and reconnects
+        addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', (d) ->
+            if API.getDJ!?.id != userID and API.getWaitListPosition! == -1
+                if join!
+                    console.log "#{getTime!} [autojoin] joined waitlist"
+                else
+                    console.error "#{getTime!} [autojoin] failed to join waitlist"
+                    API.once \advance, @autojoin, this
+
+        # when DJ Wait List gets unlocked
+        wasLocked = $djButton.hasClass \is-locked
+        addListener _$context, \djButton:update, ~>
+            isLocked = $djButton.hasClass \is-locked
+            join! if wasLocked and not isLocked
+            wasLocked := isLocked
+
+        # disable when user gets removed by a moderator
+        addListener API, \socket:modRemoveDJ, (e) ~> if e.t == API.getUser!.rawun
+            @disable!
+
+
+
+/*module \autojoin, do
+    displayName: "Autojoin"
+    help: '''
+        Automatically join the waitlist again after you DJ'd or if the waitlist gets unlocked.
         It will not automatically join if you got removed from the waitlist by a moderator.
     '''
     settings: \base
@@ -4970,8 +5157,7 @@ module \autojoin, do
         #DEBUG
         # compare if old logic would have autojoined
         addListener API, \advance, (d) ~>
-            wlPos := API.getWaitListPosition!
-            if d and d.id != userID and wlPos == -1
+            if d and d.id != userID and API.getWaitListPosition! == -1
                 sleep 5_000ms, ~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
                     chatWarn "old algorithm would have autojoined now. Please report about this in the beta tester Skype chat", "plug_p0ne autojoin"
 
@@ -4987,7 +5173,7 @@ module \autojoin, do
 
     disable: ->
         API.off \advance, @autojoin
-
+*/
 
 /*####################################
 #             AUTOWOOT               #
@@ -5005,7 +5191,7 @@ module \autowoot, do
     _settings:
         warnOnMehs: true
     setup: ({addListener}) ->
-        var timer
+        var timer, timer2
         lastScore = API.getHistory!.1.score
         hasMehWarning = false
 
@@ -5016,26 +5202,28 @@ module \autowoot, do
                 clearTimeout timer
                 # wait between 1 to 4 seconds (to avoid flooding plug.dj servers)
                 timer := sleep 1.s  +  3.s * Math.random!, ->
-                    if not API.getUser!.vote # only woot if user didn't meh already
+                    if not API.getUser!.vote # only woot if user didn't vote already
+                        console.log "#{getTime!} [autowoot] autowooting"
                         woot!
             if hasMehWarning
-                $cms! .find \.p0ne-autowoot-meh-btn .remove!
+                clearTimeout(timer2)
+                $cms! .find \.p0ne-autowoot-meh-btn .closest \.cm .remove!
                 hasMehWarning := false
 
         # warn if user is blocking a voteskip
-        addListener API, \voteUpdate, (d) ->
+        addListener API, \voteUpdate, (d) ~>
             score = API.getScore!
             # some number magic
-            if score.negative > 2 * score.positive and score.negative > (lastScore.positive + lastScore.negative) / 4 and score.negative >= 5 and not hasMehWarning
-                chatWarn "Many users meh'd this song, you may be stopping a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span>", "Autowoot", true
-                playChatSound!
+            if @_settings.warnOnMehs and (score.negative > 2 * score.positive and score.negative > (lastScore.positive + lastScore.negative) / 4 and score.negative >= 5) and not hasMehWarning and API.getTimeRemaining! > 30s
+                timer2 := sleep 5_000ms, ->
+                    chatWarn "Many users meh'd this song, you may be stopping a voteskip. <span class=p0ne-autowoot-meh-btn>Click here to meh</span>", "Autowoot", true
+                    playChatSound!
                 hasMehWarning := true
 
         # make the meh button meh
-        if chatDomEvents
-            addListener chatDomEvents, \click, \.p0ne-autowoot-meh-btn, ->
-                meh!
-                $ this .closest \.cm .remove!
+        addListener chatDomEvents, \click, \.p0ne-autowoot-meh-btn, ->
+            meh!
+            $ this .closest \.cm .remove!
 
 
 /*####################################
@@ -5045,6 +5233,48 @@ module \automute, do
     optional: <[ streamSettings ]>
     _settings:
         songlist: {}
+
+    setup: ({addListener}, automute) ->
+        @songlist = @_settings.songlist
+        media = API.getMedia!
+        addListener API, \advance, (d) ~>
+            if (media := d.media) and @songlist[media.cid]
+                console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
+                #muteonce!
+                snooze!
+
+        #== Turn SNOOZE button into add/remove AUTOMUTE button when media is snoozed ==
+        $snoozeBtn = $ '#playback .snooze'
+        @$box_ = $snoozeBtn .children!
+        $box = $ "<div class='box'></div>"
+        streamOff = isSnoozed!
+        addListener API, \p0ne:changeMode, onModeChange = (mode) ~>
+            newStreamOff = (mode == \off)
+            <~ requestAnimationFrame
+            if newStreamOff
+                if not streamOff
+                    $snoozeBtn
+                        .empty!
+                        .append $box
+                if not media
+                    # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
+                    console.warn "[automute] uw0tm8?"
+                else if @songlist[media.cid] # btn "remove from automute"
+                    console.log "[automute] change automute-btn to REMOVE"
+                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
+                    $box .html "remove from<br>automute"
+                else # btn "add to automute"
+                    console.log "[automute] change automute-btn to ADD"
+                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
+                    $box .html "add to<br>automute"
+            else if streamOff
+                console.log "[automute] change automute-btn to SNOOZE"
+                $snoozeBtn
+                    .empty!
+                    .append @$box_
+                    .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
+            streamOff := newStreamOff
+
     module: (media, isAdd) ->
         # add/remove/toggle `media` to/from/in list of automuted songs
         # and show a notification in chat
@@ -5081,47 +5311,6 @@ module \automute, do
         appendChat $msg
         if media.cid == API.getMedia!?.cid
             @updateBtn!
-
-    setup: ({addListener}, automute) ->
-        @songlist = @_settings.songlist
-        media = API.getMedia!
-        addListener API, \advance, (d) ~>
-            media := d.media
-            if media and @songlist[media.cid]
-                #muteonce!
-                snooze!
-
-        #== Turn SNOOZE button into add/remove AUTOMUTE button when media is snoozed ==
-        $snoozeBtn = $ '#playback .snooze'
-        @$box_ = $snoozeBtn .children!
-        $box = $ "<div class='box'></div>"
-        streamOff = isSnoozed!
-        addListener API, \p0ne:changeMode, onModeChange = (mode) ~>
-            newStreamOff = (mode == \off)
-            <~ requestAnimationFrame
-            if newStreamOff
-                if not streamOff
-                    $snoozeBtn
-                        .empty!
-                        .append $box
-                if not media
-                    # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
-                    console.warn "[automute] uw0tm8?"
-                else if @songlist[media.cid] # btn "remove from automute"
-                    console.log "[automute] change automute-btn to REMOVE"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
-                    $box .html "remove from<br>automute"
-                else # btn "add to automute"
-                    console.log "[automute] change automute-btn to ADD"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
-                    $box .html "add to<br>automute"
-            else if streamOff
-                console.log "[automute] change automute-btn to SNOOZE"
-                $snoozeBtn
-                    .empty!
-                    .append @$box_
-                    .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
-            streamOff := newStreamOff
 
         @updateBtn = (mode) ->
             onModeChange(streamOff && \off)
@@ -5359,7 +5548,7 @@ module \chatDblclick2Mention, do
                     try
                         chatDblclick2Mention.timer = 0
                         $this = $ this
-                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || ($this .data \uid) || (i = getUserInternal $this.text!).id
+                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || ($this .data \uid) || (i = getUserInternal $this.text!)?.id
                             pos =
                                 x: chat.getPosX!
                                 y: $this .offset!.top
@@ -5393,7 +5582,8 @@ module \chatDblclick2Mention, do
 
         # instead of individual event listeners, we use a delegated event (which offers better performance)
         addListener chatDomEvents, \click, \.un, newFromClick
-        addListener $(\.app-right), \click, \.name, newFromClick
+        addListener $body, \click, '.p0ne-name, .app-right .name', newFromClick
+        #                                                       , #history-panel .name
 
         function noop
             return null
@@ -5413,33 +5603,46 @@ module \chatDblclick2Mention, do
 module \etaTimer, do
     displayName: 'ETA Timer'
     settings: \base
+    optional: <[ _$context ]>
     setup: ({css, addListener, $create}) ->
         css \etaTimer, '
+            .p0ne-eta {
+                width: auto;
+            }
             #your-next-media>span {
                 width: auto !important;
                 right: 50px;
             }
         '
-        sum = lastSongDur = 0
+        sum = lastSongDur = tooltipIntervalID = 0
+        showingTooltip = false
         $nextMediaLabel = $ '#your-next-media > span'
         $eta = $create '<div class=p0ne-eta>'
             .append $etaText = $ '<span class=p0ne-eta-text>ETA: </span>'
             .append $etaTime = $ '<span class=p0ne-eta-time></span>'
-            .mouseover ->
-                # show ETA calc
-                avg = (sum * p / l) / 60 |> Math.round
-                p = API.getWaitListPosition!
-                p = API.getWaitList!.length if p == -1
-                rem = API.getTimeRemaining!
-                if p
-                    $eta .attr \title, "#{mediaTime rem} remaining + #p × #{mediaTime avg} ø song duration"
-                else if rem
-                    $eta .attr \title, "#{mediaTime rem} remaining, the waitlist is empty"
-                else
-                    $eta .attr \title, "Nobody is playing and the waitlist is empty"
+            .mouseover !->
+                if _$context?
+                    clearInterval tooltipIntervalID
+                    tooltipIntervalID := repeat 1_000ms, updateToolTip
+
+                do function updateToolTip
+                    # show ETA calc
+                    p = API.getWaitListPosition!
+                    p = API.getWaitList!.length if p == -1
+                    avg = sum / l |> Math.round
+                    rem = API.getTimeRemaining!
+                    if _$context?
+                        if p
+                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining + #p × #{mediaTime avg} ø song duration", $etaText
+                        else if rem
+                            _$context.trigger \tooltip:show, "#{mediaTime rem} remaining, the waitlist is empty", $etaText
+                        else
+                            _$context.trigger \tooltip:show, "Nobody is playing and the waitlist is empty", $etaText
             .mouseout ->
-                $eta .attr \title, null
-            .appendTo \#footer
+                if _$context?
+                    clearInterval tooltipIntervalID
+                    _$context.trigger \tooltip:hide
+            .appendTo \#playlist-meta
 
 
         # note: the ETA timer cannot be shown while the room's history is 0
@@ -5478,7 +5681,8 @@ module \etaTimer, do
 
         # show the ETA timer
         updateETA!
-        API.once \p0ne:stylesLoaded, ->
+
+        API.on \p0ne:stylesLoaded, -> requestAnimationFrame ->
             $nextMediaLabel .css right: $eta.width! - 50px
 
         ~function updateETA
@@ -5626,7 +5830,7 @@ module \avoidHistoryPlay, do
         # i.e. use another object which holds the next songs of the current playlist
         playlist = app.footer.playlist.playlist.media
         addListener API, \advance, (d) ->
-            if d.dj?.id != userID
+            if d.media and d.dj?.id != userID
                 if playlist.list?.rows?.0?.model.cid == d.media.cid  and  getActivePlaylist?
                     chatWarn 'moved down', '☢ Avoid History Plays'
                     ajax \PUT, "playlists/#{getActivePlaylist!.id}/media/move", do
@@ -5667,9 +5871,7 @@ module \avoidHistoryPlay, do
  */
 
 
-CHAT_WIDTH = 328px
 MAX_IMAGE_HEIGHT = 300px # should be kept in sync with p0ne.css
-roles = <[ none dj bouncer manager cohost host ambassador ambassador ambassador admin ]>
 
 
 
@@ -5919,26 +6121,42 @@ module \chatMessageClasses, do
                     $this = $ this
                     if fromUser = users.get uid
                         role = getRank(fromUser)
-                        if role != \ghost
-                            fromRole = "from-#role"
-                            fromRole += " from-staff" if role != \none
-                            /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
-                                fromRole += " from"
-                            */
-                    if not fromRole
+                        #if role != \ghost
+                        fromRole = "from-#role"
+                        if role == \regular
+                            fromRole = \from-you if uid == userID
+                        else
+                            fromRole += " from-staff"
+                        /*else # stupid p3. who would abuse the class `from` instead of using something sensible instead?!
+                            fromRole += " from"
+                        */
+                        fromRole += " from-friend" if fromUser.friend
+                    else
                         for r in ($this .find \.icon .prop(\className) ||"").split " " when r.startsWith \icon-chat-
                             fromRole = "from-#{r.substr 10}"
                         else
-                            fromRole = \from-none
+                            fromRole = \from-regular
+                    if $ this .find \.subscriber
+                        fromRole += " from-subscriber"
                     $this .addClass "fromID-#{uid} #fromRole"
         catch err
             console.error "[chatMessageClasses] couldn't convert old messages", err.stack
 
         addListener (window._$context || API), \chat:plugin, ({type, uid}:message) -> if uid
-            message.user = user = getUser(uid)
             message.addClass "fromID-#uid"
-            message.addClass "from-#{getRank user}"
-            message.addClass \from-staff if user and (user.role > 1 or user.gRole)
+
+
+            if message.user = getUser(uid)
+                rank = getRank message.user
+                if uid == userID
+                    message.addClass \from-you
+                    also = \-also
+                else
+                    message.addClass "from-#rank"
+                message.addClass \from-staff if message.user.role > 1 or message.user.gRole
+                if rank == \regular
+                    message.addClass \from-subscriber if message.user.sub
+                    message.addClass \from-friend if message.user.friend
 
 
 
@@ -6186,11 +6404,12 @@ module \imageLightbox, do
                 offset = $img.offset!
                 console.log "[lightbox] rendering" #, {w, h, oW: $el.css(\width), oH: $el.css(\height), ratio}
                 $el
+                    .removeClass \p0ne-img-large-open
                     .css do # copy position and size of inline image (note: the -10px are to make up for the margin)
-                        left:      "#{(offset.left + imgW/2 - PADDING) *100/contW}%"
-                        top:       "#{(offset.top  + imgH/2 - PADDING) *100/contH}%"
-                        maxWidth:  "#{                           imgW  *100/contW}%"
-                        maxHeight: "#{                           imgH  *100/contH}%"
+                        left:      "#{(offset.left + imgW/2) *100/contW}%"
+                        top:       "#{(offset.top  + imgH/2) *100/contH}%"
+                        maxWidth:  "#{               imgW    *100/contW}%"
+                        maxHeight: "#{               imgH    *100/contH}%"
                     .show!
                 $img.css visibility: \hidden # hide inline image
                 requestAnimationFrame ->
@@ -6213,10 +6432,10 @@ module \imageLightbox, do
                 offset = $img.offset!
                 $el
                     .css do
-                        left:      "#{(offset.left + imgW/2 - PADDING) *100/contW}%"
-                        top:       "#{(offset.top  + imgH/2 - PADDING) *100/contH}%"
-                        maxWidth:  "#{                           imgW  *100/contW}%"
-                        maxHeight: "#{                           imgH  *100/contH}%"
+                        left:      "#{(offset.left + imgW/2) *100/contW}%"
+                        top:       "#{(offset.top  + imgH/2) *100/contH}%"
+                        maxWidth:  "#{                 imgW  *100/contW}%"
+                        maxHeight: "#{                 imgH  *100/contH}%"
                 sleep 200ms, ~>
                     # let's hope this is somewhat sync with when the CSS transition ends
                     $el .removeClass \p0ne-img-large-open
@@ -6330,7 +6549,7 @@ module \chatYoutubeThumbnails, do
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=41"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=44"
 
 /*
 window.moduleStyle = (name, d) ->
@@ -6358,7 +6577,7 @@ module \fimplugTheme, do
     settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
     setup: ({loadStyle}) ->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=24"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=26"
 
 
 /*####################################
@@ -6424,7 +6643,7 @@ module \playlistIconView, do
             newCellsPerRow = ~~((@$el.width! - 10px) / CELL_WIDTH)
             newVisibleRows = Math.ceil(2rows + @$el.height!/CELL_HEIGHT) * newCellsPerRow
             if newVisibleRows != @visibleRows or newCellsPerRow != @cellsPerRow
-                console.log "[pIV resize]", newVisibleRows, newCellsPerRow
+                #console.log "[pIV resize]", newVisibleRows, newCellsPerRow
                 @visibleRows = newVisibleRows
                 @cellsPerRow = newCellsPerRow
                 delete @currentRow
@@ -6436,7 +6655,7 @@ module \playlistIconView, do
                 @firstRow = top * @cellsPerRow
                 lastRow = @firstRow + @visibleRows <? @collection.length
                 if @currentRow != @firstRow
-                    console.log "[scroll]", @firstRow, lastRow, @visibleRows
+                    #console.log "[scroll]", @firstRow, lastRow, @visibleRows
                     @currentRow = @firstRow
                     @$firstRow.height top * CELL_HEIGHT
                     @$lastRow.height do
@@ -6458,7 +6677,10 @@ module \playlistIconView, do
             @pl.$el
                 .off \jsp-scroll-y, @pl.scrollBind
                 .on \jsp-scroll-y, replace(@pl, \scrollBind, ~> return @pl~onScroll)
-            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, ~> return  @pl.onResize # is bound
+
+            # opening playlist drawer animation fix
+            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, ~> return ~>
+                @pl.onResize! if @pl.$el
 
             # to force rerender
             delete @pl.currentRow
@@ -6469,7 +6691,7 @@ module \playlistIconView, do
 
         #= fix search =
         replace searchManager, \_search, -> return ->
-            limit = pl?.visibleRows || 50
+            limit = pl?.visibleRows >? 50 # will return 50 if +pl.visibleRows is NaN
             console.log "[_search]", @lastQuery, @page, limit
             if @lastFormat == 1
                 searchAux.ytSearch(@lastQuery, @page, limit, @ytBind)
@@ -6738,14 +6960,15 @@ module \roomSettings, do
     optional: <[ _$context ]>
     persistent: <[ _data _room ]>
     module: new DataEmitter(\roomSettings)
+
+    _room: \dashboard
     setup: ({addListener}) ->
         @_update!
         if _$context?
-            addListener _$context, \room:joining, @_clear, this
+            addListener _$context, \room:joining, @clear, this
             addListener _$context, \room:joined, @_update, this
-    _update: ->
-        @_listeners = []
 
+    _update: ->
         roomslug = getRoomSlug!
         return if @_data and roomslug == @_room
 
@@ -6761,6 +6984,182 @@ module \roomSettings, do
                 .fail ->
                     chatWarn "cannot load Room Settings", "p0ne"
 
+/*####################################
+#             YELLOW MOD             #
+####################################*/
+module \yellowMod, do
+    setup: ({@css}) ->
+        @update!
+    update: -> if not @disabled
+        @css \yellowMod, "
+            \#chat .fromID-#userID .un,
+            .user[data-uid='#userID'] .name > span {
+                color: #{customColors?.colors?.you || roomSettings?._data?.colors.chat.you || \#ffdd6f} !important;
+            }
+        "
+
+
+/*####################################
+#           CUSTOM  COLORS           #
+####################################*/
+window.ColorPicker = !!$.fn.ColorPicker
+module \customColors, do
+    displayName: "☢ Custom Colours"
+    settings: \look&feel
+    help: """
+        Change colours of usernames, depending on their role.
+
+        Note: some aggressive Room Themes might override custom colour settings from this module.
+    """
+    require: <[ yellowMod ColorPicker ]>
+    _settings:
+        global: {}
+        perRoom: {}
+    setup: ({@css, loadStyle}) ->
+        loadStyle "#{p0ne.host}/vendor/colorpicker/css/colorpicker.css"
+
+    roles:
+        * displayName: 'You',              name: \you,        default: 0xffdd6f, regular: true, noIcon: true
+        * displayName: 'Regular',          name: \regular,    default: 0xb0b0b0, regular: true, noIcon: true
+        * displayName: 'Friend',           name: \friend,     default: 0xb0b0b0, regular: true, noIcon: true
+        * displayName: 'Subscriber',       name: \subscriber, default: 0xc59840, regular: true
+        * displayName: 'Resident DJ',      name: \dj,         default: 0xac76ff, staff: true
+        * displayName: 'Bouncer',          name: \bouncer,    default: 0xac76ff, staff: true
+        * displayName: 'Manager',          name: \manager,    default: 0xac76ff, staff: true
+        #* displayName: 'Co-Host',          name: \co-host,    default: 0xac76ff, staff: true
+        * displayName: '(Co-) Host',       name: \host,       default: 0xac76ff, staff: true
+        * displayName: 'Brand Ambassador', name: \ambassador, default: 0x89be6c
+        * displayName: 'Admin',            name: \admin,      default: 0x42a5dc
+
+    settingsExtra: ($wrapper) ->
+        #ToDo add custom icons
+        #ToDo add icon colourizing (?)
+        #   possibly via:
+        #   - canvas + to BlobURI
+        #   - canvas + to Base64
+        #   - SVG
+        #   - PHP
+        #ToDo implement "Co-Host" class in ChatClasses
+        #ToDo add custom colours for custom users
+        cc = this
+        @colors = @_settings.global with @_settings.perRoom[getRoomSlug!]
+
+        visible = false
+        $wrapper .append do
+            $ \<button>
+                .text "change custom colours"
+                .click ~>
+                    if visible
+                        @$el.fadeOut!
+                        visible := false
+                    else
+                        @$el.fadeIn!
+                        visible := true
+
+        @$el = $ '<div class=p0ne-cc-settings>'
+            .hide!
+            #.css do
+            #    left: $ \.p0ne-settings .width!
+            .appendTo $body
+
+        # for simplicity, we only support setting global custom colours yet.
+        #ToDo add perRoom settings
+        scope = @_settings.global
+
+        @rolesHashmap = {}
+        for role in @roles
+            @rolesHashmap[role.name] = role
+            c = scope[role.name] || roomTheme._data?.colors?.chat?[role.name] || "##{role.default.toString(16)}"
+            $ "
+                <div data-role=#{role.name} class='
+                        p0ne-cc-row from-#{role.name}
+                        #{if role.staff then ' from-staff' else ''}
+                        #{if scope[role.name] then '' else ' p0ne-cc-default'}'>
+                    #{if role.noIcon then '' else '<i class=\'icon icon-chat-'+role.name+'\'></i>'}
+                    <span class=name>#{role.displayName}</span>
+                    <i class='icon icon-clear-input'></i>
+                </div>
+            "
+                .css color: c
+                .appendTo @$el
+
+        var roleName, $row
+        @$cp = $cp = $ \<div>
+            .ColorPicker do
+                onChange: (hsb, hex, rgb) ->
+                    c = "##hex"
+                    scope[roleName] = c
+                    $row
+                        .css color: c
+                        .removeClass \p0ne-cc-default
+                    cc.updateCSS!
+        $cpDialog = $ "##{@$cp.data(\colorpickerId)}"
+
+        @$el
+            .on \click, \.icon-clear-input, ->
+                $row = $ this .parent!
+                name = $row .data \role
+                $row
+                    .css color: roomTheme._data?.colors?.chat?[name] || "##{cc.rolesHashmap[name].default.toString(16)}"
+                    .addClass \p0ne-cc-default
+                delete scope[name]
+                cc.updateCSS!
+            .on \click, \.p0ne-cc-row, ->
+                $row := $ this
+                roleName := $row .data \role
+                $cp
+                    .ColorPickerSetColor scope[roleName] || roomTheme._data?.colors?.chat?[roleName] || "##{cc.rolesHashmap[roleName].default.toString(16)}"
+                    .ColorPickerShow!
+                console.log "[colorpicker]", $cpDialog.0, $row.offset!
+                offset = $row.offset!
+                $cpDialog .css do
+                    left: offset.left
+                    top: offset.top + 24px;
+
+        $ '<label class=p0ne-css-override-you><input type=checkbox class=checkbox> "You" overrides other rules</label>'
+            .attr \checked, not yellowMod.disabled
+            .appendTo @$el
+            .find \input
+                .on \click, (e) ->
+                    console.log "[custom colors] force 'you' Override:", @checked
+                    if @checked
+                        yellowMod.enable!
+                    else
+                        yellowMod.disable!!
+        @updateCSS!
+
+    updateCSS: ->
+        styles = ""
+        scope = @_settings.global
+        for role in @roles when color = scope[role.name]
+            name = role.name
+            name = "regular.from-#name" if role.regularOnly
+            styles += "/* #{role.name} => #color */\n"
+            if not role.noIcon
+                styles += """
+                    \#app \#user-lists .icon-chat-#{role.name} + .name,
+                    \#app \#waitlist .icon-chat-#{role.name} + span,
+                    \#app \#user-rollover .icon-chat-#{role.name} + span,\n
+                """
+            styles += """
+                \#app \#chat .from-#name#{if role.regularOnly then '.from-regular' else ''} .un,
+                \#app .p0ne-name.#{role.name}#{if role.regularOnly then '.regular' else ''}
+                {
+                    color: #color !important;
+                }\n
+            """
+        @css \customColors, styles
+        yellowMod.update!
+        #if roomTheme? and not roomTheme.disabled
+        #    roomTheme.applyTheme roomSettings._data
+
+    disable: ->
+        if @$cp
+            @$cp .ColorPickerHide!
+            $ @$cp.data(\colorpickerId) .remove!
+            @$cp .remove!
+        @$el?.remove!
+
 
 /*####################################
 #             ROOM THEME             #
@@ -6775,26 +7174,32 @@ module \roomTheme, do
         Room Settings and thus a Room Theme can be added by (co-) hosts of the room.
     '''
     setup: ({addListener, replace, css, loadStyle}) ->
-        roles = <[ residentdj bouncer manager cohost host ambassador admin ]> #TODO
         @$playbackBackground = $ '#playback .background img'
-        @playbackBackgroundVanilla = @$playbackBackground .attr(\src)
+        @playbackBackgroundVanilla = @$playbackBackground .attr \src
 
-        addListener roomSettings, \data, (d) ~>
+        addListener roomSettings, \data, @applyTheme = (d) ~>
             console.log "#{getTime!} [roomTheme] loading theme"
-            @clear!
+            @clear d.images.background, false
+            @_data = d
+            cc = customColors?.colors ||{}
             styles = ""
 
             /*== colors ==*/
             if d.colors
                 styles += "\n/*== colors ==*/\n"
-                for role, color of d.colors.chat when /*role in roles and*/ isColor(color)
+                for role, color of d.colors.chat when isColor(color)
+                    if role in <[ rdj residentdj ]>
+                        role = \dj
+                        d.colors.chat.dj = color
                     styles += """
                     /* #role => #color */
-                    \#user-panel:not(.is-none) .user > .icon-chat-#role + .name, \#user-lists .user > .icon-chat-#role + .name,
-                    .cm.from-#role .from, \#waitlist .icon-chat-#role + span,
-                    \#user-rollover .icon-chat-cohost + span, .#role {
+                    \#user-lists .icon-chat-#role + .name,
+                    .from-#role .from, \#waitlist .icon-chat-#role + span,
+                    \#user-rollover .icon-chat-#role + span, .p0ne-name.#role {
                             color: #color !important;
                     }\n"""
+                    if role == \you
+                        yellowMod?.update!
                     #ToDo @mention other colours
                 colorMap =
                     background: \.room-background
@@ -6853,12 +7258,18 @@ module \roomTheme, do
                         \#avatars-container::before {
                             background-image: url(#{d.images.booth});
                         }\n"""
-                for role, url of d.images.icons when role in roles
+                for role, url of d.images.icons
                     styles += """
                         .icon-chat-#role {
                             background-image: url(#url);
                             background-position: 0 0;
                         }\n"""
+                    if role == \cohost
+                        styles += """
+                            .from-cohost .icon-chat-host { /* cohost icon fix */
+                                background-image: url(#url);
+                                background-position: 0 0;
+                            }\n"""
 
             /*== text ==*/
             if d.text
@@ -6867,11 +7278,12 @@ module \roomTheme, do
                         replace Lang[key], lang, -> return text
 
             css \roomTheme, styles
+            yellowMod.update!
             @styles = styles
 
         addListener roomSettings, \cleared, @clear, this
 
-    clear: (skipDisables) ->
+    clear: (resetBackground, skipDisables) ->
         console.log "#{getTime!} [roomTheme] clearing RoomTheme"
         if not skipDisables
             # copied from p0ne.module
@@ -6884,12 +7296,15 @@ module \roomTheme, do
             delete [@_cbs.replacements, @_cbs.css, @_cbs.loadedStyles]
 
         @currentRoom = null
-        @$playbackBackground?
-            .one \load ->
-                roomLoader?.onVideoResize Layout.getSize! if Layout?
-            .attr \src, @playbackBackgroundVanilla
+        if resetBackground and @$playbackBackground
+            @$playbackBackground
+                .one \load ->
+                    roomLoader?.onVideoResize Layout.getSize! if Layout?
+                .attr \src, @playbackBackgroundVanilla
 
-    disable: -> @clear true
+    disable: ->
+        @clear true, true
+        @_data = {}
 
 
 /*@source p0ne.song-notif.ls */
@@ -7391,11 +7806,15 @@ require <[ sockjs ]>, (SockJS) ->
     # auxiliaries
     window.sleep ||= (delay, fn) -> return setTimeout fn, delay
 
+    requireHelper \InventoryDropdown, (.selected)
     requireHelper \avatarAuxiliaries, (.getAvatarUrl)
     requireHelper \Avatar, (.AUDIENCE)
     #requireHelper \AvatarList, (._byId?.admin01)
-    requireHelper \myAvatars, (.comparator == \id) # (_) -> _.comparator == \id and _._events?.reset and (!_.length || _.models[0].attributes.type == \avatar)
-    requireHelper \InventoryDropdown, (.selected)
+    requireHelper \myAvatars, (m) !->
+        if m.comparator == \id
+            for ev in user_?._events?[\change:avatarID] ||[] when ev.ctx == m
+                return true
+        return false
 
     window.Lang = require \lang/Lang
 
@@ -7593,15 +8012,16 @@ require <[ sockjs ]>, (SockJS) ->
                         <div class="row" data-value="#category"><span>#{Lang.userAvatars[category]}</span></div>
                     """
 
-                @$el.html """
-                    <dl class="dropdown">
-                        <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
-                        <dd>#html</dd>
-                    </dl>
-                """
+                @$el
+                    .html """
+                        <dl class="dropdown">
+                            <dt><span></span><i class="icon icon-arrow-down-grey"></i><i class="icon icon-arrow-up-grey"></i></dt>
+                            <dd>#html</dd>
+                        </dl>
+                    """
 
-                $ \dt   .on \click, (e) ~> @onBaseClick e
-                $ \.row .on \click, (e) ~> @onRowClick  e
+                    .on \click, \dt,   @~onBaseClick
+                    .on \click, \.row, @~onRowClick
                 @select InventoryDropdown.selected
 
                 @$el.show!
@@ -7721,7 +8141,7 @@ require <[ sockjs ]>, (SockJS) ->
                     else
                         console.warn "[p0ne custom avatars] invalid ppCAS server"
 
-            @connect 'https://p0ne.com/_'
+            @connect 'https://ppcas.p0ne.com/_'
 
 
         connectAttemps: 1
@@ -7733,7 +8153,8 @@ require <[ sockjs ]>, (SockJS) ->
             reconnect = true
 
             if reconnectWarning
-                setTimeout (~> if @connectAttemps==0 then chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"), 10_000ms
+                sleep 10_000ms, ~> if @connectAttemps==0
+                    chatWarn "lost connection to avatar server \xa0 =(", "p0ne avatars"
 
             @socket = new SockJS(url)
             @socket.url = url
@@ -7771,7 +8192,7 @@ require <[ sockjs ]>, (SockJS) ->
             # replace old authTokens
             user = API.getUser!
             oldBlurb = user.blurb || ""
-            newBlurb = oldBlurb .replace /🐎\w{4}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
+            newBlurb = oldBlurb .replace /🐎\w{6}/g, '' # THIS SHOULD BE KEPT IN SYNC WITH ppCAS' AUTH_TOKEN GENERATION
             if oldBlurb != newBlurb
                 @changeBlurb newBlurb, do
                     success: ~>
@@ -7785,7 +8206,7 @@ require <[ sockjs ]>, (SockJS) ->
                 else if user.blurb.length >= 72
                     newBlurb = "#{user.blurb.substr(0, 71)}… 🐎#authToken"
                 else
-                    newBlurb = "#{user.blurb} #authToken"
+                    newBlurb = "#{user.blurb} 🐎#authToken"
 
                 @blurbIsChanged = true
                 @changeBlurb newBlurb, do
@@ -7887,7 +8308,8 @@ require <[ sockjs ]>, (SockJS) ->
                 success: options.success
                 error: options.error
 
-            #setTimeout (-> @socket.emit \reqAuthToken if @connectAttemps), 5_000ms
+            #sleep 5_000ms, -> if @connectAttemps
+            #   @socket.emit \reqAuthToken
 
         disable: ->
             @changeBlurb @oldBlurb if @blurbIsChanged
@@ -7954,7 +8376,7 @@ module \p0neSettings, do
             .appendTo $ppS
 
         #= add toggles for existing modules =
-        for ,module of p0ne.modules
+        for ,module of p0ne.modules when not module.loading
             @addModule module
 
 
@@ -8037,15 +8459,12 @@ module \p0neSettings, do
                 .stop!
                 .slideUp ->
                     $ this .remove!
-            console.log "[p0neSettings:disabledModule]", module_.name
         addListener API, \p0ne:moduleEnabled, (module) ~>
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
             @settingsExtra true, module
-            console.log "[p0neSettings:enabledModule]", module.name
         addListener API, \p0ne:moduleUpdated, (module, module_) ~>
-            console.log "[p0neSettings:updatedModule]", module.name, module_.name
             if module.settings
                 @addModule module, module_
                 if module.help != module_.help and module._$settings?.is \:hover
@@ -8149,13 +8568,14 @@ module \p0neSettings, do
             else
                 module._$settings .appendTo $s
 
+                # render extra settings element if module is enabled
+                if not module.disabled
+                    @settingsExtra false, module
+
             # (animatedly) open the settings group
             if @_settings.groupToggles[module.settings] and not module.settingsVip
                 $s .stop! .animate height: $s.children!.length * 44px, \slow
 
-            # render extra settings element if module is enabled
-            if not module.disabled
-                @settingsExtra false, module
 
     settingsExtra: (autofocus, module, module_) ->
         try
@@ -8190,43 +8610,31 @@ module \p0neSettings, do
 module \enableModeratorModules, do
     require: <[ user_ ]>
     setup: ({addListener}) ->
-        prevRole = user_.attributes.role
+        prevRole = user_.get \role
         $body.addClass \user-is-staff if user.isStaff
 
-        addListener user_, \change:role, (user, newRole) ->
+        addListener user_, \change:role, (user_, newRole) ->
+            console.log "[p0ne] change:role from #prevRole to #newRole"
             if newRole > 1 and prevRole < 2
-                for m in p0ne.modules when m.modDisabled
+                console.info "[p0ne] enabling moderator modules"
+                for ,m of p0ne.modules when m.modDisabled
+                    console.log "[p0ne moderator] enabling", m.name
                     m.enable!
                     m.modDisabled = false
                 $body.addClass \user-is-staff
-                user.isStaff = true
-            else
-                for m in p0ne.modules when m.moderator and not m.modDisabled
+                user_.isStaff = true
+            else if newRole < 2 and prevRole > 1
+                console.info "[p0ne] disabling moderator modules"
+                for ,m of p0ne.modules when m.moderator    and not m.disabled
+                    console.log "[p0ne moderator] disabling", m.name
                     m.modDisabled = true
                     m.disable!
                 $body.removeClass \user-is-staff
-                user.isStaff = true
+                user_.isStaff = false
+            prevRole := newRole
     disable: ->
         $body.removeClass \user-is-staff
 
-
-/*####################################
-#             YELLOW MOD             #
-####################################*/
-module \yellowMod, do
-    displayName: 'Yellow Name as Staff'
-    moderator: true
-    settings: \moderation
-    setup: ({css}) ->
-        id = API.getUser! .id
-        css \yellowMod, "
-            \#chat .fromID-#id .un,
-            .user[data-uid='#id'] .name > span {
-                color: \#ffdd6f !important;
-            }
-        "
-            # \#chat .from-#id .from,
-            # \#chat .fromID-#id .from,
 
 
 /*####################################
@@ -8308,6 +8716,7 @@ module \disableChatDelete, do
                 $msg .addClass \deleted if cid == uid or not getUser(uid)?.gRole
                 d = $createPersistent getTimestamp!
                     .addClass \delete-timestamp
+                    .removeClass \timestamp
                     .appendTo $msg
                 d .text "deleted #{if moderator then 'by '+moderator else ''} #{d.text!}"
                 cm = $cm!
@@ -8369,7 +8778,7 @@ module \warnOnMehers, do
                         <div class='cm system'>
                             <div class=box><i class='icon icon-chat-system'></i></div>
                             <div class='msg text'>
-                                #{formatUserHTML troll, true} meh'd the past #{plural users[k], 'song'}!
+                                #{formatUserHTML d.user, true} meh'd this song!
                             </div>
                         </div>"
 
@@ -8392,6 +8801,45 @@ module \warnOnMehers, do
                     delete users[k]
             current := {}
             lastAdvance := d
+
+    settingsExtra: ($el) !->
+        warnOnMehers = this
+        var resetTimer
+        $ "
+            <form>
+                <label><input type=radio name=max-mehs value=on #{if @_settings.instantWarn then \checked else ''}> alert instantly</label><br>
+                <label>
+                    <input type=radio name=max-mehs value=off #{if @_settings.instantWarn then '' else \checked}> alert after <input type=number value='#{@_settings.maxMehs}' class=max-mehs> consequitive mehs
+                </label>
+            </form>"
+            .append do
+                $warning = $ '<div class=warning>'
+            .on \click, \input:radio, !->
+                if @checked
+                    warnOnMehers._settings.instantWarn = (@value == \on)
+                    console.log "#{getTime!} [warnOnMehers] updated instantWarn to #{warnOnMehers._settings.instantWarn}"
+            .on \input, \.max-mehs, !->
+                val = ~~@value # note: invalid numbers (NaN) get floored to 0
+                if val > 1
+                    warnOnMehers._settings.maxMehs = val
+                    if resetTimer
+                        $warning .fadeOut!
+                        clearTimeout resetTimer
+                        resetTimer := 0
+                    if warnOnMehers._settings.instantWarn
+                        $ this .parent! .click!
+                    console.log "#{getTime!} [warnOnMehers] updated maxMehs to #val"
+                else
+                    $warning
+                        .fadeIn!
+                        .text "please enter a valid number >1"
+                    resetTimer := sleep 2.min, !->
+                        @value = warnOnMehers._settings.maxMehs
+                        resetTimer := 0
+                    console.warn "#{getTime!} [warnOnMehers] invalid input for maxMehs", @value
+            .appendTo $el
+        $el .css do
+            paddingLeft: 15px
 
 
 /*####################################
@@ -9213,7 +9661,7 @@ module \ponify, do
 
 
     ponifyMsg: (msg) !->
-        msg.message .= replace @regexp, (_, prepre, pre, s, post, i) ~>
+        msg.message .= replace @regexp, (_, pronoun, s, possessive, htmltag, i) ~>
             w = @map[s.toLowerCase!]
             r = ""
 
@@ -9234,20 +9682,20 @@ module \ponify, do
 
             r = "<abbr class=ponified title='#s'>#r</abbr>"
 
-            if pre
+            if pronoun
                 if "aeioujyh".has(w.0)
                     r = "an #r"
                 else
                     r = "a #r"
 
-            if post
+            if possessive
                 if "szx".has(w[*-1])
                     r += "' "
                 else
                     r += "'s "
 
             console.log "replaced '#s' with '#r'", msg.cid
-            return prepre+r
+            return r+htmltag
 
 
     /*== EMOTICONS ==*/
@@ -9314,9 +9762,9 @@ module \ponify, do
 
     setup: ({addListener, replace, css}) ->
         @regexp = //
-            ((?:^|<.+?>.+?</.+?>).*?) # avoid ponifying urls
-            (\b|an?\s+)(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
-            //gi
+            \b(an?\s+)?(#{Object.keys @map .join '|' .replace(/\s+/g,'\\s*')})('s?)?\b
+            ((?:<.+?</.+?>|$).*?) # avoid ponifying urls
+        //gi
         addListener _$context, \chat:plugin, (msg) ~> @ponifyMsg msg
         if emoticons?
             aEM = {}<<<<emoticons.autoEmoteMap
@@ -9388,56 +9836,66 @@ module \fimstats, do
     disabled: true
     setup: ({addListener, $create}, lookup) ->
         css \fimstats, '
-            .p0ne-last-played {
+            .p0ne-fimstats {
                 position: absolute;
-                right: 140px;
-                top: 30px;
+                left: 0;
+                right: 345px;
+                bottom: 54px;
+                height: 1em;
+                padding: 5px 0;
                 font-size: .9em;
-                color: #ddd;
+                color: #12A9E0;
+                background: rgba(0,0,0, 0.4);
+                text-align: center;
+                z-index: 6;
                 transition: opacity .2s ease-out;
             }
-            #volume:hover ~ .p0ne-last-played {
-              opacity: 0;
-            }
-            #dialog-preview .p0ne-last-played {
-              right: 0;
-              top: 23px;
-              left: 0;
-            }
 
-            /*@media (min-width: 0px) {*/
-                .p0ne-fimstats-last { display: none; }
-                .p0ne-fimstats-first { display: none; }
-
-                .p0ne-fimstats-plays::before { content: " ("; }
-                .p0ne-fimstats-plays::after { content: "x) "; }
-                .p0ne-fimstats-first-notyet::before { content: "first play!"; }
-                .p0ne-fimstats-once::before { content: "once "; }
-            /*}*/
-            @media (min-width: 1600px) {
-                .p0ne-fimstats-last { display: inline; }
-                .p0ne-fimstats-first { display: inline; }
-
-                .p0ne-fimstats-plays::before { content: " …("; }
-                .p0ne-fimstats-plays::after { content: "x)… "; }
-
-                .p0ne-fimstats-first-notyet::before { content: "first played just now!"; }
-                .p0ne-fimstats-once::before { content: "once played by "; }
+            .p0ne-fimstats-field {
+                display: block;
+                position: absolute;
+                width: 100%;
+                padding: 0 5px;
+                box-sizing: border-box;
             }
-            @media (min-width: 1700px) {
-                .p0ne-fimstats-last::before { content: "last: "; }
-                .p0ne-fimstats-plays::before { content: " - (played "; }
-                .p0ne-fimstats-plays::after { content: "x)"; }
-                .p0ne-fimstats-first::before { content: " - first: "; }
+            .p0ne-fimstats-last { text-align: left; }
+            .p0ne-fimstats-plays, .p0ne-fimstats-once, .p0ne-fimstats-first-notyet { text-align: center; }
+            .p0ne-fimstats-first { text-align: right; }
+
+            .p0ne-fimstats-field::before, .p0ne-fimstats-field::after,
+            .p0ne-fimstats-first-time, .p0ne-fimstats-last-time, .p0ne-fimstats-once-time {
+                color: #ddd;
             }
-            @media (min-width: 1800px) {
-                .p0ne-fimstats-last::before { content: "last played by "; }
-                .p0ne-fimstats-plays::before { content: " \xa0 - (played "; }
-                .p0ne-fimstats-plays::after { content: "x)"; }
-                .p0ne-fimstats-first::before { content: " - \xa0 first played by "; }
+            #dialog-container .p0ne-fimstats {
+                bottom: 16px;
+                width: 100%;
+                background: rgba(0,0,0, 0.8);
+            }
+            #dialog-container .p0ne-fimstats-first-notyet::before { content: "not played yet!"; color: #12A9E0 }
+
+            .p0ne-fimstats-first-notyet::before { content: "first played just now!"; color: #12A9E0 }
+            .p0ne-fimstats-once::before { content: "once played by: "; }
+            .p0ne-fimstats-last::before { content: "last played by: "; }
+            .p0ne-fimstats-last-time::before,
+            .p0ne-fimstats-first-time::before,
+            .p0ne-fimstats-once-time::before { content: "("; }
+            .p0ne-fimstats-last-time::after,
+            .p0ne-fimstats-first-time::after,
+            .p0ne-fimstats-once-time::after { content: ")"; }
+            .p0ne-fimstats-plays::before { content: "played: "; }
+            .p0ne-fimstats-plays::after { content: " times"; }
+            .p0ne-fimstats-first::before { content: "first played by: "; }
+
+            .p0ne-fimstats-first-time,
+            .p0ne-fimstats-last-time,
+            .p0ne-fimstats-once-time {
+                font-size: 0.8em;
+                display: inline;
+                position: static;
+                margin-left: 5px;
             }
         '
-        $el = $create '<span class=p0ne-last-played>' .appendTo \#now-playing-bar
+        $el = $create '<span class=p0ne-fimstats>' .appendTo \#room
         addListener API, \advance, @updateStats = (d) ->
             d ||= media: API.getMedia!
             if d.media
@@ -9445,45 +9903,72 @@ module \fimstats, do
                     .then (d) ->
                         $el
                             .html d.html
-                            .prop \title, d.text
                     .fail (err) ->
                         $el
                             .html err.html
-                            .prop \title, err.text
 
             else
                 $el.html ""
         if _$context?
             addListener _$context, \ShowDialogEvent:show, (d) -> #\PreviewEvent:preview, (d) ->
-                if d.dialog.options?.media
-                    console.log "[fimstats]", d.media
+                _.defer -> if d.dialog.options?.media
+                    console.log "[fimstats]", d.dialog.options.media
                     lookup d.dialog.options.media.toJSON!
                         .then (d) ->
-                            console.log "[fimstats] ->", d.media, d, $('#dialog-preview .message')
-                            $ '#dialog-preview .message' .after do
-                                $ '<div class=p0ne-last-played>' .html d.html
+                            $ \#dialog-preview .after do
+                                $ '<div class=p0ne-fimstats>' .html d.html
+        if app?.dialog?.dialog?.options?.media
+            console.log "[fimstats]", that
+            lookup that.toJSON!
+                .then (d) ->
+                    $ \#dialog-preview .after do
+                        $ '<div class=p0ne-fimstats>' .html d.html
+
+        # prevent the p0ne settings from overlaying the ETA
+        do addListener API, \p0ne:stylesLoaded, ->
+            $ \#p0ne-menu .css bottom: 54px + 21px
+        addListener API, \p0ne:moduleEnabled, (m) -> if m.name == \p0neSettings
+            $ \#p0ne-menu .css bottom: 54px + 21px
+
+        # show stats for current song
         @updateStats!
+
     module: (media) ->
-        return $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
+        $ \#p0ne-menu .css bottom: 54px
+        def = $.Deferred!
+        $.getJSON "https://fimstats.anjanms.com/_/media/#{media.format}/#{media.cid}?key=#{p0ne.FIMSTATS_KEY}"
             .then (d) ->
-                d.firstPlay = d.data.0.firstPlay; d.lastPlay = d.data.0.lastPlay; d.plays = d.data.0.plays
-                first = "#{d.firstPlay.user} #{ago d.firstPlay.time*1000}"
-                last = "#{d.lastPlay.user} #{ago d.lastPlay.time*1000}"
-                if first != last
-                    #                       note: playcount doesn't contain current play
-                    d.text = "last played by #last \xa0 - (#{d.plays}x) - \xa0 first played by #first"
-                    d.html = "<span class=p0ne-fimstats-last>#last</span><span class=p0ne-fimstats-plays>#{d.plays}</span><span class=p0ne-fimstats-first>#first</span>"
+                # note: `d.plays` (playcount) doesn't contain current play
+                d = d.data.0
+
+                if d.firstPlay.time != d.lastPlay.time
+                    d.text = "last played by #{d.lastPlay.user} \xa0 - (#{d.plays}x) - \xa0 first played by #{d.firstPlay.user}"
+                    d.html = "
+                        <span class='p0ne-fimstats-field p0ne-fimstats-last p0ne-name' data-uid=#{d.lastPlay.id}>#{d.lastPlay.user}
+                            <span class=p0ne-fimstats-last-time>#{ago d.lastPlay.time*1000s_to_ms}</span>
+                        </span>
+                        <span class='p0ne-fimstats-field p0ne-fimstats-plays'>#{d.plays}</span>
+                        <span class='p0ne-fimstats-field p0ne-fimstats-first p0ne-name' data-uid=#{d.firstPlay.id}>#{d.firstPlay.user}
+                            <span class=p0ne-fimstats-first-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
+                        </span>
+                    "
                 else
-                    d.text = "once played by #first"
-                    d.html = "<span class=p0ne-fimstats-once>#first</span>"
-                return d
+                    d.text = "once played by #{d.firstPlay.user}"
+                    d.html = "
+                        <span class='p0ne-fimstats-field p0ne-fimstats-once'>#{d.firstPlay.user}
+                            <span class=p0ne-fimstats-once-time>#{ago d.firstPlay.time*1000s_to_ms}</span>
+                        </span>"
+                def.resolve d
             .fail (d,,status) ->
                 if status == "Not Found"
                     d.text = "first played just now!"
-                    d.html = "<span class=p0ne-fimstats-first-notyet></span>"
+                    d.html = "<span class='p0ne-fimstats-field p0ne-fimstats-first-notyet'></span>"
+                    def.resolve d
+                #else if status == \Unauthorized
                 else
-                    d.text = d.html = ""
-                return d
+                    d.text = d.html = "error loading fimstats"
+                    def.reject d
+        return def.promise!
 
 /*@source p0ne.bpm.ls */
 /**
@@ -9510,7 +9995,7 @@ module \bpm, do
     module: (str) ->
         if not str
             console.error "bpm(null)"
-        return @bpm str 
+        return @bpm str
 
     setup: ({addListener, $create}, {_settings}) ->
         host = window.p0ne?.host or "https://cdn.p0ne.com"
@@ -9658,14 +10143,14 @@ module \bpm, do
         #== main BPM plugin ==
         @bpm = (str) ->
             console.error "bpm(null) [2]" if not str
-            str .replace EMOTE_REGEXP, (_, parts, altText) ->
+            str .replace EMOTE_REGEXP, (all, parts, altText) ->
                 parts .= split '-'
                 name = parts.0
                 info = lookup_core_emote name, altText
                 if not info
-                    return _
+                    return all
                 else
-                    return convert_emote_element info, parts, _
+                    return convert_emote_element info, parts, all
 
         #== integration ==
         addListener (window._$context || API), \chat:plugin, (msg) ->
