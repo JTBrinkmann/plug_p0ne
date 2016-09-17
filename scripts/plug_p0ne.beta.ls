@@ -42,8 +42,8 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.7
-    lastCompatibleVersion: \1.8.0 /* see below */
+    version: \1.8.8.2
+    lastCompatibleVersion: \1.8.8.2 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
     YOUTUBE_V3_KEY: \AIzaSyDaWL9emnR9R_qBWlDAYl-Z_h4ZPYBDjzk
@@ -88,7 +88,7 @@ window.compareVersions = (a, b) !-> /* returns whether `a` is greater-or-equal t
         return a[i] > b[i]
     return b.length >= a.length
 
-
+API?.enabled = true # to make plug_p0ne work for guests
 <-      (fn__) !->
     if window.P0NE_UPDATE
         window.P0NE_UPDATE = false
@@ -1067,6 +1067,7 @@ ColorPickerHide:h.hidePicker,ColorPickerShow:h.showPicker,ColorPickerSetColor:h.
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
 */
+console.log "~~~~~~~ p0ne.auxiliaries ~~~~~~~"
 
 export $window = $ window
 export $body = $ document.body
@@ -1429,7 +1430,7 @@ window <<<<
             for u in userList when u.username == user
                 return u
             user .= toLowerCase!
-            for u in userList when u.username .toLowerCase! == user
+            for u in userList when u.username .toLowerCase! == user or u.rawun .toLowerCase! == user
                 return u
         else
             console.warn "unknown user format", user
@@ -1449,7 +1450,7 @@ window <<<<
             for u in users.models when u.get(\username) == user
                 return u
             user .= toLowerCase!
-            for u in users.models when u.get(\username) .toLowerCase! == user
+            for u in users.models when u.get(\username).toLowerCase! == user or u.get(\rawun).toLowerCase! == user
                 return u
         else
             console.warn "unknown user format", user
@@ -2217,7 +2218,7 @@ window <<<<
         if not cid
             return $!
         else
-            return $cms! .find ".text.cid-#cid"
+            return get$cms! .find ".text.cid-#cid"
     getChat: (cid) !->
         if typeof cid == \object
             return cid.$el ||= getChat(cid.cid)
@@ -2311,7 +2312,7 @@ window <<<<
         if typeof msg == \string
             $msg = getChat($msg)
         if $msg?.length
-            return $cm!.height! > $msg .offset!.top > 101px
+            return get$cm!.height! > $msg .offset!.top > 101px
         else
             return false
 
@@ -2383,7 +2384,7 @@ window <<<<
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
-                .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
+            /*  .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
                     if x.hasAny ['=', '^']  or  a == ":" or c == ":"
                         return x
                     else if b == \(
@@ -2392,9 +2393,11 @@ window <<<<
                     else if lvl > 0
                         lvl--
                         return "#a)</i>#c" if lvl == 0
-                    return x
-            return pre if not url
-            return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
+                    return x*/
+            if not url
+                return pre
+            else
+                return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
         text += "</i>" if lvl
         return text .replace /\n/g, \<br>
 
@@ -2426,21 +2429,22 @@ window <<<<
             return false
 
 
-    mention: (list) !->
-        if not list?.length
-            return ""
-        else if list.0.username
-            return humanList ["@#{list[i].username}" for ,i in list]
-        else if list.0.attributes?.username
-            return humanList ["@#{list[i].get \username}" for ,i in list]
-        else
-            return humanList ["@#{list[i]}" for ,i in list]
     humanList: (arr) !->
         return "" if not arr.length
         arr = []<<<<arr
         if arr.length > 1
             arr[*-2] += " and\xa0#{arr.pop!}" # \xa0 is NBSP
         return arr.join ", "
+    mention: (list) !->
+        if not list?.length
+            return ""
+        else if list.0.username
+            res = ["@#{list[i].username}" for ,i in list]
+        else if list.0.attributes?.username
+            res = ["@#{list[i].get \username}" for ,i in list]
+        else
+            res = ["@#{list[i]}" for ,i in list]
+        return humanList
 
     plural: (num, singular, plural="#{singular}s") !->
         # for further functionality, see
@@ -2486,7 +2490,7 @@ window <<<<
         return "<span class=\"emoji emoji-#key\"></span>"
     flag: (language, unicode) !->
         /*@security HTML injection possible, if Lang.languages[language] is maliciously crafted*/
-        if language.0 == \' or language.1 == \' # avoid HTML injection
+        if not language or (window.Lang and not Lang.languages[language])
             return ""
         else
             return "<span class='flag flag-#language' title='#{Lang?.languages[language]}'></span>"
@@ -2551,7 +2555,7 @@ window <<<<
         return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span>#{userFlag}#{info ||''}</span>"
 
     formatUserSimple: (user) !->
-        return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
+        return "<span class=un data-uid='#{user.id}'>#{user.rawun}</span>"
 
 
     # formatting
@@ -2704,168 +2708,128 @@ if err
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
+delete window.room
 for id, m of require.s.contexts._.defined when m
+    moduleName = false
     m.requireID = id
     switch
     | m.ACTIVATE =>
         moduleName = "ActivateEvent"
-        window.ActivateEvent = m
     | m._name == \AlertEvent =>
         moduleName = "AlertEvent"
-        window.AlertEvent = m
     | m.deserializeMedia =>
         moduleName = "auxiliaries"
-        window.auxiliaries = m
     | m.AUDIENCE =>
         moduleName = "Avatar"
-        window.Avatar = m
     | m.getAvatarUrl =>
         moduleName = "avatarAuxiliaries"
-        window.avatarAuxiliaries = m
     | m.Events =>
         moduleName = "backbone"
-        window.backbone = m
-    | m.sendChat =>
+    | m.sendChat and m != API =>
         moduleName = "chatAuxiliaries"
-        window.chatAuxiliaries = m
     | m.updateElapsedBind =>
         moduleName = "currentMedia"
-        window.currentMedia = m
     | m.settings =>
         moduleName = "database"
-        window.database = m
     | m.emojify =>
         moduleName = "emoticons"
-        window.emoticons = m
+        m.reversedMap = {[v, k] for k,v of m.map}
+    | m.mapEvent =>
+        moduleName = "eventMap"
     | m.getSize =>
         moduleName = "Layout"
-        window.Layout = m
     | m.canModChat =>
         moduleName = "permissions"
-        window.permissions = m
     | m._read =>
         moduleName = "playlistCache"
-        window.playlistCache = m
     | m.activeMedia =>
         moduleName = "playlists"
-        window.playlists = m
     | m.scThumbnail =>
         moduleName = "plugUrls"
-        window.plugUrls = m
     | m.className == \pop-menu =>
         moduleName = "popMenu"
-        window.popMenu = m
     | \_window of m =>
         moduleName = "PopoutView"
-        window.PopoutView = m
     | m.onVideoResize =>
         moduleName = "roomLoader"
-        window.roomLoader = m
     | m.ytSearch =>
         moduleName = "searchAux"
-        window.searchAux = m
     | m._search =>
         moduleName = "searchManager"
-        window.searchManager = m
     | m.settings =>
         moduleName = "settings"
-        window.settings = m
     | m.ack =>
         moduleName = "socketEvents"
-        window.socketEvents = m
     | m.sc =>
         moduleName = "soundcloud"
-        window.soundcloud = m
     | m.identify =>
         moduleName = "tracker"
-        window.tracker = m
     | m.onRole =>
         moduleName = "users"
-        window.users = m
     | otherwise =>
         switch m.id
         | \playlist-menu =>
             moduleName = "playlistMenu"
-            window.playlistMenu = m
         | \user-lists =>
             moduleName = "userList"
-            window.userList = m
         | \user-rollover =>
             moduleName = "userRollover"
-            window.userRollover = m
         | otherwise =>
             if m._events
                 switch
                 | m._events[\chat:receive] =>
-                    moduleName = "_"
-                    window._$context = m
+                    moduleName = "_$context"
 
             if m.attributes
                 switch
                 | \shouldCycle of m.attributes =>
                     moduleName = "booth"
-                    window.booth = m
                 | \hostID of m.attributes =>
                     moduleName = "room"
-                    window.room = m
                 | \grabbers of m.attributes =>
                     moduleName = "votes"
-                    window.votes = m
             if m::
                 switch
-                | m::execute?.toString!.has("/media/insert") =>
-                    moduleName = "Curate"
-                    window.Curate = m
                 | m::id == \dialog-alert =>
                     moduleName = "DialogAlert"
-                    window.DialogAlert = m
-                    export Dialog = m.__super__
+                    export Dialog = m.__super__.constructor
                 | m::className == \friends =>
                     moduleName = "FriendsList"
-                    window.FriendsList = m
                 | m::className == \avatars && m::eventName =>
                     moduleName = "InventoryAvatarPage"
-                    window.InventoryAvatarPage = m
                     export InventoryDropdown = new m().dropDown.constructor
                 | m::onPlaylistVisible =>
                     moduleName = "MediaPanel"
-                    window.MediaPanel = m
                 | m::id == \playback =>
                     moduleName = "Playback"
-                    window.Playback = m
                 | m::listClass == \playlist-media =>
                     moduleName = "PlaylistItemList"
-                    window.PlaylistItemList = m
                     export PlaylistItemRow = m::RowClass
+                    export PlaylistMediaList = m.__super__.constructor
                 | m::onItemsChange =>
                     moduleName = "PlaylistListRow"
-                    window.PlaylistListRow = m
                 | m::hasOwnProperty \permissionAlert =>
                     moduleName = "PlugAjax"
-                    window.PlugAjax = m
                 | m::listClass == \history and m::hasOwnProperty \listClass =>
                     moduleName = "RoomHistory"
-                    window.RoomHistory = m
                 | m::vote =>
                     moduleName = "RoomUserRow"
-                    window.RoomUserRow = m
                 | m::listClass == \search =>
                     moduleName = "SearchList"
-                    window.SearchList = m
-                | m::id == \chat-suggestion =>
+                    export PlaylistMediaList = m.__super__.constructor
+                | m::id == \chat-suggestion != m.__super__.id =>
                     moduleName = "SuggestionView"
-                    window.SuggestionView = m
                 | m::onAvatar =>
                     moduleName = "WaitlistRow"
-                    window.WaitlistRow = m
                 | m::onVideos =>
                     moduleName = "YtSearchService"
-                    window.YtSearchService = m
+                | m::execute?.toString!.has("/media/insert") =>
+                    moduleName = "Curate"
+
     if moduleName
-        console.log "[require]", id, moduleName, m
-        moduleName = ""
-    else if m.ytSearch
-        console.warn "[require] has .ytSearch", id, m
+        if not p0ne_ and window[moduleName]?
+            console.warn "[require] found multiple matches for '#moduleName'"
+        window[moduleName] = m
     /*| m._events?[\update:next] =>
         window.visiblePlaylist = m
     | m\currentFilter of =>
@@ -2874,11 +2838,11 @@ for id, m of require.s.contexts._.defined when m
         window.AvatarList = m
     */
 for m in <[ _$context ActivateEvent AlertEvent auxiliaries Avatar avatarAuxiliaries backbone booth chatAuxiliaries Curate currentMedia database DialogAlert emoticons FriendsList InventoryAvatarPage Layout MediaPanel permissions Playback playlistCache PlaylistItemList PlaylistListRow playlistMenu playlists PlugAjax plugUrls popMenu PopoutView room RoomHistory roomLoader RoomUserRow searchAux SearchList searchManager settings socketEvents soundcloud SuggestionView tracker userList userRollover users votes WaitlistRow YtSearchService ]> when not m of window
-    console.warn "[require] couldn't require"
+    console.warn "[require] couldn't require", m
 
+if not DialogAlert?
+    $app .addClass \p0ne-dialog-not-required
 
-if emoticons?
-    emoticons.reversedMap = {[v, k] for k,v of emoticons.map}
 
 #= _$context =
 if not _$context?
@@ -2934,11 +2898,11 @@ if app and not (window.chat = app.room.chat) and window._$context
 #======================
 #== CHAT AUXILIARIES ==
 #======================
-cm = $ \#chat-messages
+$cm = $ \#chat-messages
 window <<<<
-    $cm: !->
+    get$cm: !->
         return PopoutView?.chat?.$chatMessages || chat?.$chatMessages || cm
-    $cms: !->
+    get$cms: !->
         cm = chat?.$chatMessages || cm
         if PopoutView?.chat?.$chatMessages
             return cm .add that
@@ -2955,7 +2919,7 @@ window <<<<
     appendChat: (div, wasAtBottom) !->
         wasAtBottom ?= chatIsAtBottom!
         $div = $ div
-        $cms!.append $div
+        get$cms!.append $div
         chatScrollDown! if wasAtBottom
         chat.lastType = null # avoid message merging above the appended div
         PopoutView?.chat?.lastType = null
@@ -2981,12 +2945,29 @@ window <<<<
                         .append do
                             $('<div class=text>')[if isHTML then \html else \text] message
 
+    chatWarnSmall: (className, message, icon, isHTML) !->
+        if typeof message != \string
+            [message, icon, isHTML] = [className, message, icon]
+            className = ''
+        if typeof icon == \boolean
+            isHTML = icon; icon = false
+        icon ||= \icon-chat-system
+        if chat?
+            chat.lastType = className
+        return not message || appendChat do
+            $ "<div class='cm p0ne-notif p0ne-notif-small #className'><i class='icon #icon'></i></div>"
+                .append do
+                    $ '<div class="msg text">'
+                        .append do
+                            $('<div class=text>')[if isHTML then \html else \text] message
+                        .append getTimestamp!
+
     chatIsAtBottom: !->
-        cm = $cm!
-        return cm.scrollTop! > cm.0 .scrollHeight - cm.height! - 20
+        $cm = get$cm!
+        return $cm.scrollTop! > $cm.0 .scrollHeight - $cm.height! - 20
     chatScrollDown: !->
-        cm = $cm!
-        cm.scrollTop( cm.0 .scrollHeight )
+        $cm = get$cm!
+        $cm.scrollTop( $cm.0 .scrollHeight )
 
     chatInput: (msg, append) !->
         $input = chat?.$chatInputField || $ \#chat-input-field
@@ -3148,16 +3129,17 @@ console.logImg = (src, customWidth, customHeight) !->
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
-window.module = (name, data) !->
+console.log "~~~~~~~ p0ne.module ~~~~~~~"
+window.module = (moduleName, data) !->
     try
         # setup(helperFNs, module, args)
         # update(helperFNs, module, args, oldModule)
         # disable(helperFNs, module, args)
-        if typeof name == \string
-            data.name = name
+        if typeof moduleName == \string
+            data.moduleName = moduleName
         else
-            data = name
-            name = data.name if data
+            data = moduleName
+            moduleName = data.moduleName if data
 
         if typeof data == \function
             setup = data
@@ -3170,29 +3152,19 @@ window.module = (name, data) !->
                 module = !->
                     return fn.apply module, arguments
                 module <<<< data
-                # what what, functions apparently don't like the .name property
-                Object.defineProperty module, \name, do
-                    get: !-> return name
-                    #set: (newName) !-> name := newName
             else if typeof module == \object
                 module <<<< data
             else
-                console.warn "#{getTime!} [#name] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
+                console.warn "#{getTime!} [#moduleName] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
                 module = data
+            console.log "[test] 3", moduleName, module.moduleName
         else
             module = data
+            console.log "[test] 4", moduleName, module.moduleName
+        module.displayName = displayName ||= moduleName
 
-
-        module.displayName = displayName || name
-        # sanitize module name (to alphanum-only camel case)
-        # UPDATE: the developers should be able to do this for themselves >_>
-        #dataName = name
-        #    .replace(/^[A-Z]/, (.toLowerCase!)) # first letter is to be lowercase
-        #    .replace(/^[^a-z_]/,"_$&") # first letter is to be a letter or a lowdash
-        #    .replace(/(\w)?\W+(\w)?/g, (,a,b) !-> return "#{a||''}#{(b||'').toUpperCase!}")
 
         cbs = module._cbs = {}
-
         arrEqual = (a, b) !->
             return false if not a or not b or a.length != b.length
             for ,i in a
@@ -3212,13 +3184,13 @@ window.module = (name, data) !->
                     if target.onEarly
                         target.onEarly .apply target, args
                     else
-                        console.warn "#{getTime!} [#name] cannot use .onEarly on", target
+                        console.warn "#{getTime!} [#moduleName] cannot use .onEarly on", target
                 else if target in <[ once one ]>
                     [target, ...args] = args
                     if target.once or target.one
                         that .apply target, args
                     else
-                        console.warn "#{getTime!} [#name] cannot use .once / .one on", target
+                        console.warn "#{getTime!} [#moduleName] cannot use .once / .one on", target
                 else
                     target.on .apply target, args
                 cbs.[]listeners[*] = {target, args}
@@ -3312,13 +3284,13 @@ window.module = (name, data) !->
             enable: !->
                 return if not @disabled
                 @disabled = false
-                disabledModules[name] = false if not module.modDisabled
+                disabledModules[moduleName] = false if not module.modDisabled
                 try
                     setup.call module, helperFNs, module
                     trigger \moduleEnabled
-                    console.info "#{getTime!} [#name] enabled", setup != null
+                    console.info "#{getTime!} [#moduleName] enabled", setup != null
                 catch err
-                    console.error "#{getTime!} [#name] error while re-enabling", err.messageAndStack
+                    console.error "#{getTime!} [#moduleName] error while re-enabling", err.messageAndStack
                 return this
 
             disable: (temp) !->
@@ -3347,25 +3319,25 @@ window.module = (name, data) !->
                         p0neCSS.unloadStyle url
                     for $el in cbs.$elements ||[]
                         $el .remove!
-                    for m in p0ne.dependencies[name] ||[]
+                    for m in p0ne.dependencies[moduleName] ||[]
                         m.disable!
 
                     @_$settingsPanel?.wrapper.remove!
                     delete @_$settingsPanel
 
-                    disabledModules[name] = true if not module.modDisabled and not temp
+                    disabledModules[moduleName] = true if not module.modDisabled and not temp
                     if not newModule
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         trigger \moduleDisabled
-                        console.info "#{getTime!} [#name] disabled"
-                        dataUnload "p0ne/#name"
+                        console.info "#{getTime!} [#moduleName] disabled"
+                        dataUnload "p0ne/#moduleName"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
                     disableLate.call module, helperFNs, newModule if typeof disableLate == \function
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
-                    delete window[name]
-                delete p0ne.dependencies[name]
+                    console.error "#{getTime!} [module] failed to disable '#moduleName' cleanly", err.messageAndStack
+                    delete window[moduleName]
+                delete p0ne.dependencies[moduleName]
                 return this
         module.trigger ||= (target, ...args) !-> # FOR DEBUGGING
             for listener in cbs.listeners ||[] when listener.target == target
@@ -3389,14 +3361,14 @@ window.module = (name, data) !->
         module.enable = helperFNs.enable
 
         # if there's an old instance of the module
-        if module_ = window[name]
+        if module_ = window[moduleName]
             for k in persistent ||[]
                 module[k] = module_[k]
             if not module_.disabled
                 try
                     module_.disable? module
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
+                    console.error "#{getTime!} [module] failed to disable '#moduleName' cleanly", err.messageAndStack
 
 
         # checking dependencies (required modules)
@@ -3415,13 +3387,13 @@ window.module = (name, data) !->
                     .done loadingDone
                     .fail loadingFailed
         if l
-            console.error "#{getTime!} [#name] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
+            console.error "#{getTime!} [#moduleName] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
             return module
 
         # checking optional requirements
         optionalRequirements = [r for r in optional ||[] when !r or (typeof r == \string and not window[r])]
         if optionalRequirements.length
-            console.warn "#{getTime!} [#name] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
+            console.warn "#{getTime!} [#moduleName] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
 
         # set up Help
         module.help? .= replace /\n/g, "<br>\n"
@@ -3434,29 +3406,29 @@ window.module = (name, data) !->
                 roomSlug = getRoomSlug!
                 module_ = module
                 disabledModules = p0ne.disabledModules._rooms[roomSlug]
-                module.disabled = disabledModules[name]
+                module.disabled = disabledModules[moduleName]
                 def = $.Deferred!
                 module.loading = def.promise!
 
-                settingsKey = "p0ne__#{roomSlug}_#name"
+                settingsKey = "p0ne__#{roomSlug}_#moduleName"
                 dataLoad settingsKey, _settings, (err, module._settings) !->
                     if err
                         # play it cool (defaulting is magic)
-                        console.warn "[p0ne] error loading room settings for #name", err
+                        console.warn "[p0ne] error loading room settings for #moduleName", err
 
                     def.resolve module # resolve module.loading
                     delete module.loading
 
                     # trigger events
-                    console.info "#{getTime!} [#name] new room settings loaded"
+                    console.info "#{getTime!} [#moduleName] new room settings loaded"
         else
             disabledModules = p0ne.disabledModules
 
         # checks if module is disabled
-        if name of disabledModules
-            module.disabled = disabledModules[name]
+        if moduleName of disabledModules
+            module.disabled = disabledModules[moduleName]
         else
-            module.disabled = disabledModules[name] = !!disabled
+            module.disabled = disabledModules[moduleName] = !!disabled
 
         # disable staff-only modules if user is not staff
         if moderator and not user.isStaff and not module.disabled
@@ -3466,15 +3438,15 @@ window.module = (name, data) !->
         if module_?._settings # use _settings from previous module
             module._settings = module_._settings
         else if _settings
-            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#name" else "p0ne_#name"
+            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#moduleName" else "p0ne_#moduleName"
             dependenciesLoading++
             dataLoad settingsKey, _settings, (err, module._settings) !->
                 if err
                     # play it cool (defaulting is magic)
-                    console.warn "[p0ne] error loading settings for #name", err
+                    console.warn "[p0ne] error loading settings for #moduleName", err
                 loadingDone!
 
-        window[name] = p0ne.modules[name] = module
+        window[moduleName] = p0ne.modules[moduleName] = module
 
         # create a Promise, if module is loading
         # so that other modules which require this module can attach callbacks
@@ -3486,7 +3458,7 @@ window.module = (name, data) !->
 
 
     catch e
-        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.messageAndStack
+        console.error "#{getTime!} [p0ne module] error initializing '#moduleName':", e.messageAndStack
     return module
 
     function loadingDone
@@ -3510,33 +3482,35 @@ window.module = (name, data) !->
                     setup?.call module, helperFNs, module, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#{getTime!} [#name] error initializing", e.messageAndStack
+                    console.error "#{getTime!} [#moduleName] error initializing", e.messageAndStack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
 
             # trigger events
             if module_
                 trigger \moduleUpdated
-                console.info "#{getTime!} [#name] updated#wasDisabled", "color: orange"
+                console.info "#{getTime!} [#moduleName] updated#wasDisabled", "color: orange"
             else
                 trigger \moduleLoaded
-                console.info "#{getTime!} [#name] initialized#wasDisabled", "color: orange"
+                console.info "#{getTime!} [#moduleName] initialized#wasDisabled", "color: orange"
 
             if not module.disabled
                 trigger \moduleEnabled
+
+            module_ := null
 
     function loadingFailed
         # if any dependency fails to load
         def?.reject module # reject module.loading
         delete module.loading
-        delete window[name]
+        delete window[moduleName]
 
     function trigger type
         if _$context?
             _$context.trigger "p0ne:#type", module, module_
-            #_$context.trigger "p0ne:#type:#name", module, module_
+            #_$context.trigger "p0ne:#type:#moduleName", module, module_
         API.trigger "p0ne:#type", module, module_
-        #API.trigger "p0ne:#type:#name", module, module_
+        #API.trigger "p0ne:#type:#moduleName", module, module_
 
 window.loadModule = (moduleName, url) !->
     def = $.Deferred!
@@ -3577,6 +3551,7 @@ window.loadModule = (moduleName, url) !->
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.auxiliaries-modules ~~~~~~~"
 
 
 /*####################################
@@ -3627,9 +3602,8 @@ module \PopoutListener, do
             try
                 c_ ...
             catch err
-                appendChat do
-                    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: #{err.message}"
-                        .on \click, !-> console.error err.messageAndStack
+                chatWarnSmall \p0ne-error, "[p0ne] Error closing the popout: #{err.message}"
+                    .on \click, !-> console.error err.messageAndStack
                 window.error = err
             _$context?.trigger \popout:close, PopoutView._window, PopoutView
             API.trigger \popout:close, PopoutView._window, PopoutView
@@ -3645,8 +3619,6 @@ module \chatDomEvents, do
             @_events[*] = arguments
             cm .on.apply cm, arguments
             PopoutView.chat.$el .on.apply PopoutView.chat.$el, arguments if PopoutView.chat
-            if &1 == '.p0ne-notif .badge-box'
-                console.info "[TEST] .p0ne-notif .badge-box", arguments, cm
         @off = !->
             isAnyMatch = false
             i = -1
@@ -3873,12 +3845,11 @@ module \p0neCSS, do
                 @loadStyle url
                 @urlMap[url] = i
 
-_.defer !->
+_.defer !-> # because for some reason the event listener doesn't get attached otherwise
     module \p0neNotifHelper, do
         require: <[ chatDomEvents ]>
         setup: ({addListener}) !->
             addListener chatDomEvents, \click, '.p0ne-notif .badge-box', !->
-                console.info "[TEST]", '.p0ne-notif .badge-box {event}', this, it
                 $this = $ this .closest \.p0ne-notif
                     .slideUp !-> $this.remove!
 
@@ -4077,6 +4048,7 @@ module \perfChat, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.socket ~~~~~~~"
 /*####################################
 #          SOCKET LISTENERS          #
 ####################################*/
@@ -4183,6 +4155,7 @@ module \socketListeners, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.fixes ~~~~~~~"
 
 
 /*####################################
@@ -4765,7 +4738,7 @@ module \fixPopoutChatClose, do
     setup: ({addListener}) !->
         addListener API, \popout:open, (window_) !->
             window_.onbeforeunload = PopoutView~close
-
+/*
 module \fixNullUser, do
     settings: \fixes
     require: <[ _$context ]>
@@ -4784,6 +4757,43 @@ module \fixNullUser, do
                 sleep 2_000ms, !->
                     for u in users.models
                         cb(u)
+*/
+
+module \playlistCacheUpdate, do
+    require: <[ playlistCache playlistCachePatch eventMap ]>
+    setup: ({replace}) !->
+        replace eventMap.eventTypeMap[\MediaActionEvent:add]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            console.log "[MediaActionEvent:add:onSuccess]", e, @event
+            if pl=playlistCache._data.1.p[e.id]
+                for m in @event.items
+                    pl.items[m.get \cid] = true
+            _$context?.trigger \p0ne:playlistCache:update, e.id
+            oS_.call this, e
+            API.trigger \p0ne:playlistCache:update, e.id
+
+
+        replace eventMap.eventTypeMap[\MediaInsertEvent:insert]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            #console.log "[MediaInsertEvent:insert:onSuccess]", e, @event
+            if pl=playlistCache._data.1.p[e.id]
+                for m in @event.items
+                    pl.items[m.get \cid] = true
+            _$context?.trigger \p0ne:playlistCache:update, e.id
+            oS_.call this, e
+            API.trigger \p0ne:playlistCache:update, e.id
+
+
+        replace eventMap.eventTypeMap[\PlaylistCreateEvent:create]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            #console.log "[MediaInsertEvent:insert:onSuccess]", e, @event
+            event = @event
+            if event.items
+                _$context?.trigger \p0ne:playlistCache:update, e.id
+                oS_.call this, e
+                if pl=playlistCache._data.1.p[e.id]
+                    for m in event.items
+                        pl.items[m.get \cid] = true
+                API.trigger \p0ne:playlistCache:update, e.id
+            else
+                oS_.call this, e
 
 /*@source p0ne.stream.ls */
 /**
@@ -5254,6 +5264,7 @@ module \streamSettings, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.chat-commands ~~~~~~~"
 
 /*####################################
 #           CHAT COMMANDS            #
@@ -5697,6 +5708,7 @@ module \chatCommands, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.base ~~~~~~~"
 
 
 /*####################################
@@ -5717,28 +5729,27 @@ module \disableCommand, do
                 response = "@#{msg.un} "
                 if enabledModules.length
                     response += "disabled #{humanList enabledModules}."
-                if disabledModules.length
+                else if disabledModules.length
                     response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} weren't enabled."
                 API.sendChat response
 
 module \getStatus, do
     module: !->
         status = "Running plug_p0ne v#{p0ne.version}"
-        status += " (incl. chat script)" if window.p0ne_chat
         status += "\tand plug³ v#{that}" if getPlugCubedVersion!
         status += "\tand plugplug #{window.getVersionShort!}" if window.ppSaved
         status += ".\tStarted #{ago p0ne.started}"
-        modules = [m for m in disableCommand.modules when window[m] and not window[m].disabled]
-        status += ".\t#{humanList modules} are enabled" if modules.length
+        modules = [m for ,m of p0ne.modules when m.disableCommand and not m.disabled]
+        status += ".\t#{humanList modules} enabled" if modules.length
 
 module \statusCommand, do
     timeout: false
     setup: ({addListener}) !->
         addListener API, \chat, (data) !~> if not @timeout
-            if data.message.has( \!status ) and data.message.has("@#{user.username}") and API.hasPermission(data.uid, API.ROLE.BOUNCER)
+            if data.message.has( \!status ) and isMention(data) and API.hasPermission(data.uid, API.ROLE.BOUNCER)
                 @timeout = true
                 status = "#{getStatus!}"
-                console.info "[AUTORESPOND] status: '#status'", data.uid, data.un
+                console.info "[AR] status: '#status'", data.uid, data.un
                 API.sendChat status, data
                 sleep 30min *60_000to_ms, !->
                     @timeout = false
@@ -5882,7 +5893,7 @@ module \autowoot, do
                         woot!
             if hasMehWarning
                 clearTimeout(timer2)
-                $cms! .find \.p0ne-autowoot-meh-btn .closest \.cm .remove!
+                get$cms! .find \.p0ne-autowoot-meh-btn .closest \.cm .remove!
                 hasMehWarning := false
 
         # warn if user is blocking a voteskip
@@ -5932,29 +5943,27 @@ module \automute, do
         streamOff = isSnoozed!
         addListener API, \p0ne:changeMode, onModeChange = (mode) !~>
             newStreamOff = (mode == \off)
-            <~ requestAnimationFrame
+            <~! requestAnimationFrame
             if newStreamOff
-                if not streamOff
+                if media
                     $snoozeBtn
                         .empty!
+                        .removeClass 'p0ne-automute-add p0ne-automute-remove'
                         .append $box
-                if not media
-                    # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
-                    console.warn "[automute] uw0tm8? how did the stream mode change if there's no song playing? well this could happen if you changed the room or something…"
-                else if @songlist[media.cid] # btn "remove from automute"
-                    console.log "[automute] change automute-btn to REMOVE"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
-                    $box .html "remove from<br>automute"
-                else # btn "add to automute"
-                    console.log "[automute] change automute-btn to ADD"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
-                    $box .html "add to<br>automute"
+                    if @songlist[media.cid] # btn "remove from automute"
+                        console.log "[automute] change automute-btn to REMOVE"
+                        $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
+                        $box .html "remove from<br>automute"
+                    else # btn "add to automute"
+                        console.log "[automute] change automute-btn to ADD"
+                        $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
+                        $box .html "add to<br>automute"
             else if streamOff
                 console.log "[automute] change automute-btn to SNOOZE"
                 $snoozeBtn
                     .empty!
+                    .removeClass 'p0ne-automute p0ne-automute-add p0ne-automute-remove'
                     .append @$box_
-                    .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
             streamOff := newStreamOff
 
         @updateBtn = (mode) !->
@@ -5986,24 +5995,17 @@ module \automute, do
         if isAdd == \toggle or not isAdd? # default to toggle
             isAdd = not @songlist[media.cid]
 
-        $msg = $ "<div class='p0ne-automute-notif'>"
         if isAdd # add to automute list
             @songlist[media.cid] = media
             @createRow media.cid
-            $msg
-                .text "+ automute #{media.author} - #{media.title}"
-                .addClass \p0ne-automute-added
+            chatWarnSmall 'p0ne-automute-notif p0ne-automute-added', "automute #{media.author} - #{media.title}'", \icon-volume-off
         else # remove from automute list
             delete @songlist[media.cid]
-            $msg
-                .text "- automute #{media.author} - #{media.title}'"
-                .addClass \p0ne-automute-removed
+            chatWarnSmall 'p0ne-automute-notif p0ne-automute-removed', "un-automute #{media.author} - #{media.title}'", \icon-volume-half
             if $row = @$rows[media.cid]
                 $row .css transform: 'scale(0)', height: 0px
                 sleep 500ms, !->
                     $row .remove!
-        $msg .append getTimestamp!
-        appendChat $msg
         if media.cid == API.getMedia!?.cid
             @updateBtn!
 
@@ -6104,7 +6106,6 @@ module \afkAutorespond, do
 module \joinLeaveNotif, do
     optional: <[ chatDomEvents chat auxiliaries database ]>
     settings: \base
-    settingsVip: true
     displayName: 'Join/Leave Notifications'
     help: '''
         Shows notifications for when users join/leave the room in the chat.
@@ -6120,7 +6121,7 @@ module \joinLeaveNotif, do
         mergeSameUser: true
     setup: ({addListener, css}, joinLeaveNotif, update) !->
         if update
-            lastMsg = $cm! .children! .last!
+            lastMsg = get$cm! .children! .last!
             if lastMsg .hasClass \p0ne-notif-joinleave
                 $lastNotif = lastMsg
 
@@ -6177,7 +6178,7 @@ module \joinLeaveNotif, do
                         chat.lastType = CHAT_TYPE
  
         addListener API, 'popout:open popout:close', !->
-            $lastNotif = $cm! .find \.p0ne-notif-joinleave:last
+            $lastNotif = get$cm! .find \.p0ne-notif-joinleave:last
 
 
 
@@ -6304,7 +6305,7 @@ module \chatDblclick2Mention, do
                 chatDblclick2Mention.timer = 0
                 (PopoutView?.chat || chat).onInputMention e.target.textContent
 
-        for [ctx, $el, attr, boundAttr] in [ [chat, $cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
+        for [ctx, $el, attr, boundAttr] in [ [chat, get$cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
             # remove individual event listeners (we use a delegated event listener below)
             # setting them to `$.noop` will prevent .bind to break
             #replace ctx, attr, !-> return $.noop
@@ -6327,8 +6328,7 @@ module \chatDblclick2Mention, do
 
     disableLate: !->
         # note: here we actually have to pay attention as to what to re-enable
-        cm = $cms!
-        for attr, [ctx, $el] of {fromClickBind: [chat, cm], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
+        for attr, [ctx, $el] of {fromClickBind: [chat, get$cms!], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
             $el .find '.mention .un, .message .un, .name'
                 .off \click, ctx[attr] # if for some reason it is already re-assigned
                 .on \click, ctx[attr]
@@ -6576,89 +6576,39 @@ module \boothAlert, do
     help: '''
         Play a notification sound before you are about to play
     '''
-    _settings:
-        warnOnPrevPlay: true # takes precedence
-        warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
     setup: ({addListener}, {_settings}, module_) !->
-        var warnTimeout
-        @remainingStr = humanTime _settings.warnXMinBefore
         isNext = false
         fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', !->
             if API.getWaitListPosition! == 0
-                if _settings.warnOnPrevPlay
-                    if not isNext
-                        isNext := true
-                        sleep 3_000ms, !->
-                            chatWarn "You are about to DJ next!", "Booth Alert"
-                            playChatSound!
-                else
-                    clearTimeout warnTimeout
-                    remaining = API.getTimeRemaining! *1000s_to_ms
-                    warnTimeout := sleep remaining - _settings.warnXMinBefore, !->
-                        if remaining > 0
-                            chatWarn "You are about to DJ in #{humanTime remaining}!", "Booth Alert"
-                        else
-                            chatWarn "You are about to DJ in #remainingStr!", "Booth Alert"
+                if not isNext
+                    isNext := true
+                    sleep 3_000ms, !->
+                        chatWarn "You are about to DJ next!", "Booth Alert"
                         playChatSound!
             else
                 isNext := false
         fn! if not module_
-    settingsExtra: ($el) !->
-        boothAlert = this
-        var resetTimer
-        $ "<form>
-                Show notification<br>
-                <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
-                <label>
-                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s) before your play
-                </label>
-            </form>"
-            .append do
-                $warning = $ '<div class=warning>'
-            .on \click, \input:radio, !->
-                if @checked
-                    boothAlert._settings.warnOnPrevPlay = (@value == \on)
-                    console.log "#{getTime!} [boothAlert] updated warnOnPrevPlay to #{boothAlert._settings.warnOnPrevPlay}"
-            .on \input, \.booth-alert, !->
-                if @value > 0 #  # note: returns false for non-number inputs
-                    boothAlert._settings.warnXMinBefore = @value .min
-                    if resetTimer
-                        $warning .fadeOut!
-                        clearTimeout resetTimer
-                        resetTimer := 0
-                    if boothAlert._settings.warnOnPrevPlay
-                        $ this .parent! .click!
-                    console.log "#{getTime!} [boothAlert] updated to #{@value}ms"
-                else
-                    $warning
-                        .fadeIn!
-                        .text "please enter a valid number >0"
-                    resetTimer := sleep 2.min, !~>
-                        @value = ~~(boothAlert._settings.warnXMinBefore * 60_000_00) / 100
-                        resetTimer := 0
-                    console.warn "#{getTime!} [boothAlert] invalid input for X min", @value
-            .appendTo $el
-        $el .css do
-            paddingLeft: 15px
 
 module \notifyOnGrabbers, do
     require: <[ grabEvent ]>
+    persistent: <[ grabs notifs ]>
+    displayName: "Notify on Grabs"
+    settings: \base
+    grabs: {}
+    notifs: {}
     setup: ({addListener, replace}) !->
-        addListener API, \p0ne:grab, (u) !->
-            if not grabs[u.id]
-                notifs[u.id] = appendChat $ "
-                    <div class='cm p0ne-notif p0ne-grab-notif'>
-                        <i class='icon icon-grab'></i>
-                        <div class='msg text'>
-                            #{formatUserHTML d.user, true}
-                        </div>
-                    </div>"
-                grabs[u.id] = 1
+        addListener API, \advance, !~>
+            @grabs = {}
+            @notifs = {}
+        addListener API, \p0ne:vote:grab, (u) !~>
+            if not @grabs[u.id]
+                @notifs[u.id] = chatWarnSmall \p0ne-grab-notif, formatUserHTML(u, true), \icon-grab, true
+                @grabs[u.id] = 1
             else
-                if grabs[u.id] == 1
-                    notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
-                        .appendTo notifs[u.id]
-                notifs[u.id] .text = " (x#{grabs[u.id]++})"
+                if @grabs[u.id] == 1
+                    @notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
+                        .appendTo @notifs[u.id]
+                @notifs[u.id] .text(++@grabs[u.id])
 
 /*####################################
 #         AVOID HISTORY PLAY         #
@@ -6726,9 +6676,9 @@ module \maintenanceCountdown, do
     require: <[ socketListeners ]>
     setup: ({addListener}) !->
         @timer = 0
-        addListener API, \socket:plugMaintenanceAlert, (remainingMinutes) !~>
+        addListener API, \socket:plugMaintenanceAlert, ({p:remainingMinutes}) !~>
             @$el = $ '#footer-user .name' .css color: \orange
-            $bck = @$el.children!
+            @$bck = @$el.children!
             clearInterval @timer
             @timer = repeat 60_000ms, updateRemaining
             do ~!function updateRemaining
@@ -6741,10 +6691,13 @@ module \maintenanceCountdown, do
                     sleep 5.min, !~> if not @timer
                             @$el
                                 .html ""
-                                .append $bck
+                                .append @$bck
     disable: !->
         clearInterval @timer
-        @$el? .css color: ''
+        @$el?
+            .css color: ''
+            .html ""
+            .append $bck
 
 module \grabMenuHighlight, do
     require: <[ popMenu playlistCachePatch ]>
@@ -6766,11 +6719,34 @@ module \grabMenuHighlight, do
         replace popMenu, \drawRowBind, !-> return popMenu~drawRow
 
 module \playlistMenuHighlight, do
-    require: <[ playlistMenu playlistCacheEvent ]>
-    setup: ({addListener}) !->
-        for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
-            row.inCache = true
-            row.$el.addClass \p0ne-pl-cached
+    require: <[ pl playlists PlaylistListRow PlaylistMediaList playlistMenu playlistCacheEvent ]>
+    setup: ({addListener, replace}) !->
+        replace PlaylistListRow::, \render, (r_) !-> return !->
+            r_.call this
+            if playlistCache._data.1.p[@model.id]
+                @inCache = true
+                @$el.addClass \p0ne-pl-cached
+
+        replace PlaylistMediaList::, \onCheckThreshold, (oCT_) !-> return (n) !->
+            oCT_.call this, n
+            if @isDragging # when dragging starts
+                for row in playlistMenu.rows
+                    hasAllMedia = true
+                    for cid of @selectedRows when not playlistCache._data.1.p[row.model.id].items[cid]
+                        hasAllMedia = false
+                        break
+                    if hasAllMedia
+                        row.$el.addClass \p0ne-pl-has-media
+                    if row.model.get(\count) == 200
+                        row.$el.addClass \p0ne-pl-is-full
+        if pl?.list?
+            replace pl.list, \thresholdBind, !-> return _.bind(pl.list.onCheckThreshold, pl.list)
+        replace PlaylistMediaList::, \resetDrag, (rD_) !-> return !->
+            if @isDragging
+                for row in playlistMenu.rows
+                    row.$el.removeClass 'p0ne-pl-has-media p0ne-pl-is-full'
+            rD_.call this
+
 
         addListener API, \p0ne:playlistCache:update, (playlistID) !->
             for row in playlistMenu.rows when row.model.id == playlistID
@@ -6778,10 +6754,17 @@ module \playlistMenuHighlight, do
                     row.inCache = true
                     row.$el.addClass \p0ne-pl-cached
                 break
-    disable: !->
+
+        playlists.sort! # force re-rendering
+
+    disableLate: !->
         for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
             delete row.inCache
             row.$el.removeClass \p0ne-pl-cached
+
+# skip walkthrough button
+# plug_p0ne users are expected to have used plug at least once
+$ '#walkthrough:not(.wt-p0) .next a' .click!
 
 /*@source p0ne.chat.ls */
 /**
@@ -6791,6 +6774,7 @@ module \playlistMenuHighlight, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.chat ~~~~~~~"
 
 /* ToDo:
  * add missing chat inline image plugins:
@@ -6931,7 +6915,7 @@ module \betterChatInput, do
             $autoresize_helper := $onpage_autoresize_helper
 
 
-        chatHidden = $cm!.parent!.css(\display) == \none
+        chatHidden = get$cm!.parent!.css(\display) == \none
 
 
         wasEmote = false
@@ -7054,7 +7038,7 @@ module \chatMessageClasses, do
     setup: ({addListener}) !->
         /* designed to be compatible with p³-compatible Room Themes */
         try
-            $cms! .children! .each !->
+            get$cms! .children! .each !->
                 if uid = this.dataset.cid
                     uid .= substr(0, 7)
                     return if not uid
@@ -7114,18 +7098,18 @@ module \unreadChatNotif, do
         unreadCount = 0
         $chatButton = $ \#chat-button
             .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
-        @bottomMsg = $cm! .children! .last!
+        @bottomMsg = get$cm! .children! .last!
         addListener _$context, \p0ne:chat:plugin, (message) !->
             message.wasAtBottom ?= chatIsAtBottom!
             if not $chatButton.hasClass \selected and not PopoutView?.chat?
                 $chatButton.addClass \p0ne-toolbar-highlight
                 $unreadCount .text (unreadCount + 1)
             else if message.wasAtBottom
-                @bottomMsg = message.cid
+                @bottomMsg = get$cm! .children! .last!
                 return
 
             delete @bottomMsg
-            $cm! .addClass \has-unread
+            get$cm! .addClass \has-unread
             message.unread = true
             message.addClass \unread
             unreadCount++
@@ -7145,11 +7129,11 @@ module \unreadChatNotif, do
             @throttled := true
             sleep 200ms, !~>
                 try
-                    cm = $cm!
-                    cmHeight = cm .height!
+                    $cm = get$cm!
+                    cmHeight = $cm .height!
                     lastMsg = msg = @bottomMsg
                     $readMsgs = $!; l=0
-                    while ( msg .=next! ).length
+                    while ( msg .= next! ).length
                         if msg .position!.top > cmHeight
                             @bottomMsg = lastMsg
                             break
@@ -7157,26 +7141,25 @@ module \unreadChatNotif, do
                             $readMsgs[l++] = msg.0
                         lastMsg = msg
                     if l
-                        unread = cm.find \.unread
+                        unread = $cm.find \.unread
                         sleep 1_500ms, !~>
                             $readMsgs.removeClass \unread
                             if (unread .= filter \.unread) .length
                                 @bottomMsg = unread .removeClass \unread .last!
                     if not msg.length
-                        cm .removeClass \has-unread
+                        $cm .removeClass \has-unread
                         $chatButton .removeClass \p0ne-toolbar-highlight
                         unreadCount := 0
                 @throttled := false
     fix: !->
         #DEBUG for testing
         @throttled = false
-        cm = $cm!
-        cm
+        $cm = get$cm!
             .removeClass \has-unread
             .find \.unread .removeClass \unread
-        @bottomMsg = cm.children!.last!
+        @bottomMsg = $cm.children!.last!
     disable: !->
-        $cm!
+        get$cm!
             .removeClass \has-unread
             .find \.unread .removeClass \unread
 
@@ -7211,7 +7194,6 @@ CHAT_WIDTH = 500px
 module \chatInlineImages, do
     require: <[ chatPlugin ]>
     settings: \chat
-    settingsVip: true
     settingsSimple: true
     displayName: 'Inline Images'
     help: '''
@@ -7277,7 +7259,7 @@ module \chatInlineImages, do
 
     settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
-            .text "filter tags:"
+            .text "filter tags: (space seperated, case-insensitive)"
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.filterTags.join " "
@@ -7525,7 +7507,7 @@ module \customChatNotificationTrigger, do
     disabled: true
     require: <[ chatPlugin _$context ]>
     setup: ({addListener}) !->
-        @test = addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
+        addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
             mentioned = false
             mentions = {}
             if @hasUsernameTrigger
@@ -7543,20 +7525,28 @@ module \customChatNotificationTrigger, do
         @updateRegexp!
 
     updateRegexp: !->
-        @regexp = //
-            \b(?:#{@_settings.triggerwords .join '|' |> escapeRegExp})\b
-        //gi
+        return if @_settings.triggerwords .length == 0
+        triggerwords = []; l=0
+        for triggerword in @_settings.triggerwords
+            triggerword = triggerword |> htmlEscape |> escapeRegExp
+            if /\w/.test triggerword[0]
+                triggerword = "\\b"+triggerword
+            if /\w/.test triggerword[*-1]
+                triggerword = triggerword+"\\b"
+            triggerwords[l++] = triggerword
+        @regexp = //#{triggerwords .join '|'}//gi
         @hasUsernameTrigger = false
         @usernameTriggers = {}
-        API.getUser!.username .replace @regexp, (word, i) !~>
+        rawun = API.getUser!.rawun
+        rawun.replace @regexp, (word, i) !~>
             @hasUsernameTrigger = true
             @usernameTriggers[word] ||= {}
             @usernameTriggers[word][i + 1] = true
-        @usernameReg = //@#{API.getUser!.username}//g
+        @usernameReg = //@#rawun//g
 
     settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
-            .text "aliases (comma seperated):"
+            .text "aliases: (comma seperated, case insensitive)"
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.triggerwords.join ", "
@@ -7576,6 +7566,7 @@ module \customChatNotificationTrigger, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.look-and-feel ~~~~~~~"
 
 
 module \p0neStylesheet, do
@@ -7619,7 +7610,7 @@ module \animatedUI, do
     require: <[ Dialog ]>
     setup: ({addListener, replace}) !->
         $ \.dialog .addClass \opaque
-        replace Dialog, \render, !-> return !->
+        replace Dialog::, \render, !-> return !->
             @show!
             sleep 0ms, !~> @$el.addClass \opaque
             return this
@@ -7628,28 +7619,11 @@ module \animatedUI, do
                 if d.dialog.options?.media?.format == 2
                     sleep 0ms, !~> @$el.addClass \opaque
 
-        replace Dialog, \close, (close_) !-> return !->
+        replace Dialog::, \close, (close_) !-> return !->
             @$el?.removeClass \opaque
             @animate = $.noop
             sleep 200ms, !~> close_.call this
             return this
-
-
-/*####################################
-#        FIX HIGH RESOLUTIONS        #
-####################################*/
-module \fixHiRes, do
-    displayName: "☢ Fix high resolutions"
-    settings: \fixes
-    disabled: true
-    help: '''
-        This will fix some odd looking things on larger screens
-        NOTE: This is WORK IN PROGESS! Right now it doesn't help much.
-    '''
-    setup: ({}) !->
-        $body .addClass \p0ne-fix-hires
-    disable: !->
-        $body .removeClass \p0ne-fix-hires
 
 
 /*####################################
@@ -7669,7 +7643,7 @@ module \playlistIconView, do
 
         #= fix visiblerows calculation =
         if not PlaylistItemList?
-            chatWarn playlistIconView.displayName, "this module couldn't fully load, it might not act 100% as expected. If you have problems, you might want to disable this."
+            chatWarn "this module couldn't fully load, it might not act 100% as expected. If you have problems, you might want to disable this.", playlistIconView.displayName
             return
         const CELL_HEIGHT = 185px # keep in sync with plug_p0ne.css
         const CELL_WIDTH = 160px
@@ -7914,7 +7888,7 @@ module \djIconChat, do
 ####################################*/
 module \draggableDialog, do
     require: <[ Dialog ]>
-    displayName: '☢ Draggable Dialog'
+    displayName: 'Draggable Dialog'
     settings: \look&feel
     setup: ({addListener, replace, css}) !->
         # set up styles
@@ -7953,7 +7927,7 @@ module \draggableDialog, do
 
         /* add lights-out button to dialogs */
         lightsout = true
-        replace Dialog, \getHeader, !-> return (title) !->
+        replace Dialog::, \getHeader, !-> return (title) !->
             $  "<div class=dialog-frame>
                     <span class=title>#title</span>
                     <i class='icon icon-#{if lightsout then '' else 'un'}locked p0ne-lightsout-btn'></i>
@@ -7985,7 +7959,7 @@ module \draggableDialog, do
             lightsout := !lightsout
 
         # reset when the dialog is closed
-        replace Dialog, \close, (c_) !-> return !->
+        replace Dialog::, \close, (c_) !-> return !->
             console.log "[dialogDragNDrop] closing dialog"
             stopDragging true
             c_ ...
@@ -8018,7 +7992,6 @@ module \draggableDialog, do
 module \emojiPack, do
     displayName: 'Emoji Pack'
     settings: \look&feel
-    disabled: true
     help: '''
         Replace all emojis with the one from Google (for Android Lollipop) or Twitter.
 
@@ -8026,33 +7999,83 @@ module \emojiPack, do
     '''
     screenshot: 'https://i.imgur.com/Ef94Csn.png'
     _settings:
-        pack: \google
+        pack: \apple
         # note: as of now, only Google's emojicons (from Android Lollipop) are supported
         # possible future emoji packs are: Twitter's and EmojiOne's (and native browser)
         # by default, plug.dj uses Apple's emojipack
-    setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
+    appleIcons: []
+    setup: (, emojiPack, module_) !->
+        # cache vanilla emoji CSS
+        l=0
+        $span = $ '<span class=emoji>' .appendTo $body
+        for className in <[ emoji-1f604 emoji-1f60d emoji-1f44b emoji-1f494 ]>
+            $span .addClass className
+            emojiPack.appleIcons[l++] = $span .css \background
+            $span .removeClass className
+        $span .remove!
+
+        if @value != \apple
+            p0neCSS.loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
 
     settingsExtra: ($el) !->
         emojiPack = this
         var resetTimer
-        $ "
-            <form>
+        appleURL = getIcon("", true).url
+        $form = $ "
+            <form style='font-size: 15px'>
                 <label>
-                    <input type=radio name=max-mehs value=google> Google
+                    <input type=radio name=emojipack value=google> Google
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f604.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f60d.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f44b.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f494.png' />
+                    </span>
                 </label><br>
                 <label>
-                    <input type=radio name=max-mehs value=twitter> Twitter
+                    <input type=radio name=emojipack value=twitter> Twitter
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f604.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f60d.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f44b.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f494.png' />
+                    </span>
+                </label><br>
+                <label>
+                    <input type=radio name=emojipack value=emojione> Emoji One
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F604.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F60D.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F44B.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F494.png?v=1.2.4' />
+                    </span>
+                </label><br>
+                <label>
+                    <input type=radio name=emojipack value=apple> Apple (default)
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <span class=emoji></span><span class=emoji></span><span class=emoji></span><span class=emoji></span>
+                    </span>
                 </label>
             </form>"
             .on \click, \input:radio, !->
-                if @checked
+                if @checked and emojiPack._settings.pack != @value
+                    if emojiPack._settings.pack != \apple
+                        p0neCSS.unloadStyle "#{p0ne.host}/css/#{emojiPack._settings.pack}.emoji.css"
                     emojiPack._settings.pack = @value
-                    emojiPack.disable!.enable!
+                    if @value != \apple
+                        p0neCSS.loadStyle "#{p0ne.host}/css/#{emojiPack._settings.pack}.emoji.css"
             .appendTo $el
-            .find "input[value=#{emojiPack._settings.pack}]" .attr \checked, \checked
+        $form .find "input[value=#{emojiPack._settings.pack}]" .attr \checked, \checked
+        $sampleEmojis = $form .find '.p0ne-settings-emoji-pack-sample:last .emoji'
+        console.log $sampleEmojis, @appleIcons
+        for emoji, i in $sampleEmojis
+            $(emoji) .css background: @appleIcons[i]
         $el .css do
             paddingLeft: 15px
+
+    disable: !->
+        if @_settings.pack != \apple
+            p0neCSS.unloadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
 
 
 /*####################################
@@ -8148,6 +8171,7 @@ module \censor, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
 */
+console.log "~~~~~~~ p0ne.room-theme ~~~~~~~"
 
 /*####################################
 #            ROOM SETTINGS           #
@@ -8345,6 +8369,14 @@ module \roomTheme, do
 
 
 /*@source p0ne.customcolors.ls */
+/**
+ * Custom Colors module for plug_p0ne
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+*/
+console.log "~~~~~~~ p0ne.customcolors.picker ~~~~~~~"
 if not window.staff
     staff =
         loading: $.Deferred!
@@ -8599,6 +8631,7 @@ module \customColors, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.song-notif ~~~~~~~"
 
 #ToDo add proper SoundCloud Support
 #   $.ajax url: "https://api.soundcloud.com/tracks/#cid.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
@@ -8625,7 +8658,7 @@ module \songNotif, do
     persistent: <[ lastMedia $div ]>
     setup: ({addListener, $create, @$createPersistent, addCommand, css},, module_) !->
         @$lastNotif = $!
-        @$div ||= $cms! .find \.p0ne-song-notif:last
+        @$div ||= get$cms! .find \.p0ne-song-notif:last
 
         #$create \<div>
         #    .addClass \playback-thumb
@@ -8754,12 +8787,12 @@ module \songNotif, do
                         !-> $description .css height: \auto
 
                 # smooth scroll
-                cm = $cm!
+                $cm = get$cm!
+                ch = $cm .height!
                 offsetTop = $notif.offset!?.top - 100px
-                ch = cm .height!
                 if offsetTop + h > ch
-                    cm.animate do
-                        scrollTop: cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
+                    $cm.animate do
+                        scrollTop: $cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
                         # 100px is height of .song-notif without .song-description
 
         function hideDescription
@@ -8784,9 +8817,9 @@ module \songNotif, do
             # smooth scroll
             offsetTop = $notif.offset!?.top - 100px # 100 is # $(\.app-header).height! + $(\#chat-header).height
             if offsetTop < 0px
-                cm = $cm!
-                cm.animate do
-                    scrollTop: cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
+                $cm = get$cm!
+                $cm.animate do
+                    scrollTop: $cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
 
         @showDescription = showDescription
         @hideDescription = hideDescription
@@ -8939,6 +8972,7 @@ module \songNotifPopup, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.song-info ~~~~~~~"
 # maybe add "other videos by artist", which loads a list of other uploads by the uploader?
 # http://gdata.youtube.com/feeds/api/users/#{channel}/uploads?alt=json&max-results=10
 
@@ -8948,12 +8982,12 @@ module \songNotifPopup, do
 ####################################*/
 module \songInfo, do
     optional: <[ _$context ]>
-    settings: \base
+    /*settings: \base
     displayName: 'Song-Info Dropdown'
     help: '''
         A panel with the song's description and links to the artist and song.
         Click on the now-playing-bar (in the top-center of the page) to open it.
-    '''
+    '''*/
     setup: ({addListener, $create, css}) !->
         @$create = $create
         css \songInfo, '
@@ -9073,6 +9107,7 @@ module \songInfo, do
  * However, please drop me an e-mail so I can keep an overview of things.
  * I remain the right to revoke this right anytime.
  */
+console.log "~~~~~~~ p0ne.avatars ~~~~~~~"
 
 /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
 /* (this includes things mentioned in the "notes" section below) */
@@ -9173,9 +9208,7 @@ require <[ sockjs ]>, (SockJS) !->
             p0ne._avatars = {}
 
             avatarID = API.getUser!.avatarID
-            if @_settings.vanillaAvatarID
-                @hasNewAvatar = @_settings.vanillaAvatarID != avatarID
-            else
+            if @hasNewAvatar = (@_settings.vanillaAvatarID and @_settings.vanillaAvatarID != avatarID)
                 @_settings.vanillaAvatarID = avatarID
 
             # - display custom avatars
@@ -9252,15 +9285,15 @@ require <[ sockjs ]>, (SockJS) !->
                 return _internal_addAvatar d
             @removeAvatar = (avatarID, replace) !->
                 for u in users.models
-                    if u.get(\avatarID) == avatarID
-                        u.set(\avatarID, u.get(\vanillaAvatarID))
+                    if u.get(\avatarID) == avatarID and vaID = u.get(\vanillaAvatarID)
+                        u.set(\avatarID, vaID)
                 delete p0ne._avatars[avatarID]
 
 
 
             # - set avatarID to custom value
             @changeAvatar = (uid, avatarID) !~>
-                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.get \vanillaAvatarID)
                     console.warn "[p0ne custom avatars] can't load user or avatar: '#uid', '#avatarID'"
                     return
 
@@ -9373,10 +9406,18 @@ require <[ sockjs ]>, (SockJS) !->
 
             #== patch Avatar Selection ==
             for Cell in window.Cells
+                # highlight the user's vanilla avatar (if the user has a custom avatar)
+                replace Cell::, \render, (r_) !-> return !->
+                    r_.call this
+                    if customAvatars._settings.avatarID != customAvatars._settings.vanillaAvatarID and customAvatars._settings.vanillaAvatarID == @model.get \id
+                        @$el .find \.top
+                            .append "<div class=p0ne-vanilla-avatar-highlight>your vanilla avatar</div>"
+
+                # propagate custom avatar selection to ppCAS
                 replace Cell::, \onClick, (oC_) !-> return !->
                     #console.log "[p0ne custom avatars] Avatar Cell click", this
-                    avatarID = @model.get("id")
-                    if /*not this.$el.closest \.inventory .length or*/ not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
+                    avatarID = @model.get \id
+                    if not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
                         # if avatatar is in the Inventory or not bought, properly select it
                         oC_ ...
                         customAvatars.socket? .emit \changeAvatarID, null
@@ -9385,6 +9426,7 @@ require <[ sockjs ]>, (SockJS) !->
                         customAvatars.socket? .emit \changeAvatarID, avatarID
                         customAvatars.changeAvatar(userID, avatarID)
                         @onSelected!
+
             # - get avatars in inventory -
             $.ajax do
                 url: '/_/store/inventory/avatars'
@@ -9429,35 +9471,6 @@ require <[ sockjs ]>, (SockJS) !->
                     server = $.trim str.substr(6)
                     if server == "<url>"
                         chatWarn "hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars"
-                        return
-                    else if server == "."
-                        # Veteran avatars
-                        # This is more or less for testing only
-                        base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/"
-                        helper = (fn) !-> # helper to add or remove veteran avatars
-                            fn = customAvatars[fn]
-                            for avatarID in <[ su01 su02 space03 space04 space05 space06 ]>
-                                fn avatarID, do
-                                    category: \Veteran
-                                    base_url: base_url
-                                    thumbOffsetTop: -5px
-                            fn \animal12, do
-                                category: \Veteran
-                                base_url: base_url
-                                thumbOffsetTop: -19px
-                                thumbOffsetLeft: -16px
-                            for avatarID in <[ animal01 animal02 animal03 animal04 animal05 animal06 animal07 animal08 animal09 animal10 animal11 animal12 animal13 animal14 lucha01 lucha02 lucha03 lucha04 lucha05 lucha06 lucha07 lucha08 monster01 monster02 monster03 monster04 monster05 _tastycat _tastycat02 warrior01 warrior02 warrior03 warrior04 ]>
-                                fn avatarID, do
-                                    category: \Veteran
-                                    base_url: base_url
-                                    thumbOffsetTop: -10px
-                            # if only we had backups of the Halloween avatars :C
-                            # if YOU have them, please contact me
-
-                        @socket = close: !->
-                            helper \removeAvatar #ToDo check if this is even required
-                            delete @socket
-                        helper \addAvatar
                         return
                     else if server == \default
                         server = @DEFAULT_SERVER
@@ -9693,17 +9706,18 @@ require <[ sockjs ]>, (SockJS) !->
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.settings ~~~~~~~"
 
 /*####################################
 #              SETTINGS              #
 ####################################*/
 module \p0neSettings, do
     _settings:
-        groupToggles: {p0neSettings: true, base: true}
+        open: false
+        openGroup: \base
         expert: false
+        largeSettingsPanel: true
     setup: ({$create, addListener}, p0neSettings, oldModule) !->
-        groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
-
         #= create DOM elements =
         $ppM = $create "<div id=p0ne-menu>" # (only the root needs to be created with $create)
             .insertAfter \#app-menu
@@ -9715,17 +9729,11 @@ module \p0neSettings, do
             .appendTo $ppW
         $ppP = $ "<div class=p0ne-settings-popup>"
             .appendTo $ppM
-            .fadeOut 0
-
-        if @_settings.expert
-            $ppW .addClass \p0ne-settings-expert
-        #@<<<<{$ppP, $ppM, $ppI}
+            .hide!
 
         #= add "simple" settings =
         @$vip = $ "<div class=p0ne-settings-vip>" .appendTo $ppS
         @$vip.items = @$vip
-
-        @toggleMenu groupToggles.p0neSettings
 
         #= settings footer =
         @$ppInfo = $ "
@@ -9733,17 +9741,14 @@ module \p0neSettings, do
                 <div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>
                 <div class=p0ne-settings-version>v#{p0ne.version}</div>
                 <div class=p0ne-settings-help-btn>help</div>
-                <div class=p0ne-settings-expert-toggle>show all options</div>
             </div>"
+            #   <div class=p0ne-settings-expert-toggle>show all options</div>
             .on \click, \.p0ne-settings-help-btn, !->
                 p0ne.modules.p0neHelp?.enable!
-            .on \click, \.p0ne-settings-expert-toggle, !~>
-                if @_settings.expert = not @_settings.expert
-                    $ppW .addClass \p0ne-settings-expert
-                else
-                    $ppW .removeClass \p0ne-settings-expert
-                updateSize!
             .appendTo $ppS
+
+        /*@$expertToggle = @$ppInfo .find \.p0ne-settings-expert-toggle
+            .click @~expertToggle*/
 
         #= add toggles for existing modules =
         for ,module of p0ne.modules when not module.loading
@@ -9751,99 +9756,42 @@ module \p0neSettings, do
             module._$settingsPanel?.wrapper .appendTo $ppM
 
 
-        do addListener API, \p0ne:stylesLoaded, updateSize
-
-        !~function updateSize
-            cb = !~>
-                for group, $el of @groups # when @_settings.groupToggles[group]
-                    $el .trigger \p0ne:resize
-                for group, $el of @groups # when @_settings.groupToggles[group]
-                    $el .trigger \p0ne:resize
-            requestAnimationFrame cb
-            sleep 2_000ms, cb
-
-
-        #= DEBUG =
-        debugMode = if groupToggles.p0neSettings then 0 else -1
-        debugClosingDur = 500ms
-
         #= add DOM event listeners =
         # slide settings-menu in/out
-        $ppI .click !~>
-            if @toggleMenu!
-                #DEBUG
-                $ppW .removeClass "p0ne-settings-debug-#{debugMode}"
-                debugMode := (debugMode + 1) % 3
-                $ppI .children! .text debugMode
-                $ppW .addClass "p0ne-settings-debug-#{debugMode}"
-
-                if debugMode == 2
-                    debugClosingDur := 0ms
-                    $ppP .appendTo $ppW
-                    $ppW .addClass \p0ne-settings-expert
-                else
-                    debugClosingDur := 500ms
-                    $ppP .appendTo $ppM
-                    if @_settings.expert
-                        $ppW .addClass \p0ne-settings-expert
+        @_settings.open = not @_settings.open
+        @_settings.largeSettingsPanel = not @_settings.largeSettingsPanel
+        $ppI
+            .click !~>
+                if @toggleMenu!
+                    if @_settings.largeSettingsPanel = not @_settings.largeSettingsPanel
+                        $ppW .addClass 'p0ne-settings-large p0ne-settings-expert'
+                        $ppI .children! .text '2'
+                        $ppP .appendTo $ppW
+                        if not @_settings.openGroup
+                            p0neSettings.openGroup \base
                     else
-                        $ppW .removeClass \p0ne-settings-expert
+                        $ppW .removeClass \p0ne-settings-large
+                        $ppI .children! .text '0'
+                        $ppP .appendTo $ppM
+                        #@toggleExpert(@_settings.expert)
+            .click!
 
-                for group, $el of @groups when @_settings.groupToggles[group]
-                    if keepOpen
-                        @_settings.groupToggles[group] = false
-                        $el .removeClass \open .css height: 30px
-                    else
-                        keepOpen = group
-                if not keepOpen
-                    keepOpen = \base
-                    @groupToggles.base = true
-                    @groups.base .find \.p0ne-settings-summary .click!
+        #if @_settings.expert
+        $ppW .addClass \p0ne-settings-expert
 
-                sleep debugClosingDur, !~>
-                    for group, $el of @groups
-                        if not groupToggles[group]
-                            $el .addClass \closed
-                        else
-                            $el .trigger \p0ne:resize
+
+
 
         # toggle groups
-        addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
-            $s = $ this .parent!
-            group = $s.data \group
-            if $s.hasClass \open    and debugMode != 2 # close
-                groupToggles[group] = false
-                $s
-                    .removeClass \open
-                    .css height: 30px
-                    #.stop! .animate height: 30px, \slow
-                sleep 500ms, !-> if not groupToggles[group]
-                    $s .addClass \closed
-            else
-                groupToggles[group] = true
-                $s
-                    .addClass \open
-                    .removeClass \closed
-                    #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
-                    .trigger \p0ne:resize
-                if debugMode != 0 #DEBUG
-                    $s = $s .siblings(\.open) .removeClass \open .css height: 30px
-                    sleep debugClosingDur, !->
-                        $s.each !->
-                            $this = $(this)
-                            group = $this.data \group
-                            groupToggles[group] = false
-                            $this .addClass \closed
+        $ppW.on \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
+            group = $ this .parent! .data \group
+            if p0neSettings._settings.openGroup != group
+                p0neSettings.openGroup group
+            else if not p0neSettings._settings.largeSettingsPanel
+                p0neSettings.closeGroup group
             e.preventDefault!
 
-        addListener $ppW, \p0ne:resize, \.p0ne-settings-group, (e) !->
-            $this = $ this
-            if p0neSettings._settings.groupToggles[$this.data \group]
-                $this .css height: 0 # reset scrollHeight
-                $this .css height: @scrollHeight # make group as large as content
-            #$this .scrollTop 0
-
-        addListener $ppW, \click, \.checkbox, throttle 200ms, !->
+        $ppW.on \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
             $this = $ this
             enable = this .checked
@@ -9856,7 +9804,7 @@ module \p0neSettings, do
             else
                 module.disable!
         panelIconTimeout = 0
-        addListener $ppW, \click, \.p0ne-settings-panel-icon, (e) !->
+        $ppW.on \click, \.p0ne-settings-panel-icon, (e) !->
             e.stopImmediatePropagation!
             e.preventDefault!
 
@@ -9872,7 +9820,7 @@ module \p0neSettings, do
                 module._$settingsPanel =
                     open: false
                     wrapper: $ '<div class=p0ne-settings-panel-wrapper>' .appendTo $ppM
-                    $el: $ "<div class='p0ne-settings-panel p0ne-settings-panel-#{module.name .toLowerCase!}'>"
+                    $el: $ "<div class='p0ne-settings-panel p0ne-settings-panel-#{module.moduleName .toLowerCase!}'>"
                 module._$settingsPanel.$el .appendTo module._$settingsPanel.wrapper
                 module.settingsPanel(module._$settingsPanel.$el, module)
 
@@ -9896,74 +9844,84 @@ module \p0neSettings, do
                     .addClass \icon-settings-white
                     .removeClass \icon-settings-grey
 
-        addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
-            $this = $ this
-            module = $this .data \module
-            $ppP .html "
-                    <div class=p0ne-settings-popup-triangle></div>
-                    <h3>#{module.displayName}</h3>
-                    #{module.help}
-                    #{if!   module.screenshot   then'' else
-                        '<img src='+module.screenshot+'>'
-                    }
-                "
-            l = $ppW.width!
-            maxT = $ppM .height!
-            h = $ppP .height!
-            t = $this .offset! .top - 50px
-            tt = t - h/2 >? 0px
-            diff = tt - (maxT - h - 30px)
-            if diff > 0
-                t += diff + 10px - tt
-                tt -= diff
-            else if tt != 0
-                t = \50%
-            $ppP
-                .css top: tt, left: l
-                .stop!.fadeIn!
-            $ppP .find \.p0ne-settings-popup-triangle
-                .css top: 14px >? t
-        addListener $ppW, \mouseout, \.p0ne-settings-has-more, !->
-            $ppP .stop!.fadeOut!
-        addListener $ppP, \mouseover, !->
-            $ppP .stop!.fadeIn!
-        addListener $ppP, \mouseout, !->
-            $ppP .stop!.fadeOut!
+        $ppW.on \mouseover, '.p0ne-settings-item, .p0ne-settings-extra', (e) !->
+            if p0neSettings._settings.largeSettingsPanel or $ e.target .is \.p0ne-settings-help
+                $module = $ this
+                module = $module .data \module
+                return if not module.help and not module.screenshot
+                $ppP .html "
+                        <div class=p0ne-settings-popup-triangle></div>
+                        <h3>#{module.displayName}</h3>
+                        #{module.help ||''}
+                        #{if!   module.screenshot   then'' else
+                            '<img src='+module.screenshot+'>'
+                        }
+                    "
+                l = $ppW.width!
+                maxT = $ppM .height!
+                h = $ppP .height!
+                t = $module .offset! .top - 50px
+                tt = t - h/2 >? 0px
+                diff = tt - (maxT - h - 30px)
+                if diff > 0
+                    t += diff + 10px - tt
+                    tt -= diff
+                else if tt != 0
+                    t = \50%
+                $ppP
+                    .css top: tt, left: l
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .show!
+                else
+                    $ppP .stop! .fadeIn!
+                $ppP .find \.p0ne-settings-popup-triangle
+                    .css top: 14px >? t
+        $ppM.on \mouseout, '.p0ne-settings-has-more, .p0ne-settings-popup', !->
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .hide!
+                else
+                    $ppP .stop! .fadeOut!
+        $ppP.on \mouseover, !->
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .show!
+                else
+                    $ppP .stop! .fadeIn!
 
         # add p0ne.module listeners
         #= module INITALIZED =
         addListener API, \p0ne:moduleLoaded, (module) !~> @addModule module
 
         #= module ENABLED =
-        addListener API, \p0ne:moduleEnabled, (module) !~>
+        addListener API, \p0ne:moduleEnabled, (module, isUpdate) !~>
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
-            @loadSettingsExtra true, module
-            if @_settings.groupToggles[module.settings]
-                requestAnimationFrame !~>
-                    @groups[module.settings] .trigger \p0ne:resize
+            if not isUpdate
+                @loadSettingsExtra true, module
 
         #= module UPDATED =
         addListener API, \p0ne:moduleUpdated, (module, module_) !~>
+            module_._$settingsExtra? .remove!
+            module_._$settingsPanel? .remove!
             if module.settings
                 @addModule module, module_
+            else if module_.settings
+                module_._$settings .remove!
+                /* # i think this is a highly neglectable edge case
                 if module.help != module_.help and module._$settings?.is \:hover
                     # force update .p0ne-settings-popup (which displays the module.help)
-                    module._$settings .mouseover!
+                    module._$settings .mouseover!*/
 
         #= module DISABLES =
-        addListener API, \p0ne:moduleDisabled, (module_) !~>
-            module_._$settings?
+        addListener API, \p0ne:moduleDisabled, (module_) !~> if module_._$settings
+            module_._$settings
                 .removeClass \p0ne-settings-item-enabled
                 .find \.checkbox
                     .attr \checked, false
             module_._$settingsExtra?
                 .stop!
                 .slideUp !->
-                    $ this
-                        .trigger \p0ne:resize
-                        .remove!
+                    module_._$settingsExtra .remove!
 
         addListener $body, \click, \#app-menu, !~> @toggleMenu false
         if _$context?
@@ -9996,23 +9954,68 @@ module \p0neSettings, do
                 $ppW .css paddingRight: scrollLeftMax
             d.remove!
 
+        # toggle expert mode
+    toggleExpert: (state) !->
+        @$expertToggle .text do
+            if state ?= @_settings.expert
+                "show less options"
+            else
+                "show all options"
+        $ppW .toggleClass \p0ne-settings-expert, state
+        @_settings.expert = state
+
     toggleMenu: (state) !->
-        if state ?= not @groupToggles.p0neSettings
-            @$ppW.slideDown!
+        if state ?= not @_settings.open
+            @$ppW.css maxHeight: \100%
         else
-            @$ppW.slideUp!
+            @$ppW.css maxHeight: 0
             for ,module of p0ne.modules when module._$settingsPanel?.open # close panel
                     module._$settingsPanel.wrapper
                         .animate do
                             left: @$ppW.width! - module._$settingsPanel.$el.width!
                             -> $(this).hide!
                     module._$settingsPanel.open = false
-        return @groupToggles.p0neSettings = state
+        return @_settings.open = state
 
 
     groups: {}
     groupEmpty: {}
     moderationGroup: $!
+
+    openGroup: (group) !->
+        console.info "[openGroup]", group
+        if @_settings.openGroup
+            @closeGroup @_settings.openGroup
+
+        @_settings.openGroup = group
+        $s = @groups[group]
+            .removeClass \closed
+            .addClass \open
+        if @_settings.largeSettingsPanel
+            $s .css height: \auto
+        else
+            requestAnimationFrame !~>
+                $s .css height: $s.0.scrollHeight
+                sleep 500ms, !~> if @_settings.openGroup == group
+                    $s .css height: \auto
+
+
+    closeGroup: (group) !->
+        console.info "[closeGroup]", group, @groups[group], @groups[group]?.0?.scrollHeight
+        @_settings.openGroup = false
+        $s = @groups[group]
+            .removeClass \open
+        if @_settings.largeSettingsPanel
+            $s
+                .css height: 30px
+                .addClass \closed
+        else
+            $s .css height: $s.0.scrollHeight
+            requestAnimationFrame !~>
+                $s .css height: 30px
+                sleep 500ms, !~> if @_settings.openGroup != group
+                    $s .addClass \closed
+
     addModule: (module, module_) !->
         if module.settings
             # prepare extra icons to be added to the module's settings element
@@ -10041,20 +10044,17 @@ module \p0neSettings, do
                         $ '<div class=p0ne-settings-summary>' .text module.settings #.toUpperCase!
                     .insertBefore @$ppInfo
                 $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
-                if @_settings.groupToggles[module.settings]
-                    $s  .addClass \open
+
+                if module.settings == \moderation
+                    $s .addClass \p0ne-settings-group-moderation
+
+                if @_settings.openGroup == module.settings
+                    @openGroup module.settings
                 else
                     $s
                         .addClass \closed
                         .css height: 30px
 
-                if module.settings == \moderation
-                    $s .addClass \p0ne-settings-group-moderation
-
-                # (animatedly) open the settings group
-                if @_settings.groupToggles[module.settings]
-                    #.stop! .animate height: $s.children!.length * 44px, \slow
-                    $s .find \.p0ne-settings-summary .click!
             # otherwise we already created the settings group
 
             if not module.settingsVip and not @groupEmpty[module.settings] and (@groupEmpty[module.settings] = module.settingsSimple)
@@ -10064,7 +10064,7 @@ module \p0neSettings, do
             module._$settings = $ "
                     <label class='#itemClasses'>
                         <input type=checkbox class=checkbox #{if module.disabled then '' else \checked} />
-                        <div class=togglebox><div class=knob></div></div>
+                        <div class=togglebox></div>
                         #{module.displayName}
                         #icons
                     </label>
@@ -10072,44 +10072,44 @@ module \p0neSettings, do
                 .data \module, module
 
             if module_?._$settings?.parent!.parent! .is $s
-                module_._$settings
-                    .after do
-                        module._$settings .addClass \updated
-                    .remove!
+                module._$settings
+                    .addClass \updated
+                    .insertAfter module_._$settings
                 sleep 2_000ms, !->
                     module._$settings .removeClass \updated
-                @loadSettingsExtra false, module, module_ if not module.disabled
             else
                 module._$settings .appendTo $s.items
 
-                # render extra settings element if module is enabled
-                @loadSettingsExtra false, module if not module.disabled
+            # render extra settings element if module is enabled
+            @loadSettingsExtra false, module if not module.disabled
+
+            if module_
+                module_._$settings? .remove!
 
 
 
 
-    loadSettingsExtra: (autofocus, module, module_) !->
+    loadSettingsExtra: (autofocus, module) !->
         try
-            module_?._$settingsExtra? .remove!
             if module.settingsExtra
                 module.settingsExtra do
                     module._$settingsExtra = $ "<div class=p0ne-settings-extra>"
-                        .hide!
+                        .data \module, module
                         .insertAfter module._$settings
                 # using rAF because otherwise jQuery calculates the height incorrectly
-                requestAnimationFrame !~>
-                    module._$settingsExtra
-                        .slideDown ->
-                            module._$settingsExtra .trigger \p0ne:resize
-                    if autofocus
-                        module._$settingsExtra .find \input .focus!
-                    else
-                        module._$settings .parent! .scrollTop 0
+                $group = @groups[module.settings]
+                if autofocus and @_settings.openGroup == module.settings
+
+                    module._$settingsExtra .css height: 0px
+                    requestAnimationFrame !->
+                        module._$settingsExtra .css height: module._$settingsExtra.0.scrollHeight
+                        sleep 250ms, !->
+                            module._$settingsExtra .css height: \auto
+                    module._$settingsExtra .find \input .focus!
         catch err
-            console.error "[#{module.name}] error while processing settingsExtra", err.stack
+            console.error "[#{module.moduleName}] error while processing settingsExtra", err.stack
             module._$settingsExtra?
                 .remove!
-            @groups[module.settings] .trigger \p0ne:resize
 
 /*@source p0ne.moderate.ls */
 /**
@@ -10119,6 +10119,7 @@ module \p0neSettings, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.moderate ~~~~~~~"
 
 /*####################################
 #       BASE MODERATION MODULE       #
@@ -10134,7 +10135,7 @@ module \enableModeratorModules, do
             if newRole > 1 and prevRole < 2
                 console.info "[p0ne] enabling moderator modules"
                 for ,m of p0ne.modules when m.modDisabled
-                    console.log "[p0ne moderator] enabling", m.name
+                    console.log "[p0ne moderator] enabling", m.moduleName
                     m.enable!
                     m.modDisabled = false
                 $body.addClass \user-is-staff
@@ -10142,7 +10143,7 @@ module \enableModeratorModules, do
             else if newRole < 2 and prevRole > 1
                 console.info "[p0ne] disabling moderator modules"
                 for ,m of p0ne.modules when m.moderator    and not m.disabled
-                    console.log "[p0ne moderator] disabling", m.name
+                    console.log "[p0ne moderator] disabling", m.moduleName
                     m.modDisabled = true
                     m.disable!
                 $body.removeClass \user-is-staff
@@ -10195,22 +10196,6 @@ module \disableChatDelete, do
     settings: \moderation
     settingsSimple: true
     setup: ({replace_$Listener, addListener, $createPersistent, css}) !->
-        css \disableChatDelete, '
-            .deleted {
-                border-left: 2px solid red;
-                display: none;
-            }
-            .p0ne-showDeletedMessages .deleted {
-                display: block;
-            }
-            .deleted-message {
-                display: block;
-                text-align: right;
-                color: red;
-                font-family: monospace;
-            }
-        '
-
         $body .addClass \p0ne-showDeletedMessages
 
         lastDeletedCid = null
@@ -10237,8 +10222,8 @@ module \disableChatDelete, do
                     .removeClass \timestamp
                     .appendTo $msg
                 d .text "deleted #{if moderator then 'by '+moderator else ''} #{d.text!}"
-                cm = $cm!
-                cm.scrollTop cm.scrollTop! + d.height!
+                $cm = get$cm!
+                $cm.scrollTop $cm.scrollTop! + d.height!
                 $msg .find \.delete-button .remove! # remove delete button
 
                 # revert inline images
@@ -10262,7 +10247,7 @@ module \chatDeleteOwnMessages, do
     #settings: \moderation
     settingsSimple: true
     setup: ({addListener}) !->
-        $cm! .find "fromID-#{userID}"
+        get$cm! .find "fromID-#{userID}"
             .addClass \deletable
             .append do
                 $ '<div class="delete-button">Delete</div>'
@@ -10300,13 +10285,7 @@ module \warnOnMehers, do
             if d.vote == -1 and d.user.uid != userID
                 console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
-                    appendChat $ "
-                        <div class='cm p0ne-notif p0ne-meh-warning'>
-                            <i class='icon icon-chat-system'></i>
-                            <div class='msg text'>
-                                #{formatUserHTML d.user, true} meh'd this song!
-                            </div>
-                        </div>"
+                    chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML d.user, true} meh'd this song!"
 
         lastAdvance = 0
         addListener API, \advance, (d) !~>
@@ -10316,13 +10295,7 @@ module \warnOnMehers, do
                     users[cid] ||= 0
                     if ++users[cid] > @_settings.maxMehs and troll = getUser(cid)
                         # note: the user (`troll`) may have left during this song
-                        appendChat $ "
-                            <div class='cm system'>
-                                <div class=box><i class='icon icon-chat-system'></i></div>
-                                <div class='msg text'>
-                                    #{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!
-                                </div>
-                            </div>"
+                        chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!"
                 else if d > lastAdvance + 10_000ms
                     delete users[cid]
             if d > lastAdvance + 10_000ms
@@ -10426,7 +10399,7 @@ module \afkTimer, do
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
 
-        chatHidden = $cm!.parent!.css(\display) == \none
+        chatHidden = get$cm!.parent!.css(\display) == \none
         if _$context? and (app? or userList?)
             addListener _$context, 'show:users show:waitlist', !->
                 chatHidden := true
@@ -10536,6 +10509,7 @@ module \forceSkipButton, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
 */
+console.log "~~~~~~~ p0ne.userHistory ~~~~~~~"
 #HistoryItem = RoomHistory::collection.model if RoomHistory
 
 
@@ -10612,14 +10586,15 @@ module \userHistory, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.help ~~~~~~~"
 
 module \p0neHelp, do
     optional: <[ currentMedia ]>
     require: <[ automute p0neSettings ]>
-    setup: ({$create, css}:aux) ->
+    setup: ({$create, loadStyle}:aux) !->
         #== create CSS ==
         #ToDo move this to plug_p0ne.css
-        #css \p0neHelp, ""
+        loadStyle "#{p0ne.host}/css/walkthrough.css"
 
         automute = p0ne.modules.automute
         var i
@@ -10633,6 +10608,10 @@ module \p0neHelp, do
         $pp0 = $ppI .find \.p0ne-icon-sub
         $hdButton = $ '#playback .hd'
         $snoozeBtn = $ '#playback .snooze'
+        $bar = $ \#now-playing-bar
+        $songInfo = $ \.p0ne-song-info
+        $footerUser = $ \#footer-user
+
         #== create DOM elements ==
         $el = $create "
             <div class=wt-cover></div>
@@ -10668,16 +10647,11 @@ module \p0neHelp, do
                 <div class='step fade-in wt-p0-dblclick2mention' data-screen=dblclick2mention>
                     <h1>dblclick2mention</h1>
                     <p>
-                        Most of plug_p0ne's awesome features are not immediately obvious.<br>
-                        Let's try out some, to see what we can do with plug_p<span class=wt-p0-0>0</span>ne.
+                        One of most often used p0 features is the so called \"DblClick username to Mention\".<br>
+                        Just <b>double click</b> their name to <em>@mention</em> them. This is great to quickly greet friends, for example.<br>
+                        <small>(it works on username in chat, join notifications and just about EVERYWHERE)</small>
                     </p>
-                    <p>
-                        One of best is the so called \"DblClick username to Mention\", which let's you @mention others simply by double clicking their usernames (e.g. in their chat messages or join/leave notifications, but it works just about everywhere).<br>
-                        This is great to quickly greet friends, for example.
-                    </p>
-                    <p>
-                        [insert image]<!-- <img src='...'> -->
-                    </p>
+                    <img src='http://i.imgur.com/e5JVTqU.gif' alt='screenrecording of dblclick2mention' width=350 height=185 />
 
                     <button class='wt-p0-back'>back</button>
                     <button class='wt-p0-next continue'>next</button>
@@ -10686,7 +10660,10 @@ module \p0neHelp, do
                 <div class='step fade-in wt-p0-stream-settings' data-screen=stream-settings>
                     <h1>Stream Settings</h1>
                     <p>
-                        plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br><i class='icon icon-stream-video'></i> Video,<br><i class='icon icon-stream-audio'></i> Audio-Only and<br><i class='icon icon-stream-off'></i> Stream-Off (no video/sound).
+                        plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br>
+                            <i class='icon icon-stream-video'></i> Video<br>
+                            <i class='icon icon-stream-audio'></i> Audio-Only<br>
+                            <i class='icon icon-stream-off'></i> Stream-Off (no video/sound)
                     </p>
                     <p>
                         You can click the icons in the top-middle to change between the modes.
@@ -10733,6 +10710,27 @@ module \p0neHelp, do
                     <button class=wt-p0-next>skip</button>
                 </div>
 
+                <div class='step fade-in wt-p0-songinfo' data-screen=songinfo>
+                    <h1>Song-Info</h1>
+                    <p>
+                        Want to find out more about the current song?
+                    </p>
+                    <p class=wt-p0-songinfo-closed>
+                        Click the song title above!
+                    </p>
+                    <div class=wt-p0-songinfo-open>
+                        In the top middle you can see two rows.
+                        <img src='//i.imgur.com/clwk2QL.png' alt='top row shows author - title as seen on plug.dj, second row shows channel name and upload title as seen on Youtube/Soundcloud' width=338 height=66 />
+                        <ul>
+                            <li>Click on the author or title to search for them on plug.dj.</li>
+                            <li>Click on the channel or song name to open them in a new tab.</li>
+                        </ul>
+                    </div>
+
+                    <button class='wt-p0-back'>back</button>
+                    <button class='wt-p0-next continue'>next</button>
+                </div>
+
                 <div class='step fade-in wt-p0-info-footer' data-screen=info-footer>
                     <h1>Info Footer</h1>
                     <p>
@@ -10762,12 +10760,12 @@ module \p0neHelp, do
                 </div>
 
                 <div class=nav>
-                    <i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i>
+                    <i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i>
                     <button class='wt-p0-skip'>skip walkthrough</button
                 </div>
             </div>
         "
-            .on \click, \.wt-p0-button, ->
+            .on \click, \.wt-p0-button, !->
                 $this = $ this
                 $this .trigger "button-#{$this.index!} button-#{$this.text!}"
             .on \click, \.wt-p0-skip, !~>
@@ -10779,70 +10777,75 @@ module \p0neHelp, do
                 nextScreen $(this).index!
             .appendTo $app
         $app .addClass \is-wt-p0
+        $pSettingsClosed = $el .find \.wt-p0-settings-closed
+        $pSettingsOpen = $el .find \.wt-p0-settings-open
+        $pSongInfoClosed = $el .find \.wt-p0-songinfo-closed
+        $pSongInfoOpen = $el .find \.wt-p0-songinfo-open
+
+        DUMMY_VIDEO =
+            cid: \wZZ7oFKsKzY
+            format: 1
+            author: "plug_p0ne test"
+            title: "Nyan Cat 1h"
+            duration: 36001
+            image: "https://i.ytimg.com/vi/wZZ7oFKsKzY/default.jpg"
 
 
         #== show help screens ==
         #ToDo @screenClose(), accomplished(), step(num)
         screens = [
-            ~> # welcome
+            !~> # welcome
                 $screen .removeClass \revealed
                 $nextBtn_ = $nextBtn
                 p0neSettings.toggleMenu(false)
-                sleep 2_000ms ~>
+                sleep 2_000ms !~>
                     $screen .addClass \revealed
                     sleep 3_000ms, !-> if i == 0
                         $nextBtn_
                             .text "next"
 
-            ~> # settings icon
-                $divClosed = $el .find \.wt-p0-settings-closed
-                $divOpen = $el .find \.wt-p0-settings-open
-                do addListener $ppI, \click, ~>
-                    if not p0neSettings.groupToggles.p0neSettings
-                        $divClosed .show!; $divOpen .hide!
-                        $screen .css left: ""
+            !~> # settings icon
+                do addListener $ppI, \click, !~>
+                    if not p0neSettings._settings.open
+                        $pSettingsClosed .show!; $pSettingsOpen .hide!
+                        $screen .css left: '', top: ''
                         blinking($ppI)
                     else
                         blinking!
-                        $divClosed .hide!; $divOpen .show!
+                        $pSettingsClosed .hide!; $pSettingsOpen .show!
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 160px, top: 100px
                         else
-                            $screen .css left: $ppW.width! + 20px
+                            $screen .css left: $ppW.width! + 60px, top: ''
                         blinking $nextBtn
                         accomplished!
 
-                @screenClose = ~>
+                @screenClose = !~>
                     p0neSettings.toggleMenu(false)
 
-            ~> # dblclick2mention
-
-            ~> # Stream Settings
+            !~> # dblclick2mention
                 $playback = $ \#playback
                 blinking $hdButton
 
-            ~> # Automute
+            !~> # Stream Settings
+                $playback = $ \#playback
+                blinking $hdButton
+
+            !~> # Automute
                 var m
                 if currentMedia?
                     do addListener API,  \advance, !->
                         if not m := currentMedia.get \media
-                            currentMedia .set new Backbone.Model do
-                                cid: \wZZ7oFKsKzY
-                                format: 1
-                                author: "plug_p0ne test"
-                                title: "Nyan Cat 1h"
-                                duration: 36001
-                                image: "https://i.ytimg.com/vi/wZZ7oFKsKzY/default.jpg"
+                            currentMedia .set new Backbone.Model DUMMY_VIDEO
                         else
                             step(if isSnoozed! then 2 else 1)
-                    cb1!
 
-                addListener API, \p0ne:changeMode, (m) !~>
+                do addListener API, \p0ne:changeMode, (m) !~>
                     step(if m == \off then 2 else 1)
                 if isSnoozed!
                     step(2)
 
-                addListener $snoozeBtn, \click, !~>
+                do addListener $snoozeBtn, \click, !~>
                         console.log "smooze [sic]", automute.songlist[API.getMedia!.cid]
                         if automute.songlist[API.getMedia!.cid]
                             accomplished!
@@ -10850,31 +10853,29 @@ module \p0neHelp, do
                 blinking $snoozeBtn
 
                 @screenClose = !->
-                    if m
-                        currentMedia.set \media, m
+                    currentMedia.set \media, m if m
 
-            ~> # Automute (remove)
+            !~> # Automute (remove)
                 $spI = automute._$settings.find '.p0ne-settings-panel-icon .icon'
                 $summary = p0neSettings.groups[automute.settings].find \.p0ne-settings-summary
-                export test = -> $spI
                 # step 1
                 blinking $ppI
                 addListener $ppI, \click, cb1 = !~>
-                    if not p0neSettings.groupToggles.p0neSettings
+                    if not p0neSettings._settings.open
                         step(1)
-                        $screen .css left: ""
+                        $screen .css left: "", top: ''
                     else
                         step(2)
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 160px, top: 150px
                         else
-                            $screen .css left: $ppW.width! + 20px
+                            $screen .css left: $ppW.width! + 20px, top: ''
                         blinking $summary
                         cb2!
 
                 # step 2
                 addListener $summary, \click, cb2 = !~> requestAnimationFrame !~>
-                    if not p0neSettings.groupToggles[automute.settings]
+                    if p0neSettings._settings.openGroup != automute.settings
                         step(2)
                         $spI .css boxShadow: '', borderRadius: ''
                         blinking $summary
@@ -10904,33 +10905,58 @@ module \p0neHelp, do
 
 
                         # step 4
+                        # add a dummy song to automute if automute list is empty
+                        for k of automute.songlist
+                            break
+                        else
+                            automute.songlist[DUMMY_VIDEO.cid] = DUMMY_VIDEO
+                            automute.createRow DUMMY_VIDEO.cid
+
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 100px
                         else
                             $screen .css left: $ppW.width! + 520px
-                        if settingsPanel != automute._$settingsPanel
+                        if automute._$settingsPanel and settingsPanel != automute._$settingsPanel.wrapper
                             if settingsPanel
                                 settingsPanel .off \click, \.song-remove, accomplished
                             #ToDo add dummy song to automute list, if it's empty
-                            settingsPanel := automute._$settingsPanel
+                            settingsPanel := automute._$settingsPanel.wrapper
                             addListener settingsPanel, \click, \.icon-clear-input, accomplished
                         blinking!
 
                 cb1!
 
-                @screenClose = ~>
+                @screenClose = !~>
                     $spI? .css boxShadow: '', borderRadius: ''
                     p0neSettings.toggleMenu(false)
+                    if automute.songlist[DUMMY_VIDEO.cid]
+                        delete automute.songlist[DUMMY_VIDEO.cid]
+                        automute.rows[DUMMY_VIDEO.cid] .remove!
 
-            ~> # Info Footer
-                addListener $footerUser, \click, cb = !->
-                    if $(this).hasClass \menu
-                        $screen .css right: 20px;
+            !~> # Song Info
+                blinking $bar
+                do addListener $bar, \click, !->
+                    if b = $songInfo .hasClass \expanded
+                        $screen .css top: 220px
+                        $pSongInfoClosed .hide!; $pSongInfoOpen .show!
+                        accomplished!
                     else
-                        $screen .css right: -330px;
+                        $screen .css top: ""
+                        $pSongInfoClosed .show!; $pSongInfoOpen .hide!
+                @screenClose = !~>
+                    if $songInfo .hasClass \expanded
+                        $bar .click!
+                    p0neSettings.toggleMenu(false)
+
+            !~> # Info Footer
+                addListener $footerUser, \click, cb = !->
+                    if $footerUser.hasClass \menu
+                        $screen .css right: 20px
+                    else
+                        $screen .css right: -330px
                 cb!
 
-            ~> # End
+            !~> # End
             @disable # already bound
         ]
         /**  other interesting things to show:
@@ -11027,6 +11053,7 @@ module \p0neHelp, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.dev ~~~~~~~"
 
 /*####################################
 #        FIX CONSOLE SPAMMING        #
@@ -11144,7 +11171,7 @@ module \logGrabbers, do
     setup: ({addListener, replace}) !->
         grabbers = {}
         hasGrabber = false
-        addListener API, \p0ne:grab, (u) !->
+        addListener API, \p0ne:vote:grab, (u) !->
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
             grabbers[u.id] = u.username
             hasGrabber := true
@@ -11211,14 +11238,7 @@ module \downloadLink, do
             dataOrURL = JSON.stringify dataOrURL if typeof dataOrURL != \string
             dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
         filename .= replace /[\/\\\?%\*\:\|\"\<\>\.]/g, '' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
-        return appendChat "
-                <div class='message p0ne-downloadlink'>
-                    <i class='icon'></i>
-                    <span class='text'>
-                        <a href='#{dataOrURL}' download='#{filename}'>#{name}</a>
-                    </span>
-                </div>
-            "
+        return chatWarnSmall \p0ne-downloadlink, "<a href='#{dataOrURL}' download='#{filename}'>#{name}</a>", true
 
 
 /*####################################
@@ -11550,7 +11570,7 @@ window.copyChat = (copy) !->
         <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
         <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
         <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
-    """ if window.bpm or $cm! .find \.bpm-emote .length
+    """ if window.bpm or get$cm! .find \.bpm-emote .length
 
     res += """\n
         <style>
@@ -11590,6 +11610,7 @@ module \_$contextUpdateEvent, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.ponify ~~~~~~~"
 
 /*####################################
 #            PONIFY CHAT             #
@@ -11875,8 +11896,6 @@ module \ponifiedLang, do
                     replace group, k, !-> return v2
                     console.log "\treplacing '#v' with '#{group[k]}'"
         console.groupEnd!
-        console.log Lang.dashboard.people
-        console.log Lang.roles.host
 
         # roles
         replace Lang.roles, \none, !-> return "Mudpony"
@@ -11943,6 +11962,7 @@ module \ponifiedLang, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.fimplug ~~~~~~~"
 
 /*####################################
 #              RULESKIP              #
@@ -11978,7 +11998,7 @@ module \forceSkipButtonRuleskip, do
         '
         var $rulelist
         visible = false
-        fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.name == \forceSkipButton
+        fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.moduleName == \forceSkipButton
             $rulelist := $create '
                 <ul class=p0ne-skip-ruleskip>
                     <li data-rule=insta><b>insta skip</b></li>
@@ -12133,7 +12153,7 @@ module \fimstats, do
 
         # prevent the p0ne settings from overlaying the ETA
         console.info "[fimstats] prevent p0neSettings overlay", $(\#p0ne-menu).css bottom: 54px + 21px
-        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) !-> if m.name == \p0neSettings
+        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) !-> if m.moduleName == \p0neSettings
             $ \#p0ne-menu .css bottom: 54px + 21px
 
         # show stats for next song in playlist
@@ -12267,6 +12287,7 @@ module \fimstats, do
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.bpm ~~~~~~~"
 
 
 /*####################################
@@ -12448,7 +12469,7 @@ module \bpm, do
             console.info "[bpm] loaded"
 
             #== ponify old messages ==
-            $cms! .find \.text .html !->
+            get$cms! .find \.text .html !->
                 return bpm @innerHTML
 
             #== Autocomplete integration ==
@@ -12506,7 +12527,7 @@ module \bpm, do
 
     disable: (revertPonimotes) !->
         if revertPonimotes
-            $cms! .find \.bpm-emote .replaceWith !->
+            get$cms! .find \.bpm-emote .replaceWith !->
                 flags = ""
                 for class_ in this.classList || this.className.split(/s+/)
                     if class_.startsWith \bpmote-
