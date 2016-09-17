@@ -502,7 +502,7 @@ module \userlistIcons, do
 /*####################################
 #        DBLCLICK to @MENTION        #
 ####################################*/
-/*note: this is also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
+/*note: this also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
 module \chatDblclick2Mention, do
     require: <[ chat simpleFixes ]>
     #optional: <[ PopoutListener ]>
@@ -543,10 +543,10 @@ module \chatDblclick2Mention, do
             else
                 clearTimeout chatDblclick2Mention.timer
                 chatDblclick2Mention.timer = 0
-                name = e.target.textContent
+                name = this.textContent
                 if name.0 == "@"
                     name .= substr 1
-                (PopoutView?.chat || chat).onInputMention e.target.textContent
+                (PopoutView?.chat || chat).onInputMention name
 
         $cms = get$cms!
         for [ctx, $el, attr, boundAttr] in [ [chat, $cms.find(\.un), \onFromClick, \fromClickBind],  [WaitlistRow::, $('#waitlist .user'), \onDJClick, \clickBind],  [RoomUserRow::, $('#user-lists .user'), \onClick, \clickBind] ]
@@ -563,10 +563,10 @@ module \chatDblclick2Mention, do
 
         replace WaitlistRow::, \draw, (d_) !-> return !->
             d_.call(this)
-            @$el.attr \uid, @model.id
+            @$el.data \uid, @model.id
         replace RoomUserRow::, \draw, (d_) !-> return !->
             d_.call(this)
-            @$el.attr \uid, @model.id
+            @$el.data \uid, @model.id
 
         # instead of individual event listeners, we use a delegated event (which offers better performance)
         addListener chatDomEvents, \click, \.un, newFromClick

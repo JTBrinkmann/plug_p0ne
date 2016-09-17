@@ -62,7 +62,7 @@ module \animatedUI, do
         replace Dialog::, \close, (close_) !-> return !->
             @$el?.removeClass \opaque
             @animate = $.noop
-            sleep 200ms, !~> close_.call this
+            sleep 180ms, !~> close_.call this
             return this
 
 
@@ -342,6 +342,7 @@ module \djIconChat, do
 ####################################*/
 module \draggableDialog, do
     require: <[ Dialog ]>
+    optional: <[ chatDomEvents ]>
     displayName: 'Draggable Dialog'
     settings: \look&feel
     setup: ({addListener, replace, css}) !->
@@ -434,6 +435,15 @@ module \draggableDialog, do
             $body
                 .off \mousemove, mousemove
                 .off \mouseup, mouseup
+
+        #compatibility fix with Lightbox Images
+        if window.chatDomEvents
+            addListener chatDomEvents, \click, '.p0ne-img, .p0ne-img-filtered', (e) !->
+                if not lightsout
+                    $dialogContainer
+                        .addClass \lightsout
+                        .find \.icon-unlocked
+                            .removeClass \icon-unlocked .addClass \icon-locked
     disable: !->
         @stopDragging?!
         $ '#dialog-container .dialog' .css position: \static

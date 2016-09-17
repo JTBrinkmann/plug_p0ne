@@ -715,7 +715,7 @@ module \chatYoutubeThumbnails, do
         addListener API, \p0ne:chat:link, ({pre, protocol, url, onload}) !->
             yt = YT_REGEX .exec(protocol+url)
             if yt and (yt = yt.1)
-                console.log "[inline-img]", "[YouTube #yt] #url ==> https://i.ytimg.com/vi/#yt/default.jpg"
+                console.log "[p0ne_yt_preview]", "#url ==> https://i.ytimg.com/vi/#yt/default.jpg"
                 if window.mediaLookupCache[yt]
                     media = auxiliaries.authorTitle(that.title)
                     media.author ||= that.uploader.name
@@ -782,11 +782,13 @@ module \customChatNotificationTrigger, do
                 return "<span class=p0ne-trigger-word>#word</span>"
             playChatSound! if mentioned
         if window.user_
-            addListener window.user_, \change:username, @~updateRegexp
+            addListener window.user_, \change:rawun, @~updateRegexp
         @updateRegexp!
 
     updateRegexp: !->
-        return if @_settings.triggerwords .length == 0
+        if @_settings.triggerwords .length == 0
+            @hasUsernameTrigger = false
+            return
         triggerwords = []; l=0
         for triggerword in @_settings.triggerwords
             triggerword = triggerword |> htmlEscape |> escapeRegExp

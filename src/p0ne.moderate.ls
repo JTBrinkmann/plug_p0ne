@@ -243,11 +243,12 @@ module \afkTimer, do
     settingsSimple: true
     displayName: "Show Idle Time"
     help: '''
-        This module shows how long users have been inactive in the User- and Waitlist-Panel.
-        "Being active"
+        This module shows how long since users have last been by adding a timer to the User- and Waitlist-Panel.
+        It also adds the number of inactive users in the waitlist to the waitlist button. (updated every minute)
+        "Being active" means sending chat, changing your name, gifting someone, grabbing or doing moderator things.
     '''
     _settings:
-        lastActivity: {}
+        lastActivity: {} # this is for caching, not meant to be an actual setting
         highlightOver: 43.min
 
     setup: ({addListener, $create, replace},, m_) !->
@@ -255,11 +256,9 @@ module \afkTimer, do
         settings = @_settings
         start = Date.now!
         if m_
-            console.log "m_ =", m_
             @start = m_.start
             lastActivity = m_._settings.lastActivity ||{}
         else
-            console.log "args", arguments
             @start = start
             if @_settings.lastActivity?.0 + 60_000ms > Date.now!
                 lastActivity = @_settings.lastActivity
@@ -314,6 +313,7 @@ module \afkTimer, do
                         #$waitlistBtn .removeClass \p0ne-toolbar-highlight
                         $afkCount .clear!
                     lastAfkCount := afkCount
+        addListener API, \waitListUpdate, updateAfkCount
         updateAfkCount!
 
         # UI

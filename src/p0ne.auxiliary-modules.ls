@@ -299,6 +299,57 @@ module \p0neCSS, do
                 @loadStyle url
                 @urlMap[url] = i
 
+
+
+/* open a dialog to let the user create a playlist with a user-selected name */
+module \createPlaylistDialog, do
+    require: <[ ShowDialogEvent _$context ]>
+    module: (songList, defaultName) !->
+        _$context.trigger do
+            ShowDialogEvent.SHOW
+            ,evt = new ShowDialogEvent do
+                ShowDialogEvent.SHOW
+                ,new PlaylistCreateDialog media: songListCollection(songList).models
+        if defaultName
+            requestAnimationFrame !->
+                requestAnimationFrame !->
+                    evt.dialog.$field .val defaultName
+                    evt.dialog.onKeyUp!
+
+/* opens a list of songs in the playlist drawer */
+module \mediaListShow, do
+    require: <[ pl SearchList SearchHeader ]>
+    module: (title, songList, icon) !->
+        list = new SearchList()
+        header = new SearchHeader()
+
+        # compatibility check
+        songList = songListCollection(songList)
+
+        # render list
+        list.collection = songList
+        pl.show(header, list)
+        header.setTitle title
+        $icon = header .$el .find \.icon
+            .removeClass!
+        if window.createPlaylistDialog
+            header .$el .append do
+                $ "<div class='button import-button'><span>#{Lang?.import.importThis || 'Import This Playlist'}</span></div>"
+                    .on \click, !->
+                        createPlaylistDialog(songList, title)
+        if icon
+            $icon
+                .addClass(icon)
+                .css do
+                    top: 13px
+                    left: 12px
+        list.render!
+
+        # open playlist drawer (if not open already)
+        openPlaylistDrawer!
+
+
+
 _.defer !-> # because for some reason the event listener doesn't get attached otherwise
     module \p0neNotifHelper, do
         require: <[ chatDomEvents ]>

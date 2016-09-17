@@ -30,7 +30,7 @@ module \socketListeners, do
             forEach(onRoomJoinQueue2)
             onRoomJoinQueue2 := []
 
-        for let event in <[ send dispatchEvent close ]>
+        for let event in <[ send dispatchEvent ]>
             #console.log "[socketListeners] injecting into Socket::#event"
             replace Socket::, event, (e_) !-> return !->
                 try
