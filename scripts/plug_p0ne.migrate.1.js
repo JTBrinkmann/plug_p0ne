@@ -1044,6 +1044,27 @@ out$.localforage = localforage;
         }
       });
     }
+    break;
+  case compareVersions(v, dest = '1.8.8.2'):
+    localforage.removeItem('p0ne_boothAlert');
+    editLocalforage('p0neSettings', function(d){
+      var group, ref$, v, openGroup;
+      for (group in ref$ = d.groupToggles) {
+        v = ref$[group];
+        if (v && group !== 'p0neSettings') {
+          openGroup = group;
+          break;
+        }
+      }
+      d = {
+        open: d.groupToggles.p0neSettings,
+        openGroup: openGroup,
+        expert: d.expert,
+        largeSettingsPanel: false
+      };
+    });
+    migrated(dest);
+    migrate();
   }
 })();
 function editLocalStorage(moduleName, cb){

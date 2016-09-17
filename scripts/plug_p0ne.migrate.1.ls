@@ -1022,6 +1022,19 @@ do migrate=!->
                     localforage .setItem \p0ne_customColors, d, !->
                         migrated dest
                         migrate!
+    | compareVersions v, dest=\1.8.8.2 =>
+        localforage.removeItem \p0ne_boothAlert
+        editLocalforage \p0neSettings, (d) !->
+            for group, v of d.groupToggles when v and group != \p0neSettings
+                openGroup = group; break
+            d =
+                open: d.groupToggles.p0neSettings
+                openGroup: openGroup
+                expert: d.expert
+                largeSettingsPanel: false
+
+        migrated dest
+        migrate!
 
 
     #| compareVersions v, dest=\1.6.0 =>
@@ -1046,6 +1059,8 @@ function editLocalforage moduleName, cb
         return console.error "failed to read '#moduleName' using localforage" if err
         try
             return false if not data
+            # if no module data is present, we likely don't want to modify it,
+            # as the module will default it itself
             cb data
             localforage.setItem "p0ne_#moduleName", data
             return true

@@ -3,6 +3,14 @@
 \*=====================*/
 
 /*@source p0ne.customcolors.picker.ls */
+/**
+ * settings panel for the Custom Colors module for plug_p0ne
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+*/
+console.log "~~~~~~~ p0ne.customcolors.picker ~~~~~~~"
 /*
     user data format
     user = {
