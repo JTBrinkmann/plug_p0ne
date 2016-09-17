@@ -56,7 +56,7 @@ module \songNotif, do
                         .text modUsername
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=19"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?v=#{p0ne.version}"
 
 
         #== show current song ==

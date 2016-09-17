@@ -6,30 +6,31 @@
  *
  * @author jtbrinkmann aka. Brinkie Pie
  * @license MIT License
- * @copyright (c) 2015 J.-T. Brinkmann
+ * @copyright (c) 2014-2015 J.-T. Brinkmann
  *
  * further credits go to
  *     the plugCubed Team - for coining a standard for the "Custom Room Settings"
- *     Christian Petersen - for the toggle boxes in the settings menu http://codepen.io/cbp/pen/FLdjI/
  *     all the beta testers! <3
  *     plug.dj - for it's horribly broken implementation of everything.
  *               "If it wasn't THAT broken, I wouldn't have had as much fun in coding plug_p0ne"
  *                   --Brinkie Pie (2015)
  *
  * The following 3rd party scripts are used:
- *     - pieroxy's lz-string https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
- *     - Mozilla's localforage.min.js https://github.com/mozilla/localforage (Apache License v2.0)
+ *     - pieroxy's      lz-string    https://github.com/pieroxy/lz-string (DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
+ *     - Mozilla's      localforage  https://github.com/mozilla/localforage (Apache License v2.0)
  *     - Stefan Petre's Color Picker http://www.eyecon.ro/colorpicker/ (Dual licensed under the MIT and GPL licenses)
  *
  * The following are not used by plug_p0ne, but provided for usage in the console, for easier debugging
  *     - Oliver Steele's lambda.js https://github.com/fschaefer/Lambda.js (MIT License)
+ *     - SteamDev's      zClip     http://steamdev.com/zclip/ (MIT license)
+ *         - using Marcus Handa & Isaac Durazo's ZeroClipboard http://zeroclipboard.org/ (MIT License)
  *
  * Not happy with plug_p0ne? contact me (the developer) at brinkiepie@gmail.com
  * great alternative plug.dj scripts are
+ *     - RCS       (best alternative I could recommend - https://radiant.dj/rcs )
  *     - TastyPlug (relatively lightweight but does a good job - https://fungustime.pw/tastyplug/ )
- *     - RCS (best alternative I could recommend - https://radiant.dj/rcs )
- *     - plugCubed (does a lot of things, but breaks on plug.dj updates - https://plugcubed.net/ )
- *     - plugplug (lightweight as heck - https://bitbucket.org/mateon1/plugplug/ )
+ *     - plugCubed (does a lot of things, but breaks often and doesn't seem to be actively developed anymore - https://plugcubed.net/ )
+ *     - plugplug  (lightweight as heck - https://bitbucket.org/mateon1/plugplug/ )
  */
 
 console.info "~~~~~~~~~~~~ plug_p0ne loading ~~~~~~~~~~~~"
@@ -37,7 +38,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.8.2
+    version: \1.8.9
     lastCompatibleVersion: \1.8.8.2 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -83,6 +84,11 @@ window.compareVersions = (a, b) !-> /* returns whether `a` is greater-or-equal t
         return a[i] > b[i]
     return b.length >= a.length
 
+
+errors = warnings = 0
+error_ = console.error; console.error = !-> errors++; error_ ...
+warn_ = console.warn; console.warn = !-> warnings++; warn_ ...
+
 API?.enabled = true # to make plug_p0ne work for guests
 <-      (fn__) !->
     if window.P0NE_UPDATE
@@ -99,7 +105,12 @@ API?.enabled = true # to make plug_p0ne work for guests
         try
             fn__!
         catch err
+            console.error = error_; console.warn = warn_
             console.groupEnd!;console.groupEnd!;console.groupEnd!
+            console.error "[plug_p0ne fatal error]" err
+            console.error "[p0ne] There have been #errors (other) errors" if errors
+            console.warn "[p0ne] There have been #warnings warnings" if warnings
+
             API.chatLog("failed to load plug_p0ne: fatal error")
             #ToDo upload error stack to pastebin
             #ToDo auto bug reporting
@@ -115,7 +126,7 @@ API?.enabled = true # to make plug_p0ne work for guests
                 that .open \_localforage_spec_test, 1
                     ..onsuccess = !->
                         fn_!
-                    ..onerror = ..onblocked = ..onupgradeneededd = (err) !->
+                    ..onerror = ..onblocked = ..onupgradeneeded = (err) !->
                         # fall back to localStorage
                         delete! [window.indexedDB, window.webkitIndexedDB, window.mozIndexedDB, window.OIndexedDB, window.msIndexedDB]
                         console.error "[p0ne] indexDB doesn't work, falling back to localStorage", err
@@ -139,18 +150,14 @@ API?.enabled = true # to make plug_p0ne work for guests
         # incompatible, load migration script and continue when it's done
         console.warn "[p0ne] obsolete p0ne version detected (#v < #{p0ne.lastCompatibleVersion}), loading migration script…"
         API.off \p0ne_migrated
-        API.once \p0ne_migrated, onMigrated = (newVersion) !->
+        API.on \p0ne_migrated, onMigrated = (newVersion) !->
             if newVersion == p0ne.lastCompatibleVersion
+                API.off \p0ne_migrated, onMigrated
                 fn!
-            else
-                API.once \p0ne_migrated, onMigrated # did you mean "recursion"?
         $.getScript "#{p0ne.host}/scripts/plug_p0ne.migrate.#{v.substr(0,v.indexOf(\.))}.js?from=#v&to=#{p0ne.version}"
 
 /* start of fn_ */
 /* if needed, this function is called once plug_p0ne successfully migrated. Otherwise it gets called right away */
-errors = warnings = 0
-error_ = console.error; console.error = !-> errors++; error_ ...
-warn_ = console.warn; console.warn = !-> warnings++; warn_ ...
 
 if console.groupCollapsed
     console.groupCollapsed "[p0ne] initializing… (click on this message to expand/collapse the group)"

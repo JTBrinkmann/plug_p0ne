@@ -12,12 +12,14 @@
    These are all conbined into this one module to avoid conflicts
    and due to them sharing a lot of code
 */
+/*####################################
+#           STREAM SETTINGS          #
+####################################*/
 module \streamSettings, do
     settings: \dev
     displayName: 'Stream-Settings'
     require: <[ app Playback currentMedia database _$context ]>
     optional: <[ database plugUrls ]>
-    audioOnly: false
     _settings:
         audioOnly: false
     setup: ({addListener, replace, revert, replaceListener, $create, css}, streamSettings, m_) !->

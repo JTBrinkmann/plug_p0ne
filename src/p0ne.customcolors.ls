@@ -113,7 +113,7 @@ module \customColors, do
 
     settingsPanel: ($wrapper) !->
         $wrapper .text "loading…"
-        loadModule \customColorsPicker, "#{p0ne.host}/scripts/p0ne.customcolors.picker.js?r=1"
+        loadModule \customColorsPicker, "#{p0ne.host}/scripts/p0ne.customcolors.picker.js?v=#{p0ne.version}"
             .then (ccp) !~>
                 console.log "[ccp]", ccp
                 ccp.disable!.enable!

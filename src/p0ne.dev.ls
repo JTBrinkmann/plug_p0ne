@@ -81,7 +81,8 @@ module \logEventsToConsole, do
             ctx = API
             chatEvnt = \chat
         addListener \early, ctx, chatEvnt, (data) !->
-            message = cleanMessage data.originalMessage || data.message
+            message = cleanMessage(data.originalMessage || data.message)
+                .replace /%/g, "%%"
             if data.un
                 name = data.un .replace(/\u202e/g, '\\u202e') |> collapseWhitespace
                 name = " " * (24 - name.length) + name |> stripHTML

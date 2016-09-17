@@ -344,6 +344,30 @@ window <<<<
 
     generateID: !-> return (~~(Math.random!*0xFFFFFF)) .toString(16).toUpperCase!
 
+    naturalSorter: do !->
+        regexp = /(\.\d+)|(\d+(\.\d+)?)|([^\d.]+)|(\.\D+)|(\.$)/g
+        # based on http://stackoverflow.com/a/2802804
+        return (as, bs) !->
+            i = 0
+            return 0 if as == bs
+            a = as.toLowerCase!.match(regexp)
+            b = bs.toLowerCase!.match(regexp)
+            for i from 0 til a.length
+                return +1 if not b[i]
+                a1= a[i]
+                b1= b[i++]
+                if a1 != b1
+                    n = a1 - b1
+                    return do
+                        if isNaN(n)
+                            if a1>b1
+                                +1
+                            else
+                                -1
+                        else
+                            n
+            return if b[i] then -1 else 0
+
 
 
     getUser: (user) !->
@@ -832,6 +856,9 @@ window <<<<
 
         return def.promise!
 
+    mediaPreview: (mediaObj) !->
+        _$context.trigger(PreviewEvent.PREVIEW, new PreviewEvent(PreviewEvent.PREVIEW, new Backbone.Model(mediaObj)))
+
     # https://www.youtube.com/annotations_invideo?video_id=gkp9ohUPIuo
     # AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH,ER,ES,ET,FI,FJ,FK,FM,FO,FR,GA,GB,GD,GE,GF,GG,GH,GI,GL,GM,GN,GP,GQ,GR,GS,GT,GU,GW,GY,HK,HM,HN,HR,HT,HU,ID,IE,IL,IM,IN,IO,IQ,IR,IS,IT,JE,JM,JO,JP,KE,KG,KH,KI,KM,KN,KP,KR,KW,KY,KZ,LA,LB,LC,LI,LK,LR,LS,LT,LU,LV,LY,MA,MC,MD,ME,MF,MG,MH,MK,ML,MM,MN,MO,MP,MQ,MR,MS,MT,MU,MV,MW,MX,MY,MZ,NA,NC,NE,NF,NG,NI,NL,NO,NP,NR,NU,NZ,OM,PA,PE,PF,PG,PH,PK,PL,PM,PN,PR,PS,PT,PW,PY,QA,RE,RO,RS,RU,RW,SA,SB,SC,SD,SE,SG,SH,SI,SJ,SK,SL,SM,SN,SO,SR,SS,ST,SV,SX,SY,SZ,TC,TD,TF,TG,TH,TJ,TK,TL,TM,TN,TO,TR,TT,TV,TW,TZ,UA,UG,UM,US,UY,UZ,VA,VC,VE,VG,VI,VN,VU,WF,WS,YE,YT,ZA,ZM,ZW
     mediaDownload: do !->
@@ -1167,7 +1194,7 @@ window <<<<
         return msg.isMentionName ?= msg.message.has("@#{user.rawun}") if nameMentionOnly
         fromUser = msg.from ||= getUser(msg) ||{}
         return msg.isMention ?=
-            msg.message.has("@#{user.rawun}")
+            user.rawun and msg.message.has("@#{user.rawun}")
             or fromUser.id != userID and do
                     (fromUser.gRole or fromUser.role >= 4) and msg.message.has("@everyone") # @everyone is co-host+
                     or (fromUser.gRole or fromUser.role >= 2) and do # all other special mentions are bouncer+
@@ -1226,7 +1253,7 @@ window <<<<
             # filter out the best matching name (e.g. "@foobar" would find @foo if @fo, @foo and @fooo are in the room)
             while possibleMatches.length and i < msgLength
                 possibleMatches2 = []; l2 = 0
-                for m in possibleMatches when m.rawun[i] == data.message[offset + i]
+                for m in possibleMatches when m.rawun and m.rawun[i] == data.message[offset + i]
                     if m.rawun.length == i + 1
                         res = m
                     else
@@ -1652,66 +1679,68 @@ for id, m of require.s.contexts._.defined when m
     m.requireID = id
     switch
     | m.ACTIVATE =>
-        moduleName = "ActivateEvent"
+        moduleName = \ActivateEvent
     | m._name == \AlertEvent =>
-        moduleName = "AlertEvent"
+        moduleName = \AlertEvent
     | m.deserializeMedia =>
-        moduleName = "auxiliaries"
+        moduleName = \auxiliaries
     | m.AUDIENCE =>
-        moduleName = "Avatar"
+        moduleName = \Avatar
     | m.getAvatarUrl =>
-        moduleName = "avatarAuxiliaries"
+        moduleName = \avatarAuxiliaries
     | m.Events =>
-        moduleName = "backbone"
-    | m.sendChat and m != API =>
-        moduleName = "chatAuxiliaries"
+        moduleName = \backbone
+    | m.mutes =>
+        moduleName = \chatAuxiliaries
     | m.updateElapsedBind =>
-        moduleName = "currentMedia"
+        moduleName = \currentMedia
     | m.settings =>
-        moduleName = "database"
+        moduleName = \database
     | m.emojify =>
-        moduleName = "emoticons"
+        moduleName = \emoticons
         m.reversedMap = {[v, k] for k,v of m.map}
     | m.mapEvent =>
-        moduleName = "eventMap"
+        moduleName = \eventMap
     | m.getSize =>
-        moduleName = "Layout"
+        moduleName = \Layout
     | m.canModChat =>
-        moduleName = "permissions"
+        moduleName = \permissions
     | m._read =>
-        moduleName = "playlistCache"
+        moduleName = \playlistCache
     | m.activeMedia =>
-        moduleName = "playlists"
+        moduleName = \playlists
     | m.scThumbnail =>
-        moduleName = "plugUrls"
+        moduleName = \plugUrls
     | m.className == \pop-menu =>
-        moduleName = "popMenu"
-    | \_window of m =>
-        moduleName = "PopoutView"
+        moduleName = \popMenu
     | m.onVideoResize =>
-        moduleName = "roomLoader"
+        moduleName = \roomLoader
     | m.ytSearch =>
-        moduleName = "searchAux"
+        moduleName = \searchAux
     | m._search =>
-        moduleName = "searchManager"
+        moduleName = \searchManager
     | m.settings =>
-        moduleName = "settings"
+        moduleName = \settings
     | m.ack =>
-        moduleName = "socketEvents"
+        moduleName = \socketEvents
     | m.sc =>
-        moduleName = "soundcloud"
+        moduleName = \soundcloud
     | m.identify =>
-        moduleName = "tracker"
+        moduleName = \tracker
     | m.onRole =>
-        moduleName = "users"
+        moduleName = \users
+    | m.PREVIEW =>
+        moduleName = \PreviewEvent
+    | \_window of m =>
+        moduleName = \PopoutView
     | otherwise =>
         switch m.id
         | \playlist-menu =>
-            moduleName = "playlistMenu"
+            moduleName = \playlistMenu
         | \user-lists =>
-            moduleName = "userList"
+            moduleName = \userList
         | \user-rollover =>
-            moduleName = "userRollover"
+            moduleName = \userRollover
         | otherwise =>
             if m._events
                 switch
@@ -1721,48 +1750,48 @@ for id, m of require.s.contexts._.defined when m
             if m.attributes
                 switch
                 | \shouldCycle of m.attributes =>
-                    moduleName = "booth"
+                    moduleName = \booth
                 | \hostID of m.attributes =>
-                    moduleName = "room"
+                    moduleName = \room
                 | \grabbers of m.attributes =>
-                    moduleName = "votes"
+                    moduleName = \votes
             if m::
                 switch
                 | m::id == \dialog-alert =>
-                    moduleName = "DialogAlert"
+                    moduleName = \DialogAlert
                     export Dialog = m.__super__.constructor
                 | m::className == \friends =>
-                    moduleName = "FriendsList"
+                    moduleName = \FriendsList
                 | m::className == \avatars && m::eventName =>
-                    moduleName = "InventoryAvatarPage"
+                    moduleName = \InventoryAvatarPage
                     export InventoryDropdown = new m().dropDown.constructor
                 | m::onPlaylistVisible =>
-                    moduleName = "MediaPanel"
+                    moduleName = \MediaPanel
                 | m::id == \playback =>
-                    moduleName = "Playback"
+                    moduleName = \Playback
                 | m::listClass == \playlist-media =>
-                    moduleName = "PlaylistItemList"
+                    moduleName = \PlaylistItemList
                     export PlaylistItemRow = m::RowClass
                     export PlaylistMediaList = m.__super__.constructor
                 | m::onItemsChange =>
-                    moduleName = "PlaylistListRow"
+                    moduleName = \PlaylistListRow
                 | m::hasOwnProperty \permissionAlert =>
-                    moduleName = "PlugAjax"
+                    moduleName = \PlugAjax
                 | m::listClass == \history and m::hasOwnProperty \listClass =>
-                    moduleName = "RoomHistory"
+                    moduleName = \RoomHistory
                 | m::vote =>
-                    moduleName = "RoomUserRow"
+                    moduleName = \RoomUserRow
                 | m::listClass == \search =>
-                    moduleName = "SearchList"
+                    moduleName = \SearchList
                     export PlaylistMediaList = m.__super__.constructor
                 | m::id == \chat-suggestion != m.__super__.id =>
-                    moduleName = "SuggestionView"
+                    moduleName = \SuggestionView
                 | m::onAvatar =>
-                    moduleName = "WaitlistRow"
+                    moduleName = \WaitlistRow
                 | m::onVideos =>
-                    moduleName = "YtSearchService"
+                    moduleName = \YtSearchService
                 | m::execute?.toString!.has("/media/insert") =>
-                    moduleName = "Curate"
+                    moduleName = \Curate
 
     if moduleName
         if not p0ne_ and window[moduleName]?
@@ -1775,7 +1804,7 @@ for id, m of require.s.contexts._.defined when m
     | m._byId?.admin01 =>
         window.AvatarList = m
     */
-for m in <[ _$context ActivateEvent AlertEvent auxiliaries Avatar avatarAuxiliaries backbone booth chatAuxiliaries Curate currentMedia database DialogAlert emoticons FriendsList InventoryAvatarPage Layout MediaPanel permissions Playback playlistCache PlaylistItemList PlaylistListRow playlistMenu playlists PlugAjax plugUrls popMenu PopoutView room RoomHistory roomLoader RoomUserRow searchAux SearchList searchManager settings socketEvents soundcloud SuggestionView tracker userList userRollover users votes WaitlistRow YtSearchService ]> when not m of window
+for m in <[ _$context ActivateEvent AlertEvent auxiliaries Avatar avatarAuxiliaries backbone booth chatAuxiliaries Curate currentMedia database DialogAlert emoticons FriendsList InventoryAvatarPage Layout MediaPanel permissions Playback PreviewEvent playlistCache PlaylistItemList PlaylistListRow playlistMenu playlists PlugAjax plugUrls popMenu PopoutView room RoomHistory roomLoader RoomUserRow searchAux SearchList searchManager settings socketEvents soundcloud SuggestionView tracker userList userRollover users votes WaitlistRow YtSearchService ]> when not m of window
     console.warn "[require] couldn't require", m
 
 if not DialogAlert?
@@ -1816,11 +1845,6 @@ if user ||= window.user
     user.isStaff = user.role>1 or user.gRole # this is kept up to date in enableModeratorModules in p0ne.moderate
 
 
-#= underscore =
-# this should already be global, but let's be sure to avoid stuff breaking
-# (because apparently at some point it did)
-export _ = require \underscore
-
 #= Lang =
 window.Lang = require \lang/Lang
 # security fix to avoid HTML injection
@@ -1833,9 +1857,9 @@ if app and not (window.chat = app.room.chat) and window._$context
         window.chat = e.context
         break
 
-#======================
-#== CHAT AUXILIARIES ==
-#======================
+/*####################################
+#          CHAT AUXILIARIES          #
+####################################*/
 $cm = $ \#chat-messages
 window <<<<
     get$cm: !->
@@ -1896,8 +1920,7 @@ window <<<<
             $ "<div class='cm p0ne-notif p0ne-notif-small #className'><i class='icon #icon'></i></div>"
                 .append do
                     $ '<div class="msg text">'
-                        .append do
-                            $('<div class=text>')[if isHTML then \html else \text] message
+                        .[if isHTML then \html else \text] message
                         .append getTimestamp!
 
     chatIsAtBottom: !->
@@ -1922,9 +1945,8 @@ window <<<<
             return "<time class='timestamp' datetime='#{d.toISOString!}'>#{pad d.getHours!}:#{pad d.getMinutes!}</time>"
 
 
-
 /*####################################
-#          extend Deferreds          #
+#          EXTEND DEFERREDS          #
 ####################################*/
 # add .timeout(time, fn) to Deferreds and Promises
 replace jQuery, \Deferred, (Deferred_) !-> return !->
@@ -1954,9 +1976,8 @@ replace jQuery, \Deferred, (Deferred_) !-> return !->
                 callback.call this, this if @state! == \pending
 
 
-
 /*####################################
-#     Listener for other Scripts     #
+#     LISTENER FOR OTHER SCRIPTS     #
 ####################################*/
 # plug³
 var rR_
@@ -1995,6 +2016,7 @@ if window.ppSaved
 else
     export ppStop = onLoaded
 
+
 /*####################################
 #          GET PLUG³ VERSION         #
 ####################################*/
@@ -2025,6 +2047,9 @@ window.getPlugCubedVersion = !->
 
 
 
+/*####################################
+#          CONSOLE LOG IMAGE         #
+####################################*/
 # draws an image to the console
 # `src` can be any url, even data-URIs; relative to the current page
 # the optional parameter `customWidth` and `customHeight` need to be in px (integers e.g. `316` for 316px)
