@@ -195,8 +195,6 @@ module \betterChatInput, do
                 .appendTo @$popoutForm
 
 
-
-
 /*####################################
 #            CHAT PLUGIN             #
 ####################################*/
@@ -542,6 +540,9 @@ module \chatInlineImages, do
     */
 
 
+/*####################################
+#           IMAGE LIGHTBOX           #
+####################################*/
 module \imageLightbox, do
     require: <[ chatInlineImages chatDomEvents ]>
     setup: ({addListener, $createPersistent}) !->
@@ -675,55 +676,84 @@ module \imageLightbox, do
 #        \sta.sh :            [/^sta.sh\/[\w:\-]+/, "https://api.plugCubed.net/redirect/da/$&"]
 #        \gfycat.com :        [/^gfycat.com\/(.+)/, "https://api.plugCubed.net/redirect/gfycat/$1"]
 
-/*
+
+/*####################################
+#            YT THUMBNAILS           #
+####################################*/
 module \chatYoutubeThumbnails, do
+    displayName: 'Youtube Links to Thumbnails'
     settings: \chat
     help: '''
         Convert show thumbnails of linked Youtube videos in the chat.
         When hovering the thumbnail, it will animate, alternating between three frames of the video.
     '''
-    setup: ({add, addListener}) !->
-        addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) !~>
-            clearInterval @interval
-            img = this
-            id = this.parentElement
+    setup: ({add, addListener}, chatYoutubeThumbnails) !->
+        interval = -1
+        frame = 1
+        lastID = ''
+        addListener chatDomEvents, \mouseenter, \.p0ne-yt-img, (e) !->
+            clearInterval interval
+            id = this.parentElement.dataset.ytCid
 
-            if id != @lastID
-                @frame = 1
-                @lastID = id
-            img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-            @interval = repeat 1_000ms, !~>
-                console.log "[p0ne_yt_preview]", "showing 'http://i.ytimg.com/vi/#id/#{@frame}.jpg'"
-                @frame = (@frame % 3) + 1
-                img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/#{@frame}.jpg)"
-            console.log "[p0ne_yt_preview]", "started", e, id, @interval
+            if id != lastID
+                frame := 1
+                lastID := id
+            @style.backgroundImage = "url(https://i.ytimg.com/vi/#id/#frame.jpg)"
+            export interval := repeat 1_000ms, !~>
+                frame := (frame % 3) + 1
+                @style.backgroundImage = "url(https://i.ytimg.com/vi/#id/#frame.jpg)"
+            console.log "[p0ne_yt_preview]", "started", e, id, interval
             #ToDo show YT-options (grab, open, preview, [automute])
 
-        addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) !~>
-            clearInterval @interval
-            img = this
-            id = this.parentElement.dataset.ytCid
-            img.style.backgroundImage = "url(http://i.ytimg.com/vi/#id/0.jpg)"
+        addListener chatDomEvents, \mouseleave, \.p0ne-yt-img, (e) !->
+            clearInterval interval
+            id = @parentElement.dataset.ytCid
+            @style.backgroundImage = "url(https://i.ytimg.com/vi/#id/0.jpg)"
             console.log "[p0ne_yt_preview]", "stopped"
             #ToDo hide YT-options
 
-        addListener API, \p0ne:chat:link, ({pre, url, onload}) !->
-        yt = YT_REGEX .exec(url)
-        if yt and (yt = yt.1)
-            console.log "[inline-img]", "[YouTube #yt] #url ==> http://i.ytimg.com/vi/#yt/0.jpg"
-            return "
-                <a class=p0ne-yt data-yt-cid='#yt' #pre>
-                    <div class=p0ne-yt-icon></div>
-                    <div class=p0ne-yt-img #onload style='background-image:url(http://i.ytimg.com/vi/#yt/0.jpg)'></div>
-                    #url
-                </a>
-            " # no `onerror` on purpose # when updating the HTML, check if it breaks the animation callback
-            # default.jpg for smaller thumbnail; 0.jpg for big thumbnail; 1.jpg, 2.jpg, 3.jpg for previews
-        return false
-    interval: -1
-    frame: 1
-    lastID: ''
-*/
+        addListener API, \p0ne:chat:link, ({pre, protocol, url, onload}) !->
+            yt = YT_REGEX .exec(protocol+url)
+            if yt and (yt = yt.1)
+                console.log "[inline-img]", "[YouTube #yt] #url ==> https://i.ytimg.com/vi/#yt/default.jpg"
+                if window.mediaLookupCache[yt]
+                    media = auxiliaries.authorTitle(that.title)
+                    media.author ||= that.uploader.name
+                else
+                    media = {title: 'loading…', author: 'loading…'}
+                    mediaLookup yt, (data) !->
+                        media := auxiliaries.authorTitle(data.title)
+                        media.author ||= data.uploader.name
+                        get$cms! .find ".p0ne-yt[data-yt-cid='#yt']"
+                            ..find \.song-title
+                                .text media.title
+                                .attr \title, media.title
+                            ..find \.song-author
+                                .text media.author
+                                .attr \title, media.author
+                return "
+                    <a class=p0ne-yt data-yt-cid='#yt' #pre>
+                        <div class=p0ne-yt-img #onload style='background-image:url(https://i.ytimg.com/vi/#yt/default.jpg)'></div>
+                        <div class=p0ne-yt-icon></div>
+                        <b class='song-title'>#{media.title}</b>
+                        <span class='song-author'>#{media.author}</span>
+                        #url
+                    </a>
+                "
+            return false
+
+        addListener chatDomEvents, \click, \.p0ne-yt, (e) !->
+            e.preventDefault!
+            $this = $(this)
+            mediaPreview do
+                format: 1
+                author: $this .find \.song-author .text!
+                title: $this .find \.song-title .text!
+                cid: $this .data \yt-cid
+
+        @disableLate = !->
+            clearInterval(interval)
+
 
 
 /*####################################

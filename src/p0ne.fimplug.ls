@@ -176,6 +176,7 @@ module \fimstats, do
                         $el .html res.html
                     .fail (err) !->
                         $el .html err.html
+                @checkUnplayed?(d.dj)
 
             else
                 $el.html ""
@@ -203,18 +204,19 @@ module \fimstats, do
         if app? and playlists?
             $yourNextMedia = $ \#your-next-media
 
-            @checkUnplayed = !->
+            @checkUnplayed = (dj) !->
                 $yourNextMedia .removeClass \p0ne-fimstats-unplayed
-                if fimstats._settings.highlightUnplayed and playlists.activeMedia.length > 0
-                    console.log "[fimstats] checking next song", playlists.activeMedia.0
-                    fimstats playlists.activeMedia.0 .then (d) !->
-                        if d.unplayed
+                i = +((dj || API.getDJ!)?.id == userID)
+                if fimstats._settings.highlightUnplayed and playlists.activeMedia.length >= i
+                    console.log "[fimstats] checking next song", playlists.activeMedia[i]
+                    fimstats playlists.activeMedia[i]
+                        .then (d) !-> if d.unplayed
                             $yourNextMedia .addClass \p0ne-fimstats-unplayed
 
             replace app.footer.playlist, \updateMeta, (uM_) !-> return !->
                 if playlists.activeMedia.length > 0
-                    fimstats.checkUnplayed!
                     uM_ ...
+                    fimstats.checkUnplayed!
                 else
                     clearTimeout @updateMetaBind
             replace app.footer.playlist, \updateMetaBind, !-> return app.footer.playlist~updateMeta

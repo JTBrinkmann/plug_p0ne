@@ -309,13 +309,14 @@ require <[ sockjs ]>, (SockJS) !->
             */
 
             #== patch Avatar Selection ==
+            var $vanillaAvatarCell
             for Cell in window.Cells
                 # highlight the user's vanilla avatar (if the user has a custom avatar)
                 replace Cell::, \render, (r_) !-> return !->
                     r_.call this
                     if customAvatars._settings.avatarID != customAvatars._settings.vanillaAvatarID and customAvatars._settings.vanillaAvatarID == @model.get \id
-                        @$el .find \.top
-                            .append "<div class=p0ne-vanilla-avatar-highlight>your vanilla avatar</div>"
+                        $vanillaAvatarCell := $ "<div class=p0ne-vanilla-avatar-highlight>your vanilla avatar</div>"
+                            .appendTo(@$el .find \.top)
 
                 # propagate custom avatar selection to ppCAS
                 replace Cell::, \onClick, (oC_) !-> return !->
@@ -324,14 +325,24 @@ require <[ sockjs ]>, (SockJS) !->
                     if not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
                         # if avatatar is in the Inventory or not bought, properly select it
                         oC_ ...
+                        user_.set \vanillaAvatarID, customAvatars._settings.vanillaAvatarID=avatarID
                         customAvatars.socket? .emit \changeAvatarID, null
                     else
                         # if not, hax-apply it
-                        customAvatars.socket? .emit \changeAvatarID, avatarID
                         customAvatars.changeAvatar(userID, avatarID)
+                        customAvatars.socket? .emit \changeAvatarID, avatarID
                         @onSelected!
 
-            # - get avatars in inventory -
+            addListener user_, \change:vanillaAvatarID, (user_, newAvatarID) !->
+                $vanillaAvatarCell? .remove!
+                if view = app?.user.view?.view
+                    for cell in view.cells ||[] when cell.model.id == newAvatarID
+                        $vanillaAvatarCell := $ "<div class=p0ne-vanilla-avatar-highlight>your vanilla avatar</div>"
+                            .appendTo(cell.$el .find \.top)
+                        break
+            user_.set \vanillaAvatarID, @_settings.vanillaAvatarID
+
+            #- get avatars in inventory -
             $.ajax do
                 url: '/_/store/inventory/avatars'
                 success: (d) !~>
@@ -530,17 +541,18 @@ require <[ sockjs ]>, (SockJS) !->
 
             @socket.on \disconnected, (reason) !~>
                 @socket.trigger \close, reason
-            @socket.on \close, (reason) !->
-                console.warn "#{getTime!} [ppCAS] connection closed", reason
-                reconnect := false
             @socket.onclose = (e) !~>
+                reconnect := false
                 console.warn "#{getTime!} [ppCAS] DISCONNECTED", e
                 _$context.trigger \ppCAS:disconnected
                 API.trigger \ppCAS:disconnected
                 /*if e.wasClean
                     reconnect := false
                 else*/ if reconnect and not @disabled
-                    timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps)
+                    if @connectAttemps < 90
+                        timeout = ~~((5_000ms + Math.random!*5_000ms)*@connectAttemps*@connectAttemps)
+                    else
+                        timeout = 15.min
                     console.info "#{getTime!} [ppCAS] reconnecting in #{humanTime timeout} (#{xth @connectAttemps} attempt)"
                     @reconnectTimer = sleep timeout, !~>
                         console.log "#{getTime!} [ppCAS] reconnecting…"
@@ -601,3 +613,4 @@ require <[ sockjs ]>, (SockJS) !->
         disable: !->
             if @$footerAvi
                 @$footerAvi .css borderColor: ''
+            $ \.p0ne-vanilla-avatar-highlight .remove!

@@ -6,6 +6,10 @@
  * @copyright (c) 2015 J.-T. Brinkmann
  */
 console.log "~~~~~~~ p0ne.module ~~~~~~~"
+
+/*####################################
+#               MODULE               #
+####################################*/
 window.module = (moduleName, data) !->
     try
         # setup(helperFNs, module, args)
@@ -33,10 +37,8 @@ window.module = (moduleName, data) !->
             else
                 console.warn "#{getTime!} [#moduleName] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
                 module = data
-            console.log "[test] 3", moduleName, module.moduleName
         else
             module = data
-            console.log "[test] 4", moduleName, module.moduleName
         module.displayName = displayName ||= moduleName
 
 
@@ -197,9 +199,6 @@ window.module = (moduleName, data) !->
                         $el .remove!
                     for m in p0ne.dependencies[moduleName] ||[]
                         m.disable!
-
-                    @_$settingsPanel?.wrapper.remove!
-                    delete @_$settingsPanel
 
                     disabledModules[moduleName] = true if not module.modDisabled and not temp
                     if not newModule

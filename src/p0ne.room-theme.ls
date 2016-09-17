@@ -128,12 +128,14 @@ module \roomTheme, do
                     styles += """
                         \#app { background: url(#{d.images.background}) fixed center center / cover }
                         .room-background { display: none }\n
+                        .torch { display: none !important; }\n
                     """
 
                     /* original plug³ stuff */
                 else if isURL(d.images.background)
                     styles += """
                         .room-background { background-image: url(#{d.images.background}) !important; }\n
+                        .torch { display: none !important; }\n
                     """
                 if isURL(d.images.playback) and roomLoader? and Layout?
                     new Image

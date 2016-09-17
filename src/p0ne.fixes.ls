@@ -41,6 +41,7 @@ module \simpleFixes, do
     disable: !->
         @scm? .insertAfter \#playlist-panel
 
+
 /*####################################
 #           USE P0 GAPI KEY          #
 ####################################*/
@@ -54,6 +55,7 @@ module \p0neGapiKey, do
     disableLate: !->
         gapi.client.setApiKey(gapi.client.key)
 
+
 /*####################################
 #        BULLETPROOF ANIMATION       #
 ####################################*/
@@ -66,22 +68,11 @@ module \sandboxAnimation, do
             catch err
                 console.error err.messageAndStack
 
-# This fixes the current media reloading on socket reconnects, even if the song didn't change
-/* NOT WORKING
-module \fixMediaReload, do
-    require: <[ currentMedia ]>
-    setup: ({replace}) !->
-        replace currentMedia, \set, (s_) !-> return (a, b) !->
-            if a.historyID and a.historyID == @get \historyID
-                console.log "avoid force-reloading current song"
-                return this
-            else
-                return s_.call this, a, b
 
-replaced with:
-*/
-/*
-module \fixPseudoAdvance, do
+/*####################################
+#       PREVENT DOUBLE ADVANCES      #
+####################################*/
+module \fixDoubleAdvances, do
     require: <[ socketEvents ]>
     setup: ({replace}) !->
         var lastHistoryID
@@ -90,9 +81,11 @@ module \fixPseudoAdvance, do
                 # only trigger `advance()` if the historyID differs from the current one
                 lastHistoryID := data.h
                 return a_.call(this, data)
-*/
 
 
+/*####################################
+#        FIX MEDIA THUMBNAILS        #
+####################################*/
 module \fixMediaThumbnails, do
     require: <[ auxiliaries ]>
     help: '''
@@ -116,6 +109,9 @@ module \fixMediaThumbnails, do
                     #    e.image = "https://i.ytimg.com/vi_webp/#{e.cid}/sddefault.webp
 
 
+/*####################################
+#            FIX GHOSTING            #
+####################################*/
 module \fixGhosting, do
     displayName: 'Fix Ghosting'
     require: <[ PlugAjax ]>
@@ -192,6 +188,9 @@ module \fixGhosting, do
                                 rejoining := false
 
 
+/*####################################
+#        FIX OTHERS GHOSTING         #
+####################################*/
 module \fixOthersGhosting, do
     require: <[ users socketEvents ]>
     displayName: "Fix Other Users Ghosting"
@@ -225,6 +224,9 @@ module \fixOthersGhosting, do
                     console.error "[fixOthersGhosting] cannot load user data:", status, data
 
 
+/*####################################
+#            FIX STUCK DJ            #
+####################################*/
 module \fixStuckDJ, do
     require: <[ socketEvents ]>
     optional: <[ votes ]>
@@ -288,6 +290,9 @@ module \fixStuckDJ, do
                     chatWarn "fixed DJ not advancing", "p0ne" if @_settings.verbose and showWarning
 
 
+/*####################################
+#         FIX PLAYLIST CYCLE         #
+####################################*/
 /*
 module \fixNoPlaylistCycle, do
     require: <[ _$context ActivateEvent ]>
@@ -317,6 +322,10 @@ module \fixNoPlaylistCycle, do
         * /
 */
 
+
+/*####################################
+#         FIX STUCK DJ BUTTON        #
+####################################*/
 module \fixStuckDJButton, do
     settings: \fixes
     displayName: 'Fix Stuck DJ Button'
@@ -340,6 +349,9 @@ module \fixStuckDJButton, do
                                 forceJoin!
 
 
+/*####################################
+#              ZALGO FIX             #
+####################################*/
 module \zalgoFix, do
     settings: \fixes
     displayName: 'Fix Zalgo Messages'
@@ -355,7 +367,9 @@ module \zalgoFix, do
         '
 
 
-
+/*####################################
+#           WARN ON ADBLOCK          #
+####################################*/
 module \warnOnAdblockPopoutBlock, do
     require: <[ PopoutListener ]>
     setup: ({addListener}) !->
@@ -372,6 +386,9 @@ module \warnOnAdblockPopoutBlock, do
                     warningShown := false
 
 
+/*####################################
+#           CHAT EMOJI FIX           #
+####################################*/
 /*module \chatEmojiPolyfill, do
     require: <[ users ]>
     #optional: <[ chatPlugin socketEvents database ]> defined later
@@ -478,6 +495,10 @@ module \warnOnAdblockPopoutBlock, do
             user.rawun = @originalNames[userID]
 */
 
+
+/*####################################
+#        STOP SUBSCRIBER SPAM        #
+####################################*/
 module \stopSubscriberSpam, do
     displayName: "Stop Subscriber Spam"
     settings: \fixes
@@ -566,6 +587,10 @@ module \ytPagedSearch, do
                 @errorBind
             #window.ga and window.ga("send", "event", "Search")
 
+
+/*####################################
+#            FIX PLAYLIST            #
+####################################*/
 module \fixPlaylists, do
     help: '
         This fixes some issues with the playlist drawer.
@@ -583,11 +608,20 @@ module \fixPlaylists, do
 
         playlists?.sort! # force redrawing
 
+
+/*####################################
+#          FIX POPOUT CLOSE          #
+####################################*/
 module \fixPopoutChatClose, do
     require: <[ PopoutListener ]>
     setup: ({addListener}) !->
         addListener API, \popout:open, (window_) !->
             window_.onbeforeunload = PopoutView~close
+
+
+/*####################################
+#            FIX NULL USER           #
+####################################*/
 /*
 module \fixNullUser, do
     settings: \fixes
@@ -609,6 +643,10 @@ module \fixNullUser, do
                         cb(u)
 */
 
+
+/*####################################
+#           PL CACHE UPDATE          #
+####################################*/
 module \playlistCacheUpdate, do
     require: <[ playlistCache playlistCachePatch eventMap ]>
     setup: ({replace}) !->

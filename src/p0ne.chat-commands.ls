@@ -169,7 +169,7 @@ module \chatCommands, do
         automute:
             parameters: " [add|remove]"
             description: "adds/removes this song from the automute list"
-            callback:  !->
+            callback: (c) !->
                 muteonce! if API.getVolume! != 0
                 if automute?
                     # see note for /stream

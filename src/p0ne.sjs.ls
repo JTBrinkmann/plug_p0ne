@@ -6,6 +6,7 @@
  * @copyright (c) 2015 J.-T. Brinkmann
  */
 console.log "~~~~~~~ p0ne.socket ~~~~~~~"
+
 /*####################################
 #          SOCKET LISTENERS          #
 ####################################*/
@@ -23,7 +24,12 @@ module \socketListeners, do
             base_url = "wss://godj.plug.dj/socket" # 2015-02-12
         #return if parseURL(window.socket?.url).host.endsWith \plug.dj
         return if window.socket?.url == base_url
+
         onRoomJoinQueue2 = []
+        _$context .on \room:joined, !->
+            forEach(onRoomJoinQueue2)
+            onRoomJoinQueue2 := []
+
         for let event in <[ send dispatchEvent close ]>
             #console.log "[socketListeners] injecting into Socket::#event"
             replace Socket::, event, (e_) !-> return !->
@@ -33,29 +39,16 @@ module \socketListeners, do
                     if window.socket != this and url == base_url #parseURL(url).host.endsWith \plug.dj
                         replace window, \socket, !~> return this
                         replace this, \onmessage, (msg_) !-> return (t) !->
-                            socketListeners.lastHandshake = Date.now!
+                            #socketListeners.lastHandshake = Date.now!
                             return if t.data == \h
 
                             if typeof t.data == \string
                                 data = JSON.parse t.data
                             else
                                 data = t.data ||[]
-
-                            for el in data
-                                _$context.trigger "socket:#{el.a}", el
-
-                            type = data.0?.a
-                            console.warn "[SOCKET:WARNING] socket message format changed", t if not type
-
-                            msg_ ...
-
-                            for el in data
-                                API.trigger "socket:#{el.a}", el
+                            forEach data
 
 
-                        _$context .on \room:joined, !->
-                            while onRoomJoinQueue2.length
-                                forEach onRoomJoinQueue2.shift!
 
                         socket.emit = (e, t, n) !->
                             #if e != \chat
@@ -78,27 +71,29 @@ module \socketListeners, do
                     console.error "error when patching socket", this, err.stack
 
 
-        function onMessage  t
-            if room.get \joined
-                forEach( t.data )
-            else
-                n = []; r = []
-                for e in t.data
-                    if e.s == \dashboard
-                        n[*] = e
-                    else
-                        r[*] = e
-                forEach( n )
-                onRoomJoinQueue2.push( r )
+        function forEach data
+            for el in data
+                if not data.0?.a
+                    console.warn "[SOCKET:WARNING] socket message format changed", t
 
-        function forEach  t
-            for el in t || []
+                # _$context
+                _$context.trigger("socket:#{el.a}", el)
+
+                # queue room events if user is in dashboard
+                if el.s == \dashboard and not room.get(\joined)
+                    onRoomJoinQueue2[*] = r
+
+                # vanilla
                 if socketEvents[ el.a ]
                     try
                         socketEvents[ el.a ]( el.p )
                     catch err
-                        console.error "#{getTime!} [Socket] failed triggering '#{el.a}'", err.stack
-                _$context.trigger "socket:#{el.a}", el
+                        console.error "#{getTime!} [Socket] failed triggering '#{el.a}'", err.messageAndStack
+                else
+                    console.error "#{getTime!} [Socket] unknown event type '#{el.a}'"
+
+                # API
                 API.trigger "socket:#{el.a}", el
+
     disable: !->
         clearInterval @hoofcheck

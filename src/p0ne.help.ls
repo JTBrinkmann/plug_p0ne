@@ -30,6 +30,7 @@ module \p0neHelp, do
         $bar = $ \#now-playing-bar
         $songInfo = $ \.p0ne-song-info
         $footerUser = $ \#footer-user
+        $footerInfo = $footerUser.find \.info
 
         #== create DOM elements ==
         $el = $create "
@@ -353,27 +354,30 @@ module \p0neHelp, do
                         automute.rows[DUMMY_VIDEO.cid] .remove!
 
             !~> # Song Info
-                blinking $bar
                 do addListener $bar, \click, !->
                     if b = $songInfo .hasClass \expanded
+                        blinking $bar
                         $screen .css top: 220px
                         $pSongInfoClosed .hide!; $pSongInfoOpen .show!
                         accomplished!
                     else
+                        blinking $songInfo.find(\.p0ne-song-info-meta)
                         $screen .css top: ""
                         $pSongInfoClosed .show!; $pSongInfoOpen .hide!
                 @screenClose = !~>
                     if $songInfo .hasClass \expanded
                         $bar .click!
                     p0neSettings.toggleMenu(false)
+                    $ '#playlist-button .icon-arrow-down'
+                        .click! # will silently fail if playlist is already open, which is desired
 
             !~> # Info Footer
-                addListener $footerUser, \click, cb = !->
-                    if $footerUser.hasClass \menu
-                        $screen .css right: 20px
-                    else
+                addListener $footerInfo, \click, cb = !->
+                    $screen .css right: 20px
+                    $body.one \click, !->
                         $screen .css right: -330px
-                cb!
+                if $footerUser.hasClass \menu
+                    cb!
 
             !~> # End
             @disable # already bound

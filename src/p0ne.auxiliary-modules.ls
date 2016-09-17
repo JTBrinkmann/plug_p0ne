@@ -95,14 +95,6 @@ module \chatDomEvents, do
                 console.log "[chatDomEvents] adding listener", cm, cb
                 cm .on .apply cm, cb
 
-module \grabEvent, do
-    require: <[ votes ]>
-    setup: ({replace}) !->
-        replace votes, \grab, (g_) !-> return (uid) !->
-            _$context?.trigger \p0ne:vote:grab, getUser(uid)
-            g_.call(this, uid)
-            API.trigger \p0ne:vote:grab, getUser(uid)
-
 module \playlistCachePatch, do
     require: <[ playlistCache ]>
     setup: ({replace}) !->
@@ -121,6 +113,14 @@ module \playlistCacheEvent, do
             mU_ .call this, playlistID
             _$context?.trigger \p0ne:playlistCache:update, playlistID
             API.trigger \p0ne:playlistCache:update, playlistID
+
+module \grabEvent, do
+    require: <[ votes ]>
+    setup: ({replace}) !->
+        replace votes, \grab, (g_) !-> return (uid) !->
+            _$context?.trigger \p0ne:vote:grab, getUser(uid)
+            g_.call(this, uid)
+            API.trigger \p0ne:vote:grab, getUser(uid)
 
 module \grabMedia, do
     require: <[ playlists auxiliaries ]>
@@ -178,7 +178,6 @@ module \grabMedia, do
                     def.reject \ajaxError, err
 
 
-
 /*####################################
 #            ROOM  HELPER            #
 ####################################*/
@@ -195,6 +194,7 @@ module \p0neModuleRoomSettingsLoader, do
                         m.enable!
                 else
                     m.enable!
+
 
 /*####################################
 #             CUSTOM CSS             #

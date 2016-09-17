@@ -95,68 +95,6 @@ module \autojoin, do
             @disable!
 
 
-
-/*module \autojoin, do
-    displayName: "Autojoin"
-    help: '''
-        Automatically join the waitlist again after you DJ'd or if the waitlist gets unlocked.
-        It will not automatically join if you got removed from the waitlist by a moderator.
-    '''
-    settings: \base
-    settingsVip: true
-    disabled: true
-    disableCommand: true
-    optional: <[ _$context booth ]>
-    setup: ({addListener}) !->
-        wlPos = API.getWaitListPosition!
-        if wlPos == -1
-            @autojoin!
-        else if API.getDJ!?.id == userID
-            API.once \advance, @autojoin, this
-
-        # regular autojoin
-        addListener API, \advance, !~>
-            if API.getDJ!?.id == userID # if user is the current DJ, delay autojoin until next advance
-                API.once \advance, @autojoin, this
-
-        # autojoin on reconnect
-        addListener API, \p0ne:reconnected, !~>
-            if wlPos != -1 # make sure we were actually in the waitlist before autojoining
-                @autojoin!
-
-        $djButton = $ \#dj-button
-        if _$context?
-            # when joining a room
-            addListener _$context, \room:joined, @autojoin, this
-
-            # when DJ booth gets unlocked
-            wasLocked = $djButton.hasClass \is-locked
-            addListener _$context, \djButton:update, !~>
-                isLocked = $djButton.hasClass \is-locked
-                @autojoin! if wasLocked and not isLocked
-                wasLocked := isLocked
-
-        #DEBUG
-        # compare if old logic would have autojoined
-        addListener API, \advance, (d) !~>
-            if d and d.id != userID and API.getWaitListPosition! == -1
-                sleep 5_000ms, !~> if API.getDJ!.id != userID and API.getWaitListPosition! == -1
-                    chatWarn "old algorithm would have autojoined now. Please report about this in the beta tester Skype chat", "plug_p0ne autojoin"
-
-    autojoin: !->
-        if API.getWaitListPosition! == -1 # if user is not in the waitlist yet
-            if join!
-                console.log "#{getTime!} [autojoin] joined waitlist"
-            else
-                console.error "#{getTime!} [autojoin] failed to join waitlist"
-                API.once \advance, @autojoin, this
-        #else # user is already in the waitlsit
-        #    console.log "#{getTime!} [autojoin] already in waitlist"
-
-    disable: !->
-        API.off \advance, @autojoin
-*/
-
 /*####################################
 #             AUTOWOOT               #
 ####################################*/
@@ -571,10 +509,11 @@ module \chatDblclick2Mention, do
     settings: \chat
     displayName: 'DblClick username to Mention'
     setup: ({replace, addListener}, chatDblclick2Mention) !->
+        $appRight = $ \.app-right
         newFromClick = (e) !->
             # after a click, wait 0.2s
             # if the user clicks again, consider it a double click
-            # otherwise fall back to default behaviour (show user rollover) 
+            # otherwise fall back to default behaviour (show user rollover)
             e .stopPropagation!; e .preventDefault!
 
             # single click
@@ -583,10 +522,14 @@ module \chatDblclick2Mention, do
                     try
                         chatDblclick2Mention.timer = 0
                         $this = $ this
-                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || ($this .data \uid) || (i = getUserInternal $this.text!)?.id
+                        if text = $this.find(\.name)
+                            text = text.text!
+                        else
+                            text = $this.text!
+                        if r = ($this .closest \.cm .children \.badge-box .data \uid) || ($this .data \uid) || (i = getUserInternal text)?.id
                             pos =
-                                x: chat.getPosX!
-                                y: $this .offset!.top
+                                x: $appRight.offset!.left
+                                y: $this .offset!.top >? 0
                             if i ||= getUserInternal(r)
                                 chat.onShowChatUser i, pos
                             else
@@ -600,35 +543,49 @@ module \chatDblclick2Mention, do
             else
                 clearTimeout chatDblclick2Mention.timer
                 chatDblclick2Mention.timer = 0
+                name = e.target.textContent
+                if name.0 == "@"
+                    name .= substr 1
                 (PopoutView?.chat || chat).onInputMention e.target.textContent
 
-        for [ctx, $el, attr, boundAttr] in [ [chat, get$cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
+        $cms = get$cms!
+        for [ctx, $el, attr, boundAttr] in [ [chat, $cms.find(\.un), \onFromClick, \fromClickBind],  [WaitlistRow::, $('#waitlist .user'), \onDJClick, \clickBind],  [RoomUserRow::, $('#user-lists .user'), \onClick, \clickBind] ]
             # remove individual event listeners (we use a delegated event listener below)
             # setting them to `$.noop` will prevent .bind to break
             #replace ctx, attr, !-> return $.noop
             # setting them to `null` will make `.on("click", …)` in the vanilla code do nothing (this requires the underscore.bind fix)
             replace ctx, attr, noop
             if ctx[boundAttr]
-                replace ctx, boundAttr, !-> noop
+                replace ctx, boundAttr, noop
 
             # update DOM event listeners
             $el .off \click, ctx[boundAttr]
 
+        replace WaitlistRow::, \draw, (d_) !-> return !->
+            d_.call(this)
+            @$el.attr \uid, @model.id
+        replace RoomUserRow::, \draw, (d_) !-> return !->
+            d_.call(this)
+            @$el.attr \uid, @model.id
 
         # instead of individual event listeners, we use a delegated event (which offers better performance)
         addListener chatDomEvents, \click, \.un, newFromClick
-        addListener $body, \click, '.p0ne-name, .app-right .name', newFromClick
+        addListener $body, \click, '.p0ne-name, #user-lists .user, #waitlist .user, .friends .row', newFromClick
         #                                                       , #history-panel .name
 
         function noop
             return null
 
-    disableLate: !->
+    disableLate: (,newModule) !->
         # note: here we actually have to pay attention as to what to re-enable
         for attr, [ctx, $el] of {fromClickBind: [chat, get$cms!], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
             $el .find '.mention .un, .message .un, .name'
                 .off \click, ctx[attr] # if for some reason it is already re-assigned
                 .on \click, ctx[attr]
+
+        legacyChat = p0ne.modules.legacyChat
+        if not newModule and legacyChat and legacyChat.disabled
+            chatWarn "while #{legacyChat.displayName} is enabled, clicking usernames might not work without #{@displayName}", "plug_p0ne warning"
 
 
 /*####################################
@@ -723,7 +680,6 @@ module \etaTimer, do
         updateETA!
 
         addListener API, \p0ne:stylesLoaded, !-> requestAnimationFrame !->
-            console.info "[TEST stylesLoaded] $eta.width: #{$eta.width!}"
             $nextMediaLabel .css right: $eta.width! - 50px
 
         var lastETA
@@ -782,7 +738,8 @@ module \votelist, do
     disabled: true
     help: '''
         Moving your mouse above the woot/grab/meh icon shows a list of users who have wooted, grabbed or meh'd respectively.
-    '''
+        (note: seeing who has meh'd is for staff-only)
+    ''' #ToDo insert reference link, explaining why seeing mehs are staff-only
     setup: ({addListener, $create}) !->
         $tooltip = $ \#tooltip
         currentFilter = false
@@ -790,20 +747,37 @@ module \votelist, do
         $vl = $create '<div class=p0ne-votelist>'
             .hide!
             .appendTo $vote
+        $rows = {}
+        MAX_ROWS = 30
 
         addListener $(\#woot), \mouseenter, changeFilter 'left: 0', (userlist) !->
-            for u in API.getAudience! when u.vote == +1
+            audience = API.getAudience!
+            i = 0
+            for u in audience when u.vote == +1
                 userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
+                if ++i == MAX_ROWS and audience.length > MAX_ROWS + 1
+                    userlist += "<i title='use the userlist to see all'>and #{audience.length - MAX_ROWS} more</i>"
+                    break
             return userlist
 
         addListener $(\#grab), \mouseenter, changeFilter 'left: 50%; transform: translateX(-50%)', (userlist) !->
-            for u in API.getAudience! when u.grab
+            audience = API.getAudience!
+            i=0
+            for u in audience when u.grab
                 userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
+                if ++i == MAX_ROWS and audience.length > MAX_ROWS + 1
+                    userlist += "<i title='use the userlist to see all'>and #{audience.length - MAX_ROWS} more</i>"
+                    break
             return userlist
 
         addListener $(\#meh), \mouseenter, changeFilter 'right: 0', (userlist) !-> if user.isStaff
-            for u in API.getAudience! when u.vote == -1
+            audience = API.getAudience!
+            i = 0
+            for u in audience when u.vote == -1
                 userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
+                if ++i == MAX_ROWS and audience.length > MAX_ROWS + 1
+                    userlist += "<i title='use the userlist to see all'>and #{audience.length - MAX_ROWS} more</i>"
+                    break
             return userlist
 
 
@@ -812,7 +786,10 @@ module \votelist, do
             $vl.hide!
             $tooltip .show!
 
-        addListener API, \voteUpdate, updateVoteList
+        var timeout
+        addListener API, \voteUpdate, !-> # throttle
+            clearTimeout timeout
+            timeout := sleep 200ms, updateVoteList
 
         function changeFilter styles, filter
             return !->
@@ -862,7 +839,6 @@ module \waitlistUserPopup, do
             @$ '.name, .image' .click @clickBind
 
 
-
 /*####################################
 #            BOOTH  ALERT            #
 ####################################*/
@@ -886,6 +862,10 @@ module \boothAlert, do
                 isNext := false
         fn! if not module_
 
+
+/*####################################
+#          NOTFIY ON GRABBER         #
+####################################*/
 module \notifyOnGrabbers, do
     require: <[ grabEvent ]>
     persistent: <[ grabs notifs ]>
@@ -906,6 +886,7 @@ module \notifyOnGrabbers, do
                     @notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
                         .appendTo @notifs[u.id]
                 @notifs[u.id] .text(++@grabs[u.id])
+
 
 /*####################################
 #         AVOID HISTORY PLAY         #
@@ -947,6 +928,7 @@ module \avoidHistoryPlay, do
         do @checkOnNextAdv = checkOnNextAdv
 */
 
+
 /*####################################
 #         WARN ON PAGE LEAVE         #
 ####################################*/
@@ -960,6 +942,10 @@ module \warnOnPageLeave, do
             # Firefox always shows "This page is asking you to confirm that you want to leave - data you have entered may not be saved. [Leave Page] [Stay on Page]"
             return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under #{@settings .toUpperCase!} > #{@displayName})"
 
+
+/*####################################
+#          NOTIFY ON LVL UP          #
+####################################*/
 module \notifyOnLevelUp, do
     displayName: "Show Friends' Level-Ups"
     settings: \base
@@ -969,6 +955,10 @@ module \notifyOnLevelUp, do
             if p.level and (u = getUser(p.i))?.friend
                 chatWarn "<b>#{formatUserSimple u}</b> just reached level #{p.level}!", "Friend Level-Up", true
 
+
+/*####################################
+#        MAINTENANCE COUNTDOWN       #
+####################################*/
 module \maintenanceCountdown, do
     require: <[ socketListeners ]>
     setup: ({addListener}) !->
@@ -996,6 +986,10 @@ module \maintenanceCountdown, do
             .html ""
             .append $bck
 
+
+/*####################################
+#         PLAYLIST HIGHLIGHT         #
+####################################*/
 module \grabMenuHighlight, do
     require: <[ popMenu playlistCachePatch ]>
     setup: ({replace}) !->
@@ -1008,9 +1002,9 @@ module \grabMenuHighlight, do
         replace popMenu, \drawRow, (dR_) !-> return (e) !->
             row = dR_.call(this, e)
             matches = 0
-            if playlistCache._data.1.p[e.id].items[@media.0.get \cid] # we don't use .get() for performance reasons
+            if playlistCache._data.1.p[e.id]?.items[@media.0.get \cid] # we don't use .get() for performance reasons
                 row.$el.addClass \p0ne-pl-has-media
-            else if playlists?.get(e.id).get(\count) == 200
+            if playlists?.get(e.id).get(\count) == 200
                 row.$el.addClass \p0ne-pl-is-full
 
         replace popMenu, \drawRowBind, !-> return popMenu~drawRow
@@ -1059,6 +1053,10 @@ module \playlistMenuHighlight, do
             delete row.inCache
             row.$el.removeClass \p0ne-pl-cached
 
+
+/*####################################
+#          SKIP WALKTHROUGH          #
+####################################*/
 # skip walkthrough button
 # plug_p0ne users are expected to have used plug at least once
 $ '#walkthrough:not(.wt-p0) .next a' .click!

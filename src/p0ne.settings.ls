@@ -53,6 +53,8 @@ module \p0neSettings, do
         for ,module of p0ne.modules when not module.loading
             @addModule module
             module._$settingsPanel?.wrapper .appendTo $ppM
+            if not module.disabled
+                @loadSettingsExtra true, module
 
 
         #= add DOM event listeners =
@@ -202,25 +204,28 @@ module \p0neSettings, do
         addListener API, \p0ne:moduleUpdated, (module, module_) !~>
             module_._$settingsExtra? .remove!
             module_._$settingsPanel? .remove!
+            delete module_._$settingsPanel
             if module.settings
                 @addModule module, module_
-            else if module_.settings
-                module_._$settings .remove!
-                /* # i think this is a highly neglectable edge case
-                if module.help != module_.help and module._$settings?.is \:hover
-                    # force update .p0ne-settings-popup (which displays the module.help)
-                    module._$settings .mouseover!*/
+            module_._$settings? .remove!
+            /* # i think this is a highly neglectable edge case
+            if module.help != module_.help and module._$settings?.is \:hover
+                # force update .p0ne-settings-popup (which displays the module.help)
+                module._$settings .mouseover!*/
 
         #= module DISABLES =
         addListener API, \p0ne:moduleDisabled, (module_) !~> if module_._$settings
             module_._$settings
                 .removeClass \p0ne-settings-item-enabled
-                .find \.checkbox
+                .find \.checkbox:first
                     .attr \checked, false
             module_._$settingsExtra?
                 .stop!
                 .slideUp !->
                     module_._$settingsExtra .remove!
+            module_._$settingsPanel?.wrapper.remove!
+            delete module_._$settingsPanel
+
 
         addListener $body, \click, \#app-menu, !~> @toggleMenu false
         if _$context?
@@ -282,7 +287,6 @@ module \p0neSettings, do
     moderationGroup: $!
 
     openGroup: (group) !->
-        console.info "[openGroup]", group
         if @_settings.openGroup
             @closeGroup @_settings.openGroup
 
@@ -300,7 +304,6 @@ module \p0neSettings, do
 
 
     closeGroup: (group) !->
-        console.info "[closeGroup]", group, @groups[group], @groups[group]?.0?.scrollHeight
         @_settings.openGroup = false
         $s = @groups[group]
             .removeClass \open
@@ -379,11 +382,6 @@ module \p0neSettings, do
             else
                 module._$settings .appendTo $s.items
 
-            # render extra settings element if module is enabled
-            @loadSettingsExtra false, module if not module.disabled
-
-            if module_
-                module_._$settings? .remove!
 
 
 

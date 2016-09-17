@@ -171,7 +171,7 @@ module \warnOnMehers, do
             if d.vote == -1 and d.user.uid != userID
                 console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
-                    chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML d.user, true} meh'd this song!"
+                    chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML d.user, true} meh'd this song!", true
 
         lastAdvance = 0
         addListener API, \advance, (d) !~>
@@ -181,7 +181,7 @@ module \warnOnMehers, do
                     users[cid] ||= 0
                     if ++users[cid] > @_settings.maxMehs and troll = getUser(cid)
                         # note: the user (`troll`) may have left during this song
-                        chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!"
+                        chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!", true
                 else if d > lastAdvance + 10_000ms
                     delete users[cid]
             if d > lastAdvance + 10_000ms

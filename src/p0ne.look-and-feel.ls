@@ -11,7 +11,7 @@ console.log "~~~~~~~ p0ne.look-and-feel ~~~~~~~"
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=51"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?v=#{p0ne.version}"
 
 /*
 window.moduleStyle = (name, d) !->
@@ -40,7 +40,7 @@ module \fimplugTheme, do
     settings: \look&feel
     disabled: true
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=30"
+        loadStyle "#{p0ne.host}/css/fimplug.css?v=#{p0ne.version}"
 
 
 /*####################################
@@ -118,10 +118,15 @@ module \playlistIconView, do
 
         # opening playlist drawer animation fix
         replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return $.noop
+        for x in _$context._events[\anim:playlist:progress] ||[] when x.ctx.id == \playlist-menu
+            _$context._events[\anim:playlist:progress] = [x]
+            break
         #for e, i in Layout._events.resize when e.callback == pl.list.resizeBind
 
         if pl?.list?.rows
+            # re-initiate the playlist header and list
             pl.show(new pl.header.constructor(), new pl.list.constructor())
+            pl.list.render!
             /*# onResize hook
             replace pl.list, \resizeBind, !-> return _.bind pl.list, \onResize
             for e, i in Layout._events.resize when e.callback == pl.list.resizeBind
@@ -240,12 +245,17 @@ module \videoPlaceholderImage, do
         updatePic media: API.getMedia!
 
         function updatePic d
-            if not d.media
+            if d
+                media = d.media
+            else
+                media = API.getMedia!
+
+            if not media
                 $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
-            else if d.media.format == 1  # YouTube
-                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(https://i.ytimg.com/vi/#{d.media.cid}/0.jpg)"
+            else if media.format == 1  # YouTube
+                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(https://i.ytimg.com/vi/#{media.cid}/0.jpg)"
             else # SoundCloud
-                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
+                $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{media.image})"
     disable: !->
         $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none
 
@@ -272,6 +282,10 @@ module \legacyChat, do
             e.preventDefault!
     disable: !->
         $body .removeClass \legacy-chat
+
+        dblclick2mention = p0ne.modules.dblclick2mention
+        if dblclick2mention and dblclick2mention.disabled
+            chatWarn "while #{@displayName} is enabled, clicking usernames might not work without #{dblclick2mention.displayName}", "plug_p0ne warning"
 
 
 /*####################################
@@ -454,7 +468,7 @@ module \emojiPack, do
             $span .removeClass className
         $span .remove!
 
-        if @value != \apple
+        if @_settings.pack != \apple
             p0neCSS.loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
 
     settingsExtra: ($el) !->
@@ -544,7 +558,7 @@ module \customBackground, do
             if @_settings.scalable
                 @css \customBackground, """
                     \#app { background: url(#{@_settings.background}) fixed center center / cover !important; }\n
-                    .room-background { display: none !important; }\n
+                    .room-background { display: none !important; }
                 """
             else
                 @css \customBackground, """
@@ -552,6 +566,7 @@ module \customBackground, do
                     \#app .app-right { background: #0a0a0a !important; }
                     \#app \#avatars-container::before { content: "" !important; }
                     \#app .room-background { background-image: url(#{@_settings.background}) !important; display: block !important; }\n
+                    .torch { display: none !important; }
                 """
         else
             css \customBackground, ""
