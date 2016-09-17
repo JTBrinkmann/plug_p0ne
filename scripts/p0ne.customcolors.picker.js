@@ -26,7 +26,7 @@ module('customColorsPicker', {
   iconCache: {},
   rows: {},
   setup: function(arg$, ccp){
-    var addListener, css, loadStyle, $create, cc, $el, ref$, ref1$, $roles, $input, i$, len$, roleName, icon, ref2$, d, scopeName, uid, drag_cb, drag_pos, imageDragInitPos, $cp, image, $css, tmpCSS, defaultIconURL, $cpp, $un, $contentName, $contentImage, $nameCustomToggles, $newColor, $currentColor, $crosshair, $huePointer, $hex, $rgb, $hsv, $font, currentColor, customColor, color, colorHSV, font, nameCustomMode, $imageCustomToggles, $snapToGrid, $badgeGroup, $imagePicker, $cloak, $image, badge, scale, imageMode, snapToGrid, imageCustomMode, imagePicker, imageEl, urlUpdateTimeout, scope, key, $row, loadData, updateCSSTimeout, updateCSS, test, this$ = this;
+    var addListener, css, loadStyle, $create, cc, $el, ref$, key, ref1$, $roles, $input, i$, len$, roleName, icon, ref2$, d, scopeName, uid, drag_cb, drag_pos, imageDragInitPos, $cp, image, $css, tmpCSS, defaultIconURL, $cpp, $contentName, $contentImage, $nameCustomToggles, $newColor, $currentColor, $crosshair, $huePointer, $hex, $rgb, $hsv, $font, currentColor, customColor, color, colorHSV, font, nameCustomMode, $imageCustomToggles, $snapToGrid, $badgeGroup, $imagePicker, $cloak, $image, badge, scale, imageMode, snapToGrid, imageCustomMode, imagePicker, imageEl, urlUpdateTimeout, scope, $row, styleDefault, customImage, loadData, updateCSSTimeout, updateCSS, test, this$ = this;
     addListener = arg$.addListener, css = arg$.css, loadStyle = arg$.loadStyle, $create = arg$.$create;
     this.cc = cc = p0ne.modules.customColors;
     $el = cc != null ? (ref$ = cc._$settingsPanel) != null ? ref$.wrapper : void 8 : void 8;
@@ -35,7 +35,7 @@ module('customColorsPicker', {
     }
     this.rows = {};
     this.lang = (ref1$ = clone$(Lang.roles), ref1$.friend = Lang.userList.friend, ref1$.subscriber = Lang.userStatus.subscriber, ref1$.regular = 'Regular', ref1$.you = 'You', ref1$);
-    loadStyle(p0ne.host + "/css/customcolors.css");
+    loadStyle(p0ne.host + "/css/customcolors.css?r=3");
     $el.addClass('p0ne-cc-settings').css({
       left: $('.p0ne-settings').width()
     }).html("<h3>Custom Colours</h3><div class=p0ne-cc-buttons><button class='p0ne-cc-reset-order-btn' disabled>reset order</button><button class='p0ne-cc-reset-all-btn'>reset everything</button></div><div class='p0ne-cc-roles'></div><div class='p0ne-cc-users'><div class=p0ne-cc-user-add><i class='icon icon-add p0ne-cc-user-add-icon'></i><input class='p0ne-settings-input p0ne-cc-user-input' placeholder='new custom user style' /><ul class=p0ne-cc-user-suggestion-list></ul></div></div>");
@@ -104,10 +104,12 @@ module('customColorsPicker', {
         }
         if (removeUserCache) {
           delete cc.users[row_key];
+          delete ccp.rows[row_key];
           $row.remove();
         }
       }
       if (key === row_key) {
+        key = "";
         ccp.close();
       }
       cc.updateCSS();
@@ -130,7 +132,7 @@ module('customColorsPicker', {
       ccp.sugg.updateSuggestions();
     });
     out$.sugg = this.sugg = new SuggestionView();
-    this.sugg.$el.appendTo(this.$add);
+    this.sugg.$el.insertBefore(this.$add.children().first());
     this.sugg.render().on('refocus', function(){
       $input.focus();
     }).on('submitSuggestion', function(){
@@ -173,9 +175,7 @@ module('customColorsPicker', {
     $css = $create('<style>').appendTo('head');
     tmpCSS = true;
     defaultIconURL = getIcon('', true).url;
-    $cp = $('.colorpicker');
     $cpp = $cp.find('.p0ne-ccp-color');
-    $un = $('.p0ne-cc-user .name:last');
     $contentName = $cp.find('.p0ne-ccp-content-name');
     $contentImage = $cp.find('.p0ne-ccp-content-image');
     addListener($cp, 'click', '.p0ne-ccp-tab-name, .p0ne-ccp-tab-icon, .p0ne-ccp-tab-badge', function(e){
@@ -242,7 +242,7 @@ module('customColorsPicker', {
         switch ($(this).data('mode')) {
         case 'default':
           customColor = getHex();
-          $hex.val(currentColor).trigger('input');
+          $hex.val(styleDefault.color).trigger('input');
           nameCustomMode = 'default';
           break;
         case 'custom':
@@ -292,12 +292,12 @@ module('customColorsPicker', {
       if ($this.hasClass('p0ne-ccp-btn-selected')) {
         font[btn] = false;
         $this.removeClass('p0ne-ccp-btn-selected p0ne-ccp-btn-default p0ne-ccp-btn-default-selected');
-      } else if (font[btn] = !$this.hasClass('p0ne-ccp-btn-default')) {
-        delete font[btn];
-        $this.addClass('p0ne-ccp-btn-selected');
-        if (font[btn]) {
-          $this.addClass('p0ne-ccp-btn-default-selected');
-        }
+        /*else if font[btn] = not $this.hasClass \p0ne-ccp-btn-default
+            # set to default
+            delete font[btn]
+            $this .addClass \p0ne-ccp-btn-selected
+            if styleDefault.font[btn] # default value is in font.__proto__[btn]
+                $this .addClass \p0ne-ccp-btn-default-selected */
       } else {
         font[btn] = true;
         $this.addClass('p0ne-ccp-btn-selected');
@@ -516,7 +516,7 @@ module('customColorsPicker', {
       drag_pos.left = e.pageX + image.x;
       drag_pos.top = e.pageY + image.y;
     });
-    addListener($cp, 'input', '.p0ne-ccp-group-image input', function(){
+    addListener($cp, 'input keyup', '.p0ne-ccp-group-image input', function(){
       var x, y, this$ = this;
       if (checkImageCustomMode()) {
         return;
@@ -657,24 +657,16 @@ module('customColorsPicker', {
         image = badge;
         $badgeGroup.show();
         break;
-      case 'default':
-        if (image['default']) {
-          imageCustomMode[imageMode] = 'default';
-          image = image['default'];
-        }
-        break;
-      case 'custom':
-        if (image.custom) {
-          imageCustomMode[imageMode] = 'custom';
-          image = image.custom;
+      default:
+        switch (imageCustomMode[imageMode] = mode) {
+        case 'default':
+          image = styleDefault[imageMode];
+          break;
+        case 'custom':
+          image = customImage[imageMode];
         }
       }
-      console.log("set image mode", mode, image);
-      if (imageCustomMode[imageMode] === 'none') {
-        $contentImage.addClass('disabled');
-      } else {
-        $contentImage.removeClass('disabled');
-      }
+      console.log("set image mode", imageMode, "=>", mode, image);
       $imageCustomToggles.removeClass('selected').filter("[data-mode=" + imageCustomMode[imageMode] + "]").addClass('selected');
       loadImage(image.url);
       updateImageVal();
@@ -731,13 +723,19 @@ module('customColorsPicker', {
     }
     function checkImageCustomMode(){
       if (imageCustomMode[imageMode] === 'default') {
-        image = import$(image.custom, image);
+        image = import$(customImage[imageMode], image);
+        if (imageMode === 'icon') {
+          icon = image;
+        } else {
+          badge = image;
+        }
         imageCustomMode[imageMode] = 'custom';
         return $imageCustomToggles.removeClass('selected').filter('[data-mode=custom]').addClass('selected');
       } else if (imageCustomMode[imageMode] === 'none') {
         return true;
       }
     }
+    customImage = {};
     this.loadData = loadData = function(scopeName, key_, $row_){
       /* note: the reason we clone$ the variables (font, icon, badge)
        * is so that the initial values are stored in the prototype of the
@@ -745,12 +743,12 @@ module('customColorsPicker', {
        * this way the reset button can delete the custom properties
        * which will than default back to the initial values
        */
-      var data, styleDefault, iconTemplate, badgeTemplate, ref$, err, btn, ref1$, state;
+      var data, badgeTemplate, ref$, iconTemplate, err;
       this.key = key = key_;
       scope = cc.scopes[scopeName];
       data = scope[key];
       $row = $row_;
-      console.log("loading data", scopeName, key, data);
+      console.info("loading data", scopeName, key, data);
       if (key in cc.roles) {
         uid = 0;
         $cp.addClass('p0ne-ccp-nobadge');
@@ -763,58 +761,60 @@ module('customColorsPicker', {
       }
       delete scope[key];
       try {
-        if (uid) {
-          styleDefault = customColors.getUserStyle(key, true);
-        } else {
+        if (!uid) {
           styleDefault = customColors.getRoleStyle(key, true);
+        } else {
+          styleDefault = customColors.getUserStyle(key, true);
+          badgeTemplate = function(){};
+          if (uid) {
+            switch (typeof styleDefault.badge) {
+            case 'string':
+              imageCustomMode.badge = 'default';
+              styleDefault.badge = getIcon("bdg bdg-" + styleDefault.badge + " " + (ref$ = styleDefault.badge)[ref$.length - 1], true);
+              styleDefault.badge.w = styleDefault.badge.h = 30;
+              break;
+            case 'object':
+              imageCustomMode.badge = 'default';
+              styleDefault.badge = styleDefault.badge;
+              break;
+            default:
+              imageCustomMode.badge = 'none';
+              styleDefault.badge = {
+                w: 30,
+                h: 30
+              };
+            }
+          }
         }
         console.log("styleDefault", styleDefault);
+        if (styleDefault.color != null) {
+          styleDefault.color = styleDefault.color.substr(1);
+        }
         iconTemplate = function(){};
         switch (typeof styleDefault.icon) {
         case 'string':
           imageCustomMode.icon = 'default';
-          iconTemplate.prototype['default'] = getIcon(styleDefault.icon, true);
+          styleDefault.icon = getIcon(styleDefault.icon, true);
           break;
         case 'object':
           imageCustomMode.icon = 'default';
-          iconTemplate.prototype['default'] = styleDefault.icon;
+          if (styleDefault.icon.url === 'default') {
+            styleDefault.icon.url = defaultIconURL;
+          }
           break;
         default:
           imageCustomMode.icon = 'none';
-          iconTemplate.prototype['default'] = {
+          styleDefault.icon = {
             url: defaultIconURL,
             x: 105,
             y: 350
           };
         }
-        badgeTemplate = function(){};
-        if (uid) {
-          switch (typeof styleDefault.badge) {
-          case 'string':
-            imageCustomMode.badge = 'default';
-            badgeTemplate.prototype['default'] = getIcon("bdg bdg-" + styleDefault.badge + " " + (ref$ = styleDefault.badge)[ref$.length - 1], true);
-            badgeTemplate.prototype['default'].w = badgeTemplate.prototype['default'].h = 30;
-            break;
-          case 'object':
-            imageCustomMode.badge = 'default';
-            badgeTemplate.prototype['default'] = styleDefault.badge;
-            break;
-          default:
-            imageCustomMode.badge = 'none';
-            badgeTemplate.prototype['default'] = {
-              'default': true,
-              disabled: true,
-              w: 30,
-              h: 30
-            };
-          }
-        } else {
-          imageCustomMode.badge = 'none';
-          badgeTemplate.prototype['default'] = {};
-        }
       } catch (e$) {
         err = e$;
         console.error("failed to create icon or badge template", err.messageAndStack);
+        scope[key] = data;
+        return;
       }
       scope[key] = data;
       if (data.color) {
@@ -822,21 +822,28 @@ module('customColorsPicker', {
         $hex.val(currentColor = data.color.substr(1));
       } else {
         nameCustomMode = 'default';
-        $hex.val(currentColor = (ref$ = styleDefault.color) != null ? ref$.substr(1) : void 8);
+        $hex.val(currentColor = styleDefault.color);
       }
       customColor = currentColor;
-      font = {
+      font = data.font || {
         b: true,
         i: false,
         u: false
       };
-      for (btn in ref1$ = data.font) {
-        state = ref1$[btn];
-        if (font[btn] = state) {
-          $font[btn].addClass('p0ne-ccp-btn-selected');
-        } else {
-          $font[btn].removeClass('p0ne-ccp-btn-selected');
-        }
+      if (font.b !== false) {
+        $font.b.removeClass('p0ne-ccp-btn-selected');
+      } else {
+        $font.b.addClass('p0ne-ccp-btn-selected');
+      }
+      if (font.i) {
+        $font.i.addClass('p0ne-ccp-btn-selected');
+      } else {
+        $font.i.removeClass('p0ne-ccp-btn-selected');
+      }
+      if (font.u) {
+        $font.u.addClass('p0ne-ccp-btn-selected');
+      } else {
+        $font.u.removeClass('p0ne-ccp-btn-selected');
       }
       font = clone$(font);
       console.log("typeof data.icon", typeof data.icon);
@@ -845,7 +852,7 @@ module('customColorsPicker', {
         imageCustomMode.icon = 'none';
         // fallthrough
       case 'undefined':
-        import$(iconTemplate.prototype, iconTemplate.prototype['default']);
+        import$(iconTemplate.prototype, styleDefault.icon);
         break;
       case 'string':
         imageCustomMode.icon = 'custom';
@@ -855,37 +862,39 @@ module('customColorsPicker', {
         imageCustomMode.icon = 'custom';
         import$(iconTemplate.prototype, data.icon);
       }
-      iconTemplate.prototype.w = iconTemplate.prototype.h = iconTemplate.prototype['default'].w = iconTemplate.prototype['default'].h = 15;
-      icon = iconTemplate.prototype['default'].custom = new iconTemplate;
+      iconTemplate.prototype.w = iconTemplate.prototype.h = styleDefault.icon.w = styleDefault.icon.h = 15;
+      icon = customImage.icon = new iconTemplate;
       if (imageCustomMode.icon !== 'custom') {
-        icon = icon['default'];
+        icon = styleDefault.icon;
       }
-      console.log("typeof data.badge", typeof data.badge);
-      switch (typeof data.badge) {
-      case 'boolean':
-        imageCustomMode.badge = 'custom';
-        // fallthrough
-      case 'undefined':
-        import$(badgeTemplate.prototype, badgeTemplate.prototype['default']);
-        /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
-        getUserData data.uid, (d) ->
-            console.log "[customColors] loaded user data", data.uid, data.name, d
-            badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
-            badgeTemplate::default = true
-            badgeTemplate::w = badgeTemplate::h = 30px*/
-        break;
-      case 'string':
-        imageCustomMode.badge = 'custom';
-        import$(badgeTemplate.prototype, getIcon("bdg bdg-" + data.badge + " " + (ref1$ = data.badge)[ref1$.length - 1], true));
-        badgeTemplate.prototype.w = badgeTemplate.prototype.h = 30;
-        break;
-      case 'object':
-        imageCustomMode.badge = 'custom';
-        import$(badgeTemplate.prototype, data.badge);
-      }
-      badge = badgeTemplate.prototype['default'].custom = new badgeTemplate;
-      if (imageCustomMode.badge !== 'custom') {
-        badge = badge['default'];
+      if (uid) {
+        console.log("typeof data.badge", typeof data.badge);
+        switch (typeof data.badge) {
+        case 'boolean':
+          imageCustomMode.badge = 'custom';
+          // fallthrough
+        case 'undefined':
+          import$(badgeTemplate.prototype, styleDefault.badge);
+          /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
+          getUserData data.uid, (d) ->
+              console.log "[customColors] loaded user data", data.uid, data.name, d
+              badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
+              styleDefault.badge = true
+              badgeTemplate::w = badgeTemplate::h = 30px*/
+          break;
+        case 'string':
+          imageCustomMode.badge = 'custom';
+          import$(badgeTemplate.prototype, getIcon("bdg bdg-" + data.badge + " " + (ref$ = data.badge)[ref$.length - 1], true));
+          badgeTemplate.prototype.w = badgeTemplate.prototype.h = 30;
+          break;
+        case 'object':
+          imageCustomMode.badge = 'custom';
+          import$(badgeTemplate.prototype, data.badge);
+        }
+        badge = customImage.badge = new badgeTemplate;
+        if (imageCustomMode.badge !== 'custom') {
+          badge = styleDefault.badge;
+        }
       }
       if ($cp.find('.p0ne-ccp-tab-icon').hasClass('p0ne-ccp-tab-selected')) {
         setImageMode('icon');
@@ -893,6 +902,7 @@ module('customColorsPicker', {
         setImageMode('badge');
       }
       console.log("imageCustomMode", imageCustomMode.icon, imageCustomMode.badge);
+      console.info("==>", test());
       $nameCustomToggles.removeClass('selected').filter("[data-mode=" + nameCustomMode + "]").addClass('selected');
       inputHex();
       $currentColor.css({
@@ -900,6 +910,7 @@ module('customColorsPicker', {
       });
       $snapToGrid.attr('checked', false).click();
       $cp.show();
+      sleep(200, bind$(cc, 'updateCSS'));
     };
     function rgbToHsv(rgb){
       var hsv, min, ref$, ref1$, ref2$, ref3$, max, delta;
@@ -1011,9 +1022,11 @@ module('customColorsPicker', {
       clearTimeout(updateCSSTimeout);
       return updateCSSTimeout = sleep(200, function(){
         var badge_, style;
-        badge_ = badge[imageCustomMode.badge] || badge;
-        if (!('srcW' in badge_)) {
-          badge_ = void 8;
+        if (uid) {
+          badge_ = badge[imageCustomMode.badge] || badge;
+          if (!('srcW' in badge_)) {
+            badge_ = void 8;
+          }
         }
         style = cc[uid ? 'calcCSSUser' : 'calcCSSRole'](key, {
           color: "#" + getHex(),
@@ -1029,49 +1042,21 @@ module('customColorsPicker', {
       $cp.hide();
     };
     this.save = function(){
-      var style, hex, i$, ref$, len$, k, hasCustomFont, icon_, hasCustomIcon, badge_, hasCustomBadge, err;
+      var style, hex, err;
       if (key) {
         try {
           style = scope[key];
-          hex = getHex();
-          if (hex !== currentColor) {
-            style.color = "#" + hex;
+          hex = "#" + getHex();
+          console.info("[save]", key, hex, font, icon, badge);
+          if (hex !== styleDefault.color) {
+            style.color = hex;
           } else {
             delete style.color;
           }
-          style.font = {
-            b: true,
-            i: false,
-            u: false
-          };
-          for (i$ = 0, len$ = (ref$ = ['b', 'i', 'u']).length; i$ < len$; ++i$) {
-            k = ref$[i$];
-            if (font.hasOwnProperty(k)) {
-              hasCustomFont = true;
-              style.font[k] = font[k];
-            }
-          }
-          if (!hasCustomFont) {
-            delete style.font;
-          }
+          style.font = import$({}, font);
           switch (imageCustomMode.icon) {
           case 'custom':
-            icon_ = icon[imageCustomMode.icon] || icon;
-            for (i$ = 0, len$ = (ref$ = ['url', 'x', 'y']).length; i$ < len$; ++i$) {
-              k = ref$[i$];
-              if (icon_.hasOwnProperty(k)) {
-                hasCustomIcon = true;
-                style.icon = {
-                  url: icon_.url,
-                  x: icon_.x,
-                  y: icon_.y
-                };
-                break;
-              }
-            }
-            if (!hasCustomIcon) {
-              delete style.icon;
-            }
+            style.icon = importAll$({}, icon);
             break;
           case 'default':
             delete style.icon;
@@ -1083,26 +1068,7 @@ module('customColorsPicker', {
           }
           switch (uid && imageCustomMode.badge) {
           case 'custom':
-            badge_ = badge[imageCustomMode.badge] || badge;
-            for (i$ = 0, len$ = (ref$ = ['url', 'x', 'y', 'w', 'h']).length; i$ < len$; ++i$) {
-              k = ref$[i$];
-              if (badge_.hasOwnProperty(k)) {
-                hasCustomBadge = true;
-                style.badge = {
-                  url: badge_.url,
-                  x: badge_.x,
-                  y: badge_.y,
-                  w: badge_.w,
-                  h: badge_.h,
-                  srcW: badge_.srcW,
-                  srcH: badge_.srcH
-                };
-                break;
-              }
-            }
-            if (!hasCustomBadge) {
-              delete style.badge;
-            }
+            style.badge = importAll$({}, badge);
             break;
           case 'default':
             delete style.badge;
@@ -1119,14 +1085,11 @@ module('customColorsPicker', {
                       <div class=p0ne-cc-userid>#{style.uid}</div>
                   </div>
               </div>"*/
-          $css.text("");
           if (uid) {
             cc.users[uid].css = cc.calcCSSUser(uid);
           } else {
             cc.roles[key].css = cc.calcCSSRole(key);
           }
-          cc.updateCSS();
-          tmpCSS = true;
           /*if not tmpCSS
               tmpCSS := true
               $css .text ""
@@ -1139,6 +1102,9 @@ module('customColorsPicker', {
     };
     out$.test = test = function(){
       return {
+        styleDefault: styleDefault,
+        customImage: customImage,
+        $css: $css,
         image: image,
         defaultIconURL: defaultIconURL,
         currentColor: currentColor,
@@ -1160,35 +1126,6 @@ module('customColorsPicker', {
         snapToGrid: snapToGrid
       };
     };
-    /*
-    loadData {}, do
-        name: "MᗣD Pᗣᗧ•••MᗣN"
-        uid: 3947647 # MᗣD Pᗣᗧ•••MᗣN
-        #uid: 4103672 # The Sensational Stallion
-        roles: <[ manager ]>
-        badge:
-            url: "http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png"
-            x:  0px
-            y:  0px
-            w: 30px
-            h: 30px
-            srcW: 30px
-            srcH: 30px
-        color: \#D35w
-        font: {+b, -i, +u}
-        icon:
-            url: "https://cdn.plug.dj/_/static/images/icons.d8b5eb442b3acb5ccfbbe2541b9db0756e45beba.png" # DUMMY
-            x:  15px
-            y: 365px
-        badge:
-            url: "https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png" # ponies
-            x: 140px
-            y: 210px
-            w:  70px
-            h:  70px
-            srcW: 280px
-            srcH: 700px
-        */
     out$.loadData = loadData;
     $el.find('.p0ne-cc-row.selected').click();
   },
@@ -1271,12 +1208,17 @@ module('customColorsPicker', {
     if ((ref$ = this.cc) != null) {
       if ((ref1$ = ref$._$settingsPanel) != null) {
         if ((ref2$ = ref1$.wrapper) != null) {
-          ref2$.html("");
+          ref2$.html("").off();
         }
       }
     }
   }
 });
+/*# sample badge spritesets
+http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png
+https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png
+https://fimplug.net/theme/images/badges.png
+*/
 function clone$(it){
   function fun(){} fun.prototype = it;
   return new fun;
@@ -1368,5 +1310,12 @@ function deepEq$(x, y, type){
 function import$(obj, src){
   var own = {}.hasOwnProperty;
   for (var key in src) if (own.call(src, key)) obj[key] = src[key];
+  return obj;
+}
+function bind$(obj, key, target){
+  return function(){ return (target || obj)[key].apply(obj, arguments) };
+}
+function importAll$(obj, src){
+  for (var key in src) obj[key] = src[key];
   return obj;
 }
