@@ -44,7 +44,7 @@ if (typeof console.time == 'function') {
 }
 p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.8.9',
+  version: '1.9.0',
   lastCompatibleVersion: '1.8.8.2',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
@@ -1208,9 +1208,18 @@ if (typeof API != 'undefined' && API !== null) {
     return true;
   });
   String.prototype.define('replaceSansHTML', function(rgx, rpl){
-    return this.replace(/(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, function(arg$, pre, post){
-      return pre.replace(rgx, rpl) + "" + post;
-    });
+    if (typeof rpl === 'function') {
+      return this.replace(/(.+?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, function(arg$, pre, post, i){
+        return pre.replace(rgx, function(){
+          arguments[arguments.length - 2] += i;
+          return rpl.apply(this, arguments);
+        }) + "" + post;
+      });
+    } else {
+      return this.replace(/(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, function(arg$, pre, post){
+        return pre.replace(rgx, rpl) + "" + post;
+      });
+    }
   });
   for (i$ = 0, len$ = (ref$ = [String, Array]).length; i$ < len$; ++i$) {
     Constr = ref$[i$];
@@ -1887,19 +1896,16 @@ if (typeof API != 'undefined' && API !== null) {
     },
     getUserData: function(user, cb){
       if (typeof user !== 'number') {
-        user = getUser(user);
+        user = getUser(user).id;
       }
-      return $.get("/_/users/" + user).then(function(arg){
+      return $.getJSON("/_/users/" + user).then(function(arg){
         var data;
         data = arg.data, data = data[0];
-        if (cb) {
-          return data;
-        } else {
-          console.log("[userdata]", data, data.level >= 5 ? "https://plug.dj/@/" + encodeURI(data.slug) : void 8);
-        }
+        console.log("[userdata]", data, data.level >= 5 ? "https://plug.dj/@/" + encodeURI(data.slug) : void 8);
+        return data;
       }).fail(function(){
         console.warn("couldn't get userdata for user with id '" + id + "'");
-      });
+      }).then(cb);
     },
     $djButton: $('#dj-button'),
     mute: function(){
@@ -2009,8 +2015,52 @@ if (typeof API != 'undefined' && API !== null) {
       }
       return ytItags;
     }(),
-    mediaSearch: function(query){
+    parseYTDuration: function(){
+      var multiplicators;
+      multiplicators = [0, 31104000, 2592000, 604800, 86400, 3600, 60, 1];
+      return function(str){
+        var duration, that, i$, len$, i, t;
+        duration = 0;
+        if (that = /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(str)) {
+          for (i$ = 0, len$ = that.length; i$ < len$; ++i$) {
+            i = i$;
+            t = that[i$];
+            if (+t) {
+              duration += t * multiplicators[i];
+            }
+          }
+        }
+        return duration;
+      };
+    }(),
+    songListCollection: function(songList){
+      var i$, len$, m, ref$, ref1$, ref2$, i;
+      if (songList != null && songList.length) {
+        if (songList[0]) {
+          for (i$ = 0, len$ = songList.length; i$ < len$; ++i$) {
+            m = songList[i$];
+            if (+m.id === 0) {
+              delete m.id;
+            }
+          }
+          return new Backbone.Collection(songList);
+        } else if (!((ref$ = songList.models) != null && ((ref1$ = ref$[0]) != null && ref1$.attributes))) {
+          for (i$ = 0, len$ = (ref2$ = songList.models).length; i$ < len$; ++i$) {
+            i = i$;
+            m = ref2$[i$];
+            songList.models[i] = new Backbone.Model(m);
+          }
+        }
+      } else if (!(songList != null && songList.models)) {
+        return new Backbone.Collection();
+      }
+      return songList;
+    },
+    openPlaylistDrawer: function(){
       $('#playlist-button .icon-playlist').click();
+    },
+    mediaSearch: function(query){
+      openPlaylistDrawer();
       $('#search-input-field').val(query).trigger({
         type: 'keyup',
         which: 13
@@ -2174,21 +2224,11 @@ if (typeof API != 'undefined' && API !== null) {
         return ref1$ = (ref$ = window.mediaLookupCache)[cid], delete ref$[cid], ref1$;
       }
       function fn1$(arg$){
-        var items, multiplicators, i$, len$, d, duration, that, j$, len1$, i, t, cid, ref$, l;
+        var items, i$, len$, d, duration, cid, ref$, l;
         items = arg$.items;
-        multiplicators = [0, 31104000, 2592000, 604800, 86400, 3600, 60, 1];
         for (i$ = 0, len$ = items.length; i$ < len$; ++i$) {
           d = items[i$];
-          duration = 0;
-          if (that = /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(d.contentDetails.duration)) {
-            for (j$ = 0, len1$ = that.length; j$ < len1$; ++j$) {
-              i = j$;
-              t = that[j$];
-              if (+t) {
-                duration += t * multiplicators[i];
-              }
-            }
-          }
+          duration = parseYTDuration(d.contentDetails.duration);
           addResult(queries[1][d.id], d.id, {
             format: 1,
             data: d,
@@ -3353,7 +3393,7 @@ if (typeof API != 'undefined' && API !== null) {
       _rooms: {}
     }
   }, function(err, data){
-    var id, ref$, m, moduleName, res$, k, ref1$, v, Dialog, InventoryDropdown, PlaylistItemRow, PlaylistMediaList, i$, len$, context, ref2$, ref3$, ref4$, cb, app, friendsList, pl, user, ref5$, ev, myAvatars, userID, ref6$, e, $cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp, staff;
+    var id, ref$, m, moduleName, res$, k, ref1$, v, Dialog, InventoryDropdown, PlaylistItemRow, PlaylistMediaList, i$, len$, context, ref2$, ref3$, ref4$, cb, app, friendsList, pl, user, ref5$, ev, myAvatars, userID, ref6$, e, $cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp;
     window.requireIDs = data.p0ne_requireIDs;
     p0ne.disabledModules = data.p0ne_disabledModules;
     if (err) {
@@ -3444,6 +3484,9 @@ if (typeof API != 'undefined' && API !== null) {
         case !m.settings:
           moduleName = 'settings';
           break;
+        case m.SHOW !== 'ShowDialogEvent:show':
+          moduleName = 'ShowDialogEvent';
+          break;
         case !m.ack:
           moduleName = 'socketEvents';
           break;
@@ -3511,6 +3554,9 @@ if (typeof API != 'undefined' && API !== null) {
               case m.prototype.id !== 'playback':
                 moduleName = 'Playback';
                 break;
+              case m.prototype.id !== 'dialog-playlist-create':
+                moduleName = 'PlaylistCreateDialog';
+                break;
               case m.prototype.listClass !== 'playlist-media':
                 moduleName = 'PlaylistItemList';
                 out$.PlaylistItemRow = PlaylistItemRow = m.prototype.RowClass;
@@ -3528,6 +3574,9 @@ if (typeof API != 'undefined' && API !== null) {
               case !m.prototype.vote:
                 moduleName = 'RoomUserRow';
                 break;
+              case !m.prototype.onQueryUpdate:
+                moduleName = 'SearchHeader';
+                break;
               case m.prototype.listClass !== 'search':
                 moduleName = 'SearchList';
                 out$.PlaylistMediaList = PlaylistMediaList = m.__super__.constructor;
@@ -3537,6 +3586,12 @@ if (typeof API != 'undefined' && API !== null) {
                 break;
               case !m.prototype.onAvatar:
                 moduleName = 'WaitlistRow';
+                break;
+              case !m.prototype.getURL:
+                moduleName = 'YtPlaylistItemService';
+                break;
+              case !m.prototype.sortByName:
+                moduleName = 'YtPlaylistService';
                 break;
               case !m.prototype.onVideos:
                 moduleName = 'YtSearchService';
@@ -4866,6 +4921,51 @@ if (typeof API != 'undefined' && API !== null) {
         }
       }
     });
+    /* open a dialog to let the user create a playlist with a user-selected name */
+    module('createPlaylistDialog', {
+      require: ['ShowDialogEvent', '_$context'],
+      module: function(songList, defaultName){
+        var evt;
+        _$context.trigger(ShowDialogEvent.SHOW, evt = new ShowDialogEvent(ShowDialogEvent.SHOW, new PlaylistCreateDialog({
+          media: songListCollection(songList).models
+        })));
+        if (defaultName) {
+          requestAnimationFrame(function(){
+            requestAnimationFrame(function(){
+              evt.dialog.$field.val(defaultName);
+              evt.dialog.onKeyUp();
+            });
+          });
+        }
+      }
+    });
+    /* opens a list of songs in the playlist drawer */
+    module('mediaListShow', {
+      require: ['pl', 'SearchList', 'SearchHeader'],
+      module: function(title, songList, icon){
+        var list, header, $icon;
+        list = new SearchList();
+        header = new SearchHeader();
+        songList = songListCollection(songList);
+        list.collection = songList;
+        pl.show(header, list);
+        header.setTitle(title);
+        $icon = header.$el.find('.icon').removeClass();
+        if (window.createPlaylistDialog) {
+          header.$el.append($("<div class='button import-button'><span>" + ((typeof Lang != 'undefined' && Lang !== null ? Lang['import'].importThis : void 8) || 'Import This Playlist') + "</span></div>").on('click', function(){
+            createPlaylistDialog(songList, title);
+          }));
+        }
+        if (icon) {
+          $icon.addClass(icon).css({
+            top: 13,
+            left: 12
+          });
+        }
+        list.render();
+        openPlaylistDrawer();
+      }
+    });
     _.defer(function(){
       module('p0neNotifHelper', {
         require: ['chatDomEvents'],
@@ -5153,7 +5253,7 @@ if (typeof API != 'undefined' && API !== null) {
           forEach(onRoomJoinQueue2);
           onRoomJoinQueue2 = [];
         });
-        for (i$ = 0, len$ = (ref1$ = ['send', 'dispatchEvent', 'close']).length; i$ < len$; ++i$) {
+        for (i$ = 0, len$ = (ref1$ = ['send', 'dispatchEvent']).length; i$ < len$; ++i$) {
           (fn$.call(this, ref1$[i$]));
         }
         function forEach(data){
@@ -5559,7 +5659,7 @@ if (typeof API != 'undefined' && API !== null) {
           this.timer = sleep(5000, fixStuckDJ);
         }
         addListener(API, 'advance', function(d){
-          console.log(getTime() + " [API.advance]");
+          console.log(getTime() + " [API.advance]", this$.timer);
           clearTimeout(this$.timer);
           if (d.media) {
             this$.timer = sleep(d.media.duration * 1000 + 2000, fixStuckDJ);
@@ -5573,6 +5673,7 @@ if (typeof API != 'undefined' && API !== null) {
           console.warn("[fixNoAdvance] song seems to be stuck, trying to fix…");
         }
         m = API.getMedia() || {};
+        console.log(getTime() + " [unstuck]", this.timer, m, API.getTimeRemaining());
         ajax('GET', 'rooms/state', {
           error: function(data){
             console.error("[fixNoAdvance] cannot load room data:", status, data);
@@ -5662,17 +5763,19 @@ if (typeof API != 'undefined' && API !== null) {
         var addListener, $djbtn, fixTimeout;
         addListener = arg$.addListener;
         $djbtn = $('#dj-button');
-        fixTimeout = false;
+        fixTimeout = 0;
         addListener(_$context, 'djButton:update', function(){
-          var spinning;
-          spinning = $djbtn.find('.spinner').length === 0;
-          if (fixTimeout && spinning) {
+          var notSpinning;
+          notSpinning = $djbtn.find('.spinner').length === 0;
+          console.log("[djButton:update]", notSpinning, fixTimeout);
+          if (fixTimeout && notSpinning) {
+            fixTimeout = 0;
             clearTimeout(fixTimeout);
           } else if (!fixTimeout) {
             fixTimeout = sleep(5000, function(){
-              fixTimeout = false;
+              fixTimeout = 0;
               if ($djbtn.find('.spinner').length !== 0) {
-                console.log("[djButton:update] force joining", true, fixTimeout);
+                console.log("[djButton:update] force joining", fixTimeout);
                 ajax('GET', 'rooms/state', function(d){
                   d = d.data[0];
                   if (d.currentDJ === userID || d.waitingDJs.lastIndexOf(userID) !== -1) {
@@ -5680,6 +5783,8 @@ if (typeof API != 'undefined' && API !== null) {
                     forceJoin();
                   }
                 });
+              } else {
+                console.log("[djButton:update] NOT force joining", fixTimeout);
               }
             });
           }
@@ -5969,6 +6074,19 @@ if (typeof API != 'undefined' && API !== null) {
         }
       }
     });
+    module('fixPlaylistSort', {
+      help: 'This module improves the automatic playlist sorting, to handle playlists with numbers better.\ne.g. it will sort playlists named ',
+      require: ['playlists'],
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(playlists, 'comparator', function(){
+          return function(as, bs){
+            return naturalSorter(as.attributes.name, bs.attributes.name);
+          };
+        });
+      }
+    });
     /*####################################
     #          FIX POPOUT CLOSE          #
     ####################################*/
@@ -6064,6 +6182,153 @@ if (typeof API != 'undefined' && API !== null) {
               API.trigger('p0ne:playlistCache:update', e.id);
             } else {
               oS_.call(this, e);
+            }
+          };
+        });
+      }
+    });
+    /*@source p0ne.fix-yt-import.ls */
+    module('fixYtImport', {
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(YtPlaylistService.prototype, 'load', function(){
+          return function(e, t){
+            var this$ = this;
+            console.log("[YT Playlist Import] loading", e);
+            this.username = e;
+            this.callback = t;
+            this.start = 1;
+            this.data = [];
+            this.nextPageToken = "";
+            return $.getJSON("https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=" + this.username + "&key=" + p0ne.YOUTUBE_V3_KEY).then(function(d){
+              var ref$;
+              this$.channelID = (ref$ = d.items[0]) != null ? ref$.id : void 8;
+              console.log("got channelID", this$.channelID);
+              if (this$.channelID) {
+                this$.next();
+              } else {
+                this$.onError("user not found", d);
+              }
+            }, bind$(this, 'onError'));
+          };
+        });
+        replace(YtPlaylistService.prototype, 'next', function(){
+          return function(){
+            console.log("[YT Playlist Import] loading page", this.nextPageToken);
+            if (this.timeoutID) {
+              clearTimeout(this.timeoutID);
+            }
+            $.getJSON("https://www.googleapis.com/youtube/v3/playlists?part=contentDetails,snippet&fields=items(contentDetails,id,snippet(title)),nextPageToken&maxResults=50&channelId=" + this.channelID + "&pageToken=" + this.nextPageToken + "&key=" + p0ne.YOUTUBE_V3_KEY).then(bind$(this, 'onComplete'), bind$(this, 'onError'));
+          };
+        });
+        replace(YtPlaylistService.prototype, 'deserialize', function(){
+          return function(e){
+            var l, i$, ref$, len$, i, pl;
+            console.log("[YT Playlist Import] deserializing", e);
+            this.nextPageToken = e.nextPageToken;
+            l = this.data.length;
+            for (i$ = 0, len$ = (ref$ = e.items).length; i$ < len$; ++i$) {
+              i = i$;
+              pl = ref$[i$];
+              this.data[l + i] = {
+                playlistID: pl.id,
+                name: pl.snippet.title + " (" + pl.contentDetails.itemCount + ")",
+                count: pl.contentDetails.itemCount,
+                username: this.username
+              };
+            }
+          };
+        });
+        replace(YtPlaylistService.prototype, 'onComplete', function(){
+          return function(e){
+            var err, ref$;
+            try {
+              this.deserialize(e);
+            } catch (e$) {
+              err = e$;
+              console.error("[YT Playlist Import] parsing error", err.messageAndStack, e);
+            }
+            console.log("[YT Playlist Import] onComplete", e, e.nextPageToken);
+            if ((ref$ = this.data) != null && ref$.length) {
+              if (this.nextPageToken) {
+                this.timeoutID = sleep(200, bind$(this, 'next'));
+              } else {
+                this.data.sort(this.sortByName);
+                this.callback(this.data);
+              }
+            } else {
+              _$context.dispatch(new AlertEvent(AlertEvent.ALERT, Lang.alerts.youtubeError, Lang.alerts.pleaseTryAgain));
+              this.callback([]);
+            }
+          };
+        });
+        replace(YtPlaylistItemService.prototype, 'next', function(){
+          return function(){
+            var this$ = this;
+            this.nextPageToken = this.nextPageToken || "";
+            console.log("[YT PlaylistItems Import] loading page", this.nextPageToken);
+            if (this.timeoutID) {
+              clearTimeout(this.timeoutID);
+            }
+            $.getJSON("https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&fields=items/contentDetails/videoId,nextPageToken&maxResults=50&playlistId=" + this.query + "&pageToken=" + this.nextPageToken + "&key=" + p0ne.YOUTUBE_V3_KEY).then(function(d){
+              var ref$, ids, i$, ref1$, len$, i, id;
+              if ((ref$ = d.items) != null && ref$.length) {
+                ids = [];
+                for (i$ = 0, len$ = (ref1$ = d.items).length; i$ < len$; ++i$) {
+                  i = i$;
+                  id = ref1$[i$];
+                  ids[i] = id.contentDetails.videoId;
+                }
+                this$.nextPageToken = d.nextPageToken;
+                $.getJSON("https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&fields=items(id,snippet(title,channelTitle),contentDetails/duration),nextPageToken&id=" + ids.join(",") + "&key=" + p0ne.YOUTUBE_V3_KEY).then(bind$(this$, 'onComplete'), bind$(this$, 'onError'));
+              }
+            }, bind$(this, 'onError'));
+            this.nextPageToken = "";
+          };
+        });
+        replace(YtPlaylistItemService.prototype, 'deserialize', function(){
+          return function(e){
+            var l, i$, ref$, len$, i, m, authorTitle;
+            console.log("[YT PlaylistItems Import] deserializing", e);
+            l = this.data.length;
+            for (i$ = 0, len$ = (ref$ = e.items).length; i$ < len$; ++i$) {
+              i = i$;
+              m = ref$[i$];
+              authorTitle = auxiliaries.authorTitle(m.snippet.title);
+              this.data[l + i] = {
+                format: 1,
+                cid: m.id,
+                duration: parseYTDuration(m.contentDetails.duration),
+                author: authorTitle.author || m.snippet.channelTitle,
+                title: authorTitle.title,
+                image: "https://i.ytimg.com/vi/" + m.id + "/default.jpg",
+                index: i,
+                id: i + ""
+              };
+            }
+          };
+        });
+        replace(YtPlaylistItemService.prototype, 'onComplete', function(){
+          return function(e){
+            var err, ref$;
+            try {
+              this.deserialize(e);
+            } catch (e$) {
+              err = e$;
+              console.error("[YT PlaylistItems Import] parsing error", err.messageAndStack, e);
+            }
+            console.log("[YT PlaylistItems Import] onComplete", e, e.nextPageToken);
+            if ((ref$ = this.data) != null && ref$.length) {
+              if (this.nextPageToken) {
+                this.timeoutID = sleep(200, bind$(this, 'next'));
+              } else {
+                this.eliminateDuplicates();
+                this.callback(this.data);
+              }
+            } else {
+              _$context.dispatch(new AlertEvent(AlertEvent.ALERT, Lang.alerts.youtubeError, Lang.alerts.pleaseTryAgain));
+              this.callback([]);
             }
           };
         });
@@ -7717,7 +7982,7 @@ if (typeof API != 'undefined' && API !== null) {
     /*####################################
     #        DBLCLICK to @MENTION        #
     ####################################*/
-    /*note: this is also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
+    /*note: this also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
     module('chatDblclick2Mention', {
       require: ['chat', 'simpleFixes'],
       settings: 'chat',
@@ -7764,11 +8029,11 @@ if (typeof API != 'undefined' && API !== null) {
           } else {
             clearTimeout(chatDblclick2Mention.timer);
             chatDblclick2Mention.timer = 0;
-            name = e.target.textContent;
+            name = this.textContent;
             if (name[0] === "@") {
               name = name.substr(1);
             }
-            ((typeof PopoutView != 'undefined' && PopoutView !== null ? PopoutView.chat : void 8) || chat).onInputMention(e.target.textContent);
+            ((typeof PopoutView != 'undefined' && PopoutView !== null ? PopoutView.chat : void 8) || chat).onInputMention(name);
           }
         };
         $cms = get$cms();
@@ -7783,13 +8048,13 @@ if (typeof API != 'undefined' && API !== null) {
         replace(WaitlistRow.prototype, 'draw', function(d_){
           return function(){
             d_.call(this);
-            this.$el.attr('uid', this.model.id);
+            this.$el.data('uid', this.model.id);
           };
         });
         replace(RoomUserRow.prototype, 'draw', function(d_){
           return function(){
             d_.call(this);
-            this.$el.attr('uid', this.model.id);
+            this.$el.data('uid', this.model.id);
           };
         });
         addListener(chatDomEvents, 'click', '.un', newFromClick);
@@ -9150,7 +9415,7 @@ if (typeof API != 'undefined' && API !== null) {
           pre = arg$.pre, protocol = arg$.protocol, url = arg$.url, onload = arg$.onload;
           yt = YT_REGEX.exec(protocol + url);
           if (yt && (yt = yt[1])) {
-            console.log("[inline-img]", "[YouTube " + yt + "] " + url + " ==> https://i.ytimg.com/vi/" + yt + "/default.jpg");
+            console.log("[p0ne_yt_preview]", url + " ==> https://i.ytimg.com/vi/" + yt + "/default.jpg");
             if (that = window.mediaLookupCache[yt]) {
               media = auxiliaries.authorTitle(that.title);
               media.author || (media.author = that.uploader.name);
@@ -9232,13 +9497,14 @@ if (typeof API != 'undefined' && API !== null) {
           }
         });
         if (window.user_) {
-          addListener(window.user_, 'change:username', bind$(this, 'updateRegexp'));
+          addListener(window.user_, 'change:rawun', bind$(this, 'updateRegexp'));
         }
         this.updateRegexp();
       },
       updateRegexp: function(){
         var triggerwords, l, i$, ref$, len$, triggerword, rawun, this$ = this;
         if (this._settings.triggerwords.length === 0) {
+          this.hasUsernameTrigger = false;
           return;
         }
         triggerwords = [];
@@ -9365,7 +9631,7 @@ if (typeof API != 'undefined' && API !== null) {
               ref$.removeClass('opaque');
             }
             this.animate = $.noop;
-            sleep(200, function(){
+            sleep(180, function(){
               close_.call(this$);
             });
             return this;
@@ -9667,6 +9933,7 @@ if (typeof API != 'undefined' && API !== null) {
     ####################################*/
     module('draggableDialog', {
       require: ['Dialog'],
+      optional: ['chatDomEvents'],
       displayName: 'Draggable Dialog',
       settings: 'look&feel',
       setup: function(arg$){
@@ -9743,6 +10010,13 @@ if (typeof API != 'undefined' && API !== null) {
           }
           $body.off('mousemove', mousemove).off('mouseup', mouseup);
         };
+        if (window.chatDomEvents) {
+          addListener(chatDomEvents, 'click', '.p0ne-img, .p0ne-img-filtered', function(e){
+            if (!lightsout) {
+              $dialogContainer.addClass('lightsout').find('.icon-unlocked').removeClass('icon-unlocked').addClass('icon-locked');
+            }
+          });
+        }
       },
       disable: function(){
         if (typeof this.stopDragging == 'function') {
@@ -10128,29 +10402,17 @@ if (typeof API != 'undefined' && API !== null) {
      * @copyright (c) 2015 J.-T. Brinkmann
     */
     console.log("~~~~~~~ p0ne.customcolors.picker ~~~~~~~");
-    if (!window.staff) {
-      staff = {
-        loading: $.Deferred()
-      };
-      ajax('GET', 'staff', function(d){
-        var l, i$, len$, u;
-        l = staff.loading;
-        staff = {};
-        for (i$ = 0, len$ = d.length; i$ < len$; ++i$) {
-          u = d[i$];
-          if (u.username) {
-            staff[u.id] = {
-              role: u.role,
-              gRole: u.gRole,
-              sub: u.sub,
-              username: u.username,
-              badge: u.badge
-            };
-          }
-        }
-        l.resolve();
-      });
-    }
+    /*
+    if not window.staff
+        staff =
+            loading: $.Deferred!
+        ajax \GET, \staff, (d) !->
+            l = staff .loading
+            staff := {}
+            for u in d when u.username
+                staff[u.id] = u{role, gRole, sub, username, badge}
+            l.resolve!
+    */
     /*####################################
     #           CUSTOM  COLORS           #
     ####################################*/
@@ -12349,7 +12611,7 @@ if (typeof API != 'undefined' && API !== null) {
       settings: 'moderation',
       settingsSimple: true,
       displayName: "Show Idle Time",
-      help: 'This module shows how long users have been inactive in the User- and Waitlist-Panel.\n"Being active"',
+      help: 'This module shows how long since users have last been by adding a timer to the User- and Waitlist-Panel.\nIt also adds the number of inactive users in the waitlist to the waitlist button. (updated every minute)\n"Being active" means sending chat, changing your name, gifting someone, grabbing or doing moderator things.',
       _settings: {
         lastActivity: {},
         highlightOver: 43 .min
@@ -12360,11 +12622,9 @@ if (typeof API != 'undefined' && API !== null) {
         settings = this._settings;
         start = Date.now();
         if (m_) {
-          console.log("m_ =", m_);
           this.start = m_.start;
           lastActivity = m_._settings.lastActivity || {};
         } else {
-          console.log("args", arguments);
           this.start = start;
           if (((ref$ = this._settings.lastActivity) != null ? ref$[0] : void 8) + 60000 > Date.now()) {
             lastActivity = this._settings.lastActivity;
@@ -12436,6 +12696,7 @@ if (typeof API != 'undefined' && API !== null) {
             }
           }
         });
+        addListener(API, 'waitListUpdate', updateAfkCount);
         updateAfkCount();
         d = 0;
         for (i$ = 0, len$ = (ref1$ = [RoomUserRow, WaitlistRow]).length; i$ < len$; ++i$) {
@@ -12544,15 +12805,21 @@ if (typeof API != 'undefined' && API !== null) {
     #            USER HISTORY            #
     ####################################*/
     module('userHistory', {
-      require: ['userRollover', 'RoomHistory', 'backbone'],
+      require: ['userRollover', 'RoomHistory', 'backbone', 'chat'],
       help: 'Shows another user\'s song history when clicking on their username in the user-rollover.\n\nDue to technical restrictions, only Youtube songs can be shown.',
       setup: function(arg$){
-        var addListener, replace, css;
-        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css;
+        var addListener, replace, css, $create;
+        addListener = arg$.addListener, replace = arg$.replace, css = arg$.css, $create = arg$.$create;
         css('userHistory', '#user-rollover .username { cursor: pointer }');
-        addListener($('body'), 'click', '#user-rollover .username', function(){
+        userRollover.$histBtn = $create("<i class='icon icon-history-white p0ne-user-history-btn'></i>");
+        replace(userRollover, 'showModal', function(sM_){
+          return function(){
+            this.$histBtn.appendTo(this.$meta);
+            sM_.call(this);
+          };
+        });
+        addListener($body, 'click', '.p0ne-user-history-btn', function(){
           var user, userID, username, userlevel, userslug;
-          $('#history-button.selected').click();
           user = userRollover.user;
           userID = user.id;
           username = user.get('username');
@@ -12572,6 +12839,11 @@ if (typeof API != 'undefined' && API !== null) {
             loadUserHistory(user);
           }
         });
+        /*
+        P0neHistHeader = _.extend(SearchHeader, {
+          template: SearchHeader.prototype.template.replace("icon-search", "icon-search icon-history-white")
+        })
+         */
         function loadUserHistory(user){
           return $.get("https://plug.dj/@/" + user.get('slug')).fail(function(){
             console.error("! couldn't load user's history");
@@ -12579,47 +12851,23 @@ if (typeof API != 'undefined' && API !== null) {
             var songs;
             userRollover.cleanup();
             songs = new backbone.Collection();
-            d.replace(/<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, function(arg$, img, author, roomName, positive, grabs, negative, listeners){
+            d.replace(/<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<a.+?><span class="name">(.*?)<\/span><\/a>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, function(arg$, img, author, roomName, positive, grabs, negative, listeners){
               var cid, ref$, title;
               if (cid = /\/vi\/(.{11})\//.exec(img)) {
                 cid = cid[1];
                 ref$ = author.split(" - "), title = ref$[0], author = ref$[1];
-                songs.add(new backbone.Model({
-                  user: {
-                    id: user.id,
-                    username: "in " + roomName
-                  },
-                  room: {
-                    name: roomName
-                  },
-                  score: {
-                    positive: positive,
-                    grabs: grabs,
-                    negative: negative,
-                    listeners: listeners,
-                    skipped: 0
-                  },
-                  media: new backbone.Model({
-                    format: 1,
-                    cid: cid,
-                    author: author,
-                    title: title,
-                    image: httpsify(img)
-                  })
-                }));
+                songs.add({
+                  format: 1,
+                  cid: cid,
+                  author: author,
+                  title: title,
+                  image: httpsify(img)
+                });
               }
             });
             console.info(getTime() + " [userHistory] loaded history for " + user.get('username'), songs);
-            out$.songs = songs;
-            out$.d = d;
-            replace(RoomHistory.prototype, 'collection', function(){
-              return songs;
-            });
-            _$context.trigger('show:history');
-            requestAnimationFrame(function(){
-              RoomHistory.prototype.collection = RoomHistory.prototype.collection_;
-              console.log(getTime() + " [userHistory] restoring room's proper history");
-            });
+            $('#playlist-button .icon-playlist').click();
+            mediaListShow(user.get('username') + "'s history", songs);
           });
         }
       }
