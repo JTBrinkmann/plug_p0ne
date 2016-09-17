@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.fixes ~~~~~~~"
 
 
 /*####################################
@@ -587,7 +588,7 @@ module \fixPopoutChatClose, do
     setup: ({addListener}) !->
         addListener API, \popout:open, (window_) !->
             window_.onbeforeunload = PopoutView~close
-
+/*
 module \fixNullUser, do
     settings: \fixes
     require: <[ _$context ]>
@@ -606,3 +607,40 @@ module \fixNullUser, do
                 sleep 2_000ms, !->
                     for u in users.models
                         cb(u)
+*/
+
+module \playlistCacheUpdate, do
+    require: <[ playlistCache playlistCachePatch eventMap ]>
+    setup: ({replace}) !->
+        replace eventMap.eventTypeMap[\MediaActionEvent:add]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            console.log "[MediaActionEvent:add:onSuccess]", e, @event
+            if pl=playlistCache._data.1.p[e.id]
+                for m in @event.items
+                    pl.items[m.get \cid] = true
+            _$context?.trigger \p0ne:playlistCache:update, e.id
+            oS_.call this, e
+            API.trigger \p0ne:playlistCache:update, e.id
+
+
+        replace eventMap.eventTypeMap[\MediaInsertEvent:insert]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            #console.log "[MediaInsertEvent:insert:onSuccess]", e, @event
+            if pl=playlistCache._data.1.p[e.id]
+                for m in @event.items
+                    pl.items[m.get \cid] = true
+            _$context?.trigger \p0ne:playlistCache:update, e.id
+            oS_.call this, e
+            API.trigger \p0ne:playlistCache:update, e.id
+
+
+        replace eventMap.eventTypeMap[\PlaylistCreateEvent:create]?.0?::, \onSuccess, (oS_) !-> return (e) !->
+            #console.log "[MediaInsertEvent:insert:onSuccess]", e, @event
+            event = @event
+            if event.items
+                _$context?.trigger \p0ne:playlistCache:update, e.id
+                oS_.call this, e
+                if pl=playlistCache._data.1.p[e.id]
+                    for m in event.items
+                        pl.items[m.get \cid] = true
+                API.trigger \p0ne:playlistCache:update, e.id
+            else
+                oS_.call this, e

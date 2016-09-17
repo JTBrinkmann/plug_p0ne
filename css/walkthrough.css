@@ -1,0 +1,278 @@
+
+.is-wt-p0 .app-header,
+.is-wt-p0 #app-menu,
+.is-wt-p0 #p0ne-menu {
+    z-index: 10000020;
+}
+.firefox #walkthrough .step {
+    animation-name: inherit; /* fix firefox animations */
+}
+
+.wt-p0-screen-welcome			#walkthrough .wt-p0-welcome,
+.wt-p0-screen-settings			#walkthrough .wt-p0-settings,
+.wt-p0-screen-dblclick2mention	#walkthrough .wt-p0-dblclick2mention,
+.wt-p0-screen-stream-settings	#walkthrough .wt-p0-stream-settings,
+.wt-p0-screen-automute			#walkthrough .wt-p0-automute,
+.wt-p0-screen-automute2			#walkthrough .wt-p0-automute2,
+.wt-p0-screen-songinfo			#walkthrough .wt-p0-songinfo,
+.wt-p0-screen-info-footer		#walkthrough .wt-p0-info-footer,
+.wt-p0-screen-end				#walkthrough .wt-p0-end {
+	display: block;
+	animation-name: wt-fade-in;
+}
+
+
+#walkthrough.wt-p0,
+.is-wt-p0 .wt-cover {
+	right: 345px;
+}
+#walkthrough.wt-p0 {
+	height: 0;
+}
+.wt-p0 .nav {
+	position: fixed;
+	bottom: 0;
+	left: 190px;
+	right: 345px;
+}
+.wt-p0 .nav i {
+	display: inline-block;
+	border: 5px solid #aaa;
+	border-radius: 50%;
+	height: 0;
+	width: 0;
+	margin-left: 15px;
+	cursor: pointer;
+}
+.wt-p0 .nav .selected {
+	border-color: #FFF;
+}
+.wt-p0 .nav .wt-p0-skip {
+    margin-right: 10px;
+}
+
+
+.wt-p0 .step {
+	transition: left 1s ease-out, top 1s ease-out;
+}
+
+.wt-p0-next, .wt-p0-back, .wt-p0-skip {
+	color: #aaa;
+	background: transparent;
+	text-decoration: none;
+	font-weight: 700;
+	cursor: pointer;
+	font-size: 18px;
+	float: right;
+	transition: color 0.5s ease-out;
+}
+.wt-p0-next.continue {
+	color: #00b5e6;
+}
+.wt-p0-back {
+    float: left;
+}
+
+
+.wt-p0 h1, .wt-p0 h2 {
+	text-align: center;
+	margin-top: -10px;
+	margin-bottom: 5px;
+}
+.wt-p0 img {
+	display: block;
+	margin: 0 auto;
+}
+
+.wt-p0 p {
+	margin-bottom: 10px;
+}
+
+.wt-p0 ol {
+	margin-left: 2em;
+}
+.wt-p0 .selected {
+	color: white;
+	font-weight: bold;
+}
+
+.wt-p0 .icon {
+	position: relative;
+	display: inline-block;
+	margin-bottom: -7px;
+}
+.wt-p0 .p0ne-icon {
+	margin-bottom: -6px;
+	font-weight: bold;
+}
+
+
+.wt-p0-title-0 {
+	color: #12A9E0;
+	text-shadow: 0 0 1px #12A9E0;
+}
+
+/*= welcome =*/
+#walkthrough .wt-p0-welcome {
+	top: 300px;
+	left: 50%;
+	margin-left: -225px;
+}
+.wt-p0-title {
+	text-align: center;
+	font-size: 26px;
+	text-shadow: 0 0 1px #FFF;
+}
+
+.wt-p0-title-p,
+.wt-p0-title-lug_p,
+.wt-p0-title-0,
+.wt-p0-title-ne {
+	display: inline-block;
+}
+
+.wt-p0-title-lug_p,
+.wt-p0-title-ne {
+	max-width: 0;
+	overflow: hidden;
+	margin-bottom: -8px;
+}
+.revealed .wt-p0-title-lug_p {
+	max-width: 70px;
+	transition: max-width 1.5s ease-out 1s;
+}
+.revealed .wt-p0-title-ne {
+	max-width: 35px;
+	transition: max-width 1.5s ease-out 1s;
+}
+.wt-p0 h2 {
+	font-size: 22px;
+	color: #bbb;
+}
+
+
+
+/*= settings =*/
+#walkthrough .wt-p0-settings {
+    top: 70px;
+    left: 20px;
+}
+.wt-p0-screen-settings .app-header,
+.wt-p0-screen-settings #p0ne-menu {
+    z-index: 10000020;
+}
+.wt-p0-settings-open {
+    font-weight: bold;
+}
+
+
+/*= dblclick2mention =*/
+#walkthrough .wt-p0-dblclick2mention {
+    top: 210px;
+	left: 50%;
+	margin-left: -225px;
+}
+
+
+/*= stream-settings =*/
+#walkthrough .wt-p0-stream-settings {
+    top: 120px;
+	left: 50%;
+	margin-left: -225px;
+}
+.wt-p0-screen-stream-settings #playback,
+.wt-p0-screen-stream-settings #playback-controls {
+	z-index: 10000020;
+	display: block !important;
+}
+
+
+
+/*= automute =*/
+#walkthrough .wt-p0-automute {
+    top: 120px;
+	left: 50%;
+	margin-left: -35px;
+}
+.wt-p0-screen-automute #playback,
+.wt-p0-screen-automute #playback-controls {
+	z-index: 10000020;
+	display: block !important;
+}
+.wt-p0-screen-automute .snooze-btn {
+	padding: 5px 10px;
+	cursor: pointer;
+}
+
+
+
+/*= automute2 =*/
+#walkthrough .wt-p0-automute2 {
+    top: 70px;
+    left: 20px;
+}
+
+@media (max-width: 1280px) {
+    .wt-p0-screen-automute2 .p0ne-settings-panel-automute {
+        width: 400px;
+    }
+    
+    #walkthrough .wt-p0-automute2.wt-p0-step-4 {
+        left: 720px;
+    }
+}
+
+
+/*= SongInfo =*/
+#walkthrough .wt-p0-songinfo {
+    top: 60px;
+	left: 400px;
+}
+.wt-p0-screen-songinfo ~ .p0ne-song-info {
+	z-index: 10000000;
+}
+
+
+/*= Info Footer =*/
+#walkthrough .wt-p0-info-footer {
+    bottom: 10px;
+    right: -280px;
+}
+.wt-p0-screen-info-footer #walkthrough,
+.wt-p0-screen-info-footer .wt-cover {
+	right: 345px;
+	bottom: 54px;
+}
+.wt-p0-screen-info-footer .app-right::after,
+.wt-p0-screen-info-footer #footer::after {
+    content: " ";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(17,19,23,.9);
+    z-index: 100000020;
+}
+.wt-p0-screen-info-footer #footer::after {
+    right: 345px;
+}
+.wt-p0-screen-info-footer .wt-cover{}
+.wt-p0-screen-info-footer #walkthrough {
+	height: auto;
+}
+.wt-p0-screen-info-footer #footer {
+    z-index: 10000020;
+}
+.wt-p0-screen-info-footer #footer-user {
+    z-index: 10000021;
+}
+
+.wt-p0-screen-info-footer .signup {
+    diplay: none !important;
+}
+
+/*= end =*/
+#walkthrough .wt-p0-end {
+    top: 300px;
+	left: 50%;
+	margin-left: -225px;
+}

@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.socket ~~~~~~~"
 /*####################################
 #          SOCKET LISTENERS          #
 ####################################*/

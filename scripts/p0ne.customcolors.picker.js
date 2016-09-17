@@ -3,6 +3,15 @@
 |* p0ne.customcolors.p *|
 \*=====================*/
 /*@source p0ne.customcolors.picker.ls */
+/**
+ * settings panel for the Custom Colors module for plug_p0ne
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+*/
+var out$ = typeof exports != 'undefined' && exports || this;
+console.log("~~~~~~~ p0ne.customcolors.picker ~~~~~~~");
 /*
     user data format
     user = {
@@ -21,7 +30,6 @@
         } <OR> "bdg-raveb-s04"
     }
 */
-var out$ = typeof exports != 'undefined' && exports || this;
 module('customColorsPicker', {
   iconCache: {},
   rows: {},

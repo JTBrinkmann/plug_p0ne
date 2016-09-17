@@ -6,6 +6,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.ponify ~~~~~~~"
 
 /*####################################
 #            PONIFY CHAT             #
@@ -291,8 +292,6 @@ module \ponifiedLang, do
                     replace group, k, !-> return v2
                     console.log "\treplacing '#v' with '#{group[k]}'"
         console.groupEnd!
-        console.log Lang.dashboard.people
-        console.log Lang.roles.host
 
         # roles
         replace Lang.roles, \none, !-> return "Mudpony"

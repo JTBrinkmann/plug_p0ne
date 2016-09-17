@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
 */
+console.log "~~~~~~~ p0ne.auxiliaries ~~~~~~~"
 
 export $window = $ window
 export $body = $ document.body
@@ -367,7 +368,7 @@ window <<<<
             for u in userList when u.username == user
                 return u
             user .= toLowerCase!
-            for u in userList when u.username .toLowerCase! == user
+            for u in userList when u.username .toLowerCase! == user or u.rawun .toLowerCase! == user
                 return u
         else
             console.warn "unknown user format", user
@@ -387,7 +388,7 @@ window <<<<
             for u in users.models when u.get(\username) == user
                 return u
             user .= toLowerCase!
-            for u in users.models when u.get(\username) .toLowerCase! == user
+            for u in users.models when u.get(\username).toLowerCase! == user or u.get(\rawun).toLowerCase! == user
                 return u
         else
             console.warn "unknown user format", user
@@ -1155,7 +1156,7 @@ window <<<<
         if not cid
             return $!
         else
-            return $cms! .find ".text.cid-#cid"
+            return get$cms! .find ".text.cid-#cid"
     getChat: (cid) !->
         if typeof cid == \object
             return cid.$el ||= getChat(cid.cid)
@@ -1249,7 +1250,7 @@ window <<<<
         if typeof msg == \string
             $msg = getChat($msg)
         if $msg?.length
-            return $cm!.height! > $msg .offset!.top > 101px
+            return get$cm!.height! > $msg .offset!.top > 101px
         else
             return false
 
@@ -1321,7 +1322,7 @@ window <<<<
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
-                .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
+            /*  .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
                     if x.hasAny ['=', '^']  or  a == ":" or c == ":"
                         return x
                     else if b == \(
@@ -1330,9 +1331,11 @@ window <<<<
                     else if lvl > 0
                         lvl--
                         return "#a)</i>#c" if lvl == 0
-                    return x
-            return pre if not url
-            return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
+                    return x*/
+            if not url
+                return pre
+            else
+                return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
         text += "</i>" if lvl
         return text .replace /\n/g, \<br>
 
@@ -1364,21 +1367,22 @@ window <<<<
             return false
 
 
-    mention: (list) !->
-        if not list?.length
-            return ""
-        else if list.0.username
-            return humanList ["@#{list[i].username}" for ,i in list]
-        else if list.0.attributes?.username
-            return humanList ["@#{list[i].get \username}" for ,i in list]
-        else
-            return humanList ["@#{list[i]}" for ,i in list]
     humanList: (arr) !->
         return "" if not arr.length
         arr = []<<<<arr
         if arr.length > 1
             arr[*-2] += " and\xa0#{arr.pop!}" # \xa0 is NBSP
         return arr.join ", "
+    mention: (list) !->
+        if not list?.length
+            return ""
+        else if list.0.username
+            res = ["@#{list[i].username}" for ,i in list]
+        else if list.0.attributes?.username
+            res = ["@#{list[i].get \username}" for ,i in list]
+        else
+            res = ["@#{list[i]}" for ,i in list]
+        return humanList
 
     plural: (num, singular, plural="#{singular}s") !->
         # for further functionality, see
@@ -1424,7 +1428,7 @@ window <<<<
         return "<span class=\"emoji emoji-#key\"></span>"
     flag: (language, unicode) !->
         /*@security HTML injection possible, if Lang.languages[language] is maliciously crafted*/
-        if language.0 == \' or language.1 == \' # avoid HTML injection
+        if not language or (window.Lang and not Lang.languages[language])
             return ""
         else
             return "<span class='flag flag-#language' title='#{Lang?.languages[language]}'></span>"
@@ -1489,7 +1493,7 @@ window <<<<
         return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span>#{userFlag}#{info ||''}</span>"
 
     formatUserSimple: (user) !->
-        return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
+        return "<span class=un data-uid='#{user.id}'>#{user.rawun}</span>"
 
 
     # formatting
@@ -1642,168 +1646,128 @@ if err
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
+delete window.room
 for id, m of require.s.contexts._.defined when m
+    moduleName = false
     m.requireID = id
     switch
     | m.ACTIVATE =>
         moduleName = "ActivateEvent"
-        window.ActivateEvent = m
     | m._name == \AlertEvent =>
         moduleName = "AlertEvent"
-        window.AlertEvent = m
     | m.deserializeMedia =>
         moduleName = "auxiliaries"
-        window.auxiliaries = m
     | m.AUDIENCE =>
         moduleName = "Avatar"
-        window.Avatar = m
     | m.getAvatarUrl =>
         moduleName = "avatarAuxiliaries"
-        window.avatarAuxiliaries = m
     | m.Events =>
         moduleName = "backbone"
-        window.backbone = m
-    | m.sendChat =>
+    | m.sendChat and m != API =>
         moduleName = "chatAuxiliaries"
-        window.chatAuxiliaries = m
     | m.updateElapsedBind =>
         moduleName = "currentMedia"
-        window.currentMedia = m
     | m.settings =>
         moduleName = "database"
-        window.database = m
     | m.emojify =>
         moduleName = "emoticons"
-        window.emoticons = m
+        m.reversedMap = {[v, k] for k,v of m.map}
+    | m.mapEvent =>
+        moduleName = "eventMap"
     | m.getSize =>
         moduleName = "Layout"
-        window.Layout = m
     | m.canModChat =>
         moduleName = "permissions"
-        window.permissions = m
     | m._read =>
         moduleName = "playlistCache"
-        window.playlistCache = m
     | m.activeMedia =>
         moduleName = "playlists"
-        window.playlists = m
     | m.scThumbnail =>
         moduleName = "plugUrls"
-        window.plugUrls = m
     | m.className == \pop-menu =>
         moduleName = "popMenu"
-        window.popMenu = m
     | \_window of m =>
         moduleName = "PopoutView"
-        window.PopoutView = m
     | m.onVideoResize =>
         moduleName = "roomLoader"
-        window.roomLoader = m
     | m.ytSearch =>
         moduleName = "searchAux"
-        window.searchAux = m
     | m._search =>
         moduleName = "searchManager"
-        window.searchManager = m
     | m.settings =>
         moduleName = "settings"
-        window.settings = m
     | m.ack =>
         moduleName = "socketEvents"
-        window.socketEvents = m
     | m.sc =>
         moduleName = "soundcloud"
-        window.soundcloud = m
     | m.identify =>
         moduleName = "tracker"
-        window.tracker = m
     | m.onRole =>
         moduleName = "users"
-        window.users = m
     | otherwise =>
         switch m.id
         | \playlist-menu =>
             moduleName = "playlistMenu"
-            window.playlistMenu = m
         | \user-lists =>
             moduleName = "userList"
-            window.userList = m
         | \user-rollover =>
             moduleName = "userRollover"
-            window.userRollover = m
         | otherwise =>
             if m._events
                 switch
                 | m._events[\chat:receive] =>
-                    moduleName = "_"
-                    window._$context = m
+                    moduleName = "_$context"
 
             if m.attributes
                 switch
                 | \shouldCycle of m.attributes =>
                     moduleName = "booth"
-                    window.booth = m
                 | \hostID of m.attributes =>
                     moduleName = "room"
-                    window.room = m
                 | \grabbers of m.attributes =>
                     moduleName = "votes"
-                    window.votes = m
             if m::
                 switch
-                | m::execute?.toString!.has("/media/insert") =>
-                    moduleName = "Curate"
-                    window.Curate = m
                 | m::id == \dialog-alert =>
                     moduleName = "DialogAlert"
-                    window.DialogAlert = m
-                    export Dialog = m.__super__
+                    export Dialog = m.__super__.constructor
                 | m::className == \friends =>
                     moduleName = "FriendsList"
-                    window.FriendsList = m
                 | m::className == \avatars && m::eventName =>
                     moduleName = "InventoryAvatarPage"
-                    window.InventoryAvatarPage = m
                     export InventoryDropdown = new m().dropDown.constructor
                 | m::onPlaylistVisible =>
                     moduleName = "MediaPanel"
-                    window.MediaPanel = m
                 | m::id == \playback =>
                     moduleName = "Playback"
-                    window.Playback = m
                 | m::listClass == \playlist-media =>
                     moduleName = "PlaylistItemList"
-                    window.PlaylistItemList = m
                     export PlaylistItemRow = m::RowClass
+                    export PlaylistMediaList = m.__super__.constructor
                 | m::onItemsChange =>
                     moduleName = "PlaylistListRow"
-                    window.PlaylistListRow = m
                 | m::hasOwnProperty \permissionAlert =>
                     moduleName = "PlugAjax"
-                    window.PlugAjax = m
                 | m::listClass == \history and m::hasOwnProperty \listClass =>
                     moduleName = "RoomHistory"
-                    window.RoomHistory = m
                 | m::vote =>
                     moduleName = "RoomUserRow"
-                    window.RoomUserRow = m
                 | m::listClass == \search =>
                     moduleName = "SearchList"
-                    window.SearchList = m
-                | m::id == \chat-suggestion =>
+                    export PlaylistMediaList = m.__super__.constructor
+                | m::id == \chat-suggestion != m.__super__.id =>
                     moduleName = "SuggestionView"
-                    window.SuggestionView = m
                 | m::onAvatar =>
                     moduleName = "WaitlistRow"
-                    window.WaitlistRow = m
                 | m::onVideos =>
                     moduleName = "YtSearchService"
-                    window.YtSearchService = m
+                | m::execute?.toString!.has("/media/insert") =>
+                    moduleName = "Curate"
+
     if moduleName
-        console.log "[require]", id, moduleName, m
-        moduleName = ""
-    else if m.ytSearch
-        console.warn "[require] has .ytSearch", id, m
+        if not p0ne_ and window[moduleName]?
+            console.warn "[require] found multiple matches for '#moduleName'"
+        window[moduleName] = m
     /*| m._events?[\update:next] =>
         window.visiblePlaylist = m
     | m\currentFilter of =>
@@ -1812,11 +1776,11 @@ for id, m of require.s.contexts._.defined when m
         window.AvatarList = m
     */
 for m in <[ _$context ActivateEvent AlertEvent auxiliaries Avatar avatarAuxiliaries backbone booth chatAuxiliaries Curate currentMedia database DialogAlert emoticons FriendsList InventoryAvatarPage Layout MediaPanel permissions Playback playlistCache PlaylistItemList PlaylistListRow playlistMenu playlists PlugAjax plugUrls popMenu PopoutView room RoomHistory roomLoader RoomUserRow searchAux SearchList searchManager settings socketEvents soundcloud SuggestionView tracker userList userRollover users votes WaitlistRow YtSearchService ]> when not m of window
-    console.warn "[require] couldn't require"
+    console.warn "[require] couldn't require", m
 
+if not DialogAlert?
+    $app .addClass \p0ne-dialog-not-required
 
-if emoticons?
-    emoticons.reversedMap = {[v, k] for k,v of emoticons.map}
 
 #= _$context =
 if not _$context?
@@ -1872,11 +1836,11 @@ if app and not (window.chat = app.room.chat) and window._$context
 #======================
 #== CHAT AUXILIARIES ==
 #======================
-cm = $ \#chat-messages
+$cm = $ \#chat-messages
 window <<<<
-    $cm: !->
+    get$cm: !->
         return PopoutView?.chat?.$chatMessages || chat?.$chatMessages || cm
-    $cms: !->
+    get$cms: !->
         cm = chat?.$chatMessages || cm
         if PopoutView?.chat?.$chatMessages
             return cm .add that
@@ -1893,7 +1857,7 @@ window <<<<
     appendChat: (div, wasAtBottom) !->
         wasAtBottom ?= chatIsAtBottom!
         $div = $ div
-        $cms!.append $div
+        get$cms!.append $div
         chatScrollDown! if wasAtBottom
         chat.lastType = null # avoid message merging above the appended div
         PopoutView?.chat?.lastType = null
@@ -1919,12 +1883,29 @@ window <<<<
                         .append do
                             $('<div class=text>')[if isHTML then \html else \text] message
 
+    chatWarnSmall: (className, message, icon, isHTML) !->
+        if typeof message != \string
+            [message, icon, isHTML] = [className, message, icon]
+            className = ''
+        if typeof icon == \boolean
+            isHTML = icon; icon = false
+        icon ||= \icon-chat-system
+        if chat?
+            chat.lastType = className
+        return not message || appendChat do
+            $ "<div class='cm p0ne-notif p0ne-notif-small #className'><i class='icon #icon'></i></div>"
+                .append do
+                    $ '<div class="msg text">'
+                        .append do
+                            $('<div class=text>')[if isHTML then \html else \text] message
+                        .append getTimestamp!
+
     chatIsAtBottom: !->
-        cm = $cm!
-        return cm.scrollTop! > cm.0 .scrollHeight - cm.height! - 20
+        $cm = get$cm!
+        return $cm.scrollTop! > $cm.0 .scrollHeight - $cm.height! - 20
     chatScrollDown: !->
-        cm = $cm!
-        cm.scrollTop( cm.0 .scrollHeight )
+        $cm = get$cm!
+        $cm.scrollTop( $cm.0 .scrollHeight )
 
     chatInput: (msg, append) !->
         $input = chat?.$chatInputField || $ \#chat-input-field

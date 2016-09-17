@@ -5,16 +5,17 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
-window.module = (name, data) !->
+console.log "~~~~~~~ p0ne.module ~~~~~~~"
+window.module = (moduleName, data) !->
     try
         # setup(helperFNs, module, args)
         # update(helperFNs, module, args, oldModule)
         # disable(helperFNs, module, args)
-        if typeof name == \string
-            data.name = name
+        if typeof moduleName == \string
+            data.moduleName = moduleName
         else
-            data = name
-            name = data.name if data
+            data = moduleName
+            moduleName = data.moduleName if data
 
         if typeof data == \function
             setup = data
@@ -27,29 +28,19 @@ window.module = (name, data) !->
                 module = !->
                     return fn.apply module, arguments
                 module <<<< data
-                # what what, functions apparently don't like the .name property
-                Object.defineProperty module, \name, do
-                    get: !-> return name
-                    #set: (newName) !-> name := newName
             else if typeof module == \object
                 module <<<< data
             else
-                console.warn "#{getTime!} [#name] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
+                console.warn "#{getTime!} [#moduleName] TypeError when initializing. `module` needs to be either an Object or a Function but is #{typeof module}"
                 module = data
+            console.log "[test] 3", moduleName, module.moduleName
         else
             module = data
+            console.log "[test] 4", moduleName, module.moduleName
+        module.displayName = displayName ||= moduleName
 
-
-        module.displayName = displayName || name
-        # sanitize module name (to alphanum-only camel case)
-        # UPDATE: the developers should be able to do this for themselves >_>
-        #dataName = name
-        #    .replace(/^[A-Z]/, (.toLowerCase!)) # first letter is to be lowercase
-        #    .replace(/^[^a-z_]/,"_$&") # first letter is to be a letter or a lowdash
-        #    .replace(/(\w)?\W+(\w)?/g, (,a,b) !-> return "#{a||''}#{(b||'').toUpperCase!}")
 
         cbs = module._cbs = {}
-
         arrEqual = (a, b) !->
             return false if not a or not b or a.length != b.length
             for ,i in a
@@ -69,13 +60,13 @@ window.module = (name, data) !->
                     if target.onEarly
                         target.onEarly .apply target, args
                     else
-                        console.warn "#{getTime!} [#name] cannot use .onEarly on", target
+                        console.warn "#{getTime!} [#moduleName] cannot use .onEarly on", target
                 else if target in <[ once one ]>
                     [target, ...args] = args
                     if target.once or target.one
                         that .apply target, args
                     else
-                        console.warn "#{getTime!} [#name] cannot use .once / .one on", target
+                        console.warn "#{getTime!} [#moduleName] cannot use .once / .one on", target
                 else
                     target.on .apply target, args
                 cbs.[]listeners[*] = {target, args}
@@ -169,13 +160,13 @@ window.module = (name, data) !->
             enable: !->
                 return if not @disabled
                 @disabled = false
-                disabledModules[name] = false if not module.modDisabled
+                disabledModules[moduleName] = false if not module.modDisabled
                 try
                     setup.call module, helperFNs, module
                     trigger \moduleEnabled
-                    console.info "#{getTime!} [#name] enabled", setup != null
+                    console.info "#{getTime!} [#moduleName] enabled", setup != null
                 catch err
-                    console.error "#{getTime!} [#name] error while re-enabling", err.messageAndStack
+                    console.error "#{getTime!} [#moduleName] error while re-enabling", err.messageAndStack
                 return this
 
             disable: (temp) !->
@@ -204,25 +195,25 @@ window.module = (name, data) !->
                         p0neCSS.unloadStyle url
                     for $el in cbs.$elements ||[]
                         $el .remove!
-                    for m in p0ne.dependencies[name] ||[]
+                    for m in p0ne.dependencies[moduleName] ||[]
                         m.disable!
 
                     @_$settingsPanel?.wrapper.remove!
                     delete @_$settingsPanel
 
-                    disabledModules[name] = true if not module.modDisabled and not temp
+                    disabledModules[moduleName] = true if not module.modDisabled and not temp
                     if not newModule
                         for $el in cbs.$elementsPersistent ||[]
                             $el .remove!
                         trigger \moduleDisabled
-                        console.info "#{getTime!} [#name] disabled"
-                        dataUnload "p0ne/#name"
+                        console.info "#{getTime!} [#moduleName] disabled"
+                        dataUnload "p0ne/#moduleName"
                     delete [cbs.listeners, cbs.replacements, cbs.adds, cbs.css, cbs.loadedStyles, cbs.$elements]
                     disableLate.call module, helperFNs, newModule if typeof disableLate == \function
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
-                    delete window[name]
-                delete p0ne.dependencies[name]
+                    console.error "#{getTime!} [module] failed to disable '#moduleName' cleanly", err.messageAndStack
+                    delete window[moduleName]
+                delete p0ne.dependencies[moduleName]
                 return this
         module.trigger ||= (target, ...args) !-> # FOR DEBUGGING
             for listener in cbs.listeners ||[] when listener.target == target
@@ -246,14 +237,14 @@ window.module = (name, data) !->
         module.enable = helperFNs.enable
 
         # if there's an old instance of the module
-        if module_ = window[name]
+        if module_ = window[moduleName]
             for k in persistent ||[]
                 module[k] = module_[k]
             if not module_.disabled
                 try
                     module_.disable? module
                 catch err
-                    console.error "#{getTime!} [module] failed to disable '#name' cleanly", err.messageAndStack
+                    console.error "#{getTime!} [module] failed to disable '#moduleName' cleanly", err.messageAndStack
 
 
         # checking dependencies (required modules)
@@ -272,13 +263,13 @@ window.module = (name, data) !->
                     .done loadingDone
                     .fail loadingFailed
         if l
-            console.error "#{getTime!} [#name] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
+            console.error "#{getTime!} [#moduleName] didn't initialize (#{humanList failedRequirements} #{if failedRequirements.length > 1 then 'are' else 'is'} required)"
             return module
 
         # checking optional requirements
         optionalRequirements = [r for r in optional ||[] when !r or (typeof r == \string and not window[r])]
         if optionalRequirements.length
-            console.warn "#{getTime!} [#name] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
+            console.warn "#{getTime!} [#moduleName] couldn't load optional requirement#{optionalRequirements.length>1 && 's' || ''}: #{humanList optionalRequirements}. This module may only run with limited functionality"
 
         # set up Help
         module.help? .= replace /\n/g, "<br>\n"
@@ -291,29 +282,29 @@ window.module = (name, data) !->
                 roomSlug = getRoomSlug!
                 module_ = module
                 disabledModules = p0ne.disabledModules._rooms[roomSlug]
-                module.disabled = disabledModules[name]
+                module.disabled = disabledModules[moduleName]
                 def = $.Deferred!
                 module.loading = def.promise!
 
-                settingsKey = "p0ne__#{roomSlug}_#name"
+                settingsKey = "p0ne__#{roomSlug}_#moduleName"
                 dataLoad settingsKey, _settings, (err, module._settings) !->
                     if err
                         # play it cool (defaulting is magic)
-                        console.warn "[p0ne] error loading room settings for #name", err
+                        console.warn "[p0ne] error loading room settings for #moduleName", err
 
                     def.resolve module # resolve module.loading
                     delete module.loading
 
                     # trigger events
-                    console.info "#{getTime!} [#name] new room settings loaded"
+                    console.info "#{getTime!} [#moduleName] new room settings loaded"
         else
             disabledModules = p0ne.disabledModules
 
         # checks if module is disabled
-        if name of disabledModules
-            module.disabled = disabledModules[name]
+        if moduleName of disabledModules
+            module.disabled = disabledModules[moduleName]
         else
-            module.disabled = disabledModules[name] = !!disabled
+            module.disabled = disabledModules[moduleName] = !!disabled
 
         # disable staff-only modules if user is not staff
         if moderator and not user.isStaff and not module.disabled
@@ -323,15 +314,15 @@ window.module = (name, data) !->
         if module_?._settings # use _settings from previous module
             module._settings = module_._settings
         else if _settings
-            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#name" else "p0ne_#name"
+            settingsKey = if settingsPerCommunity then "p0ne__#{roomSlug}_#moduleName" else "p0ne_#moduleName"
             dependenciesLoading++
             dataLoad settingsKey, _settings, (err, module._settings) !->
                 if err
                     # play it cool (defaulting is magic)
-                    console.warn "[p0ne] error loading settings for #name", err
+                    console.warn "[p0ne] error loading settings for #moduleName", err
                 loadingDone!
 
-        window[name] = p0ne.modules[name] = module
+        window[moduleName] = p0ne.modules[moduleName] = module
 
         # create a Promise, if module is loading
         # so that other modules which require this module can attach callbacks
@@ -343,7 +334,7 @@ window.module = (name, data) !->
 
 
     catch e
-        console.error "#{getTime!} [p0ne module] error initializing '#name':", e.messageAndStack
+        console.error "#{getTime!} [p0ne module] error initializing '#moduleName':", e.messageAndStack
     return module
 
     function loadingDone
@@ -367,33 +358,35 @@ window.module = (name, data) !->
                     setup?.call module, helperFNs, module, module_
                     def?.resolve module # resolve module.loading
                 catch e # in case there was an oopsie
-                    console.error "#{getTime!} [#name] error initializing", e.messageAndStack
+                    console.error "#{getTime!} [#moduleName] error initializing", e.messageAndStack
                     module.disable(true) # try to disable it. (internally wrapped in a try-catch)
                     def?.reject module # reject module.loading
 
             # trigger events
             if module_
                 trigger \moduleUpdated
-                console.info "#{getTime!} [#name] updated#wasDisabled", "color: orange"
+                console.info "#{getTime!} [#moduleName] updated#wasDisabled", "color: orange"
             else
                 trigger \moduleLoaded
-                console.info "#{getTime!} [#name] initialized#wasDisabled", "color: orange"
+                console.info "#{getTime!} [#moduleName] initialized#wasDisabled", "color: orange"
 
             if not module.disabled
                 trigger \moduleEnabled
+
+            module_ := null
 
     function loadingFailed
         # if any dependency fails to load
         def?.reject module # reject module.loading
         delete module.loading
-        delete window[name]
+        delete window[moduleName]
 
     function trigger type
         if _$context?
             _$context.trigger "p0ne:#type", module, module_
-            #_$context.trigger "p0ne:#type:#name", module, module_
+            #_$context.trigger "p0ne:#type:#moduleName", module, module_
         API.trigger "p0ne:#type", module, module_
-        #API.trigger "p0ne:#type:#name", module, module_
+        #API.trigger "p0ne:#type:#moduleName", module, module_
 
 window.loadModule = (moduleName, url) !->
     def = $.Deferred!

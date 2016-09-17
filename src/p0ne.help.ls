@@ -5,14 +5,15 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.help ~~~~~~~"
 
 module \p0neHelp, do
     optional: <[ currentMedia ]>
     require: <[ automute p0neSettings ]>
-    setup: ({$create, css}:aux) ->
+    setup: ({$create, loadStyle}:aux) !->
         #== create CSS ==
         #ToDo move this to plug_p0ne.css
-        #css \p0neHelp, ""
+        loadStyle "#{p0ne.host}/css/walkthrough.css"
 
         automute = p0ne.modules.automute
         var i
@@ -26,6 +27,10 @@ module \p0neHelp, do
         $pp0 = $ppI .find \.p0ne-icon-sub
         $hdButton = $ '#playback .hd'
         $snoozeBtn = $ '#playback .snooze'
+        $bar = $ \#now-playing-bar
+        $songInfo = $ \.p0ne-song-info
+        $footerUser = $ \#footer-user
+
         #== create DOM elements ==
         $el = $create "
             <div class=wt-cover></div>
@@ -61,16 +66,11 @@ module \p0neHelp, do
                 <div class='step fade-in wt-p0-dblclick2mention' data-screen=dblclick2mention>
                     <h1>dblclick2mention</h1>
                     <p>
-                        Most of plug_p0ne's awesome features are not immediately obvious.<br>
-                        Let's try out some, to see what we can do with plug_p<span class=wt-p0-0>0</span>ne.
+                        One of most often used p0 features is the so called \"DblClick username to Mention\".<br>
+                        Just <b>double click</b> their name to <em>@mention</em> them. This is great to quickly greet friends, for example.<br>
+                        <small>(it works on username in chat, join notifications and just about EVERYWHERE)</small>
                     </p>
-                    <p>
-                        One of best is the so called \"DblClick username to Mention\", which let's you @mention others simply by double clicking their usernames (e.g. in their chat messages or join/leave notifications, but it works just about everywhere).<br>
-                        This is great to quickly greet friends, for example.
-                    </p>
-                    <p>
-                        [insert image]<!-- <img src='...'> -->
-                    </p>
+                    <img src='http://i.imgur.com/e5JVTqU.gif' alt='screenrecording of dblclick2mention' width=350 height=185 />
 
                     <button class='wt-p0-back'>back</button>
                     <button class='wt-p0-next continue'>next</button>
@@ -79,7 +79,10 @@ module \p0neHelp, do
                 <div class='step fade-in wt-p0-stream-settings' data-screen=stream-settings>
                     <h1>Stream Settings</h1>
                     <p>
-                        plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br><i class='icon icon-stream-video'></i> Video,<br><i class='icon icon-stream-audio'></i> Audio-Only and<br><i class='icon icon-stream-off'></i> Stream-Off (no video/sound).
+                        plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br>
+                            <i class='icon icon-stream-video'></i> Video<br>
+                            <i class='icon icon-stream-audio'></i> Audio-Only<br>
+                            <i class='icon icon-stream-off'></i> Stream-Off (no video/sound)
                     </p>
                     <p>
                         You can click the icons in the top-middle to change between the modes.
@@ -126,6 +129,27 @@ module \p0neHelp, do
                     <button class=wt-p0-next>skip</button>
                 </div>
 
+                <div class='step fade-in wt-p0-songinfo' data-screen=songinfo>
+                    <h1>Song-Info</h1>
+                    <p>
+                        Want to find out more about the current song?
+                    </p>
+                    <p class=wt-p0-songinfo-closed>
+                        Click the song title above!
+                    </p>
+                    <div class=wt-p0-songinfo-open>
+                        In the top middle you can see two rows.
+                        <img src='//i.imgur.com/clwk2QL.png' alt='top row shows author - title as seen on plug.dj, second row shows channel name and upload title as seen on Youtube/Soundcloud' width=338 height=66 />
+                        <ul>
+                            <li>Click on the author or title to search for them on plug.dj.</li>
+                            <li>Click on the channel or song name to open them in a new tab.</li>
+                        </ul>
+                    </div>
+
+                    <button class='wt-p0-back'>back</button>
+                    <button class='wt-p0-next continue'>next</button>
+                </div>
+
                 <div class='step fade-in wt-p0-info-footer' data-screen=info-footer>
                     <h1>Info Footer</h1>
                     <p>
@@ -155,12 +179,12 @@ module \p0neHelp, do
                 </div>
 
                 <div class=nav>
-                    <i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i>
+                    <i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i>
                     <button class='wt-p0-skip'>skip walkthrough</button
                 </div>
             </div>
         "
-            .on \click, \.wt-p0-button, ->
+            .on \click, \.wt-p0-button, !->
                 $this = $ this
                 $this .trigger "button-#{$this.index!} button-#{$this.text!}"
             .on \click, \.wt-p0-skip, !~>
@@ -172,70 +196,75 @@ module \p0neHelp, do
                 nextScreen $(this).index!
             .appendTo $app
         $app .addClass \is-wt-p0
+        $pSettingsClosed = $el .find \.wt-p0-settings-closed
+        $pSettingsOpen = $el .find \.wt-p0-settings-open
+        $pSongInfoClosed = $el .find \.wt-p0-songinfo-closed
+        $pSongInfoOpen = $el .find \.wt-p0-songinfo-open
+
+        DUMMY_VIDEO =
+            cid: \wZZ7oFKsKzY
+            format: 1
+            author: "plug_p0ne test"
+            title: "Nyan Cat 1h"
+            duration: 36001
+            image: "https://i.ytimg.com/vi/wZZ7oFKsKzY/default.jpg"
 
 
         #== show help screens ==
         #ToDo @screenClose(), accomplished(), step(num)
         screens = [
-            ~> # welcome
+            !~> # welcome
                 $screen .removeClass \revealed
                 $nextBtn_ = $nextBtn
                 p0neSettings.toggleMenu(false)
-                sleep 2_000ms ~>
+                sleep 2_000ms !~>
                     $screen .addClass \revealed
                     sleep 3_000ms, !-> if i == 0
                         $nextBtn_
                             .text "next"
 
-            ~> # settings icon
-                $divClosed = $el .find \.wt-p0-settings-closed
-                $divOpen = $el .find \.wt-p0-settings-open
-                do addListener $ppI, \click, ~>
-                    if not p0neSettings.groupToggles.p0neSettings
-                        $divClosed .show!; $divOpen .hide!
-                        $screen .css left: ""
+            !~> # settings icon
+                do addListener $ppI, \click, !~>
+                    if not p0neSettings._settings.open
+                        $pSettingsClosed .show!; $pSettingsOpen .hide!
+                        $screen .css left: '', top: ''
                         blinking($ppI)
                     else
                         blinking!
-                        $divClosed .hide!; $divOpen .show!
+                        $pSettingsClosed .hide!; $pSettingsOpen .show!
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 160px, top: 100px
                         else
-                            $screen .css left: $ppW.width! + 20px
+                            $screen .css left: $ppW.width! + 60px, top: ''
                         blinking $nextBtn
                         accomplished!
 
-                @screenClose = ~>
+                @screenClose = !~>
                     p0neSettings.toggleMenu(false)
 
-            ~> # dblclick2mention
-
-            ~> # Stream Settings
+            !~> # dblclick2mention
                 $playback = $ \#playback
                 blinking $hdButton
 
-            ~> # Automute
+            !~> # Stream Settings
+                $playback = $ \#playback
+                blinking $hdButton
+
+            !~> # Automute
                 var m
                 if currentMedia?
                     do addListener API,  \advance, !->
                         if not m := currentMedia.get \media
-                            currentMedia .set new Backbone.Model do
-                                cid: \wZZ7oFKsKzY
-                                format: 1
-                                author: "plug_p0ne test"
-                                title: "Nyan Cat 1h"
-                                duration: 36001
-                                image: "https://i.ytimg.com/vi/wZZ7oFKsKzY/default.jpg"
+                            currentMedia .set new Backbone.Model DUMMY_VIDEO
                         else
                             step(if isSnoozed! then 2 else 1)
-                    cb1!
 
-                addListener API, \p0ne:changeMode, (m) !~>
+                do addListener API, \p0ne:changeMode, (m) !~>
                     step(if m == \off then 2 else 1)
                 if isSnoozed!
                     step(2)
 
-                addListener $snoozeBtn, \click, !~>
+                do addListener $snoozeBtn, \click, !~>
                         console.log "smooze [sic]", automute.songlist[API.getMedia!.cid]
                         if automute.songlist[API.getMedia!.cid]
                             accomplished!
@@ -243,31 +272,29 @@ module \p0neHelp, do
                 blinking $snoozeBtn
 
                 @screenClose = !->
-                    if m
-                        currentMedia.set \media, m
+                    currentMedia.set \media, m if m
 
-            ~> # Automute (remove)
+            !~> # Automute (remove)
                 $spI = automute._$settings.find '.p0ne-settings-panel-icon .icon'
                 $summary = p0neSettings.groups[automute.settings].find \.p0ne-settings-summary
-                export test = -> $spI
                 # step 1
                 blinking $ppI
                 addListener $ppI, \click, cb1 = !~>
-                    if not p0neSettings.groupToggles.p0neSettings
+                    if not p0neSettings._settings.open
                         step(1)
-                        $screen .css left: ""
+                        $screen .css left: "", top: ''
                     else
                         step(2)
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 160px, top: 150px
                         else
-                            $screen .css left: $ppW.width! + 20px
+                            $screen .css left: $ppW.width! + 20px, top: ''
                         blinking $summary
                         cb2!
 
                 # step 2
                 addListener $summary, \click, cb2 = !~> requestAnimationFrame !~>
-                    if not p0neSettings.groupToggles[automute.settings]
+                    if p0neSettings._settings.openGroup != automute.settings
                         step(2)
                         $spI .css boxShadow: '', borderRadius: ''
                         blinking $summary
@@ -297,33 +324,58 @@ module \p0neHelp, do
 
 
                         # step 4
+                        # add a dummy song to automute if automute list is empty
+                        for k of automute.songlist
+                            break
+                        else
+                            automute.songlist[DUMMY_VIDEO.cid] = DUMMY_VIDEO
+                            automute.createRow DUMMY_VIDEO.cid
+
                         if $pp0.text! == \2 #DEBUG
                             $screen .css left: 100px
                         else
                             $screen .css left: $ppW.width! + 520px
-                        if settingsPanel != automute._$settingsPanel
+                        if automute._$settingsPanel and settingsPanel != automute._$settingsPanel.wrapper
                             if settingsPanel
                                 settingsPanel .off \click, \.song-remove, accomplished
                             #ToDo add dummy song to automute list, if it's empty
-                            settingsPanel := automute._$settingsPanel
+                            settingsPanel := automute._$settingsPanel.wrapper
                             addListener settingsPanel, \click, \.icon-clear-input, accomplished
                         blinking!
 
                 cb1!
 
-                @screenClose = ~>
+                @screenClose = !~>
                     $spI? .css boxShadow: '', borderRadius: ''
                     p0neSettings.toggleMenu(false)
+                    if automute.songlist[DUMMY_VIDEO.cid]
+                        delete automute.songlist[DUMMY_VIDEO.cid]
+                        automute.rows[DUMMY_VIDEO.cid] .remove!
 
-            ~> # Info Footer
-                addListener $footerUser, \click, cb = !->
-                    if $(this).hasClass \menu
-                        $screen .css right: 20px;
+            !~> # Song Info
+                blinking $bar
+                do addListener $bar, \click, !->
+                    if b = $songInfo .hasClass \expanded
+                        $screen .css top: 220px
+                        $pSongInfoClosed .hide!; $pSongInfoOpen .show!
+                        accomplished!
                     else
-                        $screen .css right: -330px;
+                        $screen .css top: ""
+                        $pSongInfoClosed .show!; $pSongInfoOpen .hide!
+                @screenClose = !~>
+                    if $songInfo .hasClass \expanded
+                        $bar .click!
+                    p0neSettings.toggleMenu(false)
+
+            !~> # Info Footer
+                addListener $footerUser, \click, cb = !->
+                    if $footerUser.hasClass \menu
+                        $screen .css right: 20px
+                    else
+                        $screen .css right: -330px
                 cb!
 
-            ~> # End
+            !~> # End
             @disable # already bound
         ]
         /**  other interesting things to show:

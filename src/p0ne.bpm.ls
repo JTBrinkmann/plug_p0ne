@@ -8,6 +8,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.bpm ~~~~~~~"
 
 
 /*####################################
@@ -189,7 +190,7 @@ module \bpm, do
             console.info "[bpm] loaded"
 
             #== ponify old messages ==
-            $cms! .find \.text .html !->
+            get$cms! .find \.text .html !->
                 return bpm @innerHTML
 
             #== Autocomplete integration ==
@@ -247,7 +248,7 @@ module \bpm, do
 
     disable: (revertPonimotes) !->
         if revertPonimotes
-            $cms! .find \.bpm-emote .replaceWith !->
+            get$cms! .find \.bpm-emote .replaceWith !->
                 flags = ""
                 for class_ in this.classList || this.className.split(/s+/)
                     if class_.startsWith \bpmote-

@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.fimplug ~~~~~~~"
 
 /*####################################
 #              RULESKIP              #
@@ -40,7 +41,7 @@ module \forceSkipButtonRuleskip, do
         '
         var $rulelist
         visible = false
-        fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.name == \forceSkipButton
+        fn = addListener API, \p0ne:moduleEnabled, (m) !-> if m.moduleName == \forceSkipButton
             $rulelist := $create '
                 <ul class=p0ne-skip-ruleskip>
                     <li data-rule=insta><b>insta skip</b></li>
@@ -195,7 +196,7 @@ module \fimstats, do
 
         # prevent the p0ne settings from overlaying the ETA
         console.info "[fimstats] prevent p0neSettings overlay", $(\#p0ne-menu).css bottom: 54px + 21px
-        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) !-> if m.name == \p0neSettings
+        addListener API, 'p0ne:moduleEnabled p0ne:moduleUpdated', (m) !-> if m.moduleName == \p0neSettings
             $ \#p0ne-menu .css bottom: 54px + 21px
 
         # show stats for next song in playlist

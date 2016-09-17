@@ -6,6 +6,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.song-info ~~~~~~~"
 # maybe add "other videos by artist", which loads a list of other uploads by the uploader?
 # http://gdata.youtube.com/feeds/api/users/#{channel}/uploads?alt=json&max-results=10
 
@@ -15,12 +16,12 @@
 ####################################*/
 module \songInfo, do
     optional: <[ _$context ]>
-    settings: \base
+    /*settings: \base
     displayName: 'Song-Info Dropdown'
     help: '''
         A panel with the song's description and links to the artist and song.
         Click on the now-playing-bar (in the top-center of the page) to open it.
-    '''
+    '''*/
     setup: ({addListener, $create, css}) !->
         @$create = $create
         css \songInfo, '

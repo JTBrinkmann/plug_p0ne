@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.song-notif ~~~~~~~"
 
 #ToDo add proper SoundCloud Support
 #   $.ajax url: "https://api.soundcloud.com/tracks/#cid.json?client_id=#{p0ne.SOUNDCLOUD_KEY}"
@@ -31,7 +32,7 @@ module \songNotif, do
     persistent: <[ lastMedia $div ]>
     setup: ({addListener, $create, @$createPersistent, addCommand, css},, module_) !->
         @$lastNotif = $!
-        @$div ||= $cms! .find \.p0ne-song-notif:last
+        @$div ||= get$cms! .find \.p0ne-song-notif:last
 
         #$create \<div>
         #    .addClass \playback-thumb
@@ -160,12 +161,12 @@ module \songNotif, do
                         !-> $description .css height: \auto
 
                 # smooth scroll
-                cm = $cm!
+                $cm = get$cm!
+                ch = $cm .height!
                 offsetTop = $notif.offset!?.top - 100px
-                ch = cm .height!
                 if offsetTop + h > ch
-                    cm.animate do
-                        scrollTop: cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
+                    $cm.animate do
+                        scrollTop: $cm .scrollTop! + Math.min(offsetTop + h - ch + 100px, offsetTop)
                         # 100px is height of .song-notif without .song-description
 
         function hideDescription
@@ -190,9 +191,9 @@ module \songNotif, do
             # smooth scroll
             offsetTop = $notif.offset!?.top - 100px # 100 is # $(\.app-header).height! + $(\#chat-header).height
             if offsetTop < 0px
-                cm = $cm!
-                cm.animate do
-                    scrollTop: cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
+                $cm = get$cm!
+                $cm.animate do
+                    scrollTop: $cm .scrollTop! + offsetTop - 100px # -100px is so it doesn't stick to the very top
 
         @showDescription = showDescription
         @hideDescription = hideDescription

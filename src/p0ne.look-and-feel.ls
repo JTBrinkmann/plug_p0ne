@@ -6,6 +6,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.look-and-feel ~~~~~~~"
 
 
 module \p0neStylesheet, do
@@ -49,7 +50,7 @@ module \animatedUI, do
     require: <[ Dialog ]>
     setup: ({addListener, replace}) !->
         $ \.dialog .addClass \opaque
-        replace Dialog, \render, !-> return !->
+        replace Dialog::, \render, !-> return !->
             @show!
             sleep 0ms, !~> @$el.addClass \opaque
             return this
@@ -58,28 +59,11 @@ module \animatedUI, do
                 if d.dialog.options?.media?.format == 2
                     sleep 0ms, !~> @$el.addClass \opaque
 
-        replace Dialog, \close, (close_) !-> return !->
+        replace Dialog::, \close, (close_) !-> return !->
             @$el?.removeClass \opaque
             @animate = $.noop
             sleep 200ms, !~> close_.call this
             return this
-
-
-/*####################################
-#        FIX HIGH RESOLUTIONS        #
-####################################*/
-module \fixHiRes, do
-    displayName: "☢ Fix high resolutions"
-    settings: \fixes
-    disabled: true
-    help: '''
-        This will fix some odd looking things on larger screens
-        NOTE: This is WORK IN PROGESS! Right now it doesn't help much.
-    '''
-    setup: ({}) !->
-        $body .addClass \p0ne-fix-hires
-    disable: !->
-        $body .removeClass \p0ne-fix-hires
 
 
 /*####################################
@@ -99,7 +83,7 @@ module \playlistIconView, do
 
         #= fix visiblerows calculation =
         if not PlaylistItemList?
-            chatWarn playlistIconView.displayName, "this module couldn't fully load, it might not act 100% as expected. If you have problems, you might want to disable this."
+            chatWarn "this module couldn't fully load, it might not act 100% as expected. If you have problems, you might want to disable this.", playlistIconView.displayName
             return
         const CELL_HEIGHT = 185px # keep in sync with plug_p0ne.css
         const CELL_WIDTH = 160px
@@ -344,7 +328,7 @@ module \djIconChat, do
 ####################################*/
 module \draggableDialog, do
     require: <[ Dialog ]>
-    displayName: '☢ Draggable Dialog'
+    displayName: 'Draggable Dialog'
     settings: \look&feel
     setup: ({addListener, replace, css}) !->
         # set up styles
@@ -383,7 +367,7 @@ module \draggableDialog, do
 
         /* add lights-out button to dialogs */
         lightsout = true
-        replace Dialog, \getHeader, !-> return (title) !->
+        replace Dialog::, \getHeader, !-> return (title) !->
             $  "<div class=dialog-frame>
                     <span class=title>#title</span>
                     <i class='icon icon-#{if lightsout then '' else 'un'}locked p0ne-lightsout-btn'></i>
@@ -415,7 +399,7 @@ module \draggableDialog, do
             lightsout := !lightsout
 
         # reset when the dialog is closed
-        replace Dialog, \close, (c_) !-> return !->
+        replace Dialog::, \close, (c_) !-> return !->
             console.log "[dialogDragNDrop] closing dialog"
             stopDragging true
             c_ ...
@@ -448,7 +432,6 @@ module \draggableDialog, do
 module \emojiPack, do
     displayName: 'Emoji Pack'
     settings: \look&feel
-    disabled: true
     help: '''
         Replace all emojis with the one from Google (for Android Lollipop) or Twitter.
 
@@ -456,33 +439,83 @@ module \emojiPack, do
     '''
     screenshot: 'https://i.imgur.com/Ef94Csn.png'
     _settings:
-        pack: \google
+        pack: \apple
         # note: as of now, only Google's emojicons (from Android Lollipop) are supported
         # possible future emoji packs are: Twitter's and EmojiOne's (and native browser)
         # by default, plug.dj uses Apple's emojipack
-    setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
+    appleIcons: []
+    setup: (, emojiPack, module_) !->
+        # cache vanilla emoji CSS
+        l=0
+        $span = $ '<span class=emoji>' .appendTo $body
+        for className in <[ emoji-1f604 emoji-1f60d emoji-1f44b emoji-1f494 ]>
+            $span .addClass className
+            emojiPack.appleIcons[l++] = $span .css \background
+            $span .removeClass className
+        $span .remove!
+
+        if @value != \apple
+            p0neCSS.loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
 
     settingsExtra: ($el) !->
         emojiPack = this
         var resetTimer
-        $ "
-            <form>
+        appleURL = getIcon("", true).url
+        $form = $ "
+            <form style='font-size: 15px'>
                 <label>
-                    <input type=radio name=max-mehs value=google> Google
+                    <input type=radio name=emojipack value=google> Google
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f604.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f60d.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f44b.png' />
+                        <img class=emoji src='//ssl.gstatic.com/chat/emoji/5/emoji_u1f494.png' />
+                    </span>
                 </label><br>
                 <label>
-                    <input type=radio name=max-mehs value=twitter> Twitter
+                    <input type=radio name=emojipack value=twitter> Twitter
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f604.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f60d.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f44b.png' />
+                        <img class=emoji src='//twemoji.maxcdn.com/16x16/1f494.png' />
+                    </span>
+                </label><br>
+                <label>
+                    <input type=radio name=emojipack value=emojione> Emoji One
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F604.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F60D.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F44B.png?v=1.2.4' />
+                        <img class=emoji src='//cdn.jsdelivr.net/emojione/assets/png/1F494.png?v=1.2.4' />
+                    </span>
+                </label><br>
+                <label>
+                    <input type=radio name=emojipack value=apple> Apple (default)
+                    <span class=p0ne-settings-emoji-pack-sample>
+                        <span class=emoji></span><span class=emoji></span><span class=emoji></span><span class=emoji></span>
+                    </span>
                 </label>
             </form>"
             .on \click, \input:radio, !->
-                if @checked
+                if @checked and emojiPack._settings.pack != @value
+                    if emojiPack._settings.pack != \apple
+                        p0neCSS.unloadStyle "#{p0ne.host}/css/#{emojiPack._settings.pack}.emoji.css"
                     emojiPack._settings.pack = @value
-                    emojiPack.disable!.enable!
+                    if @value != \apple
+                        p0neCSS.loadStyle "#{p0ne.host}/css/#{emojiPack._settings.pack}.emoji.css"
             .appendTo $el
-            .find "input[value=#{emojiPack._settings.pack}]" .attr \checked, \checked
+        $form .find "input[value=#{emojiPack._settings.pack}]" .attr \checked, \checked
+        $sampleEmojis = $form .find '.p0ne-settings-emoji-pack-sample:last .emoji'
+        console.log $sampleEmojis, @appleIcons
+        for emoji, i in $sampleEmojis
+            $(emoji) .css background: @appleIcons[i]
         $el .css do
             paddingLeft: 15px
+
+    disable: !->
+        if @_settings.pack != \apple
+            p0neCSS.unloadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
 
 
 /*####################################

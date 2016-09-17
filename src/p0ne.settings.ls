@@ -5,17 +5,18 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.settings ~~~~~~~"
 
 /*####################################
 #              SETTINGS              #
 ####################################*/
 module \p0neSettings, do
     _settings:
-        groupToggles: {p0neSettings: true, base: true}
+        open: false
+        openGroup: \base
         expert: false
+        largeSettingsPanel: true
     setup: ({$create, addListener}, p0neSettings, oldModule) !->
-        groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
-
         #= create DOM elements =
         $ppM = $create "<div id=p0ne-menu>" # (only the root needs to be created with $create)
             .insertAfter \#app-menu
@@ -27,17 +28,11 @@ module \p0neSettings, do
             .appendTo $ppW
         $ppP = $ "<div class=p0ne-settings-popup>"
             .appendTo $ppM
-            .fadeOut 0
-
-        if @_settings.expert
-            $ppW .addClass \p0ne-settings-expert
-        #@<<<<{$ppP, $ppM, $ppI}
+            .hide!
 
         #= add "simple" settings =
         @$vip = $ "<div class=p0ne-settings-vip>" .appendTo $ppS
         @$vip.items = @$vip
-
-        @toggleMenu groupToggles.p0neSettings
 
         #= settings footer =
         @$ppInfo = $ "
@@ -45,17 +40,14 @@ module \p0neSettings, do
                 <div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>
                 <div class=p0ne-settings-version>v#{p0ne.version}</div>
                 <div class=p0ne-settings-help-btn>help</div>
-                <div class=p0ne-settings-expert-toggle>show all options</div>
             </div>"
+            #   <div class=p0ne-settings-expert-toggle>show all options</div>
             .on \click, \.p0ne-settings-help-btn, !->
                 p0ne.modules.p0neHelp?.enable!
-            .on \click, \.p0ne-settings-expert-toggle, !~>
-                if @_settings.expert = not @_settings.expert
-                    $ppW .addClass \p0ne-settings-expert
-                else
-                    $ppW .removeClass \p0ne-settings-expert
-                updateSize!
             .appendTo $ppS
+
+        /*@$expertToggle = @$ppInfo .find \.p0ne-settings-expert-toggle
+            .click @~expertToggle*/
 
         #= add toggles for existing modules =
         for ,module of p0ne.modules when not module.loading
@@ -63,99 +55,42 @@ module \p0neSettings, do
             module._$settingsPanel?.wrapper .appendTo $ppM
 
 
-        do addListener API, \p0ne:stylesLoaded, updateSize
-
-        !~function updateSize
-            cb = !~>
-                for group, $el of @groups # when @_settings.groupToggles[group]
-                    $el .trigger \p0ne:resize
-                for group, $el of @groups # when @_settings.groupToggles[group]
-                    $el .trigger \p0ne:resize
-            requestAnimationFrame cb
-            sleep 2_000ms, cb
-
-
-        #= DEBUG =
-        debugMode = if groupToggles.p0neSettings then 0 else -1
-        debugClosingDur = 500ms
-
         #= add DOM event listeners =
         # slide settings-menu in/out
-        $ppI .click !~>
-            if @toggleMenu!
-                #DEBUG
-                $ppW .removeClass "p0ne-settings-debug-#{debugMode}"
-                debugMode := (debugMode + 1) % 3
-                $ppI .children! .text debugMode
-                $ppW .addClass "p0ne-settings-debug-#{debugMode}"
-
-                if debugMode == 2
-                    debugClosingDur := 0ms
-                    $ppP .appendTo $ppW
-                    $ppW .addClass \p0ne-settings-expert
-                else
-                    debugClosingDur := 500ms
-                    $ppP .appendTo $ppM
-                    if @_settings.expert
-                        $ppW .addClass \p0ne-settings-expert
+        @_settings.open = not @_settings.open
+        @_settings.largeSettingsPanel = not @_settings.largeSettingsPanel
+        $ppI
+            .click !~>
+                if @toggleMenu!
+                    if @_settings.largeSettingsPanel = not @_settings.largeSettingsPanel
+                        $ppW .addClass 'p0ne-settings-large p0ne-settings-expert'
+                        $ppI .children! .text '2'
+                        $ppP .appendTo $ppW
+                        if not @_settings.openGroup
+                            p0neSettings.openGroup \base
                     else
-                        $ppW .removeClass \p0ne-settings-expert
+                        $ppW .removeClass \p0ne-settings-large
+                        $ppI .children! .text '0'
+                        $ppP .appendTo $ppM
+                        #@toggleExpert(@_settings.expert)
+            .click!
 
-                for group, $el of @groups when @_settings.groupToggles[group]
-                    if keepOpen
-                        @_settings.groupToggles[group] = false
-                        $el .removeClass \open .css height: 30px
-                    else
-                        keepOpen = group
-                if not keepOpen
-                    keepOpen = \base
-                    @groupToggles.base = true
-                    @groups.base .find \.p0ne-settings-summary .click!
+        #if @_settings.expert
+        $ppW .addClass \p0ne-settings-expert
 
-                sleep debugClosingDur, !~>
-                    for group, $el of @groups
-                        if not groupToggles[group]
-                            $el .addClass \closed
-                        else
-                            $el .trigger \p0ne:resize
+
+
 
         # toggle groups
-        addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
-            $s = $ this .parent!
-            group = $s.data \group
-            if $s.hasClass \open    and debugMode != 2 # close
-                groupToggles[group] = false
-                $s
-                    .removeClass \open
-                    .css height: 30px
-                    #.stop! .animate height: 30px, \slow
-                sleep 500ms, !-> if not groupToggles[group]
-                    $s .addClass \closed
-            else
-                groupToggles[group] = true
-                $s
-                    .addClass \open
-                    .removeClass \closed
-                    #.stop! .animate height: $s.children!.length * 44px, \slow /* magic number, height of a .p0ne-settings-item*/
-                    .trigger \p0ne:resize
-                if debugMode != 0 #DEBUG
-                    $s = $s .siblings(\.open) .removeClass \open .css height: 30px
-                    sleep debugClosingDur, !->
-                        $s.each !->
-                            $this = $(this)
-                            group = $this.data \group
-                            groupToggles[group] = false
-                            $this .addClass \closed
+        $ppW.on \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
+            group = $ this .parent! .data \group
+            if p0neSettings._settings.openGroup != group
+                p0neSettings.openGroup group
+            else if not p0neSettings._settings.largeSettingsPanel
+                p0neSettings.closeGroup group
             e.preventDefault!
 
-        addListener $ppW, \p0ne:resize, \.p0ne-settings-group, (e) !->
-            $this = $ this
-            if p0neSettings._settings.groupToggles[$this.data \group]
-                $this .css height: 0 # reset scrollHeight
-                $this .css height: @scrollHeight # make group as large as content
-            #$this .scrollTop 0
-
-        addListener $ppW, \click, \.checkbox, throttle 200ms, !->
+        $ppW.on \click, \.checkbox, throttle 200ms, !->
             # this gets triggered when anything in the <label> is clicked
             $this = $ this
             enable = this .checked
@@ -168,7 +103,7 @@ module \p0neSettings, do
             else
                 module.disable!
         panelIconTimeout = 0
-        addListener $ppW, \click, \.p0ne-settings-panel-icon, (e) !->
+        $ppW.on \click, \.p0ne-settings-panel-icon, (e) !->
             e.stopImmediatePropagation!
             e.preventDefault!
 
@@ -184,7 +119,7 @@ module \p0neSettings, do
                 module._$settingsPanel =
                     open: false
                     wrapper: $ '<div class=p0ne-settings-panel-wrapper>' .appendTo $ppM
-                    $el: $ "<div class='p0ne-settings-panel p0ne-settings-panel-#{module.name .toLowerCase!}'>"
+                    $el: $ "<div class='p0ne-settings-panel p0ne-settings-panel-#{module.moduleName .toLowerCase!}'>"
                 module._$settingsPanel.$el .appendTo module._$settingsPanel.wrapper
                 module.settingsPanel(module._$settingsPanel.$el, module)
 
@@ -208,74 +143,84 @@ module \p0neSettings, do
                     .addClass \icon-settings-white
                     .removeClass \icon-settings-grey
 
-        addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
-            $this = $ this
-            module = $this .data \module
-            $ppP .html "
-                    <div class=p0ne-settings-popup-triangle></div>
-                    <h3>#{module.displayName}</h3>
-                    #{module.help}
-                    #{if!   module.screenshot   then'' else
-                        '<img src='+module.screenshot+'>'
-                    }
-                "
-            l = $ppW.width!
-            maxT = $ppM .height!
-            h = $ppP .height!
-            t = $this .offset! .top - 50px
-            tt = t - h/2 >? 0px
-            diff = tt - (maxT - h - 30px)
-            if diff > 0
-                t += diff + 10px - tt
-                tt -= diff
-            else if tt != 0
-                t = \50%
-            $ppP
-                .css top: tt, left: l
-                .stop!.fadeIn!
-            $ppP .find \.p0ne-settings-popup-triangle
-                .css top: 14px >? t
-        addListener $ppW, \mouseout, \.p0ne-settings-has-more, !->
-            $ppP .stop!.fadeOut!
-        addListener $ppP, \mouseover, !->
-            $ppP .stop!.fadeIn!
-        addListener $ppP, \mouseout, !->
-            $ppP .stop!.fadeOut!
+        $ppW.on \mouseover, '.p0ne-settings-item, .p0ne-settings-extra', (e) !->
+            if p0neSettings._settings.largeSettingsPanel or $ e.target .is \.p0ne-settings-help
+                $module = $ this
+                module = $module .data \module
+                return if not module.help and not module.screenshot
+                $ppP .html "
+                        <div class=p0ne-settings-popup-triangle></div>
+                        <h3>#{module.displayName}</h3>
+                        #{module.help ||''}
+                        #{if!   module.screenshot   then'' else
+                            '<img src='+module.screenshot+'>'
+                        }
+                    "
+                l = $ppW.width!
+                maxT = $ppM .height!
+                h = $ppP .height!
+                t = $module .offset! .top - 50px
+                tt = t - h/2 >? 0px
+                diff = tt - (maxT - h - 30px)
+                if diff > 0
+                    t += diff + 10px - tt
+                    tt -= diff
+                else if tt != 0
+                    t = \50%
+                $ppP
+                    .css top: tt, left: l
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .show!
+                else
+                    $ppP .stop! .fadeIn!
+                $ppP .find \.p0ne-settings-popup-triangle
+                    .css top: 14px >? t
+        $ppM.on \mouseout, '.p0ne-settings-has-more, .p0ne-settings-popup', !->
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .hide!
+                else
+                    $ppP .stop! .fadeOut!
+        $ppP.on \mouseover, !->
+                if p0neSettings._settings.largeSettingsPanel
+                    $ppP .show!
+                else
+                    $ppP .stop! .fadeIn!
 
         # add p0ne.module listeners
         #= module INITALIZED =
         addListener API, \p0ne:moduleLoaded, (module) !~> @addModule module
 
         #= module ENABLED =
-        addListener API, \p0ne:moduleEnabled, (module) !~>
+        addListener API, \p0ne:moduleEnabled, (module, isUpdate) !~>
             module._$settings?
                 .addClass \p0ne-settings-item-enabled
                 .find \.checkbox .0 .checked=true
-            @loadSettingsExtra true, module
-            if @_settings.groupToggles[module.settings]
-                requestAnimationFrame !~>
-                    @groups[module.settings] .trigger \p0ne:resize
+            if not isUpdate
+                @loadSettingsExtra true, module
 
         #= module UPDATED =
         addListener API, \p0ne:moduleUpdated, (module, module_) !~>
+            module_._$settingsExtra? .remove!
+            module_._$settingsPanel? .remove!
             if module.settings
                 @addModule module, module_
+            else if module_.settings
+                module_._$settings .remove!
+                /* # i think this is a highly neglectable edge case
                 if module.help != module_.help and module._$settings?.is \:hover
                     # force update .p0ne-settings-popup (which displays the module.help)
-                    module._$settings .mouseover!
+                    module._$settings .mouseover!*/
 
         #= module DISABLES =
-        addListener API, \p0ne:moduleDisabled, (module_) !~>
-            module_._$settings?
+        addListener API, \p0ne:moduleDisabled, (module_) !~> if module_._$settings
+            module_._$settings
                 .removeClass \p0ne-settings-item-enabled
                 .find \.checkbox
                     .attr \checked, false
             module_._$settingsExtra?
                 .stop!
                 .slideUp !->
-                    $ this
-                        .trigger \p0ne:resize
-                        .remove!
+                    module_._$settingsExtra .remove!
 
         addListener $body, \click, \#app-menu, !~> @toggleMenu false
         if _$context?
@@ -308,23 +253,68 @@ module \p0neSettings, do
                 $ppW .css paddingRight: scrollLeftMax
             d.remove!
 
+        # toggle expert mode
+    toggleExpert: (state) !->
+        @$expertToggle .text do
+            if state ?= @_settings.expert
+                "show less options"
+            else
+                "show all options"
+        $ppW .toggleClass \p0ne-settings-expert, state
+        @_settings.expert = state
+
     toggleMenu: (state) !->
-        if state ?= not @groupToggles.p0neSettings
-            @$ppW.slideDown!
+        if state ?= not @_settings.open
+            @$ppW.css maxHeight: \100%
         else
-            @$ppW.slideUp!
+            @$ppW.css maxHeight: 0
             for ,module of p0ne.modules when module._$settingsPanel?.open # close panel
                     module._$settingsPanel.wrapper
                         .animate do
                             left: @$ppW.width! - module._$settingsPanel.$el.width!
                             -> $(this).hide!
                     module._$settingsPanel.open = false
-        return @groupToggles.p0neSettings = state
+        return @_settings.open = state
 
 
     groups: {}
     groupEmpty: {}
     moderationGroup: $!
+
+    openGroup: (group) !->
+        console.info "[openGroup]", group
+        if @_settings.openGroup
+            @closeGroup @_settings.openGroup
+
+        @_settings.openGroup = group
+        $s = @groups[group]
+            .removeClass \closed
+            .addClass \open
+        if @_settings.largeSettingsPanel
+            $s .css height: \auto
+        else
+            requestAnimationFrame !~>
+                $s .css height: $s.0.scrollHeight
+                sleep 500ms, !~> if @_settings.openGroup == group
+                    $s .css height: \auto
+
+
+    closeGroup: (group) !->
+        console.info "[closeGroup]", group, @groups[group], @groups[group]?.0?.scrollHeight
+        @_settings.openGroup = false
+        $s = @groups[group]
+            .removeClass \open
+        if @_settings.largeSettingsPanel
+            $s
+                .css height: 30px
+                .addClass \closed
+        else
+            $s .css height: $s.0.scrollHeight
+            requestAnimationFrame !~>
+                $s .css height: 30px
+                sleep 500ms, !~> if @_settings.openGroup != group
+                    $s .addClass \closed
+
     addModule: (module, module_) !->
         if module.settings
             # prepare extra icons to be added to the module's settings element
@@ -353,20 +343,17 @@ module \p0neSettings, do
                         $ '<div class=p0ne-settings-summary>' .text module.settings #.toUpperCase!
                     .insertBefore @$ppInfo
                 $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
-                if @_settings.groupToggles[module.settings]
-                    $s  .addClass \open
+
+                if module.settings == \moderation
+                    $s .addClass \p0ne-settings-group-moderation
+
+                if @_settings.openGroup == module.settings
+                    @openGroup module.settings
                 else
                     $s
                         .addClass \closed
                         .css height: 30px
 
-                if module.settings == \moderation
-                    $s .addClass \p0ne-settings-group-moderation
-
-                # (animatedly) open the settings group
-                if @_settings.groupToggles[module.settings]
-                    #.stop! .animate height: $s.children!.length * 44px, \slow
-                    $s .find \.p0ne-settings-summary .click!
             # otherwise we already created the settings group
 
             if not module.settingsVip and not @groupEmpty[module.settings] and (@groupEmpty[module.settings] = module.settingsSimple)
@@ -376,7 +363,7 @@ module \p0neSettings, do
             module._$settings = $ "
                     <label class='#itemClasses'>
                         <input type=checkbox class=checkbox #{if module.disabled then '' else \checked} />
-                        <div class=togglebox><div class=knob></div></div>
+                        <div class=togglebox></div>
                         #{module.displayName}
                         #icons
                     </label>
@@ -384,41 +371,41 @@ module \p0neSettings, do
                 .data \module, module
 
             if module_?._$settings?.parent!.parent! .is $s
-                module_._$settings
-                    .after do
-                        module._$settings .addClass \updated
-                    .remove!
+                module._$settings
+                    .addClass \updated
+                    .insertAfter module_._$settings
                 sleep 2_000ms, !->
                     module._$settings .removeClass \updated
-                @loadSettingsExtra false, module, module_ if not module.disabled
             else
                 module._$settings .appendTo $s.items
 
-                # render extra settings element if module is enabled
-                @loadSettingsExtra false, module if not module.disabled
+            # render extra settings element if module is enabled
+            @loadSettingsExtra false, module if not module.disabled
+
+            if module_
+                module_._$settings? .remove!
 
 
 
 
-    loadSettingsExtra: (autofocus, module, module_) !->
+    loadSettingsExtra: (autofocus, module) !->
         try
-            module_?._$settingsExtra? .remove!
             if module.settingsExtra
                 module.settingsExtra do
                     module._$settingsExtra = $ "<div class=p0ne-settings-extra>"
-                        .hide!
+                        .data \module, module
                         .insertAfter module._$settings
                 # using rAF because otherwise jQuery calculates the height incorrectly
-                requestAnimationFrame !~>
-                    module._$settingsExtra
-                        .slideDown ->
-                            module._$settingsExtra .trigger \p0ne:resize
-                    if autofocus
-                        module._$settingsExtra .find \input .focus!
-                    else
-                        module._$settings .parent! .scrollTop 0
+                $group = @groups[module.settings]
+                if autofocus and @_settings.openGroup == module.settings
+
+                    module._$settingsExtra .css height: 0px
+                    requestAnimationFrame !->
+                        module._$settingsExtra .css height: module._$settingsExtra.0.scrollHeight
+                        sleep 250ms, !->
+                            module._$settingsExtra .css height: \auto
+                    module._$settingsExtra .find \input .focus!
         catch err
-            console.error "[#{module.name}] error while processing settingsExtra", err.stack
+            console.error "[#{module.moduleName}] error while processing settingsExtra", err.stack
             module._$settingsExtra?
                 .remove!
-            @groups[module.settings] .trigger \p0ne:resize

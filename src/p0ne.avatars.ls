@@ -11,6 +11,7 @@
  * However, please drop me an e-mail so I can keep an overview of things.
  * I remain the right to revoke this right anytime.
  */
+console.log "~~~~~~~ p0ne.avatars ~~~~~~~"
 
 /* THIS IS A TESTING VERSION! SOME THINGS ARE NOT IMPLEMENTED YET! */
 /* (this includes things mentioned in the "notes" section below) */
@@ -111,9 +112,7 @@ require <[ sockjs ]>, (SockJS) !->
             p0ne._avatars = {}
 
             avatarID = API.getUser!.avatarID
-            if @_settings.vanillaAvatarID
-                @hasNewAvatar = @_settings.vanillaAvatarID != avatarID
-            else
+            if @hasNewAvatar = (@_settings.vanillaAvatarID and @_settings.vanillaAvatarID != avatarID)
                 @_settings.vanillaAvatarID = avatarID
 
             # - display custom avatars
@@ -190,15 +189,15 @@ require <[ sockjs ]>, (SockJS) !->
                 return _internal_addAvatar d
             @removeAvatar = (avatarID, replace) !->
                 for u in users.models
-                    if u.get(\avatarID) == avatarID
-                        u.set(\avatarID, u.get(\vanillaAvatarID))
+                    if u.get(\avatarID) == avatarID and vaID = u.get(\vanillaAvatarID)
+                        u.set(\avatarID, vaID)
                 delete p0ne._avatars[avatarID]
 
 
 
             # - set avatarID to custom value
             @changeAvatar = (uid, avatarID) !~>
-                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.get \vanillaAvatarID)
                     console.warn "[p0ne custom avatars] can't load user or avatar: '#uid', '#avatarID'"
                     return
 
@@ -311,10 +310,18 @@ require <[ sockjs ]>, (SockJS) !->
 
             #== patch Avatar Selection ==
             for Cell in window.Cells
+                # highlight the user's vanilla avatar (if the user has a custom avatar)
+                replace Cell::, \render, (r_) !-> return !->
+                    r_.call this
+                    if customAvatars._settings.avatarID != customAvatars._settings.vanillaAvatarID and customAvatars._settings.vanillaAvatarID == @model.get \id
+                        @$el .find \.top
+                            .append "<div class=p0ne-vanilla-avatar-highlight>your vanilla avatar</div>"
+
+                # propagate custom avatar selection to ppCAS
                 replace Cell::, \onClick, (oC_) !-> return !->
                     #console.log "[p0ne custom avatars] Avatar Cell click", this
-                    avatarID = @model.get("id")
-                    if /*not this.$el.closest \.inventory .length or*/ not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
+                    avatarID = @model.get \id
+                    if not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
                         # if avatatar is in the Inventory or not bought, properly select it
                         oC_ ...
                         customAvatars.socket? .emit \changeAvatarID, null
@@ -323,6 +330,7 @@ require <[ sockjs ]>, (SockJS) !->
                         customAvatars.socket? .emit \changeAvatarID, avatarID
                         customAvatars.changeAvatar(userID, avatarID)
                         @onSelected!
+
             # - get avatars in inventory -
             $.ajax do
                 url: '/_/store/inventory/avatars'
@@ -367,35 +375,6 @@ require <[ sockjs ]>, (SockJS) !->
                     server = $.trim str.substr(6)
                     if server == "<url>"
                         chatWarn "hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars"
-                        return
-                    else if server == "."
-                        # Veteran avatars
-                        # This is more or less for testing only
-                        base_url = "https://dl.dropboxusercontent.com/u/4217628/plug.dj/customAvatars/"
-                        helper = (fn) !-> # helper to add or remove veteran avatars
-                            fn = customAvatars[fn]
-                            for avatarID in <[ su01 su02 space03 space04 space05 space06 ]>
-                                fn avatarID, do
-                                    category: \Veteran
-                                    base_url: base_url
-                                    thumbOffsetTop: -5px
-                            fn \animal12, do
-                                category: \Veteran
-                                base_url: base_url
-                                thumbOffsetTop: -19px
-                                thumbOffsetLeft: -16px
-                            for avatarID in <[ animal01 animal02 animal03 animal04 animal05 animal06 animal07 animal08 animal09 animal10 animal11 animal12 animal13 animal14 lucha01 lucha02 lucha03 lucha04 lucha05 lucha06 lucha07 lucha08 monster01 monster02 monster03 monster04 monster05 _tastycat _tastycat02 warrior01 warrior02 warrior03 warrior04 ]>
-                                fn avatarID, do
-                                    category: \Veteran
-                                    base_url: base_url
-                                    thumbOffsetTop: -10px
-                            # if only we had backups of the Halloween avatars :C
-                            # if YOU have them, please contact me
-
-                        @socket = close: !->
-                            helper \removeAvatar #ToDo check if this is even required
-                            delete @socket
-                        helper \addAvatar
                         return
                     else if server == \default
                         server = @DEFAULT_SERVER
