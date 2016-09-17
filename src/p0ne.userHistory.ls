@@ -6,6 +6,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
 */
+console.log "~~~~~~~ p0ne.userHistory ~~~~~~~"
 #HistoryItem = RoomHistory::collection.model if RoomHistory
 
 

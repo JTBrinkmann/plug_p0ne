@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.base ~~~~~~~"
 
 
 /*####################################
@@ -25,28 +26,27 @@ module \disableCommand, do
                 response = "@#{msg.un} "
                 if enabledModules.length
                     response += "disabled #{humanList enabledModules}."
-                if disabledModules.length
+                else if disabledModules.length
                     response += " #{humanList disabledModules} #{if disabledModules.length == 1 then 'was' else 'were'} weren't enabled."
                 API.sendChat response
 
 module \getStatus, do
     module: !->
         status = "Running plug_p0ne v#{p0ne.version}"
-        status += " (incl. chat script)" if window.p0ne_chat
         status += "\tand plug³ v#{that}" if getPlugCubedVersion!
         status += "\tand plugplug #{window.getVersionShort!}" if window.ppSaved
         status += ".\tStarted #{ago p0ne.started}"
-        modules = [m for m in disableCommand.modules when window[m] and not window[m].disabled]
-        status += ".\t#{humanList modules} are enabled" if modules.length
+        modules = [m for ,m of p0ne.modules when m.disableCommand and not m.disabled]
+        status += ".\t#{humanList modules} enabled" if modules.length
 
 module \statusCommand, do
     timeout: false
     setup: ({addListener}) !->
         addListener API, \chat, (data) !~> if not @timeout
-            if data.message.has( \!status ) and data.message.has("@#{user.username}") and API.hasPermission(data.uid, API.ROLE.BOUNCER)
+            if data.message.has( \!status ) and isMention(data) and API.hasPermission(data.uid, API.ROLE.BOUNCER)
                 @timeout = true
                 status = "#{getStatus!}"
-                console.info "[AUTORESPOND] status: '#status'", data.uid, data.un
+                console.info "[AR] status: '#status'", data.uid, data.un
                 API.sendChat status, data
                 sleep 30min *60_000to_ms, !->
                     @timeout = false
@@ -190,7 +190,7 @@ module \autowoot, do
                         woot!
             if hasMehWarning
                 clearTimeout(timer2)
-                $cms! .find \.p0ne-autowoot-meh-btn .closest \.cm .remove!
+                get$cms! .find \.p0ne-autowoot-meh-btn .closest \.cm .remove!
                 hasMehWarning := false
 
         # warn if user is blocking a voteskip
@@ -240,29 +240,27 @@ module \automute, do
         streamOff = isSnoozed!
         addListener API, \p0ne:changeMode, onModeChange = (mode) !~>
             newStreamOff = (mode == \off)
-            <~ requestAnimationFrame
+            <~! requestAnimationFrame
             if newStreamOff
-                if not streamOff
+                if media
                     $snoozeBtn
                         .empty!
+                        .removeClass 'p0ne-automute-add p0ne-automute-remove'
                         .append $box
-                if not media
-                    # umm, this shouldn't happen. when there's no song playing, there shouldn't be playback-controls
-                    console.warn "[automute] uw0tm8? how did the stream mode change if there's no song playing? well this could happen if you changed the room or something…"
-                else if @songlist[media.cid] # btn "remove from automute"
-                    console.log "[automute] change automute-btn to REMOVE"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
-                    $box .html "remove from<br>automute"
-                else # btn "add to automute"
-                    console.log "[automute] change automute-btn to ADD"
-                    $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
-                    $box .html "add to<br>automute"
+                    if @songlist[media.cid] # btn "remove from automute"
+                        console.log "[automute] change automute-btn to REMOVE"
+                        $snoozeBtn .addClass 'p0ne-automute p0ne-automute-remove'
+                        $box .html "remove from<br>automute"
+                    else # btn "add to automute"
+                        console.log "[automute] change automute-btn to ADD"
+                        $snoozeBtn .addClass 'p0ne-automute p0ne-automute-add'
+                        $box .html "add to<br>automute"
             else if streamOff
                 console.log "[automute] change automute-btn to SNOOZE"
                 $snoozeBtn
                     .empty!
+                    .removeClass 'p0ne-automute p0ne-automute-add p0ne-automute-remove'
                     .append @$box_
-                    .removeClass 'p0ne-automute p0ne-automute-remove p0ne-automute-add'
             streamOff := newStreamOff
 
         @updateBtn = (mode) !->
@@ -294,24 +292,17 @@ module \automute, do
         if isAdd == \toggle or not isAdd? # default to toggle
             isAdd = not @songlist[media.cid]
 
-        $msg = $ "<div class='p0ne-automute-notif'>"
         if isAdd # add to automute list
             @songlist[media.cid] = media
             @createRow media.cid
-            $msg
-                .text "+ automute #{media.author} - #{media.title}"
-                .addClass \p0ne-automute-added
+            chatWarnSmall 'p0ne-automute-notif p0ne-automute-added', "automute #{media.author} - #{media.title}'", \icon-volume-off
         else # remove from automute list
             delete @songlist[media.cid]
-            $msg
-                .text "- automute #{media.author} - #{media.title}'"
-                .addClass \p0ne-automute-removed
+            chatWarnSmall 'p0ne-automute-notif p0ne-automute-removed', "un-automute #{media.author} - #{media.title}'", \icon-volume-half
             if $row = @$rows[media.cid]
                 $row .css transform: 'scale(0)', height: 0px
                 sleep 500ms, !->
                     $row .remove!
-        $msg .append getTimestamp!
-        appendChat $msg
         if media.cid == API.getMedia!?.cid
             @updateBtn!
 
@@ -412,7 +403,6 @@ module \afkAutorespond, do
 module \joinLeaveNotif, do
     optional: <[ chatDomEvents chat auxiliaries database ]>
     settings: \base
-    settingsVip: true
     displayName: 'Join/Leave Notifications'
     help: '''
         Shows notifications for when users join/leave the room in the chat.
@@ -428,7 +418,7 @@ module \joinLeaveNotif, do
         mergeSameUser: true
     setup: ({addListener, css}, joinLeaveNotif, update) !->
         if update
-            lastMsg = $cm! .children! .last!
+            lastMsg = get$cm! .children! .last!
             if lastMsg .hasClass \p0ne-notif-joinleave
                 $lastNotif = lastMsg
 
@@ -485,7 +475,7 @@ module \joinLeaveNotif, do
                         chat.lastType = CHAT_TYPE
  
         addListener API, 'popout:open popout:close', !->
-            $lastNotif = $cm! .find \.p0ne-notif-joinleave:last
+            $lastNotif = get$cm! .find \.p0ne-notif-joinleave:last
 
 
 
@@ -612,7 +602,7 @@ module \chatDblclick2Mention, do
                 chatDblclick2Mention.timer = 0
                 (PopoutView?.chat || chat).onInputMention e.target.textContent
 
-        for [ctx, $el, attr, boundAttr] in [ [chat, $cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
+        for [ctx, $el, attr, boundAttr] in [ [chat, get$cms!, \onFromClick, \fromClickBind],  [WaitlistRow::, $(\#waitlist), \onDJClick, \clickBind],  [RoomUserRow::, $(\#user-lists), \onClick, \clickBind] ]
             # remove individual event listeners (we use a delegated event listener below)
             # setting them to `$.noop` will prevent .bind to break
             #replace ctx, attr, !-> return $.noop
@@ -635,8 +625,7 @@ module \chatDblclick2Mention, do
 
     disableLate: !->
         # note: here we actually have to pay attention as to what to re-enable
-        cm = $cms!
-        for attr, [ctx, $el] of {fromClickBind: [chat, cm], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
+        for attr, [ctx, $el] of {fromClickBind: [chat, get$cms!], onDJClick: [WaitlistRow::, $(\#waitlist)], onClick: [RoomUserRow::, $(\#user-lists)]}
             $el .find '.mention .un, .message .un, .name'
                 .off \click, ctx[attr] # if for some reason it is already re-assigned
                 .on \click, ctx[attr]
@@ -884,89 +873,39 @@ module \boothAlert, do
     help: '''
         Play a notification sound before you are about to play
     '''
-    _settings:
-        warnOnPrevPlay: true # takes precedence
-        warnXMinBefore: 2.min # note: when modifying this, please update `boothAlert.remainingStr`
     setup: ({addListener}, {_settings}, module_) !->
-        var warnTimeout
-        @remainingStr = humanTime _settings.warnXMinBefore
         isNext = false
         fn = addListener API, 'advance waitListUpdate ws:reconnected sjs:reconnected p0ne:reconnected', !->
             if API.getWaitListPosition! == 0
-                if _settings.warnOnPrevPlay
-                    if not isNext
-                        isNext := true
-                        sleep 3_000ms, !->
-                            chatWarn "You are about to DJ next!", "Booth Alert"
-                            playChatSound!
-                else
-                    clearTimeout warnTimeout
-                    remaining = API.getTimeRemaining! *1000s_to_ms
-                    warnTimeout := sleep remaining - _settings.warnXMinBefore, !->
-                        if remaining > 0
-                            chatWarn "You are about to DJ in #{humanTime remaining}!", "Booth Alert"
-                        else
-                            chatWarn "You are about to DJ in #remainingStr!", "Booth Alert"
+                if not isNext
+                    isNext := true
+                    sleep 3_000ms, !->
+                        chatWarn "You are about to DJ next!", "Booth Alert"
                         playChatSound!
             else
                 isNext := false
         fn! if not module_
-    settingsExtra: ($el) !->
-        boothAlert = this
-        var resetTimer
-        $ "<form>
-                Show notification<br>
-                <label><input type=radio name=booth-alert value=on #{if @_settings.warnOnPrevPlay then \checked else ''}> on preceding song</label><br>
-                <label>
-                    <input type=radio name=booth-alert value=off #{if @_settings.warnOnPrevPlay then '' else \checked}> <input type=number value='#{~~(@_settings.warnXMinBefore / 600) / 100}' class='p0ne-settings-input booth-alert'> minute(s) before your play
-                </label>
-            </form>"
-            .append do
-                $warning = $ '<div class=warning>'
-            .on \click, \input:radio, !->
-                if @checked
-                    boothAlert._settings.warnOnPrevPlay = (@value == \on)
-                    console.log "#{getTime!} [boothAlert] updated warnOnPrevPlay to #{boothAlert._settings.warnOnPrevPlay}"
-            .on \input, \.booth-alert, !->
-                if @value > 0 #  # note: returns false for non-number inputs
-                    boothAlert._settings.warnXMinBefore = @value .min
-                    if resetTimer
-                        $warning .fadeOut!
-                        clearTimeout resetTimer
-                        resetTimer := 0
-                    if boothAlert._settings.warnOnPrevPlay
-                        $ this .parent! .click!
-                    console.log "#{getTime!} [boothAlert] updated to #{@value}ms"
-                else
-                    $warning
-                        .fadeIn!
-                        .text "please enter a valid number >0"
-                    resetTimer := sleep 2.min, !~>
-                        @value = ~~(boothAlert._settings.warnXMinBefore * 60_000_00) / 100
-                        resetTimer := 0
-                    console.warn "#{getTime!} [boothAlert] invalid input for X min", @value
-            .appendTo $el
-        $el .css do
-            paddingLeft: 15px
 
 module \notifyOnGrabbers, do
     require: <[ grabEvent ]>
+    persistent: <[ grabs notifs ]>
+    displayName: "Notify on Grabs"
+    settings: \base
+    grabs: {}
+    notifs: {}
     setup: ({addListener, replace}) !->
-        addListener API, \p0ne:grab, (u) !->
-            if not grabs[u.id]
-                notifs[u.id] = appendChat $ "
-                    <div class='cm p0ne-notif p0ne-grab-notif'>
-                        <i class='icon icon-grab'></i>
-                        <div class='msg text'>
-                            #{formatUserHTML d.user, true}
-                        </div>
-                    </div>"
-                grabs[u.id] = 1
+        addListener API, \advance, !~>
+            @grabs = {}
+            @notifs = {}
+        addListener API, \p0ne:vote:grab, (u) !~>
+            if not @grabs[u.id]
+                @notifs[u.id] = chatWarnSmall \p0ne-grab-notif, formatUserHTML(u, true), \icon-grab, true
+                @grabs[u.id] = 1
             else
-                if grabs[u.id] == 1
-                    notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
-                        .appendTo notifs[u.id]
-                notifs[u.id] .text = " (x#{grabs[u.id]++})"
+                if @grabs[u.id] == 1
+                    @notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
+                        .appendTo @notifs[u.id]
+                @notifs[u.id] .text(++@grabs[u.id])
 
 /*####################################
 #         AVOID HISTORY PLAY         #
@@ -1077,11 +1016,34 @@ module \grabMenuHighlight, do
         replace popMenu, \drawRowBind, !-> return popMenu~drawRow
 
 module \playlistMenuHighlight, do
-    require: <[ playlistMenu playlistCacheEvent ]>
-    setup: ({addListener}) !->
-        for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
-            row.inCache = true
-            row.$el.addClass \p0ne-pl-cached
+    require: <[ pl playlists PlaylistListRow PlaylistMediaList playlistMenu playlistCacheEvent ]>
+    setup: ({addListener, replace}) !->
+        replace PlaylistListRow::, \render, (r_) !-> return !->
+            r_.call this
+            if playlistCache._data.1.p[@model.id]
+                @inCache = true
+                @$el.addClass \p0ne-pl-cached
+
+        replace PlaylistMediaList::, \onCheckThreshold, (oCT_) !-> return (n) !->
+            oCT_.call this, n
+            if @isDragging # when dragging starts
+                for row in playlistMenu.rows
+                    hasAllMedia = true
+                    for cid of @selectedRows when not playlistCache._data.1.p[row.model.id].items[cid]
+                        hasAllMedia = false
+                        break
+                    if hasAllMedia
+                        row.$el.addClass \p0ne-pl-has-media
+                    if row.model.get(\count) == 200
+                        row.$el.addClass \p0ne-pl-is-full
+        if pl?.list?
+            replace pl.list, \thresholdBind, !-> return _.bind(pl.list.onCheckThreshold, pl.list)
+        replace PlaylistMediaList::, \resetDrag, (rD_) !-> return !->
+            if @isDragging
+                for row in playlistMenu.rows
+                    row.$el.removeClass 'p0ne-pl-has-media p0ne-pl-is-full'
+            rD_.call this
+
 
         addListener API, \p0ne:playlistCache:update, (playlistID) !->
             for row in playlistMenu.rows when row.model.id == playlistID
@@ -1089,7 +1051,14 @@ module \playlistMenuHighlight, do
                     row.inCache = true
                     row.$el.addClass \p0ne-pl-cached
                 break
-    disable: !->
+
+        playlists.sort! # force re-rendering
+
+    disableLate: !->
         for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
             delete row.inCache
             row.$el.removeClass \p0ne-pl-cached
+
+# skip walkthrough button
+# plug_p0ne users are expected to have used plug at least once
+$ '#walkthrough:not(.wt-p0) .next a' .click!

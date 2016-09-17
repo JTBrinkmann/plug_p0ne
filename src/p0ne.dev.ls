@@ -7,6 +7,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.dev ~~~~~~~"
 
 /*####################################
 #        FIX CONSOLE SPAMMING        #
@@ -124,7 +125,7 @@ module \logGrabbers, do
     setup: ({addListener, replace}) !->
         grabbers = {}
         hasGrabber = false
-        addListener API, \p0ne:grab, (u) !->
+        addListener API, \p0ne:vote:grab, (u) !->
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
             grabbers[u.id] = u.username
             hasGrabber := true
@@ -191,14 +192,7 @@ module \downloadLink, do
             dataOrURL = JSON.stringify dataOrURL if typeof dataOrURL != \string
             dataOrURL = URL.createObjectURL new Blob( [dataOrURL], type: \text/plain )
         filename .= replace /[\/\\\?%\*\:\|\"\<\>\.]/g, '' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
-        return appendChat "
-                <div class='message p0ne-downloadlink'>
-                    <i class='icon'></i>
-                    <span class='text'>
-                        <a href='#{dataOrURL}' download='#{filename}'>#{name}</a>
-                    </span>
-                </div>
-            "
+        return chatWarnSmall \p0ne-downloadlink, "<a href='#{dataOrURL}' download='#{filename}'>#{name}</a>", true
 
 
 /*####################################
@@ -530,7 +524,7 @@ window.copyChat = (copy) !->
         <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
         <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
         <link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>
-    """ if window.bpm or $cm! .find \.bpm-emote .length
+    """ if window.bpm or get$cm! .find \.bpm-emote .length
 
     res += """\n
         <style>

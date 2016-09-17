@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.moderate ~~~~~~~"
 
 /*####################################
 #       BASE MODERATION MODULE       #
@@ -20,7 +21,7 @@ module \enableModeratorModules, do
             if newRole > 1 and prevRole < 2
                 console.info "[p0ne] enabling moderator modules"
                 for ,m of p0ne.modules when m.modDisabled
-                    console.log "[p0ne moderator] enabling", m.name
+                    console.log "[p0ne moderator] enabling", m.moduleName
                     m.enable!
                     m.modDisabled = false
                 $body.addClass \user-is-staff
@@ -28,7 +29,7 @@ module \enableModeratorModules, do
             else if newRole < 2 and prevRole > 1
                 console.info "[p0ne] disabling moderator modules"
                 for ,m of p0ne.modules when m.moderator    and not m.disabled
-                    console.log "[p0ne moderator] disabling", m.name
+                    console.log "[p0ne moderator] disabling", m.moduleName
                     m.modDisabled = true
                     m.disable!
                 $body.removeClass \user-is-staff
@@ -81,22 +82,6 @@ module \disableChatDelete, do
     settings: \moderation
     settingsSimple: true
     setup: ({replace_$Listener, addListener, $createPersistent, css}) !->
-        css \disableChatDelete, '
-            .deleted {
-                border-left: 2px solid red;
-                display: none;
-            }
-            .p0ne-showDeletedMessages .deleted {
-                display: block;
-            }
-            .deleted-message {
-                display: block;
-                text-align: right;
-                color: red;
-                font-family: monospace;
-            }
-        '
-
         $body .addClass \p0ne-showDeletedMessages
 
         lastDeletedCid = null
@@ -123,8 +108,8 @@ module \disableChatDelete, do
                     .removeClass \timestamp
                     .appendTo $msg
                 d .text "deleted #{if moderator then 'by '+moderator else ''} #{d.text!}"
-                cm = $cm!
-                cm.scrollTop cm.scrollTop! + d.height!
+                $cm = get$cm!
+                $cm.scrollTop $cm.scrollTop! + d.height!
                 $msg .find \.delete-button .remove! # remove delete button
 
                 # revert inline images
@@ -148,7 +133,7 @@ module \chatDeleteOwnMessages, do
     #settings: \moderation
     settingsSimple: true
     setup: ({addListener}) !->
-        $cm! .find "fromID-#{userID}"
+        get$cm! .find "fromID-#{userID}"
             .addClass \deletable
             .append do
                 $ '<div class="delete-button">Delete</div>'
@@ -186,13 +171,7 @@ module \warnOnMehers, do
             if d.vote == -1 and d.user.uid != userID
                 console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
-                    appendChat $ "
-                        <div class='cm p0ne-notif p0ne-meh-warning'>
-                            <i class='icon icon-chat-system'></i>
-                            <div class='msg text'>
-                                #{formatUserHTML d.user, true} meh'd this song!
-                            </div>
-                        </div>"
+                    chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML d.user, true} meh'd this song!"
 
         lastAdvance = 0
         addListener API, \advance, (d) !~>
@@ -202,13 +181,7 @@ module \warnOnMehers, do
                     users[cid] ||= 0
                     if ++users[cid] > @_settings.maxMehs and troll = getUser(cid)
                         # note: the user (`troll`) may have left during this song
-                        appendChat $ "
-                            <div class='cm system'>
-                                <div class=box><i class='icon icon-chat-system'></i></div>
-                                <div class='msg text'>
-                                    #{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!
-                                </div>
-                            </div>"
+                        chatWarnSmall \p0ne-meh-warning, "#{formatUserHTML troll} meh'd the past #{plural users[cid], 'song'}!"
                 else if d > lastAdvance + 10_000ms
                     delete users[cid]
             if d > lastAdvance + 10_000ms
@@ -312,7 +285,7 @@ module \afkTimer, do
         addListener API, 'socket:modAddDJ socket:modBan socket:modMoveDJ socket:modRemoveDJ socket:modSkip socket:modStaff', (u) !-> updateUser u.mi
         addListener API, 'userLeave', (u) !-> delete lastActivity[u.id]
 
-        chatHidden = $cm!.parent!.css(\display) == \none
+        chatHidden = get$cm!.parent!.css(\display) == \none
         if _$context? and (app? or userList?)
             addListener _$context, 'show:users show:waitlist', !->
                 chatHidden := true

@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.chat ~~~~~~~"
 
 /* ToDo:
  * add missing chat inline image plugins:
@@ -145,7 +146,7 @@ module \betterChatInput, do
             $autoresize_helper := $onpage_autoresize_helper
 
 
-        chatHidden = $cm!.parent!.css(\display) == \none
+        chatHidden = get$cm!.parent!.css(\display) == \none
 
 
         wasEmote = false
@@ -268,7 +269,7 @@ module \chatMessageClasses, do
     setup: ({addListener}) !->
         /* designed to be compatible with p³-compatible Room Themes */
         try
-            $cms! .children! .each !->
+            get$cms! .children! .each !->
                 if uid = this.dataset.cid
                     uid .= substr(0, 7)
                     return if not uid
@@ -328,18 +329,18 @@ module \unreadChatNotif, do
         unreadCount = 0
         $chatButton = $ \#chat-button
             .append $unreadCount = $ '<div class=p0ne-toolbar-count>'
-        @bottomMsg = $cm! .children! .last!
+        @bottomMsg = get$cm! .children! .last!
         addListener _$context, \p0ne:chat:plugin, (message) !->
             message.wasAtBottom ?= chatIsAtBottom!
             if not $chatButton.hasClass \selected and not PopoutView?.chat?
                 $chatButton.addClass \p0ne-toolbar-highlight
                 $unreadCount .text (unreadCount + 1)
             else if message.wasAtBottom
-                @bottomMsg = message.cid
+                @bottomMsg = get$cm! .children! .last!
                 return
 
             delete @bottomMsg
-            $cm! .addClass \has-unread
+            get$cm! .addClass \has-unread
             message.unread = true
             message.addClass \unread
             unreadCount++
@@ -359,11 +360,11 @@ module \unreadChatNotif, do
             @throttled := true
             sleep 200ms, !~>
                 try
-                    cm = $cm!
-                    cmHeight = cm .height!
+                    $cm = get$cm!
+                    cmHeight = $cm .height!
                     lastMsg = msg = @bottomMsg
                     $readMsgs = $!; l=0
-                    while ( msg .=next! ).length
+                    while ( msg .= next! ).length
                         if msg .position!.top > cmHeight
                             @bottomMsg = lastMsg
                             break
@@ -371,26 +372,25 @@ module \unreadChatNotif, do
                             $readMsgs[l++] = msg.0
                         lastMsg = msg
                     if l
-                        unread = cm.find \.unread
+                        unread = $cm.find \.unread
                         sleep 1_500ms, !~>
                             $readMsgs.removeClass \unread
                             if (unread .= filter \.unread) .length
                                 @bottomMsg = unread .removeClass \unread .last!
                     if not msg.length
-                        cm .removeClass \has-unread
+                        $cm .removeClass \has-unread
                         $chatButton .removeClass \p0ne-toolbar-highlight
                         unreadCount := 0
                 @throttled := false
     fix: !->
         #DEBUG for testing
         @throttled = false
-        cm = $cm!
-        cm
+        $cm = get$cm!
             .removeClass \has-unread
             .find \.unread .removeClass \unread
-        @bottomMsg = cm.children!.last!
+        @bottomMsg = $cm.children!.last!
     disable: !->
-        $cm!
+        get$cm!
             .removeClass \has-unread
             .find \.unread .removeClass \unread
 
@@ -425,7 +425,6 @@ CHAT_WIDTH = 500px
 module \chatInlineImages, do
     require: <[ chatPlugin ]>
     settings: \chat
-    settingsVip: true
     settingsSimple: true
     displayName: 'Inline Images'
     help: '''
@@ -491,7 +490,7 @@ module \chatInlineImages, do
 
     settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
-            .text "filter tags:"
+            .text "filter tags: (space seperated, case-insensitive)"
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.filterTags.join " "
@@ -739,7 +738,7 @@ module \customChatNotificationTrigger, do
     disabled: true
     require: <[ chatPlugin _$context ]>
     setup: ({addListener}) !->
-        @test = addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
+        addListener _$context, \p0ne:chat:plugin, (d) !~> if d.cid and d.uid != userID and @_settings.triggerwords.length
             mentioned = false
             mentions = {}
             if @hasUsernameTrigger
@@ -757,20 +756,28 @@ module \customChatNotificationTrigger, do
         @updateRegexp!
 
     updateRegexp: !->
-        @regexp = //
-            \b(?:#{@_settings.triggerwords .join '|' |> escapeRegExp})\b
-        //gi
+        return if @_settings.triggerwords .length == 0
+        triggerwords = []; l=0
+        for triggerword in @_settings.triggerwords
+            triggerword = triggerword |> htmlEscape |> escapeRegExp
+            if /\w/.test triggerword[0]
+                triggerword = "\\b"+triggerword
+            if /\w/.test triggerword[*-1]
+                triggerword = triggerword+"\\b"
+            triggerwords[l++] = triggerword
+        @regexp = //#{triggerwords .join '|'}//gi
         @hasUsernameTrigger = false
         @usernameTriggers = {}
-        API.getUser!.username .replace @regexp, (word, i) !~>
+        rawun = API.getUser!.rawun
+        rawun.replace @regexp, (word, i) !~>
             @hasUsernameTrigger = true
             @usernameTriggers[word] ||= {}
             @usernameTriggers[word][i + 1] = true
-        @usernameReg = //@#{API.getUser!.username}//g
+        @usernameReg = //@#rawun//g
 
     settingsExtra: ($el) !->
         $ '<span class=p0ne-settings-input-label>'
-            .text "aliases (comma seperated):"
+            .text "aliases: (comma seperated, case insensitive)"
             .appendTo $el
         $input = $ '<input class="p0ne-settings-input">'
             .val @_settings.triggerwords.join ", "

@@ -5,6 +5,7 @@
  * @license MIT License
  * @copyright (c) 2015 J.-T. Brinkmann
  */
+console.log "~~~~~~~ p0ne.auxiliaries-modules ~~~~~~~"
 
 
 /*####################################
@@ -55,9 +56,8 @@ module \PopoutListener, do
             try
                 c_ ...
             catch err
-                appendChat do
-                    $ "<div style='color:red'>" .text "[p0ne] Error closing the popout: #{err.message}"
-                        .on \click, !-> console.error err.messageAndStack
+                chatWarnSmall \p0ne-error, "[p0ne] Error closing the popout: #{err.message}"
+                    .on \click, !-> console.error err.messageAndStack
                 window.error = err
             _$context?.trigger \popout:close, PopoutView._window, PopoutView
             API.trigger \popout:close, PopoutView._window, PopoutView
@@ -73,8 +73,6 @@ module \chatDomEvents, do
             @_events[*] = arguments
             cm .on.apply cm, arguments
             PopoutView.chat.$el .on.apply PopoutView.chat.$el, arguments if PopoutView.chat
-            if &1 == '.p0ne-notif .badge-box'
-                console.info "[TEST] .p0ne-notif .badge-box", arguments, cm
         @off = !->
             isAnyMatch = false
             i = -1
@@ -301,11 +299,10 @@ module \p0neCSS, do
                 @loadStyle url
                 @urlMap[url] = i
 
-_.defer !->
+_.defer !-> # because for some reason the event listener doesn't get attached otherwise
     module \p0neNotifHelper, do
         require: <[ chatDomEvents ]>
         setup: ({addListener}) !->
             addListener chatDomEvents, \click, '.p0ne-notif .badge-box', !->
-                console.info "[TEST]", '.p0ne-notif .badge-box {event}', this, it
                 $this = $ this .closest \.p0ne-notif
                     .slideUp !-> $this.remove!
