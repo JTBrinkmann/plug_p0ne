@@ -1,3 +1,8 @@
+#DEBUG
+window.clear = (obj) !-> for k of obj then delete obj[k]
+
+requireHelper \SuggestionView, (.::?id == \chat-suggestion)
+
 if not window.staff
     staff =
         loading: $.Deferred!
@@ -8,13 +13,15 @@ if not window.staff
             staff[u.id] = u{role, gRole, sub, username, badge}
         l.resolve!
 
+if not window.colorPicker
+    colorPicker = {}
+
 /*####################################
 #           CUSTOM  COLORS           #
 ####################################*/
 module \customColors, do
     displayName: "☢ Custom Colours"
     settings: \look&feel
-    settingsSimple: true
     help: """
         Change colours of usernames, depending on their role.
 
@@ -48,17 +55,17 @@ module \customColors, do
             test: !-> …
             css: "…" # cache
         */
-        you:        color: \#FFDD6F, test: (.id == userID)
-        regular:    color: \#777F92, icon: false, test: (.role == 0)
-        friend:     color: \#777F92, test: (.friend)
-        subscriber: color: \#C59840, icon: \icon-chat-subscriber, test: (.sub)
-        dj:         color: \#AC76FF, icon: \icon-chat-dj, perRoom: true, test: (.role == 1)
-        bouncer:    color: \#AC76FF, icon: \icon-chat-bouncer, perRoom: true, test: (.role == 2)
-        manager:    color: \#AC76FF, icon: \icon-chat-manager, perRoom: true, test: (.role == 3)
-        cohost:     color: \#AC76FF, icon: \icon-chat-host, perRoom: true, test: (.role == 4)
-        host:       color: \#AC76FF, icon: \icon-chat-host, perRoom: true, test: (.role == 5)
-        ambassador: color: \#89BE6C, icon: \icon-chat-ambassador, test: (u) !-> return 0 < u.gRole < 5
-        admin:      color: \#42A5DC, icon: \icon-chat-admin, test: (.gRole == 5)
+        you:        color: \#ffdd6f, test: (.id == userID)
+        regular:    color: \#777f92, icon: false, test: (.role == 0)
+        friend:     test: (.friend)
+        subscriber: color: \#c59840, icon: \icon-chat-subscriber, test: (.sub)
+        dj:         color: \#ac76ff, icon: \icon-chat-dj, perRoom: true, test: (.role == 1)
+        bouncer:    color: \#ac76ff, icon: \icon-chat-bouncer, perRoom: true, test: (.role == 2)
+        manager:    color: \#ac76ff, icon: \icon-chat-manager, perRoom: true, test: (.role == 3)
+        cohost:     color: \#ac76ff, icon: \icon-chat-host, perRoom: true, test: (.role == 4)
+        host:       color: \#ac76ff, icon: \icon-chat-host, perRoom: true, test: (.role == 5)
+        ambassador: color: \#89be6c, icon: \icon-chat-ambassador, test: (u) !-> return 0 < u.gRole < 5
+        admin:      color: \#42a5dc, icon: \icon-chat-admin, test: (.gRole == 5)
     users: {}
     /*    <uid>:
             css: "…" # cache
@@ -73,16 +80,13 @@ module \customColors, do
     scopeOrderRole: <[ globalCustomRole roomThemeRole vanilla ]>
     scopeOrderUser: <[ globalCustomUser roomThemeUser ]>
 
-    setup: ({@css, @addListener}) !->
-        @users = {}
+    setup: ({@css, loadStyle, @addListener}) !->
+        loadStyle "#{p0ne.host}/playground/customcolors.css"
         @scopes.vanilla = @roles
         @scopes.globalCustomRole = @_settings.global.roles
         @scopes.globalCustomUser = @_settings.global.users
         do @addListener _$context, \room:joined, ~>
-            slug = getRoomSlug!
-            @room = @_settings.perRoom[slug] ||= {
-                userRole: {}, users: {}, roles: {}
-            }
+            @room = @_settings.perRoom[slug = getRoomSlug!] ||= {userRole: {}, users: {}, roles: {}}
             #@scopes.roomCustomUser = @room.users
             #@scopes.roomCustomRole = @room.roles
             @scopes.roomThemeRole = {}
@@ -92,32 +96,19 @@ module \customColors, do
         for role, style of @roles
             #style.role = role
             @roles[role].css = @calcCSSRole(role)
-        for uid of @scopes.globalCustomUser
-            @users[uid] = css: @calcCSSUser(uid)
+        for uid of @users
+            @users[uid] = @calcCSSUser(uid)
+
 
         @updateCSS!
 
-        # clear user cache
-        d = Date.now! - @CLEAR_USER_CACHE
-        for uid, u of @_settings.users when not @users[uid] and u.lastUsed < d
-            console.log "[customColors] removing #{u.id} (#{u.username}) from cache"
-            delete @_settings.users[uid]
 
-    settingsPanel: ($wrapper) !->
-        $wrapper .text "loading…"
-        loadModule \customColorsPicker, "#{p0ne.host}/scripts/p0ne.customcolors.picker.js?r=1"
-            .then (ccp) !~>
-                console.log "[ccp]", ccp
-                ccp.disable!.enable!
 
     updateCSS: !->
-        ccp = p0ne.modules.customColorsPicker
-        if ccp and not ccp.disabled
-            cpKey = "#{ccp.key}"
         styles = ""
-        for key, data of @roles when key != cpKey
+        for key, data of @roles when key != colorPicker.key
             styles += data.css
-        for key, data of @users when key != cpKey
+        for key, data of @users when key != colorPicker.key
             styles += data.css
 
         @css \customColors, styles
@@ -128,17 +119,16 @@ module \customColors, do
         styles = "/*= #{roleName} =*/"
         role = @roles[roleName]
         if style.color or style.font
-            font = style.font ||{+b}
+            font = style.font ||{}
             if role.icon
                 styles += "
                     \#app \#user-lists .#{role.icon} + .name,
                     \#app \#waitlist .#{role.icon} + span,
                     \#app \#user-rollover .#{role.icon} + span,
                 "
-            if roleName != \regular
-                styles += "\#app .p0ne-name.#roleName,"
             styles += "
-                \#app \#chat .from-#roleName .un {
+                \#app \#chat .from-#roleName .un,
+                \#app .p0ne-name.#roleName {
                     color: #{style.color};
                     #{if not font.b then 'font-weight: normal;' else ''}
                     #{if font.i then 'font-style: italic;' else ''}
@@ -168,22 +158,17 @@ module \customColors, do
 
     calcCSSUser: (uid, style) !->
         style ||= @getUserStyle(uid)
-        styles = "/*= #{uid} (#{@_settings.users[uid].username}) =*/"
+        styles = "/*= #{uid} (#{@_settings.users[uid]}) =*/"
 
         if style.color
-            color = "color: #{style.color};"
-        if style.font
-            font = "
-                    #{if not style.font.b then 'font-weight: normal;' else ''}
-                    #{if style.font.i then 'font-style: italic;' else ''}
-                    #{if style.font.u then 'text-decoration: underline;' else ''}
-            "
-        if color || font
+            font = style.font ||{}
             styles += "
                 \#app \#chat .fromID-#uid .un,
-                \#app .p0ne-uid-#uid .p0ne-name .name {
-                    #{color ||''}
-                    #{font  ||''}
+                \#app .p0ne-uid-#uid .p0ne-name {
+                    color: #{style.color};
+                    #{if not font.b then 'font-weight: normal;' else ''}
+                    #{if font.i then 'font-style: italic;' else ''}
+                    #{if font.u then 'text-decoration: underline;' else ''}
                 }
             "
 
@@ -197,7 +182,6 @@ module \customColors, do
 
         if bdg = style.badge
             styles += "
-                .p0ne-uid-#uid .bdg,
                 .fromID-#uid .bdg {
                     background: url(#{bdg.url}) #{-30px * bdg.x / bdg.w}px #{-30px * bdg.y / bdg.h}px / #{bdg.srcW*30px/bdg.w ||30}px #{bdg.srcH*30px/bdg.h ||30}px
                 }
@@ -231,15 +215,7 @@ module \customColors, do
             res.font ||= {+b, -i, -u}
         return res
 
-    getRoles: (uid, user) ->
-        if getUser(uid)
-            [role for role in @_settings.rolesOrder when @roles[role].test(that)]
-        else if @_settings.users[uid]
-            roomRole = getRank(role: that, true) if @room.userRole[uid] || staff[uid]?.role
-            [role for role in @_settings.rolesOrder when role in @_settings.users[uid].roles or role == roomRole]
-        else
-            []
 
-#export cc = customColors
-#<- (fn) -> if cc.loading then cc.loading.then fn else fn!
-#customColors_test?.disable!.enable!
+export cc = customColors
+<- (fn) -> if cc.loading then cc.loading.then fn else fn!
+customColors_test?.disable!.enable!

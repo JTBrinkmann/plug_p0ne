@@ -17,6 +17,7 @@ module \songNotif, do
     require: <[ chatDomEvents ]>
     optional: <[ _$context chat users database auxiliaries app popMenu ]>
     settings: \base
+    settingsSimple: true
     displayName: 'Chat Song Notifications'
     help: '''
         Shows notifications for playing songs in the chat.
@@ -54,7 +55,7 @@ module \songNotif, do
                         .text modUsername
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=18"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=19"
 
 
         #== show current song ==
@@ -264,7 +265,7 @@ module \songNotif, do
             </div>
             #{getTimestamp!}
             <div class='song-stats'></div>
-            <div class='song-dj un'></div>
+            <div class='song-dj'></div>
             <b class='song-title'></b>
             <span class='song-author'></span>
             <div class='song-description-btn'>Description</div>
@@ -273,8 +274,7 @@ module \songNotif, do
         @$div .find \.song-title .text title .prop \title, title
         @$div .find \.song-author .text author
         @$div .find \.song-dj
-            .text d.dj.username
-            .data \uid, d.dj.id
+            .html formatUserHTML d.dj, user.isStaff, getRank(d.dj)
 
         appendChat @$div
         if media.format == 2 # SoundCloud
@@ -302,12 +302,13 @@ module \songNotif, do
 window.Notification ||= window.webkitNotification
 module \songNotifPopup, do
     displayName: 'Desktop Song Notifications'
+    settings: \base
+    disabled: true
     help: '''
         Shows a small popup notifications on song changes.
     '''
     screenshot: 'https://i.imgur.com/wCrDhvb.png'
-    settings: \base
-    disabled: true
+
     require: <[ Notification ]>
     setup: ({addListener}) !->
         Notification.requestPermission!

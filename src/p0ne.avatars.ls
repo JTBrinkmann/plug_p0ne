@@ -90,6 +90,7 @@ require <[ sockjs ]>, (SockJS) !->
         optional: <[ user_ _$context ]>
         displayName: 'Custom Avatars'
         settings: \base
+        settingsSimple: true
         disabled: true
         help: '''
             This adds a few custom avatars to plug.dj
@@ -110,7 +111,10 @@ require <[ sockjs ]>, (SockJS) !->
             p0ne._avatars = {}
 
             avatarID = API.getUser!.avatarID
-            hasNewAvatar = @_settings.vanillaAvatarID == avatarID
+            if @_settings.vanillaAvatarID
+                @hasNewAvatar = @_settings.vanillaAvatarID != avatarID
+            else
+                @_settings.vanillaAvatarID = avatarID
 
             # - display custom avatars
             replace avatarAuxiliaries, \getAvatarUrl, (gAU_) !-> return (avatarID, type) !->
@@ -187,26 +191,28 @@ require <[ sockjs ]>, (SockJS) !->
             @removeAvatar = (avatarID, replace) !->
                 for u in users.models
                     if u.get(\avatarID) == avatarID
-                        u.set(\avatarID, u.get(\avatarID_))
+                        u.set(\avatarID, u.get(\vanillaAvatarID))
                 delete p0ne._avatars[avatarID]
 
 
 
             # - set avatarID to custom value
-            @changeAvatar = (userID, avatarID) !~>
-                if not (u = users.get(userID)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
-                    console.warn "[p0ne custom avatars] can't load user or avatar: '#userID', '#avatarID'"
+            @changeAvatar = (uid, avatarID) !~>
+                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                    console.warn "[p0ne custom avatars] can't load user or avatar: '#uid', '#avatarID'"
                     return
 
 
-                if not avatar.permissions or API.hasPermissions(userID, avatar.permissions)
+                if not avatar.permissions or API.hasPermissions(uid, avatar.permissions)
                     if not u.get \vanillaAvatarID
                         u.set \vanillaAvatarID, u.get(\avatarID)
                     u.set \avatarID, avatarID
                 else
-                    console.warn "user with ID #userID doesn't have permissions for avatar '#{avatarID}'"
+                    console.warn "user with ID #uid doesn't have permissions for avatar '#{avatarID}'"
 
-                if userID == userID
+                if uid == userID
+                    if p0ne._avatars[avatarID]?.isVanilla
+                        @_settings.vanillaAvatarID = avatarID
                     @_settings.avatarID = avatarID
 
             @updateAvatarStore = !->
@@ -321,26 +327,15 @@ require <[ sockjs ]>, (SockJS) !->
             $.ajax do
                 url: '/_/store/inventory/avatars'
                 success: (d) !~>
-                    avatarIDs = []; l=0
                     for avatar in d.data
-                        avatarIDs[l++] = avatar.id
-                        if not  p0ne._avatars[avatar.id]
+                        if not p0ne._avatars[avatar.id]
                             _internal_addAvatar do
                                 avatarID: avatar.id
                                 isVanilla: true
                                 category: avatar.category
                         p0ne._avatars[avatar.id] .inInventory = true
-                            #..category = d.category
                     @updateAvatarStore!
-                    /*requireAll (m) !->
-                        return if not m._models or not m._events?.reset
-                        m_avatarIDs = ""
-                        for el, i in m._models
-                            return if avatarIDs[i] != el
-                    */
 
-            if not hasNewAvatar and @_settings.avatarID
-                @changeAvatar(userID, that)
 
 
 
@@ -352,7 +347,7 @@ require <[ sockjs ]>, (SockJS) !->
             if _$context? and user_?
                 addListener _$context, \ack, !->
                     replace user_, \set, (s_) !-> return (obj, val) !->
-                        if obj.avatarID and obj.avatarID == @.get \avatarID_
+                        if obj.avatarID and obj.avatarID == @.get \vanillaAvatarID
                             delete obj.avatarID
                         return s_.call this, obj, val
                 addListener _$context, \UserEvent:friends, !->
@@ -525,9 +520,10 @@ require <[ sockjs ]>, (SockJS) !->
                     @addAvatar avatarID, avatar
 
                 if @_settings.avatarID of avatars
-                    @socket.emit \changeAvatarID, user.avatarID
-                else
-                    @socket.emit \changeAvatarID, null
+                    @changeAvatar userID, @_settings.avatarID
+                    @socket.emit \changeAvatarID, @_settings.avatarID
+                /*else if not @hasNewAvatar and @_settings.avatarID of avatars
+                    @socket.emit \changeAvatarID, @_settings.avatarID*/
                 requestAnimationFrame initUsers if @socket.users
 
             @socket.on \users, (users) !~>
@@ -594,9 +590,8 @@ require <[ sockjs ]>, (SockJS) !->
             for avatarID, avi of p0ne._avatars
                 avi.inInventory = false
             @updateAvatarStore!
-            for ,user of users.models when user.attributes.avatarID_
+            for ,user of users.models when user.get \vanillaAvatarID
                 user.set \avatarID, that
-        #chatWarn "custom avatar script loaded. type '/ppCAS <url>' into chat to connect to an avatar server :horse:", "ppCAS"
 
 module \ppCASStatusRing, do
     settings: \dev

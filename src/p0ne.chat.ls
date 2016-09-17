@@ -273,7 +273,7 @@ module \chatMessageClasses, do
                     uid .= substr(0, 7)
                     return if not uid
                     $this = $ this
-                    if fromUser = users.get uid
+                    if fromUser = getUser(uid)
                         role = getRank(fromUser, true)
                         #if role != \ghost
                         fromRole = "from-#role"
@@ -320,6 +320,7 @@ module \unreadChatNotif, do
     require: <[ _$context chatDomEvents chatPlugin ]>
     bottomMsg: $!
     settings: \chat
+    settingsSimple: true
     displayName: 'Mark Unread Chat'
     setup: ({addListener}) !->
         unreadCount = 0
@@ -423,6 +424,7 @@ module \chatInlineImages, do
     require: <[ chatPlugin ]>
     settings: \chat
     settingsVip: true
+    settingsSimple: true
     displayName: 'Inline Images'
     help: '''
         Converts image links to images in the chat, so you can see a preview.
@@ -725,6 +727,7 @@ module \chatYoutubeThumbnails, do
 module \customChatNotificationTrigger, do
     displayName: 'Notification Trigger Words'
     settings: \chat
+    settingsSimple: true
     _settings:
         triggerwords: if (tmp=user.username.split(' ')).length then tmp else []
     disabled: true

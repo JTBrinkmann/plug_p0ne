@@ -357,6 +357,23 @@ window <<<<
             if d.match /manifest.*/
                 API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
 
+    showAllAvatarThumbs: !->
+        $el = $ \#avatar-thumb-test
+        if $el.length == 0
+            $el = $ '<div id=avatar-thumb-test>'
+                .appendTo \body
+                .css do
+                    position: \absolute, top: 54px, right: 345px, width: 400px, zIndex: 99999999999, background: \#222
+                .click !-> $el.remove!
+        avis = {}
+        for id, avi of p0ne._avatars when not avi.isVanilla
+            avis[avi.category] ||= "<h4>#{avi.category}</h4>"
+            avis[avi.category] += "<div class='thumb medium' title='#id' style='position: relative; display: inline-block'><div class=background></div><i class='avi avi-#id'></i></div>"
+        res = ""
+        for ,str of avis
+            res += str
+        $el.html res
+
     parseYTGetVideoInfo: (d, onlyStripHTML) !->
         #== Parser ==
         # useful for debugging mediaDownload()
@@ -409,6 +426,19 @@ window <<<<
                 try v = decompress v
             size += (v ||'').length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
         return size
+
+    formatCSS: (css) !->
+        return css.replace /(\s*)(?:(\/\*.*?\*\/)|(@media .*?)\{(.*?)\}|(.*?)\{(.*?)\})/g, (,ws, comment, mQuery,mContent, selector,css) !->
+            ws ||= "\n"
+            if comment?
+                return "#ws#comment\n"
+            else if mQuery?
+                return "#ws#mQuery\n\{\n\t#{formatCSS(mContent).split("\n").join("\n\t")}\n\}"
+            else if selector?
+                return """
+                    #ws#{selector .replace(/\s*,\s*/g, ',\n')} \{
+                    #{css.replace(/;\s*/g, ';\n\t').replace(/^\s*(\w+):\s*/gm, '\t$1: ').replace(/\s*$/, '')}
+                    \}\n\n"""
 
 if not window.chrome
     # little fix for non-WebKit browsers to allow copying data to the clipboard

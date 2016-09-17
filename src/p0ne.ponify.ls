@@ -264,11 +264,12 @@ module \ponifiedLang, do
     setup: ({replace, css}) !->
         # ponies
         replaceMap =
+            user: 'pony'
+            person: 'pony'
             people: 'ponies'
             People: 'Ponies'
-            user: 'pony'
             Nobody: 'Nopony'
-            woots: "Squees"
+            woot: "squee"
             Woot: "Squee"
             Points: "Bits"
 
@@ -278,6 +279,7 @@ module \ponifiedLang, do
             Manager: 'Royal Guard Captain'
             "Co-Host": 'Alicorn'
             Host: 'Alicorn Princess'
+            "Community staff": "Local VIP Ponies"
             staff: 'VIP Pony List'
         regx = //\b(#{Object.keys replaceMap .join '|'})(s?|)\b//g
         console.groupCollapsed "[ponifiedLang] dynamically replacing words"
@@ -289,6 +291,8 @@ module \ponifiedLang, do
                     replace group, k, !-> return v2
                     console.log "\treplacing '#v' with '#{group[k]}'"
         console.groupEnd!
+        console.log Lang.dashboard.people
+        console.log Lang.roles.host
 
         # roles
         replace Lang.roles, \none, !-> return "Mudpony"

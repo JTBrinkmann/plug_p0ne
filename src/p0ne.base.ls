@@ -66,6 +66,7 @@ module \autojoin, do
     '''
     settings: \base
     settingsVip: true
+    settingsSimple: true
     disabled: true
     disableCommand: true
     optional: <[ _$context booth socketListeners ]>
@@ -166,6 +167,7 @@ module \autowoot, do
     '''
     settings: \base
     settingsVip: true
+    settingsSimple: true
     disabled: true
     disableCommand: true
     optional: <[ chatDomEvents ]>
@@ -211,7 +213,13 @@ module \autowoot, do
 #              AUTOMUTE              #
 ####################################*/
 module \automute, do
+    displayName: "Automute"
+    settings: \base
+    settingsSimple: true
     optional: <[ streamSettings ]>
+    help: '''
+        automatically set songs from the "mute list" to silent, so you don't have to hear them when they get played. Useful for tracks that you don't like but that often get played.
+    '''
     _settings:
         songlist: {}
 
@@ -221,6 +229,7 @@ module \automute, do
         addListener API, \advance, (d) !~>
             if (media := d.media) and @songlist[media.cid]
                 console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
+                chatWarn "This song is automuted", \automute
                 #muteonce!
                 snooze!
 
@@ -277,7 +286,7 @@ module \automute, do
             if media.toJSON
                 media = media.toJSON!
             if not media.cid or not \author of media
-                throw new TypeError "invalid arguments for automute(media, isAdd=)"
+                throw new TypeError "invalid arguments for automute(media, isAdd*)"
         else
             # default `media` to current media
             media = API.getMedia!
@@ -288,6 +297,7 @@ module \automute, do
         $msg = $ "<div class='p0ne-automute-notif'>"
         if isAdd # add to automute list
             @songlist[media.cid] = media
+            @createRow media.cid
             $msg
                 .text "+ automute #{media.author} - #{media.title}"
                 .addClass \p0ne-automute-added
@@ -296,10 +306,52 @@ module \automute, do
             $msg
                 .text "- automute #{media.author} - #{media.title}'"
                 .addClass \p0ne-automute-removed
+            if $row = @$rows[media.cid]
+                $row .css transform: 'scale(0)', height: 0px
+                sleep 500ms, !->
+                    $row .remove!
         $msg .append getTimestamp!
         appendChat $msg
         if media.cid == API.getMedia!?.cid
             @updateBtn!
+
+    $rows: {}
+    settingsPanel: (@$el, automute) !->
+        for cid of @songlist
+            @createRow cid
+        $el
+            .on \mouseover, '.song-format-2 .load-sc', !->
+                mediaLookup {format: 2, cid: $(this).closest(\row).data(\cid)} .then (d) !~>
+                    $(this)
+                        .attr \href, d.url
+                        .removeClass \load-sc
+            .on \click, \.song-remove, !->
+                $row = $(this).closest \.row
+                automute automute.songlist[$(this).closest(\.row).data(\cid)], false /*remove*/
+            .parent! .css height: \100%
+    createRow: (cid) !-> if @$el
+        song = @songlist[cid]
+        if song.format == 1  # YouTube
+            mediaURL = "http://youtube.com/watch?v=#{song.cid}"
+            loadSC = ""
+        else # if media.format == 2 # SoundCloud
+            mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent song.author+' - '+song.title}"
+            loadSC = " load-sc"
+        @$rows[cid] = $ "
+            <div class='row song-format-#{song.format}' data-cid='#cid'>
+                <div class=song-thumb-wrapper>
+                    <img class=song-thumb src='#{song.image}'>
+                    <span class=song-duration>#{mediaTime song.duration}</span>
+                </div>
+                <div class=meta>
+                    <div class=author title='#{song.author}'>#{song.author}</div>
+                    <div class=title title='#{song.title}'>#{song.title}</div>
+                </div>
+                <div class='song-remove btn'><i class='icon icon-clear-input'></i></div>
+                <a class='song-open btn #loadSC' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+            </div>
+        "
+            .appendTo @$el
 
     disable: !->
         $ '#playback .snooze'
@@ -313,6 +365,7 @@ module \automute, do
 module \afkAutorespond, do
     displayName: 'AFK Autorespond'
     settings: \base
+    settingsSimple: true
     settingsVip: true
     _settings:
         message: "I'm AFK at the moment"
@@ -393,6 +446,15 @@ module \joinLeaveNotif, do
                 event = event_
                 if not reuseNotif = (chat?.lastType == CHAT_TYPE and $lastNotif)
                     lastUsers := {}
+
+                # temporary fix, until plug takes care of unnamed accounts
+                /*if not u.username
+                    u.username = "unnamed (#{u.id})"
+                    u.language = "en"
+                    console.info "[userJoin]", u
+                else
+                    console.log "[userJoin]", u
+                */
 
 
                 title = ''
@@ -822,6 +884,7 @@ module \waitlistUserPopup, do
 module \boothAlert, do
     displayName: 'Booth Alert'
     settings: \base
+    settingsSimple: true
     help: '''
         Play a notification sound before you are about to play
     '''

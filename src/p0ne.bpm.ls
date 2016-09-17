@@ -15,37 +15,40 @@
 ####################################*/
 module \bpm, do
     require: <[ chatPlugin ]>
+    disabled: true
     displayName: 'Better Ponymotes'
     settings: \pony
     _settings:
         showNSFW: false
-    module: (str) ->
-        if not str
-            console.error "bpm(null)"
+    module: (str) !->
         return @bpm str
 
-    setup: ({addListener, $create}, {_settings}) ->
+    setup: ({addListener, $create, addCommand}, {_settings}) !->
         host = window.p0ne?.host or "https://cdn.p0ne.com"
 
         /*== external sources ==*/
         if not window.emote_map
             window.emote_map = {}
-            $.getScript "#host/scripts/bpm-resources.js" .then ->
-                API .trigger \p0ne_emotes_map
+            $.getScript "#host/scripts/bpm-resources.js"
+                .then !->
+                    API .trigger \p0ne_emotes_map
+                .fail !~>
+                    API.chatLog "Better Ponymotes failed to load ponimote data"
+                    @disable!
         else
             <- requestAnimationFrame
             API .trigger \p0ne_emotes_map
 
         $create "
             <div id='bpm-resources'>
-                <link rel='stylesheet' href='#host/css/bpmotes.css?last-update=2015-02-15' type='text/css'>
-                <link rel='stylesheet' href='#host/css/emote-classes.css?last-update=2015-06-02' type='text/css'>
-                <link rel='stylesheet' href='#host/css/combiners-nsfw.css?last-update=2015-01-30' type='text/css'>
-                <link rel='stylesheet' href='#host/css/gif-animotes.css?last-update=2015-06-02' type='text/css'>
+                <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
                 #{if \webkitAnimation of document.body.style
-                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css?last-update=2015-03-09' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css' type='text/css'>"
                 else
-                    "<link rel='stylesheet' href='#host/css/extracss-pure.css?last-update=2015-03-09' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>"
                 }
             </div>
         "
@@ -69,7 +72,7 @@ module \bpm, do
          * have to match each other.
          */
         /*                 [](/  <   emote   >   <     alt-text    >  )*/
-        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g
+        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:&#3[49];([^"]*)&#3[49];)?\)/g
 
 
         /*== auxiliaries ==*/
@@ -84,7 +87,7 @@ module \bpm, do
             \# : \_hash_
             \/ : \_slash_
         function sanitize_emote s
-            return s.toLowerCase!.replace /[!:#\/]/g, (c) -> return sanitize_map[c]
+            return s.toLowerCase!.replace /[!:#\/]/g, (c) !-> return sanitize_map[c]
 
         function lookup_core_emote name, altText
             # Refer to bpgen.py:encode() for the details of this encoding
@@ -153,8 +156,8 @@ module \bpm, do
             # usually though, there shouldn't be ponymotes in links / inline images / converted ponymotes
             if str .has("[](/")
                 # avoid replacing emotes in HTML tags
-                return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) ~>
-                    nonHTML .= replace EMOTE_REGEXP, (_, parts, altText) ->
+                return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) !~>
+                    nonHTML .= replace EMOTE_REGEXP, (_, parts, altText) !->
                         parts .= split '-'
                         name = parts.0
                         info = lookup_core_emote name, altText
@@ -168,9 +171,8 @@ module \bpm, do
             */
 
         #== main BPM plugin ==
-        @bpm = (str) ->
-            console.error "bpm(null) [2]" if not str
-            str .replace EMOTE_REGEXP, (all, parts, altText) ->
+        @bpm = (str) !->
+            return str .replace EMOTE_REGEXP, (all, parts, altText) !->
                 parts .= split '-'
                 name = parts.0
                 info = lookup_core_emote name, altText
@@ -180,44 +182,72 @@ module \bpm, do
                     return convert_emote_element info, parts, all
 
         #== integration ==
-        addListener (window._$context || API), \chat:plugin, (msg) ->
+        addListener (window._$context || API), \p0ne:chat:plugin, (msg) !->
             msg.message = bpm(msg.message)
 
-        addListener \once, API, \p0ne_emotes_map, ->
+        addListener \once, API, \p0ne_emotes_map, !->
             console.info "[bpm] loaded"
 
             #== ponify old messages ==
-            $cms! .find '.text' .html ->
+            $cms! .find \.text .html !->
                 return bpm @innerHTML
 
             #== Autocomplete integration ==
             /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
-            cb = ->
+            cb = !->
                 AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/
                 addAutocompletion? do
                     name: "Ponymotes"
                     data: Object.keys(emote_map)
                     pre: "[]"
-                    check: (str, pos) ->
+                    check: (str, pos) !->
                         if !str[pos+2] or str[pos+2] == "(" and (!str[pos+3] or str[pos+3] == "(/")
                             temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos))
                             if temp
                                 @data = temp.2 || ''
                                 return true
                         return false
-                    display: (items) ->
+                    display: (items) !->
                         return [{value: "[](/#emote)", image: bpm("[](/#emote)")} for emote in items]
-                    insert: (suggestion) ->
+                    insert: (suggestion) !->
                         return "#{suggestion.substr(0, suggestion.length - 1)}#{@data})"
             if window.addAutocompletion
                 cb!
             else
                 addListener \once, API, \p0ne:autocomplete, cb
 
+        # add /Chat Commands
+        addCommand \bpm, do
+            aliases: <[ ponymote ]>
+            parameters: " emotename or [](/emotename)"
+            description: "checks if the emote exists and sends it if so"
+            callback: (str) !->
+                if str = /^\/bpm (?:^\/\[\]\(\/(.*?)(-.*?)?\)|(.*)(-.*?)?)/i .exec str
+                    if str.1
+                        emote = str.1
+                        str = "#emote#{str.2}"
+                    else
+                        emote = str.3
+                        str = "#emote#{str.4}"
+                    if emote of emote_map
+                        API.sendChat bpm("[](/#str)")
+        addCommand \reloadBPM, do
+            description: "reloads the BPM database."
+            callback: (str) !->
+                if str = /^\/bpm (?:^\/\[\]\(\/(.*?)(-.*?)?\)|(.*)(-.*?)?)/i .exec str
+                    if str.1
+                        emote = str.1
+                        str = "#emote#{str.2}"
+                    else
+                        emote = str.3
+                        str = "#emote#{str.4}"
+                    if emote of emote_map
+                        API.sendChat bpm("[](/#str)")
 
-    disable: (revertPonimotes) ->
+
+    disable: (revertPonimotes) !->
         if revertPonimotes
-            $cms! .find \.bpm-emote .replaceWith ->
+            $cms! .find \.bpm-emote .replaceWith !->
                 flags = ""
                 for class_ in this.classList || this.className.split(/s+/)
                     if class_.startsWith \bpmote-

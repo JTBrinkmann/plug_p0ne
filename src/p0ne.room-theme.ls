@@ -59,6 +59,7 @@ module \roomTheme, do
     require: <[ roomSettings ]>
     optional: <[ roomLoader ]>
     settings: \look&feel
+    settingsSimple: true
     help: '''
         Applies the room theme, if this room has one.
         Room Settings and thus a Room Theme can be added by (co-) hosts of the room.

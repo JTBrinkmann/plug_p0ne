@@ -27,6 +27,10 @@ window.module = (name, data) !->
                 module = !->
                     return fn.apply module, arguments
                 module <<<< data
+                # what what, functions apparently don't like the .name property
+                Object.defineProperty module, \name, do
+                    get: !-> return name
+                    #set: (newName) !-> name := newName
             else if typeof module == \object
                 module <<<< data
             else

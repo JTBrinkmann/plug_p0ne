@@ -8,6 +8,7 @@
 
 export $window = $ window
 export $body = $ document.body
+export $app = $ \#app
 
 /**/ # RequireJS fix
 window.require = window.requirejs
@@ -483,6 +484,7 @@ window <<<<
                 sleep 1_000ms, delay
             else
                 # note: playlist changes will return 503 errors after ca. 15 requests per 10 seconds (plus some delay) so we'll add some more delay to ensure stability
+                # playlist updates will trigger floodAPI after 20 reqs within 40s (maybe the timespan is larger)
                 window.floodAPI_counter++; sleep 15_000ms, !-> window.floodAPI_counter--
                 req = $.ajax options
                     .then def.resolve, def.reject, def.progress
@@ -553,7 +555,9 @@ window <<<<
         if not currentMedia
             console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
         else
-            return database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            res = database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            refresh!
+            return res
     join: !->
         # for this, performance might be essential
         # return $ '#dj-button.is-wait' .click! .length != 0
@@ -1318,15 +1322,15 @@ window <<<<
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
-                .replace /(.?)([\(\)])(.?)/g, (x,a,b,c) !->
-                    if "=^".indexOf(x) == -1 or a == ":"
+                .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
+                    if x.hasAny ['=', '^']  or  a == ":" or c == ":"
                         return x
                     else if b == \(
                         lvl++
                         return "#a<i class='song-description-comment'>(#c" if lvl == 1
-                    else if lvl
-                            lvl--
-                            return "#a)</i>#c" if lvl == 0
+                    else if lvl > 0
+                        lvl--
+                        return "#a)</i>#c" if lvl == 0
                     return x
             return pre if not url
             return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
@@ -1463,11 +1467,12 @@ window <<<<
             info += ")"
         if fromClass
             fromClass = " #{getRank(user, true)}"
+            fromClass += " you" if user.id == userID
         else
             fromClass = ""
 
         # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
-        return "#rank<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
+        return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span> #{flag user.language}#{info ||''}</span>"
 
     formatUserSimple: (user) !->
         return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
@@ -1526,6 +1531,8 @@ window <<<<
             user = role: user
         else if typeof user != \object
             user = getUser(user)
+        else if \attributes of user
+            user .= toJSON!
         if not user or user.role == -1
             return if defaultToGhost then \ghost else \regular
         else if user.gRole
@@ -1603,45 +1610,46 @@ if err
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
-requireHelper \users, (.onRole)
-requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
-requireHelper \playlists, (.activeMedia)
+requireHelper \ActivateEvent, (.ACTIVATE)
+requireHelper \AlertEvent, (._name == \AlertEvent)
 requireHelper \auxiliaries, (.deserializeMedia)
+requireHelper \Avatar, (.AUDIENCE)
+requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+requireHelper \backbone, (.Events), id: \backbone
+requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
+requireHelper \chatAuxiliaries, (.sendChat)
+requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
+requireHelper \currentMedia, (.updateElapsedBind)
+requireHelper \currentPlaylistMedia, (\currentFilter of)
 requireHelper \database, (.settings)
-requireHelper \socketEvents, (.ack)
+requireHelper \FriendsList, (.::?.className == \friends)
+requireHelper \Layout, (.getSize)
+requireHelper \MediaPanel, (.::?.onPlaylistVisible)
 requireHelper \permissions, (.canModChat)
 requireHelper \Playback, (.::?.id == \playback)
-requireHelper \PopoutView, (\$document of)
-requireHelper \MediaPanel, (.::?.onPlaylistVisible)
+requireHelper \playlists, (.activeMedia)
 requireHelper \PlugAjax, (.::?.hasOwnProperty \permissionAlert)
-requireHelper \backbone, (.Events), id: \backbone
-requireHelper \roomLoader, (.onVideoResize)
-requireHelper \Layout, (.getSize)
-requireHelper \popMenu, (.className == \pop-menu)
-requireHelper \ActivateEvent, (.ACTIVATE)
-requireHelper \votes, (.attributes?.grabbers)
-requireHelper \chatAuxiliaries, (.sendChat)
-requireHelper \tracker, (.identify)
-requireHelper \currentMedia, (.updateElapsedBind)
-requireHelper \settings, (.settings)
-requireHelper \soundcloud, (.sc)
 requireHelper \plugUrls, (.scThumbnail)
-requireHelper \searchAux, (.ytSearch)
-requireHelper \searchManager, (._search)
-requireHelper \SearchList, (.::?.listClass == \search)
-requireHelper \YtSearchService, (.::?.onVideos)
-requireHelper \AlertEvent, (._name == \AlertEvent)
-requireHelper \userRollover, (.id == \user-rollover)
-requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
-requireHelper \currentPlaylistMedia, (\currentFilter of)
-requireHelper \userList, (.id == \user-lists)
-requireHelper \FriendsList, (.::?.className == \friends)
-requireHelper \RoomUserRow, (.::?.vote)
-requireHelper \WaitlistRow, (.::?.onAvatar)
+requireHelper \popMenu, (.className == \pop-menu)
+requireHelper \PopoutView, (\$document of)
 requireHelper \room, (.attributes?.hostID)
 requireHelper \RoomHistory, (it) !-> return it::?.listClass == \history and it::hasOwnProperty \listClass
-requireHelper \avatarAuxiliaries, (.getAvatarUrl)
-requireHelper \Avatar, (.AUDIENCE)
+requireHelper \roomLoader, (.onVideoResize)
+requireHelper \RoomUserRow, (.::?.vote)
+requireHelper \searchAux, (.ytSearch)
+requireHelper \SearchList, (.::?.listClass == \search)
+requireHelper \searchManager, (._search)
+requireHelper \settings, (.settings)
+requireHelper \socketEvents, (.ack)
+requireHelper \soundcloud, (.sc)
+requireHelper \SuggestionView, (.::?id == \chat-suggestion)
+requireHelper \tracker, (.identify)
+requireHelper \userList, (.id == \user-lists)
+requireHelper \userRollover, (.id == \user-rollover)
+requireHelper \users, (.onRole)
+requireHelper \votes, (.attributes?.grabbers)
+requireHelper \WaitlistRow, (.::?.onAvatar)
+requireHelper \YtSearchService, (.::?.onVideos)
 #requireHelper \AvatarList, (._byId?.admin01)
 
 if requireHelper \emoticons, (.emojify)
