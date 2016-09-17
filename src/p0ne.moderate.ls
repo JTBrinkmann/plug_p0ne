@@ -46,6 +46,7 @@ module \warnOnHistory, do
     displayName: 'Warn on History'
     moderator: true
     settings: \moderation
+    settingsSimple: true
     setup: ({addListener}) !->
         addListener API, \advance, (d) !~> if d.media
             hist = API.getHistory!
@@ -78,6 +79,7 @@ module \disableChatDelete, do
     moderator: true
     displayName: 'Show deleted messages'
     settings: \moderation
+    settingsSimple: true
     setup: ({replace_$Listener, addListener, $createPersistent, css}) !->
         css \disableChatDelete, '
             .deleted {
@@ -139,6 +141,7 @@ module \chatDeleteOwnMessages, do
     moderator: true
     #displayName: 'Delete Own Messages'
     #settings: \moderation
+    settingsSimple: true
     setup: ({addListener}) !->
         $cm! .find "fromID-#{userID}"
             .addClass \deletable
@@ -163,6 +166,7 @@ module \warnOnMehers, do
     moderator: true
     displayName: 'Warn on Mehers'
     settings: \moderation
+    settingsSimple: true
     _settings:
         instantWarn: false
         maxMehs: 3
@@ -258,6 +262,7 @@ module \afkTimer, do
     optional: <[ socketListeners app userList _$context ]>
     moderator: true
     settings: \moderation
+    settingsSimple: true
     displayName: "Show Idle Time"
     help: '''
         This module shows how long users have been inactive in the User- and Waitlist-Panel.

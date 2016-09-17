@@ -12,6 +12,7 @@
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
+        expert: false
     setup: ({$create, addListener}, p0neSettings, oldModule) !->
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
 
@@ -29,7 +30,8 @@ module \p0neSettings, do
             .fadeOut 0
 
         #debug
-        $ppS .addClass \p0ne-settings-showall
+        if @_settings.expert
+            $ppW .addClass \p0ne-settings-expert
         #@<<<<{$ppP, $ppM, $ppI}
 
         #= add "simple" settings =
@@ -46,6 +48,14 @@ module \p0neSettings, do
                 <div class=p0ne-settings-help-btn>help</div>
                 <div class=p0ne-settings-expert-toggle>show all options</div>
             </div>"
+            .on \click, \.p0ne-settings-help-btn, !->
+                p0ne.modules.p0neHelp?.enable!
+            .on \click, \.p0ne-settings-expert-toggle, !~>
+                if @_settings.expert = not @_settings.expert
+                    $ppW .addClass \p0ne-settings-expert
+                else
+                    $ppW .removeClass \p0ne-settings-expert
+                updateSize!
             .appendTo $ppS
 
         #= add toggles for existing modules =
@@ -54,13 +64,20 @@ module \p0neSettings, do
             module._$settingsPanel?.wrapper .appendTo $ppM
 
 
-        do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
-            for group, $el of @groups # when @_settings.groupToggles[group]
-                $el .trigger \p0ne:resize
+        do addListener API, \p0ne:stylesLoaded, updateSize
+
+        !~function updateSize
+            cb = !~>
+                for group, $el of @groups # when @_settings.groupToggles[group]
+                    $el .trigger \p0ne:resize
+                for group, $el of @groups # when @_settings.groupToggles[group]
+                    $el .trigger \p0ne:resize
+            requestAnimationFrame cb
+            sleep 2_000ms, cb
 
 
         #= DEBUG =
-        debugMode = 0
+        debugMode = if groupToggles.p0neSettings then 0 else -1
         debugClosingDur = 500ms
 
         #= add DOM event listeners =
@@ -75,15 +92,19 @@ module \p0neSettings, do
 
                 if debugMode == 2
                     debugClosingDur := 0ms
-                    @$vip.hide!
                     $ppP .appendTo $ppW
+                    $ppW .addClass \p0ne-settings-expert
                 else
                     debugClosingDur := 500ms
-                    @$vip.show!
                     $ppP .appendTo $ppM
+                    if not @_settings.expert
+                        $ppW .addClass \p0ne-settings-expert
+                    else
+                        $ppW .removeClass \p0ne-settings-expert
 
                 for group, $el of @groups when @_settings.groupToggles[group]
-                    if not keepOpen
+                    if keepOpen
+                        @_settings.groupToggles[group] = false
                         $el .removeClass \open .css height: 30px
                     else
                         keepOpen = group
@@ -93,10 +114,11 @@ module \p0neSettings, do
                     @groups.base .find \.p0ne-settings-summary .click!
 
                 sleep debugClosingDur, !~>
-                    for group, $el of @groups when @_settings.groupToggles[group]
-                        if not groupToggles[group] and group != keepOpen
-                            groupToggles[group] = false
+                    for group, $el of @groups
+                        if not groupToggles[group]
                             $el .addClass \closed
+                        else
+                            $el .trigger \p0ne:resize
 
         # toggle groups
         addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
@@ -296,6 +318,7 @@ module \p0neSettings, do
 
 
     groups: {}
+    groupEmpty: {}
     moderationGroup: $!
     addModule: (module, module_) !->
         if module.settings
@@ -311,6 +334,7 @@ module \p0neSettings, do
                 itemClasses += ' p0ne-settings-has-more'
             itemClasses += ' p0ne-settings-has-extra' if module.settingsExtra
             itemClasses += ' p0ne-settings-item-enabled' if not module.disabled
+            itemClasses += ' p0ne-settings-item-expert' if not module.settingsSimple
 
             if module.settingsVip
                 # VIP settings get their special place
@@ -325,7 +349,7 @@ module \p0neSettings, do
                     .insertBefore @$ppInfo
                 $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
                 if @_settings.groupToggles[module.settings]
-                    $s .addClass \open
+                    $s  .addClass \open
                 else
                     $s
                         .addClass \closed
@@ -340,6 +364,8 @@ module \p0neSettings, do
                     $s .find \.p0ne-settings-summary .click!
             # otherwise we already created the settings group
 
+            if not module.settingsVip and not @groupEmpty[module.settings] and (@groupEmpty[module.settings] = module.settingsSimple)
+                $s .addClass \p0ne-settings-has-simple
             # create the module's settings element and append it to the settings group
             # note: $create doesn't have to be used, because the resulting elements are appended to a $create'd element
             module._$settings = $ "

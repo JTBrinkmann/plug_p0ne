@@ -10,7 +10,7 @@
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=48"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=51"
 
 /*
 window.moduleStyle = (name, d) !->
@@ -35,10 +35,11 @@ window.moduleStyle = (name, d) !->
 #            FIMPLUG THEME           #
 ####################################*/
 module \fimplugTheme, do
-    settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
+    settings: \look&feel
+    disabled: true
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=29"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=30"
 
 
 /*####################################
@@ -70,6 +71,7 @@ module \animatedUI, do
 module \fixHiRes, do
     displayName: "☢ Fix high resolutions"
     settings: \fixes
+    disabled: true
     help: '''
         This will fix some odd looking things on larger screens
         NOTE: This is WORK IN PROGESS! Right now it doesn't help much.
@@ -87,6 +89,7 @@ module \fixHiRes, do
 module \playlistIconView, do
     displayName: "Playlist Grid View"
     settings: \look&feel
+    settingsSimple: true
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
@@ -300,7 +303,6 @@ module \legacyFooter, do
         Restore the old look of the footer (the thing below the chat) and transform it into a more useful information panel.
         To get to the settings etc, click anywhere on the panel.
     '''
-    disabled: true
     setup: ({addListener}) !->
         # most of this module's magic is in the CSS
         $body .addClass \legacy-footer
@@ -471,6 +473,7 @@ module \emojiPack, do
 module \customBackground, do
     displayName: 'Custom Background'
     settings: \look&feel
+    settingsSimple: true
     help: '''
         This module lets you change the background image of plug.dj
 
@@ -495,7 +498,7 @@ module \customBackground, do
             else
                 @css \customBackground, """
                     \#app { background: transparent !important }\n
-                    \#app .app-right { background: rgba(0,0,0, 0.8) !important; }
+                    \#app .app-right { background: #0a0a0a !important; }
                     \#app \#avatars-container::before { content: "" !important; }
                     \#app .room-background { background-image: url(#{@_settings.background}) !important; display: block !important; }\n
                 """

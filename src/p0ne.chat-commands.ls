@@ -21,7 +21,7 @@ module \chatCommands, do
                     try
                         cmd.callback(c)
                     catch err
-                        chatWarn "<div>#{err.message}</div>", "error while executing #c"
+                        chatWarn "<div>#{err.message}</div>", "error while executing #c", true
                         console.error "[chatCommand] #c"
                         throw err
                 else
@@ -105,7 +105,7 @@ module \chatCommands, do
         stream:
             parameters: " [on|off]"
             description: "enable/disable the stream (just '/stream' toggles it)"
-            callback: !->
+            callback: (c) !->
                 if currentMedia?
                     # depending on the parameter, this return true ("on"), false ("off") and defaults to "toggle"
                     stream c.has \on || not (c.has(\off) || \toggle)

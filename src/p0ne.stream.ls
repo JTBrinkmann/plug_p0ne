@@ -13,8 +13,8 @@
    and due to them sharing a lot of code
 */
 module \streamSettings, do
-    #settings: \dev
-    #displayName: 'Stream-Settings'
+    settings: \dev
+    displayName: 'Stream-Settings'
     require: <[ app Playback currentMedia database _$context ]>
     optional: <[ database plugUrls ]>
     audioOnly: false

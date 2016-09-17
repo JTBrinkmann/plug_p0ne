@@ -237,6 +237,8 @@ module \fixStuckDJ, do
     '''
     _settings:
         verbose: true
+    tries: 0
+    MAX_TRIES: 10
     setup: ({replace, addListener}, fixStuckDJ) !->
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
@@ -255,8 +257,12 @@ module \fixStuckDJ, do
         ajax \GET, \rooms/state, do
             error: (data) !~>
                 console.error "[fixNoAdvance] cannot load room data:", status, data
-                @timer := sleep 10_000ms, fixStuckDJ
+                if not @disabled and @tries < @MAX_TRIES
+                    @timer := sleep 10_000ms, fixStuckDJ
+                else
+                    @tries = 0
             success: (data) !~>
+                @tries = 0
                 data.0.playback ||= {}
                 if m.id == data.0.playback?.media?.id
                     console.log "[fixNoAdvance] the same song is still playing."
@@ -564,3 +570,20 @@ module \fixPopoutChatClose, do
     setup: ({addListener}) !->
         addListener API, \popout:open, (window_) !->
             window_.onbeforeunload = PopoutView~close
+
+module \fixNullUser, do
+    settings: \fixes
+    require: <[ _$context ]>
+    disabled: true
+    setup: ({addListener, replace}) !->
+        addListener _$context, \user:join, cb = (u) !->
+            if not u.get \username
+                console.info "fixed null user", u.id
+                name = "null (#{u.id})"
+                u.set \username, name
+                u.set \rawun, name
+                u.set \language, \en
+                u.set \slug, \null
+        if users?
+            for u in users.models
+                cb(u)
