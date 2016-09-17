@@ -1155,8 +1155,7 @@ window <<<<
         if not cid
             return $!
         else
-            res = $cms! .find ".text.cid-#cid"
-            return res
+            return $cms! .find ".text.cid-#cid"
     getChat: (cid) !->
         if typeof cid == \object
             return cid.$el ||= getChat(cid.cid)
@@ -1454,25 +1453,40 @@ window <<<<
 
         return "#{user.username} (#{user.language}#info)"
 
-    formatUserHTML: (user, showModInfo, fromClass) !->
+    formatUserHTML: (user, fromClass, options/*{lvl: false, flag: false, warning: false, classes: true}*/) !->
         /*@security no HTML injection should be possible, unless user.rawun or .id is improperly modified*/
         user = getUser(user)
-        if rank = getRankIcon(user)
-            rank += " "
 
-        if showModInfo
-            info = " (lvl #{if user.gRole == 5 then '∞' else user.level}"
-            if Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
-                info += " - created #{ago d}"
-            info += ")"
-        if fromClass
-            fromClass = " #{getRank(user, true)}"
-            fromClass += " you" if user.id == userID
+        if typeof fromClass == \object
+            options = fromClass
+            fromClass = not options.classes? or options.classes
+        else if not options
+            options = {}
+            fromClass = true
+
+        warning = if options.warn and Date.now! - 48.h < d = parseISOTime(user.joined) # warn on accounts younger than 2 days
+            "created #{ago d}"
         else
-            fromClass = ""
+            ""
+
+        info = if options.lvl and user.isStaff
+            " (lvl #{if user.gRole == 5 then '∞' else user.level}#{if warning then ' - '+warning else ''})"
+        else if warning
+            " (#warning)"
+
+        if fromClass
+            rank = getRankIcon(user)
+            fromClass = " "+getUserClasses(user, false)
+        else
+            fromClass = rank = ""
+
+        userFlag = if options.flag
+            flag user.language
+        else
+            ""
 
         # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
-        return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span> #{flag user.language}#{info ||''}</span>"
+        return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span>#{userFlag}#{info ||''}</span>"
 
     formatUserSimple: (user) !->
         return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
@@ -1543,6 +1557,24 @@ window <<<<
         rank = getRank(user, true)
         return rank != \regular && "<i class='icon icon-chat-#rank p0ne-icon-small'></i>" ||''
 
+    getUserClasses: (u, inclExtra, inclFrom) !->
+        if inclFrom
+            inclFrom = "from-"
+        else
+            inclFrom = ""
+        if not u   or   not u = getUser(u) || staff?[u.uid || u.id || u]
+            return ""
+
+        rank = getRank(u, true)
+        res = "#{inclFrom}#rank"
+        res += " #{inclFrom}you" if u.id == userID
+        if inclExtra
+            res += " #{inclFrom}staff" if u.role > 1 or u.gRole
+            #if rank == \regular
+            res += " #{inclFrom}subscriber" if u.sub
+            res += " #{inclFrom}friend" if u.friend
+        return res
+
     parseURL: (href) !->
         href ||= "//"
         a = document.createElement \a
@@ -1610,65 +1642,186 @@ if err
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
-requireHelper \ActivateEvent, (.ACTIVATE)
-requireHelper \AlertEvent, (._name == \AlertEvent)
-requireHelper \auxiliaries, (.deserializeMedia)
-requireHelper \Avatar, (.AUDIENCE)
-requireHelper \avatarAuxiliaries, (.getAvatarUrl)
-requireHelper \backbone, (.Events), id: \backbone
-requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
-requireHelper \chatAuxiliaries, (.sendChat)
-requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
-requireHelper \currentMedia, (.updateElapsedBind)
-requireHelper \currentPlaylistMedia, (\currentFilter of)
-requireHelper \database, (.settings)
-requireHelper \FriendsList, (.::?.className == \friends)
-requireHelper \Layout, (.getSize)
-requireHelper \MediaPanel, (.::?.onPlaylistVisible)
-requireHelper \permissions, (.canModChat)
-requireHelper \Playback, (.::?.id == \playback)
-requireHelper \playlists, (.activeMedia)
-requireHelper \PlugAjax, (.::?.hasOwnProperty \permissionAlert)
-requireHelper \plugUrls, (.scThumbnail)
-requireHelper \popMenu, (.className == \pop-menu)
-requireHelper \PopoutView, (\$document of)
-requireHelper \room, (.attributes?.hostID)
-requireHelper \RoomHistory, (it) !-> return it::?.listClass == \history and it::hasOwnProperty \listClass
-requireHelper \roomLoader, (.onVideoResize)
-requireHelper \RoomUserRow, (.::?.vote)
-requireHelper \searchAux, (.ytSearch)
-requireHelper \SearchList, (.::?.listClass == \search)
-requireHelper \searchManager, (._search)
-requireHelper \settings, (.settings)
-requireHelper \socketEvents, (.ack)
-requireHelper \soundcloud, (.sc)
-requireHelper \SuggestionView, (.::?id == \chat-suggestion)
-requireHelper \tracker, (.identify)
-requireHelper \userList, (.id == \user-lists)
-requireHelper \userRollover, (.id == \user-rollover)
-requireHelper \users, (.onRole)
-requireHelper \votes, (.attributes?.grabbers)
-requireHelper \WaitlistRow, (.::?.onAvatar)
-requireHelper \YtSearchService, (.::?.onVideos)
-#requireHelper \AvatarList, (._byId?.admin01)
+for id, m of require.s.contexts._.defined when m
+    m.requireID = id
+    switch
+    | m.ACTIVATE =>
+        moduleName = "ActivateEvent"
+        window.ActivateEvent = m
+    | m._name == \AlertEvent =>
+        moduleName = "AlertEvent"
+        window.AlertEvent = m
+    | m.deserializeMedia =>
+        moduleName = "auxiliaries"
+        window.auxiliaries = m
+    | m.AUDIENCE =>
+        moduleName = "Avatar"
+        window.Avatar = m
+    | m.getAvatarUrl =>
+        moduleName = "avatarAuxiliaries"
+        window.avatarAuxiliaries = m
+    | m.Events =>
+        moduleName = "backbone"
+        window.backbone = m
+    | m.sendChat =>
+        moduleName = "chatAuxiliaries"
+        window.chatAuxiliaries = m
+    | m.updateElapsedBind =>
+        moduleName = "currentMedia"
+        window.currentMedia = m
+    | m.settings =>
+        moduleName = "database"
+        window.database = m
+    | m.emojify =>
+        moduleName = "emoticons"
+        window.emoticons = m
+    | m.getSize =>
+        moduleName = "Layout"
+        window.Layout = m
+    | m.canModChat =>
+        moduleName = "permissions"
+        window.permissions = m
+    | m._read =>
+        moduleName = "playlistCache"
+        window.playlistCache = m
+    | m.activeMedia =>
+        moduleName = "playlists"
+        window.playlists = m
+    | m.scThumbnail =>
+        moduleName = "plugUrls"
+        window.plugUrls = m
+    | m.className == \pop-menu =>
+        moduleName = "popMenu"
+        window.popMenu = m
+    | \_window of m =>
+        moduleName = "PopoutView"
+        window.PopoutView = m
+    | m.onVideoResize =>
+        moduleName = "roomLoader"
+        window.roomLoader = m
+    | m.ytSearch =>
+        moduleName = "searchAux"
+        window.searchAux = m
+    | m._search =>
+        moduleName = "searchManager"
+        window.searchManager = m
+    | m.settings =>
+        moduleName = "settings"
+        window.settings = m
+    | m.ack =>
+        moduleName = "socketEvents"
+        window.socketEvents = m
+    | m.sc =>
+        moduleName = "soundcloud"
+        window.soundcloud = m
+    | m.identify =>
+        moduleName = "tracker"
+        window.tracker = m
+    | m.onRole =>
+        moduleName = "users"
+        window.users = m
+    | otherwise =>
+        switch m.id
+        | \playlist-menu =>
+            moduleName = "playlistMenu"
+            window.playlistMenu = m
+        | \user-lists =>
+            moduleName = "userList"
+            window.userList = m
+        | \user-rollover =>
+            moduleName = "userRollover"
+            window.userRollover = m
+        | otherwise =>
+            if m._events
+                switch
+                | m._events[\chat:receive] =>
+                    moduleName = "_"
+                    window._$context = m
 
-if requireHelper \emoticons, (.emojify)
+            if m.attributes
+                switch
+                | \shouldCycle of m.attributes =>
+                    moduleName = "booth"
+                    window.booth = m
+                | \hostID of m.attributes =>
+                    moduleName = "room"
+                    window.room = m
+                | \grabbers of m.attributes =>
+                    moduleName = "votes"
+                    window.votes = m
+            if m::
+                switch
+                | m::execute?.toString!.has("/media/insert") =>
+                    moduleName = "Curate"
+                    window.Curate = m
+                | m::id == \dialog-alert =>
+                    moduleName = "DialogAlert"
+                    window.DialogAlert = m
+                    export Dialog = m.__super__
+                | m::className == \friends =>
+                    moduleName = "FriendsList"
+                    window.FriendsList = m
+                | m::className == \avatars && m::eventName =>
+                    moduleName = "InventoryAvatarPage"
+                    window.InventoryAvatarPage = m
+                    export InventoryDropdown = new m().dropDown.constructor
+                | m::onPlaylistVisible =>
+                    moduleName = "MediaPanel"
+                    window.MediaPanel = m
+                | m::id == \playback =>
+                    moduleName = "Playback"
+                    window.Playback = m
+                | m::listClass == \playlist-media =>
+                    moduleName = "PlaylistItemList"
+                    window.PlaylistItemList = m
+                    export PlaylistItemRow = m::RowClass
+                | m::onItemsChange =>
+                    moduleName = "PlaylistListRow"
+                    window.PlaylistListRow = m
+                | m::hasOwnProperty \permissionAlert =>
+                    moduleName = "PlugAjax"
+                    window.PlugAjax = m
+                | m::listClass == \history and m::hasOwnProperty \listClass =>
+                    moduleName = "RoomHistory"
+                    window.RoomHistory = m
+                | m::vote =>
+                    moduleName = "RoomUserRow"
+                    window.RoomUserRow = m
+                | m::listClass == \search =>
+                    moduleName = "SearchList"
+                    window.SearchList = m
+                | m::id == \chat-suggestion =>
+                    moduleName = "SuggestionView"
+                    window.SuggestionView = m
+                | m::onAvatar =>
+                    moduleName = "WaitlistRow"
+                    window.WaitlistRow = m
+                | m::onVideos =>
+                    moduleName = "YtSearchService"
+                    window.YtSearchService = m
+    if moduleName
+        console.log "[require]", id, moduleName, m
+        moduleName = ""
+    else if m.ytSearch
+        console.warn "[require] has .ytSearch", id, m
+    /*| m._events?[\update:next] =>
+        window.visiblePlaylist = m
+    | m\currentFilter of =>
+        window.visiblePlaylistFiltered = m
+    | m._byId?.admin01 =>
+        window.AvatarList = m
+    */
+for m in <[ _$context ActivateEvent AlertEvent auxiliaries Avatar avatarAuxiliaries backbone booth chatAuxiliaries Curate currentMedia database DialogAlert emoticons FriendsList InventoryAvatarPage Layout MediaPanel permissions Playback playlistCache PlaylistItemList PlaylistListRow playlistMenu playlists PlugAjax plugUrls popMenu PopoutView room RoomHistory roomLoader RoomUserRow searchAux SearchList searchManager settings socketEvents soundcloud SuggestionView tracker userList userRollover users votes WaitlistRow YtSearchService ]> when not m of window
+    console.warn "[require] couldn't require"
+
+
+if emoticons?
     emoticons.reversedMap = {[v, k] for k,v of emoticons.map}
 
-if requireHelper \PlaylistItemList, (.::?.listClass == \playlist-media)
-    export PlaylistItemRow = PlaylistItemList::RowClass
-
-if requireHelper \DialogAlert, (.::?.id == \dialog-alert)
-    export Dialog = DialogAlert.__super__
-
-if requireHelper \InventoryAvatarPage, ((a) -> a::?.className == 'avatars' && a::eventName)
-    export InventoryDropdown = new InventoryAvatarPage().dropDown.constructor
-
 #= _$context =
-requireHelper \_$context, (._events?.\chat:receive), do
-    onfail: !->
-        console.error "[p0ne require] couldn't load '_$context'. A lot of modules will NOT load because of this"
-for context in [ Backbone.Events, _$context, API ] when context
+if not _$context?
+    console.error "[p0ne require] couldn't load '_$context'. A lot of modules will NOT load because of this"
+for context in [ Backbone.Events, window._$context, API ] when context
     context.onEarly = (type, callback, context) !->
         @_events[][type] .unshift({callback, context, ctx: context || this})
             # ctx:  used for .trigger in Backbone

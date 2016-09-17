@@ -312,7 +312,7 @@ require <[ sockjs ]>, (SockJS) !->
             #== patch Avatar Selection ==
             for Cell in window.Cells
                 replace Cell::, \onClick, (oC_) !-> return !->
-                    console.log "[p0ne custom avatars] Avatar Cell click", this
+                    #console.log "[p0ne custom avatars] Avatar Cell click", this
                     avatarID = @model.get("id")
                     if /*not this.$el.closest \.inventory .length or*/ not p0ne._avatars[avatarID] or p0ne._avatars[avatarID].inInventory
                         # if avatatar is in the Inventory or not bought, properly select it
@@ -363,7 +363,7 @@ require <[ sockjs ]>, (SockJS) !->
             urlParser = document.createElement \a
             addCommand \ppcas, do
                 description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")'
-                callback: (str) !->
+                callback: (str) !~>
                     server = $.trim str.substr(6)
                     if server == "<url>"
                         chatWarn "hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars"
@@ -398,9 +398,9 @@ require <[ sockjs ]>, (SockJS) !->
                         helper \addAvatar
                         return
                     else if server == \default
-                        server = 'https://ppcas.p0ne.com/_'
+                        server = @DEFAULT_SERVER
                     else if server == \reconnect
-                        server = @socket.url
+                        server = @socket?.url || @DEFAULT_SERVER
                         forceReconnect = true
                     else if server.length == 0
                         chatWarn "Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again. or `/ppCAS reconnect` to force-reconnect to the current server", "p0ne avatars"
@@ -593,19 +593,32 @@ require <[ sockjs ]>, (SockJS) !->
             for ,user of users.models when user.get \vanillaAvatarID
                 user.set \avatarID, that
 
-module \ppCASStatusRing, do
-    settings: \dev
-    help: '''
-        shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).
-        green: connected
-        orange: connecting
-        red: disconnected
-    '''
-    setup: ({addListener}) !->
-        $footerAvi = $ '#footer-user .thumb'
-        addListener API, \ppCAS:connected, !->
-            $footerAvi .css borderColor: \limegreen
-        addListener API, \ppCAS:connecting, !->
-            $footerAvi .css borderColor: \orange
-        addListener API, \ppCAS:disconnected, !->
-            $footerAvi .css borderColor: \red
+    module \ppCASStatusRing, do
+        settings: \dev
+        help: '''
+            shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).
+            green: connected
+            orange: connecting
+            red: disconnected
+        '''
+        setup: ({addListener}) !->
+            @$footerAvi = $ '#footer-user .thumb'
+            addListener API, \ppCAS:connected, !~>
+                @$footerAvi .css borderColor: \limegreen
+            addListener API, \ppCAS:connecting, !~>
+                @$footerAvi .css borderColor: \orange
+            addListener API, \ppCAS:disconnected, !~>
+                @$footerAvi .css borderColor: \red
+
+            # see https://developer.mozilla.org/en-US/docs/Web/API/WebSocket#Ready_state_constants
+            switch customAvatars.socket?.readyState
+            | 0 => # CONNECTING
+                @$footerAvi .css borderColor: \orange
+            | 1 => # OPEN
+                @$footerAvi .css borderColor: \limegreen
+            | otherwise => # CLOSING, CLOSED, no socket
+                @$footerAvi .css borderColor: \red
+
+        disable: !->
+            if @$footerAvi
+                @$footerAvi .css borderColor: ''

@@ -221,7 +221,7 @@ module \streamSettings, do
         sc = Player with
             name: "SoundCloud"
             mode: \audio
-            enable: (@media) !->
+            enable: (@media) !~>
                 console.log "[StreamSettings] loading Soundcloud audio stream"
                 if soundcloud.r # soundcloud player is ready (loaded)
                     if soundcloud.sc
@@ -249,8 +249,8 @@ module \streamSettings, do
                                     position: \absolute
                                     left: 46px
                 else
-                    _$context.off \sc:ready
-                    _$context.once \sc:ready, !~>
+                    _$context.off \sc:ready, @SCReadyCB if @SCReadyCB
+                    _$context.once \sc:ready, @SCReadyCB = !~>
                         soundcloud.updateVolume(currentMedia.get \volume)
                         if media == currentMedia.get \media
                             playback.onSCReady!

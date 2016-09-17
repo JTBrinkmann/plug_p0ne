@@ -43,7 +43,7 @@ if (typeof console.time == 'function') {
 }
 p0ne_ = window.p0ne;
 window.p0ne = {
-  version: '1.8.6.2',
+  version: '1.8.7',
   lastCompatibleVersion: '1.8.0',
   host: 'https://cdn.p0ne.com',
   SOUNDCLOUD_KEY: 'aff458e0e87cfbc1a2cde2f8aeb98759',
@@ -100,8 +100,8 @@ window.compareVersions = function(a, b){
   }
   return b.length >= a.length;
 };
-(function(fn_){
-  var fn, v, onMigrated;
+(function(fn__){
+  var fn_, fn, v, onMigrated;
   if (window.P0NE_UPDATE) {
     window.P0NE_UPDATE = false;
     if ((p0ne_ != null ? p0ne_.version : void 8) === window.p0ne.version) {
@@ -116,6 +116,18 @@ window.compareVersions = function(a, b){
     console.group = console.log;
     console.groupEnd = $.noop;
   }
+  fn_ = function(){
+    var err;
+    try {
+      fn__();
+    } catch (e$) {
+      err = e$;
+      console.groupEnd();
+      console.groupEnd();
+      console.groupEnd();
+      API.chatLog("failed to load plug_p0ne: fatal error");
+    }
+  };
   fn = function(){
     var that, x$, err;
     try {
@@ -2614,12 +2626,10 @@ window.compareVersions = function(a, b){
       }
     },
     getChatText: function(cid){
-      var res;
       if (!cid) {
         return $();
       } else {
-        res = $cms().find(".text.cid-" + cid);
-        return res;
+        return $cms().find(".text.cid-" + cid);
       }
     },
     getChat: function(cid){
@@ -3085,31 +3095,31 @@ window.compareVersions = function(a, b){
       }
       return user.username + " (" + user.language + info + ")";
     },
-    formatUserHTML: function(user, showModInfo, fromClass){
+    formatUserHTML: function(user, fromClass, options){
       /*@security no HTML injection should be possible, unless user.rawun or .id is improperly modified*/
-      var rank, info, d;
+      var warning, d, info, rank, userFlag;
       user = getUser(user);
-      if (rank = getRankIcon(user)) {
-        rank += " ";
+      if (typeof fromClass === 'object') {
+        options = fromClass;
+        fromClass = options.classes == null || options.classes;
+      } else if (!options) {
+        options = {};
+        fromClass = true;
       }
-      if (showModInfo) {
-        info = " (lvl " + (user.gRole === 5
+      warning = options.warn && Date.now() - 48 .h < (d = parseISOTime(user.joined)) ? "created " + ago(d) : "";
+      info = options.lvl && user.isStaff
+        ? " (lvl " + (user.gRole === 5
           ? '∞'
-          : user.level);
-        if (Date.now() - 48 .h < (d = parseISOTime(user.joined))) {
-          info += " - created " + ago(d);
-        }
-        info += ")";
-      }
+          : user.level) + (warning ? ' - ' + warning : '') + ")"
+        : warning ? " (" + warning + ")" : void 8;
       if (fromClass) {
-        fromClass = " " + getRank(user, true);
-        if (user.id === userID) {
-          fromClass += " you";
-        }
+        rank = getRankIcon(user);
+        fromClass = " " + getUserClasses(user, false);
       } else {
-        fromClass = "";
+        fromClass = rank = "";
       }
-      return "<span class='un p0ne-name" + fromClass + "' data-uid='" + user.id + "'>" + rank + " <span class=name>" + user.rawun + "</span> " + flag(user.language) + (info || '') + "</span>";
+      userFlag = options.flag ? flag(user.language) : "";
+      return "<span class='un p0ne-name" + fromClass + "' data-uid='" + user.id + "'>" + rank + " <span class=name>" + user.rawun + "</span>" + userFlag + (info || '') + "</span>";
     },
     formatUserSimple: function(user){
       return "<span class=un data-uid='" + user.id + "'>" + user.username + "</span>";
@@ -3204,6 +3214,34 @@ window.compareVersions = function(a, b){
       rank = getRank(user, true);
       return rank !== 'regular' && "<i class='icon icon-chat-" + rank + " p0ne-icon-small'></i>" || '';
     },
+    getUserClasses: function(u, inclExtra, inclFrom){
+      var rank, res;
+      if (inclFrom) {
+        inclFrom = "from-";
+      } else {
+        inclFrom = "";
+      }
+      if (!u || !(u = getUser(u) || (typeof staff != 'undefined' && staff !== null ? staff[u.uid || u.id || u] : void 8))) {
+        return "";
+      }
+      rank = getRank(u, true);
+      res = inclFrom + "" + rank;
+      if (u.id === userID) {
+        res += " " + inclFrom + "you";
+      }
+      if (inclExtra) {
+        if (u.role > 1 || u.gRole) {
+          res += " " + inclFrom + "staff";
+        }
+        if (u.sub) {
+          res += " " + inclFrom + "subscriber";
+        }
+        if (u.friend) {
+          res += " " + inclFrom + "friend";
+        }
+      }
+      return res;
+    },
     parseURL: function(href){
       var a;
       href || (href = "//");
@@ -3280,7 +3318,7 @@ window.compareVersions = function(a, b){
       _rooms: {}
     }
   }, function(err, data){
-    var res$, k, ref$, v, PlaylistItemRow, Dialog, InventoryDropdown, i$, len$, context, ref1$, ref2$, ref3$, cb, app, friendsList, pl, user, ref4$, ev, myAvatars, userID, _, ref5$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp, staff;
+    var id, ref$, m, moduleName, ref1$, Dialog, InventoryDropdown, PlaylistItemRow, i$, len$, res$, k, v, context, ref2$, ref3$, ref4$, cb, app, friendsList, pl, user, ref5$, ev, myAvatars, userID, _, ref6$, e, cm, rR_, onLoaded, dummyP3, ppStop, MAX_IMAGE_HEIGHT, CHAT_WIDTH, tmp, staff;
     window.requireIDs = data.p0ne_requireIDs;
     p0ne.disabledModules = data.p0ne_disabledModules;
     if (err) {
@@ -3295,145 +3333,238 @@ window.compareVersions = function(a, b){
     #          REQUIRE MODULES           #
     ####################################*/
     /* requireHelper(moduleName, testFn) */
-    requireHelper('ActivateEvent', function(it){
-      return it.ACTIVATE;
-    });
-    requireHelper('AlertEvent', function(it){
-      return it._name === 'AlertEvent';
-    });
-    requireHelper('auxiliaries', function(it){
-      return it.deserializeMedia;
-    });
-    requireHelper('Avatar', function(it){
-      return it.AUDIENCE;
-    });
-    requireHelper('avatarAuxiliaries', function(it){
-      return it.getAvatarUrl;
-    });
-    requireHelper('backbone', function(it){
-      return it.Events;
-    }, {
-      id: 'backbone'
-    });
-    requireHelper('booth', function(it){
-      var ref$;
-      return (ref$ = it.attributes) != null ? ref$.hasOwnProperty('shouldCycle') : void 8;
-    });
-    requireHelper('chatAuxiliaries', function(it){
-      return it.sendChat;
-    });
-    requireHelper('Curate', function(it){
-      var ref$, ref1$;
-      return (ref$ = it.prototype) != null ? (ref1$ = ref$.execute) != null ? ref1$.toString().has("/media/insert") : void 8 : void 8;
-    });
-    requireHelper('currentMedia', function(it){
-      return it.updateElapsedBind;
-    });
-    requireHelper('currentPlaylistMedia', (function(it){
-      return 'currentFilter' in it;
-    }));
-    requireHelper('database', function(it){
-      return it.settings;
-    });
-    requireHelper('FriendsList', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.className : void 8) === 'friends';
-    });
-    requireHelper('Layout', function(it){
-      return it.getSize;
-    });
-    requireHelper('MediaPanel', function(it){
-      var ref$;
-      return (ref$ = it.prototype) != null ? ref$.onPlaylistVisible : void 8;
-    });
-    requireHelper('permissions', function(it){
-      return it.canModChat;
-    });
-    requireHelper('Playback', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.id : void 8) === 'playback';
-    });
-    requireHelper('playlists', function(it){
-      return it.activeMedia;
-    });
-    requireHelper('PlugAjax', function(it){
-      var ref$;
-      return (ref$ = it.prototype) != null ? ref$.hasOwnProperty('permissionAlert') : void 8;
-    });
-    requireHelper('plugUrls', function(it){
-      return it.scThumbnail;
-    });
-    requireHelper('popMenu', function(it){
-      return it.className === 'pop-menu';
-    });
-    requireHelper('PopoutView', (function(it){
-      return '$document' in it;
-    }));
-    requireHelper('room', function(it){
-      var ref$;
-      return (ref$ = it.attributes) != null ? ref$.hostID : void 8;
-    });
-    requireHelper('RoomHistory', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'history' && it.prototype.hasOwnProperty('listClass');
-    });
-    requireHelper('roomLoader', function(it){
-      return it.onVideoResize;
-    });
-    requireHelper('RoomUserRow', function(it){
-      var ref$;
-      return (ref$ = it.prototype) != null ? ref$.vote : void 8;
-    });
-    requireHelper('searchAux', function(it){
-      return it.ytSearch;
-    });
-    requireHelper('SearchList', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'search';
-    });
-    requireHelper('searchManager', function(it){
-      return it._search;
-    });
-    requireHelper('settings', function(it){
-      return it.settings;
-    });
-    requireHelper('socketEvents', function(it){
-      return it.ack;
-    });
-    requireHelper('soundcloud', function(it){
-      return it.sc;
-    });
-    requireHelper('SuggestionView', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.id : void 8) === 'chat-suggestion';
-    });
-    requireHelper('tracker', function(it){
-      return it.identify;
-    });
-    requireHelper('userList', function(it){
-      return it.id === 'user-lists';
-    });
-    requireHelper('userRollover', function(it){
-      return it.id === 'user-rollover';
-    });
-    requireHelper('users', function(it){
-      return it.onRole;
-    });
-    requireHelper('votes', function(it){
-      var ref$;
-      return (ref$ = it.attributes) != null ? ref$.grabbers : void 8;
-    });
-    requireHelper('WaitlistRow', function(it){
-      var ref$;
-      return (ref$ = it.prototype) != null ? ref$.onAvatar : void 8;
-    });
-    requireHelper('YtSearchService', function(it){
-      var ref$;
-      return (ref$ = it.prototype) != null ? ref$.onVideos : void 8;
-    });
-    if (requireHelper('emoticons', function(it){
-      return it.emojify;
-    })) {
+    for (id in ref$ = require.s.contexts._.defined) {
+      m = ref$[id];
+      if (m) {
+        m.requireID = id;
+        switch (false) {
+        case !m.ACTIVATE:
+          moduleName = "ActivateEvent";
+          window.ActivateEvent = m;
+          break;
+        case m._name !== 'AlertEvent':
+          moduleName = "AlertEvent";
+          window.AlertEvent = m;
+          break;
+        case !m.deserializeMedia:
+          moduleName = "auxiliaries";
+          window.auxiliaries = m;
+          break;
+        case !m.AUDIENCE:
+          moduleName = "Avatar";
+          window.Avatar = m;
+          break;
+        case !m.getAvatarUrl:
+          moduleName = "avatarAuxiliaries";
+          window.avatarAuxiliaries = m;
+          break;
+        case !m.Events:
+          moduleName = "backbone";
+          window.backbone = m;
+          break;
+        case !m.sendChat:
+          moduleName = "chatAuxiliaries";
+          window.chatAuxiliaries = m;
+          break;
+        case !m.updateElapsedBind:
+          moduleName = "currentMedia";
+          window.currentMedia = m;
+          break;
+        case !m.settings:
+          moduleName = "database";
+          window.database = m;
+          break;
+        case !m.emojify:
+          moduleName = "emoticons";
+          window.emoticons = m;
+          break;
+        case !m.getSize:
+          moduleName = "Layout";
+          window.Layout = m;
+          break;
+        case !m.canModChat:
+          moduleName = "permissions";
+          window.permissions = m;
+          break;
+        case !m._read:
+          moduleName = "playlistCache";
+          window.playlistCache = m;
+          break;
+        case !m.activeMedia:
+          moduleName = "playlists";
+          window.playlists = m;
+          break;
+        case !m.scThumbnail:
+          moduleName = "plugUrls";
+          window.plugUrls = m;
+          break;
+        case m.className !== 'pop-menu':
+          moduleName = "popMenu";
+          window.popMenu = m;
+          break;
+        case !('_window' in m):
+          moduleName = "PopoutView";
+          window.PopoutView = m;
+          break;
+        case !m.onVideoResize:
+          moduleName = "roomLoader";
+          window.roomLoader = m;
+          break;
+        case !m.ytSearch:
+          moduleName = "searchAux";
+          window.searchAux = m;
+          break;
+        case !m._search:
+          moduleName = "searchManager";
+          window.searchManager = m;
+          break;
+        case !m.settings:
+          moduleName = "settings";
+          window.settings = m;
+          break;
+        case !m.ack:
+          moduleName = "socketEvents";
+          window.socketEvents = m;
+          break;
+        case !m.sc:
+          moduleName = "soundcloud";
+          window.soundcloud = m;
+          break;
+        case !m.identify:
+          moduleName = "tracker";
+          window.tracker = m;
+          break;
+        case !m.onRole:
+          moduleName = "users";
+          window.users = m;
+          break;
+        default:
+          switch (m.id) {
+          case 'playlist-menu':
+            moduleName = "playlistMenu";
+            window.playlistMenu = m;
+            break;
+          case 'user-lists':
+            moduleName = "userList";
+            window.userList = m;
+            break;
+          case 'user-rollover':
+            moduleName = "userRollover";
+            window.userRollover = m;
+            break;
+          default:
+            if (m._events) {
+              switch (false) {
+              case !m._events['chat:receive']:
+                moduleName = "_";
+                window._$context = m;
+              }
+            }
+            if (m.attributes) {
+              switch (false) {
+              case !('shouldCycle' in m.attributes):
+                moduleName = "booth";
+                window.booth = m;
+                break;
+              case !('hostID' in m.attributes):
+                moduleName = "room";
+                window.room = m;
+                break;
+              case !('grabbers' in m.attributes):
+                moduleName = "votes";
+                window.votes = m;
+              }
+            }
+            if (m.prototype) {
+              switch (false) {
+              case !((ref1$ = m.prototype.execute) != null && ref1$.toString().has("/media/insert")):
+                moduleName = "Curate";
+                window.Curate = m;
+                break;
+              case m.prototype.id !== 'dialog-alert':
+                moduleName = "DialogAlert";
+                window.DialogAlert = m;
+                out$.Dialog = Dialog = m.__super__;
+                break;
+              case m.prototype.className !== 'friends':
+                moduleName = "FriendsList";
+                window.FriendsList = m;
+                break;
+              case !(m.prototype.className === 'avatars' && m.prototype.eventName):
+                moduleName = "InventoryAvatarPage";
+                window.InventoryAvatarPage = m;
+                out$.InventoryDropdown = InventoryDropdown = new m().dropDown.constructor;
+                break;
+              case !m.prototype.onPlaylistVisible:
+                moduleName = "MediaPanel";
+                window.MediaPanel = m;
+                break;
+              case m.prototype.id !== 'playback':
+                moduleName = "Playback";
+                window.Playback = m;
+                break;
+              case m.prototype.listClass !== 'playlist-media':
+                moduleName = "PlaylistItemList";
+                window.PlaylistItemList = m;
+                out$.PlaylistItemRow = PlaylistItemRow = m.prototype.RowClass;
+                break;
+              case !m.prototype.onItemsChange:
+                moduleName = "PlaylistListRow";
+                window.PlaylistListRow = m;
+                break;
+              case !m.prototype.hasOwnProperty('permissionAlert'):
+                moduleName = "PlugAjax";
+                window.PlugAjax = m;
+                break;
+              case !(m.prototype.listClass === 'history' && m.prototype.hasOwnProperty('listClass')):
+                moduleName = "RoomHistory";
+                window.RoomHistory = m;
+                break;
+              case !m.prototype.vote:
+                moduleName = "RoomUserRow";
+                window.RoomUserRow = m;
+                break;
+              case m.prototype.listClass !== 'search':
+                moduleName = "SearchList";
+                window.SearchList = m;
+                break;
+              case m.prototype.id !== 'chat-suggestion':
+                moduleName = "SuggestionView";
+                window.SuggestionView = m;
+                break;
+              case !m.prototype.onAvatar:
+                moduleName = "WaitlistRow";
+                window.WaitlistRow = m;
+                break;
+              case !m.prototype.onVideos:
+                moduleName = "YtSearchService";
+                window.YtSearchService = m;
+              }
+            }
+          }
+        }
+        if (moduleName) {
+          console.log("[require]", id, moduleName, m);
+          moduleName = "";
+        } else if (m.ytSearch) {
+          console.warn("[require] has .ytSearch", id, m);
+        }
+        /*| m._events?[\update:next] =>
+            window.visiblePlaylist = m
+        | m\currentFilter of =>
+            window.visiblePlaylistFiltered = m
+        | m._byId?.admin01 =>
+            window.AvatarList = m
+        */
+      }
+    }
+    for (i$ = 0, len$ = (ref$ = ['_$context', 'ActivateEvent', 'AlertEvent', 'auxiliaries', 'Avatar', 'avatarAuxiliaries', 'backbone', 'booth', 'chatAuxiliaries', 'Curate', 'currentMedia', 'database', 'DialogAlert', 'emoticons', 'FriendsList', 'InventoryAvatarPage', 'Layout', 'MediaPanel', 'permissions', 'Playback', 'playlistCache', 'PlaylistItemList', 'PlaylistListRow', 'playlistMenu', 'playlists', 'PlugAjax', 'plugUrls', 'popMenu', 'PopoutView', 'room', 'RoomHistory', 'roomLoader', 'RoomUserRow', 'searchAux', 'SearchList', 'searchManager', 'settings', 'socketEvents', 'soundcloud', 'SuggestionView', 'tracker', 'userList', 'userRollover', 'users', 'votes', 'WaitlistRow', 'YtSearchService']).length; i$ < len$; ++i$) {
+      m = ref$[i$];
+      if (!m in window) {
+        console.warn("[require] couldn't require");
+      }
+    }
+    if (typeof emoticons != 'undefined' && emoticons !== null) {
       res$ = {};
       for (k in ref$ = emoticons.map) {
         v = ref$[k];
@@ -3441,40 +3572,17 @@ window.compareVersions = function(a, b){
       }
       emoticons.reversedMap = res$;
     }
-    if (requireHelper('PlaylistItemList', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.listClass : void 8) === 'playlist-media';
-    })) {
-      out$.PlaylistItemRow = PlaylistItemRow = PlaylistItemList.prototype.RowClass;
+    if (typeof _$context == 'undefined' || _$context === null) {
+      console.error("[p0ne require] couldn't load '_$context'. A lot of modules will NOT load because of this");
     }
-    if (requireHelper('DialogAlert', function(it){
-      var ref$;
-      return ((ref$ = it.prototype) != null ? ref$.id : void 8) === 'dialog-alert';
-    })) {
-      out$.Dialog = Dialog = DialogAlert.__super__;
-    }
-    if (requireHelper('InventoryAvatarPage', function(a){
-      var ref$;
-      return ((ref$ = a.prototype) != null ? ref$.className : void 8) === 'avatars' && a.prototype.eventName;
-    })) {
-      out$.InventoryDropdown = InventoryDropdown = new InventoryAvatarPage().dropDown.constructor;
-    }
-    requireHelper('_$context', function(it){
-      var ref$;
-      return (ref$ = it._events) != null ? ref$['chat:receive'] : void 8;
-    }, {
-      onfail: function(){
-        console.error("[p0ne require] couldn't load '_$context'. A lot of modules will NOT load because of this");
-      }
-    });
-    for (i$ = 0, len$ = (ref$ = [Backbone.Events, _$context, API]).length; i$ < len$; ++i$) {
+    for (i$ = 0, len$ = (ref$ = [Backbone.Events, window._$context, API]).length; i$ < len$; ++i$) {
       context = ref$[i$];
       if (context) {
         context.onEarly = fn$;
       }
     }
     /* `app` is like the ultimate root object on plug.dj, just about everything is somewhere in there! great for debugging :) */
-    for (i$ = 0, len$ = (ref$ = (typeof room != 'undefined' && room !== null ? (ref1$ = room._events) != null ? ref1$['change:name'] : void 8 : void 8) || (typeof _$context != 'undefined' && _$context !== null ? (ref2$ = _$context._events) != null ? ref2$['show:room'] : void 8 : void 8) || (typeof Layout != 'undefined' && Layout !== null ? (ref3$ = Layout._events) != null ? ref3$['resize'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+    for (i$ = 0, len$ = (ref$ = (typeof room != 'undefined' && room !== null ? (ref2$ = room._events) != null ? ref2$['change:name'] : void 8 : void 8) || (typeof _$context != 'undefined' && _$context !== null ? (ref3$ = _$context._events) != null ? ref3$['show:room'] : void 8 : void 8) || (typeof Layout != 'undefined' && Layout !== null ? (ref4$ = Layout._events) != null ? ref4$['resize'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
       cb = ref$[i$];
       if (cb.ctx.room) {
         out$.app = app = cb.ctx;
@@ -3487,7 +3595,7 @@ window.compareVersions = function(a, b){
       return it.canModChat;
     })) {
       out$.user = user = user_.toJSON();
-      for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref4$ = user_._events) != null ? ref4$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
+      for (i$ = 0, len$ = (ref$ = (typeof user_ != 'undefined' && user_ !== null ? (ref5$ = user_._events) != null ? ref5$['change:avatarID'] : void 8 : void 8) || []).length; i$ < len$; ++i$) {
         ev = ref$[i$];
         if (ev.ctx.comparator === 'id') {
           out$.myAvatars = myAvatars = ev.ctx;
@@ -3504,13 +3612,13 @@ window.compareVersions = function(a, b){
     for (k in ref$ = typeof Lang != 'undefined' && Lang !== null ? Lang.languages : void 8) {
       v = ref$[k];
       if (v.has('\'')) {
-        (ref5$ = Lang.languages)[k] = ref5$[k].replace(/\\?'/g, "\\'");
+        (ref6$ = Lang.languages)[k] = ref6$[k].replace(/\\?'/g, "\\'");
       }
     }
     if (app && !(window.chat = app.room.chat) && window._$context) {
       for (i$ = 0, len$ = (ref$ = _$context._events['chat:receive'] || []).length; i$ < len$; ++i$) {
         e = ref$[i$];
-        if ((ref5$ = e.context) != null && ref5$.cid) {
+        if ((ref6$ = e.context) != null && ref6$.cid) {
           window.chat = e.context;
           break;
         }
@@ -4412,6 +4520,9 @@ window.compareVersions = function(a, b){
           if (PopoutView.chat) {
             PopoutView.chat.$el.on.apply(PopoutView.chat.$el, arguments);
           }
+          if (arguments[1] === '.p0ne-notif .badge-box') {
+            console.info("[TEST] .p0ne-notif .badge-box", arguments, cm);
+          }
         };
         this.off = function(){
           var isAnyMatch, i, cb, hasMatch, i$, len$, o;
@@ -4450,6 +4561,56 @@ window.compareVersions = function(a, b){
             console.log("[chatDomEvents] adding listener", cm, cb);
             cm.on.apply(cm, cb);
           }
+        });
+      }
+    });
+    module('grabEvent', {
+      require: ['votes'],
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(votes, 'grab', function(g_){
+          return function(uid){
+            if (typeof _$context != 'undefined' && _$context !== null) {
+              _$context.trigger('p0ne:vote:grab', getUser(uid));
+            }
+            g_.call(this, uid);
+            API.trigger('p0ne:vote:grab', getUser(uid));
+          };
+        });
+      }
+    });
+    module('playlistCachePatch', {
+      require: ['playlistCache'],
+      setup: function(arg$){
+        var replace, parse, err;
+        replace = arg$.replace;
+        parse = JSON.parse;
+        try {
+          JSON.parse = function(str){
+            return playlistCache._data = parse(str);
+          };
+          playlistCache.ready(userID);
+        } catch (e$) {
+          err = e$;
+          console.error("error patching playlistCache", err.messageAndStack);
+        }
+        JSON.parse = parse;
+      }
+    });
+    module('playlistCacheEvent', {
+      require: ['playlistCache'],
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(playlistCache, 'mediaUpdate', function(mU_){
+          return function(playlistID){
+            mU_.call(this, playlistID);
+            if (typeof _$context != 'undefined' && _$context !== null) {
+              _$context.trigger('p0ne:playlistCache:update', playlistID);
+            }
+            API.trigger('p0ne:playlistCache:update', playlistID);
+          };
         });
       }
     });
@@ -4565,7 +4726,7 @@ window.compareVersions = function(a, b){
       urlMap: {},
       persistent: ['styles'],
       setup: function(arg$, arg1$, p0neCSS_){
-        var addListener, $create, $el, $popoutEl, styles, urlMap, cb, throttled, loadingStyles, res, n, css, url, ref$, i;
+        var addListener, $create, $el, $popoutEl, styles, urlMap, cb, throttled, loadingStyles, res, n, ref$, css, url, i;
         addListener = arg$.addListener, $create = arg$.$create;
         this.$el = $create('<style>').appendTo('head');
         $el = this.$el, $popoutEl = this.$popoutEl, styles = this.styles, urlMap = this.urlMap;
@@ -4675,8 +4836,8 @@ window.compareVersions = function(a, b){
         };
         if (p0neCSS_) {
           res = "";
-          for (n in styles) {
-            css = styles[n];
+          for (n in ref$ = this.styles) {
+            css = ref$[n];
             res += "/*== " + n + " ==*/\n" + css + "\n\n";
           }
           if (res) {
@@ -4690,6 +4851,22 @@ window.compareVersions = function(a, b){
           }
         }
       }
+    });
+    _.defer(function(){
+      module('p0neNotifHelper', {
+        require: ['chatDomEvents'],
+        setup: function(arg$){
+          var addListener;
+          addListener = arg$.addListener;
+          addListener(chatDomEvents, 'click', '.p0ne-notif .badge-box', function(it){
+            var $this;
+            console.info("[TEST]", '.p0ne-notif .badge-box {event}', this, it);
+            $this = $(this).closest('.p0ne-notif').slideUp(function(){
+              $this.remove();
+            });
+          });
+        }
+      });
     });
     /*@source p0ne.perf.ls */
     /**
@@ -5753,6 +5930,28 @@ window.compareVersions = function(a, b){
         });
       }
     });
+    module('fixPlaylists', {
+      help: 'This fixes some issues with the playlist drawer.<ul><li>right clicking on a playlist\'s name opens it</li><li>releasing the middle mouse button (scroll wheel) over a playlist\'s name opens it</li></ul>',
+      require: ['PlaylistListRow'],
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(PlaylistListRow.prototype.events, 'click', function(){
+          return PlaylistListRow.prototype.events.mouseup;
+        });
+        replace(PlaylistListRow.prototype.events, 'mouseup', function(){
+          return function(){
+            var ref$;
+            if ((ref$ = this.options.parent.selectedRows) != null && ref$.length) {
+              this.onRowRelease();
+            }
+          };
+        });
+        if (typeof playlists != 'undefined' && playlists !== null) {
+          playlists.sort();
+        }
+      }
+    });
     module('fixPopoutChatClose', {
       require: ['PopoutListener'],
       setup: function(arg$){
@@ -5768,11 +5967,11 @@ window.compareVersions = function(a, b){
       require: ['_$context'],
       disabled: true,
       setup: function(arg$){
-        var addListener, replace, cb, i$, ref$, len$, u;
+        var addListener, replace, cb;
         addListener = arg$.addListener, replace = arg$.replace;
         addListener(_$context, 'user:join', cb = function(u){
           var name;
-          if (!u.get('username')) {
+          if (u.get('rawun') === null) {
             console.info("fixed null user", u.id);
             name = "null (" + u.id + ")";
             u.set('username', name);
@@ -5782,10 +5981,15 @@ window.compareVersions = function(a, b){
           }
         });
         if (typeof users != 'undefined' && users !== null) {
-          for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
-            u = ref$[i$];
-            cb(u);
-          }
+          addListener(_$context, 'ack', function(){
+            sleep(2000, function(){
+              var i$, ref$, len$, u;
+              for (i$ = 0, len$ = (ref$ = users.models).length; i$ < len$; ++i$) {
+                u = ref$[i$];
+                cb(u);
+              }
+            });
+          })();
         }
       }
     });
@@ -5992,8 +6196,8 @@ window.compareVersions = function(a, b){
           playback.tx("setVolume=" + vol);
         }, ref$);
         sc = (ref$ = clone$(Player), ref$.name = "SoundCloud", ref$.mode = 'audio', ref$.enable = function(media){
-          var b, this$ = this;
-          this.media = media;
+          var b;
+          this$.media = media;
           console.log("[StreamSettings] loading Soundcloud audio stream");
           if (soundcloud.r) {
             if (soundcloud.sc) {
@@ -6024,8 +6228,10 @@ window.compareVersions = function(a, b){
               }));
             }
           } else {
-            _$context.off('sc:ready');
-            _$context.once('sc:ready', function(){
+            if (this$.SCReadyCB) {
+              _$context.off('sc:ready', this$.SCReadyCB);
+            }
+            _$context.once('sc:ready', this$.SCReadyCB = function(){
               soundcloud.updateVolume(currentMedia.get('volume'));
               if (media === currentMedia.get('media')) {
                 playback.onSCReady();
@@ -6262,7 +6468,7 @@ window.compareVersions = function(a, b){
         addListener = arg$.addListener;
         addListener(API, 'chatCommand', function(c){
           var cmd, ref$, err;
-          if (cmd = this$._commands[(ref$ = /^\/(\w+)/.exec(c)) != null ? ref$[1] : void 8]) {
+          if (cmd = this$._commands[(ref$ = /^\/(\w+)/.exec(c)) != null ? ref$[1].toLowerCase() : void 8]) {
             console.log("/chatCommand", cmd, cmd.moderation);
             if (!cmd.moderation || user.gRole || cmd.moderation === true && user.isStaff || user.role >= cmd.moderation) {
               try {
@@ -7351,13 +7557,6 @@ window.compareVersions = function(a, b){
             if (!(reuseNotif = (typeof chat != 'undefined' && chat !== null ? chat.lastType : void 8) === CHAT_TYPE && $lastNotif)) {
               lastUsers = {};
             }
-            /*if not u.username
-                u.username = "unnamed (#{u.id})"
-                u.language = "en"
-                console.info "[userJoin]", u
-            else
-                console.log "[userJoin]", u
-            */
             title = '';
             if (reuseNotif && lastUsers[u.id] && joinLeaveNotif._settings.mergeSameUser) {
               if (event === 'userJoin' && 'userJoin' !== lastUsers[u.id].event) {
@@ -7368,7 +7567,11 @@ window.compareVersions = function(a, b){
                 title = "title='joined and left again'";
               }
             }
-            $msg = $("<div class=p0ne-notif-" + cssClasses[event] + " data-uid=" + u.id + " " + title + ">" + formatUserHTML(u, user.isStaff, false) + "" + getTimestamp() + "</div>");
+            $msg = $("<div class=p0ne-notif-" + cssClasses[event] + " data-uid=" + u.id + " " + title + ">" + formatUserHTML(u, true, {
+              lvl: true,
+              flag: true,
+              warning: true
+            }) + "" + getTimestamp() + "</div>");
             if (event === event_) {
               lastUsers[u.id] = {
                 event: event,
@@ -7667,24 +7870,31 @@ window.compareVersions = function(a, b){
           });
         });
         function updateETA(){
-          var p, ref$, eta_, eta;
+          var skipCalcETA, p, ref$, eta_, eta, forceSkipBtnWidth, ref1$;
+          skipCalcETA = false;
           p = API.getWaitListPosition();
           if (p === 0) {
             $etaText.text("you are next DJ!");
             $etaTime.text('');
-            return;
+            skipCalcETA = true;
           } else if (p === -1) {
             if (((ref$ = API.getDJ()) != null ? ref$.id : void 8) === userID) {
               $etaText.text("you are DJ!");
               $etaTime.text('');
-              return;
+              skipCalcETA = true;
             } else {
               if (0 === (p = API.getWaitList().length)) {
                 $etaText.text('Join now to ');
                 $etaTime.text("DJ instantly");
-                return;
+                skipCalcETA = true;
               }
             }
+          }
+          if (skipCalcETA) {
+            $nextMediaLabel.css({
+              right: $eta.width() - 50
+            });
+            return;
           }
           eta_ = API.getTimeRemaining() + sum * p / l;
           eta = Math.round(
@@ -7697,8 +7907,9 @@ window.compareVersions = function(a, b){
             } else {
               $etaTime.text(eta + " min");
             }
+            forceSkipBtnWidth = (ref1$ = p0ne.modules.forceSkipButton) != null && ref1$.disabled ? 50 : 0;
             $nextMediaLabel.css({
-              right: $eta.width() - 50
+              right: $eta.width() - forceSkipBtnWidth
             });
             if (eta_ > 0) {
               clearTimeout(this$.timer);
@@ -7731,7 +7942,9 @@ window.compareVersions = function(a, b){
           for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
             u = ref$[i$];
             if (u.vote === +1) {
-              userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+              userlist += "<div>" + formatUserHTML(u, true, {
+                flag: true
+              }) + "</div>";
             }
           }
           return userlist;
@@ -7741,7 +7954,9 @@ window.compareVersions = function(a, b){
           for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
             u = ref$[i$];
             if (u.grab) {
-              userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+              userlist += "<div>" + formatUserHTML(u, true, {
+                flag: true
+              }) + "</div>";
             }
           }
           return userlist;
@@ -7752,7 +7967,9 @@ window.compareVersions = function(a, b){
             for (i$ = 0, len$ = (ref$ = API.getAudience()).length; i$ < len$; ++i$) {
               u = ref$[i$];
               if (u.vote === -1) {
-                userlist += "<div>" + formatUserHTML(u, false, true) + "</div>";
+                userlist += "<div>" + formatUserHTML(u, true, {
+                  flag: true
+                }) + "</div>";
               }
             }
             return userlist;
@@ -7914,52 +8131,63 @@ window.compareVersions = function(a, b){
         });
       }
     });
+    module('notifyOnGrabbers', {
+      require: ['grabEvent'],
+      setup: function(arg$){
+        var addListener, replace;
+        addListener = arg$.addListener, replace = arg$.replace;
+        addListener(API, 'p0ne:grab', function(u){
+          if (!grabs[u.id]) {
+            notifs[u.id] = appendChat($("<div class='cm p0ne-notif p0ne-grab-notif'><i class='icon icon-grab'></i><div class='msg text'>" + formatUserHTML(d.user, true) + "</div></div>"));
+            grabs[u.id] = 1;
+          } else {
+            if (grabs[u.id] === 1) {
+              notifs[u.id] = $('<span class=p0ne-grab-notif-count>').appendTo(notifs[u.id]);
+            }
+            notifs[u.id].text = " (x" + (grabs[u.id]++) + ")";
+          }
+        });
+      }
+    });
     /*####################################
     #         AVOID HISTORY PLAY         #
     ####################################*/
-    module('avoidHistoryPlay', {
-      settings: 'base',
-      displayName: '☢ Avoid History Plays',
-      help: '[WORK IN PROGRESS]\n\nThis avoid playing songs that are already in history',
-      require: ['app'],
-      setup: function(arg$){
-        var addListener, playlist;
-        addListener = arg$.addListener;
-        playlist = app.footer.playlist.playlist.media;
-        addListener(API, 'advance', function(d){
-          var ref$, ref1$, ref2$, ref3$;
-          if (d.media && ((ref$ = d.dj) != null ? ref$.id : void 8) !== userID) {
-            if (((ref1$ = playlist.list) != null ? (ref2$ = ref1$.rows) != null ? (ref3$ = ref2$[0]) != null ? ref3$.model.cid : void 8 : void 8 : void 8) === d.media.cid && (typeof getActivePlaylist != 'undefined' && getActivePlaylist !== null)) {
-              chatWarn('moved down', '☢ Avoid History Plays');
-              ajax('PUT', "playlists/" + getActivePlaylist().id + "/media/move", {
-                beforeID: -1,
-                ids: [id]
-              });
-            }
-          } else {
-            API.once('advance', checkOnNextAdv);
-          }
-        });
-        function checkOnNextAdv(d){
-          var ref$, ref1$, ref2$, ref3$, ref4$, ref5$, nextSong, ref6$, ref7$, ref8$, i$, ref9$, len$, s;
-          console.info("[Avoid History Plays]", (ref$ = playlist.list) != null ? (ref1$ = ref$.rows) != null ? (ref2$ = ref1$[0]) != null ? ref2$.model : void 8 : void 8 : void 8, (ref3$ = playlist.list) != null ? (ref4$ = ref3$.rows) != null ? (ref5$ = ref4$[1]) != null ? ref5$.model : void 8 : void 8 : void 8);
-          if (!(nextSong = (ref6$ = playlist.list) != null ? (ref7$ = ref6$.rows) != null ? (ref8$ = ref7$[1]) != null ? ref8$.nextSong : void 8 : void 8 : void 8) || (typeof getActivePlaylist == 'undefined' || getActivePlaylist === null)) {
-            return;
-          }
-          for (i$ = 0, len$ = (ref9$ = API.getHistory()).length; i$ < len$; ++i$) {
-            s = ref9$[i$];
-            if (s.media.cid === nextSong.cid) {
-              chatWarn('moved down', '☢ Avoid History Plays');
-              ajax('PUT', "playlists/" + getActivePlaylist().id + "/media/move", {
-                beforeID: -1,
-                ids: [nextSong.id]
-              });
-            }
-          }
-        }
-        (this.checkOnNextAdv = checkOnNextAdv)();
-      }
-    });
+    /*
+    module \avoidHistoryPlay, do
+        settings: \base
+        displayName: '☢ Avoid History Plays'
+        help: '''
+            [WORK IN PROGRESS]
+    
+            This avoid playing songs that are already in history
+        '''
+        require: <[ app ]>
+        setup: ({addListener}) !->
+            #TODO make sure that `playlist` is actually the active playlist, not just the one the user is looking at
+            # i.e. use another object which holds the next songs of the current playlist
+            playlist = app.footer.playlist.playlist.media
+            addListener API, \advance, (d) !->
+                if d.media and d.dj?.id != userID
+                    if playlist.list?.rows?.0?.model.cid == d.media.cid  and  getActivePlaylist?
+                        chatWarn 'moved down', '☢ Avoid History Plays'
+                        ajax \PUT, "playlists/#{getActivePlaylist!.id}/media/move", do
+                            beforeID: -1
+                            ids: [id]
+                else
+                    API.once \advance, checkOnNextAdv
+    
+            !function checkOnNextAdv d
+                # assuming that the playlist did not already advance
+                console.info "[Avoid History Plays]", playlist.list?.rows?.0?.model, playlist.list?.rows?.1?.model
+                return if not (nextSong = playlist.list?.rows?.1?.nextSong) or not getActivePlaylist?
+                for s in API.getHistory!
+                    if s.media.cid == nextSong.cid
+                        chatWarn 'moved down', '☢ Avoid History Plays'
+                        ajax \PUT, "playlists/#{getActivePlaylist!.id}/media/move", do
+                            beforeID: -1
+                            ids: [nextSong.id]
+            do @checkOnNextAdv = checkOnNextAdv
+    */
     /*####################################
     #         WARN ON PAGE LEAVE         #
     ####################################*/
@@ -7972,6 +8200,130 @@ window.compareVersions = function(a, b){
         addListener($window, 'beforeunload', function(){
           return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under " + this$.settings.toUpperCase() + " > " + this$.displayName + ")";
         });
+      }
+    });
+    module('notifyOnLevelUp', {
+      displayName: "Show Friends' Level-Ups",
+      settings: 'base',
+      require: ['socketListeners'],
+      setup: function(arg$){
+        var addListener;
+        addListener = arg$.addListener;
+        addListener(API, 'socket:userUpdate', function(arg$){
+          var p, ref$, u;
+          p = arg$.p;
+          if (p.level && ((ref$ = u = getUser(p.i)) != null && ref$.friend)) {
+            chatWarn("<b>" + formatUserSimple(u) + "</b> just reached level " + p.level + "!", "Friend Level-Up", true);
+          }
+        });
+      }
+    });
+    module('maintenanceCountdown', {
+      require: ['socketListeners'],
+      setup: function(arg$){
+        var addListener, this$ = this;
+        addListener = arg$.addListener;
+        this.timer = 0;
+        addListener(API, 'socket:plugMaintenanceAlert', function(remainingMinutes){
+          var $bck;
+          this$.$el = $('#footer-user .name').css({
+            color: 'orange'
+          });
+          $bck = this$.$el.children();
+          clearInterval(this$.timer);
+          this$.timer = repeat(60000, updateRemaining);
+          function updateRemaining(){
+            if (remainingMinutes > 1) {
+              this$.$el.text("plug.dj going down in ca. " + remainingMinutes-- + " min");
+            } else {
+              this$.$el.text("plug.dj going down in soonish");
+              clearInterval(this$.timer);
+              this$.timer = 0;
+              sleep(5 .min, function(){
+                if (!this$.timer) {
+                  this$.$el.html("").append($bck);
+                }
+              });
+            }
+          } updateRemaining();
+        });
+      },
+      disable: function(){
+        var ref$;
+        clearInterval(this.timer);
+        if ((ref$ = this.$el) != null) {
+          ref$.css({
+            color: ''
+          });
+        }
+      }
+    });
+    module('grabMenuHighlight', {
+      require: ['popMenu', 'playlistCachePatch'],
+      setup: function(arg$){
+        var replace;
+        replace = arg$.replace;
+        replace(popMenu, 'show', function(s_){
+          return function(t, n, r){
+            this.media = n;
+            if (this.isShowing) {
+              this.draw();
+            }
+            s_.call(this, t, n, r);
+          };
+        });
+        replace(popMenu, 'drawRow', function(dR_){
+          return function(e){
+            var row, matches;
+            row = dR_.call(this, e);
+            matches = 0;
+            if (playlistCache._data[1].p[e.id].items[this.media[0].get('cid')]) {
+              row.$el.addClass('p0ne-pl-has-media');
+            } else if ((typeof playlists != 'undefined' && playlists !== null ? playlists.get(e.id).get('count') : void 8) === 200) {
+              row.$el.addClass('p0ne-pl-is-full');
+            }
+          };
+        });
+        replace(popMenu, 'drawRowBind', function(){
+          return bind$(popMenu, 'drawRow');
+        });
+      }
+    });
+    module('playlistMenuHighlight', {
+      require: ['playlistMenu', 'playlistCacheEvent'],
+      setup: function(arg$){
+        var addListener, i$, ref$, len$, row;
+        addListener = arg$.addListener;
+        for (i$ = 0, len$ = (ref$ = playlistMenu.rows).length; i$ < len$; ++i$) {
+          row = ref$[i$];
+          if (playlistCache._data[1].p[row.model.id]) {
+            row.inCache = true;
+            row.$el.addClass('p0ne-pl-cached');
+          }
+        }
+        addListener(API, 'p0ne:playlistCache:update', function(playlistID){
+          var i$, ref$, len$, row;
+          for (i$ = 0, len$ = (ref$ = playlistMenu.rows).length; i$ < len$; ++i$) {
+            row = ref$[i$];
+            if (row.model.id === playlistID) {
+              if (!row.inCache) {
+                row.inCache = true;
+                row.$el.addClass('p0ne-pl-cached');
+              }
+              break;
+            }
+          }
+        });
+      },
+      disable: function(){
+        var i$, ref$, len$, row;
+        for (i$ = 0, len$ = (ref$ = playlistMenu.rows).length; i$ < len$; ++i$) {
+          row = ref$[i$];
+          if (playlistCache._data[1].p[row.model.id]) {
+            delete row.inCache;
+            row.$el.removeClass('p0ne-pl-cached');
+          }
+        }
       }
     });
     /*@source p0ne.chat.ls */
@@ -8239,29 +8591,22 @@ window.compareVersions = function(a, b){
           console.error("[chatMessageClasses] couldn't convert old messages", err.stack);
         }
         addListener(window._$context || API, 'p0ne:chat:plugin', function(message){
-          var type, uid, rank, also;
+          var type, uid;
           type = message.type, uid = message.uid;
           if (uid) {
             message.addClass("fromID-" + uid);
             if (message.user = getUser(uid)) {
-              rank = getRank(message.user, true);
-              if (uid === userID) {
-                message.addClass('from-you');
-                also = '-also';
-              } else {
-                message.addClass("from-" + rank);
-              }
-              if (message.user.role > 1 || message.user.gRole) {
-                message.addClass('from-staff');
-              }
-              if (rank === 'regular') {
-                if (message.user.sub) {
-                  message.addClass('from-subscriber');
-                }
-                if (message.user.friend) {
-                  message.addClass('from-friend');
-                }
-              }
+              message.addClass(getUserClasses(message.user, true, true));
+              /*rank = getRank(message.user, true)
+              if uid == userID
+                  message.addClass \from-you
+                  #also = \-also
+              else
+                  message.addClass "from-#rank"
+              message.addClass \from-staff if message.user.role > 1 or message.user.gRole
+              if rank == \regular
+                  message.addClass \from-subscriber if message.user.sub
+                  message.addClass \from-friend if message.user.friend*/
             }
           }
         });
@@ -8410,7 +8755,7 @@ window.compareVersions = function(a, b){
         var addListener, this$ = this;
         addListener = arg$.addListener;
         addListener(API, 'p0ne:chat:link', function(arg$){
-          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img, msgLC, i$, ref$, len$, tag;
+          var all, pre, completeURL, protocol, domain, url, onload, onerror, msg, offset, img, msgLC, i$, ref$, len$, tag, content, key$;
           all = arg$.all, pre = arg$.pre, completeURL = arg$.completeURL, protocol = arg$.protocol, domain = arg$.domain, url = arg$.url, onload = arg$.onload, onerror = arg$.onerror, msg = arg$.msg, offset = arg$.offset;
           if (img = this$.inlineify.apply(this$, arguments)) {
             if (msg.hasFilterWord == null) {
@@ -8434,7 +8779,12 @@ window.compareVersions = function(a, b){
               } else {
                 pre = "class=p0ne-img-filtered " + pre;
               }
-              return "<a " + pre + " src='" + img + "'>" + completeURL.replace(this$.regexpCache[msg.hasFilterWord], '<span class=p0ne-img-filterword>$&</span>') + "</a>";
+              if (msg.hasFilterWord) {
+                content = completeURL.replace((ref$ = this$.regexpCache)[key$ = msg.hasFilterWord] || (ref$[key$] = RegExp(escapeRegExp(msg.hasFilterWord) + '', 'ig')), '<span class=p0ne-img-filterword>$&</span>');
+              } else {
+                content = completeURL;
+              }
+              return "<a " + pre + " src='" + img + "'>" + content + "</a>";
             } else {
               console.log("[inline-img]", completeURL + " ==> " + img);
               return "<a " + pre + "><img src='" + img + "' class=p0ne-img " + onload + " " + onerror + "></a>";
@@ -8444,9 +8794,8 @@ window.compareVersions = function(a, b){
           }
         });
         addListener(API, 'p0ne:chat:plugin', function(msg){
-          var ref$, key$;
           if (msg.hasFilterWord) {
-            msg.message = msg.message.replaceSansHTML((ref$ = this$.regexpCache)[key$ = msg.hasFilterWord] || (ref$[key$] = RegExp(escapeRegExp(msg.hasFilterWord) + '', 'ig')), "<span class=p0ne-img-filterword>$&</span>");
+            msg.message = msg.message.replaceSansHTML(this$.regexpCache[msg.hasFilterWord], "<span class=p0ne-img-filterword>$&</span>");
           }
         });
       },
@@ -8926,7 +9275,7 @@ window.compareVersions = function(a, b){
       help: 'Shows songs in the playlist and history panel in an icon view instead of the default list view.',
       optional: ['PlaylistItemList', 'pl'],
       setup: function(arg$, playlistIconView){
-        var addListener, replace, replaceListener, CELL_HEIGHT, CELL_WIDTH, ref$, ref1$, $hovered, $mediaPanel, this$ = this;
+        var addListener, replace, replaceListener, CELL_HEIGHT, CELL_WIDTH, ref$, $hovered, $mediaPanel, this$ = this;
         addListener = arg$.addListener, replace = arg$.replace, replaceListener = arg$.replaceListener;
         $body.addClass('playlist-icon-view');
         if (typeof PlaylistItemList == 'undefined' || PlaylistItemList === null) {
@@ -8936,9 +9285,9 @@ window.compareVersions = function(a, b){
         CELL_HEIGHT = 185;
         CELL_WIDTH = 160;
         replace(PlaylistItemList.prototype, 'onResize', function(){
-          return function(){
+          return function(layout){
             var newCellsPerRow, newVisibleRows;
-            this.constructor.__super__.onResize.call(this);
+            this.constructor.__super__.onResize.call(this, layout);
             newCellsPerRow = ~~((this.$el.width() - 10) / CELL_WIDTH);
             newVisibleRows = Math.ceil(2 + this.$el.height() / CELL_HEIGHT) * newCellsPerRow;
             if (newVisibleRows !== this.visibleRows || newCellsPerRow !== this.cellsPerRow) {
@@ -8973,21 +9322,26 @@ window.compareVersions = function(a, b){
             }
           };
         });
+        replaceListener(_$context, 'anim:playlist:progress', PlaylistItemList, function(){
+          return $.noop;
+        });
         if (pl != null && ((ref$ = pl.list) != null && ref$.rows)) {
-          Layout.off('resize', pl.list.resizeBind).resize(replace(pl.list, 'resizeBind', function(){
-            return bind$(pl.list, 'onResize');
-          }));
-          pl.list.$el.off('jsp-scroll-y', pl.list.scrollBind).on('jsp-scroll-y', replace(pl.list, 'scrollBind', function(){
-            return bind$(pl.list, 'onScroll');
-          }));
-          replaceListener(_$context, 'anim:playlist:progress', PlaylistItemList, function(){
-            return function(){};
-          });
-          delete pl.list.currentRow;
-          pl.list.onResize(Layout.getSize());
-          if (typeof (ref1$ = pl.list).onScroll == 'function') {
-            ref1$.onScroll();
-          }
+          pl.show(new pl.header.constructor(), new pl.list.constructor());
+          /*# onResize hook
+          replace pl.list, \resizeBind, !-> return _.bind pl.list, \onResize
+          for e, i in Layout._events.resize when e.callback == pl.list.resizeBind
+              replace e, \callback, !-> return pl.list.resizeBind
+          
+          # onScroll hook
+          pl.list.$el
+              .off \jsp-scroll-y, pl.list.scrollBind
+              .on \jsp-scroll-y, replace(pl.list, \scrollBind, !~> return pl.list~onScroll)
+              #pl.list.onResize! if pl.list.$el
+          
+          # to force rerender
+          delete pl.list.currentRow
+          pl.list.onResize Layout.getSize!
+          pl.list.onScroll?!*/
         } else {
           console.warn("no pl");
         }
@@ -9034,15 +9388,10 @@ window.compareVersions = function(a, b){
         });
       },
       disableLate: function(){
-        var ref$, ref1$;
-        console.info(getTime() + " [playlistIconView] disabling");
+        var ref$;
         $body.removeClass('playlist-icon-view');
-        if (pl != null) {
-          if ((ref$ = pl.list) != null) {
-            if ((ref1$ = ref$.$el) != null) {
-              ref1$.off('jsp-scroll-y').on('jsp-scroll-y', pl.list.scrollBind);
-            }
-          }
+        if (pl != null && ((ref$ = pl.list) != null && ref$.rows)) {
+          pl.show(new pl.header.constructor(), new pl.list.constructor());
         }
         /*
         #= load all songs at once =
@@ -9080,7 +9429,7 @@ window.compareVersions = function(a, b){
         addListener = arg$.addListener;
         $room = $('#room');
         $playbackImg = $('#playback-container');
-        addListener(API, 'advance', updatePic);
+        addListener(API, 'advance p0ne:reconnected room:joined', updatePic);
         updatePic({
           media: API.getMedia()
         });
@@ -9282,10 +9631,10 @@ window.compareVersions = function(a, b){
     #             EMOJI PACK             #
     ####################################*/
     module('emojiPack', {
-      displayName: '☢ Emoji Pack [Google]',
+      displayName: 'Emoji Pack',
       settings: 'look&feel',
       disabled: true,
-      help: 'Replace all emojis with the one from Google (for Android Lollipop).\n\nEmojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>',
+      help: 'Replace all emojis with the one from Google (for Android Lollipop) or Twitter.\n\nEmojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>',
       screenshot: 'https://i.imgur.com/Ef94Csn.png',
       _settings: {
         pack: 'google'
@@ -9293,7 +9642,20 @@ window.compareVersions = function(a, b){
       setup: function(arg$){
         var loadStyle;
         loadStyle = arg$.loadStyle;
-        loadStyle(p0ne.host + "/css/temp." + this._settings.pack + "-emoji.css");
+        loadStyle(p0ne.host + "/css/" + this._settings.pack + ".emoji.css");
+      },
+      settingsExtra: function($el){
+        var emojiPack, resetTimer;
+        emojiPack = this;
+        $("<form><label><input type=radio name=max-mehs value=google> Google</label><br><label><input type=radio name=max-mehs value=twitter> Twitter</label></form>").on('click', 'input:radio', function(){
+          if (this.checked) {
+            emojiPack._settings.pack = this.value;
+            emojiPack.disable().enable();
+          }
+        }).appendTo($el).find("input[value=" + emojiPack._settings.pack + "]").attr('checked', 'checked');
+        $el.css({
+          paddingLeft: 15
+        });
       }
     });
     /*####################################
@@ -9999,12 +10361,13 @@ window.compareVersions = function(a, b){
         });
         if (typeof popMenu != 'undefined' && popMenu !== null) {
           addListener(chatDomEvents, 'click', '.song-add', function(){
-            var $el, $notif, id, format, msgOffset, obj;
+            var $el, $notif, id, cid, format, msgOffset, obj;
             $el = $(this);
             $notif = $el.closest('.p0ne-song-notif');
             id = $notif.data('id');
+            cid = $notif.data('cid');
             format = $notif.data('format');
-            console.log("[add from notif]", $notif, id, format);
+            console.log("[add from notif]", $notif, id, format, cid);
             msgOffset = $notif.offset();
             $el.offset = function(){
               return {
@@ -10014,7 +10377,8 @@ window.compareVersions = function(a, b){
             };
             obj = {
               id: id,
-              format: 1
+              format: format,
+              cid: cid
             };
             obj.get = function(name){
               return this[name];
@@ -10180,7 +10544,9 @@ window.compareVersions = function(a, b){
         this.$div.html(html);
         this.$div.find('.song-title').text(title).prop('title', title);
         this.$div.find('.song-author').text(author);
-        this.$div.find('.song-dj').html(formatUserHTML(d.dj, user.isStaff, getRank(d.dj)));
+        this.$div.find('.song-dj').html(formatUserHTML(d.dj, true, {
+          flag: true
+        }));
         appendChat(this.$div);
         if (media.format === 2) {
           this.$div.addClass('loading');
@@ -10712,7 +11078,7 @@ window.compareVersions = function(a, b){
           addCommand('ppcas', {
             description: 'changes the plug_p0ne Custom Avatar Server ("ppCAS")',
             callback: function(str){
-              var server, base_url, helper, forceReconnect;
+              var server, base_url, helper, ref$, forceReconnect;
               server = $.trim(str.substr(6));
               if (server === "<url>") {
                 chatWarn("hahaha, no. You have to replace '<url>' with an actual URL of a ppCAS server, otherwise it won't work.", "p0ne avatars");
@@ -10745,7 +11111,7 @@ window.compareVersions = function(a, b){
                     });
                   }
                 };
-                this.socket = {
+                this$.socket = {
                   close: function(){
                     helper('removeAvatar');
                     delete this.socket;
@@ -10754,9 +11120,9 @@ window.compareVersions = function(a, b){
                 helper('addAvatar');
                 return;
               } else if (server === 'default') {
-                server = 'https://ppcas.p0ne.com/_';
+                server = this$.DEFAULT_SERVER;
               } else if (server === 'reconnect') {
-                server = this.socket.url;
+                server = ((ref$ = this$.socket) != null ? ref$.url : void 8) || this$.DEFAULT_SERVER;
                 forceReconnect = true;
               } else if (server.length === 0) {
                 chatWarn("Use `/ppCAS <url>` to connect to a plug_p0ne Custom Avatar Server. Use `/ppCAS default` to connect to the default server again. or `/ppCAS reconnect` to force-reconnect to the current server", "p0ne avatars");
@@ -10765,7 +11131,7 @@ window.compareVersions = function(a, b){
               urlParser.href = server;
               if (urlParser.host !== location.host) {
                 console.log(getTime() + " [p0ne custom avatars] connecting to", server);
-                this.connect(server, forceReconnect);
+                this$.connect(server, forceReconnect);
               } else {
                 console.warn(getTime() + " [p0ne custom avatars] invalid ppCAS server");
               }
@@ -10775,7 +11141,6 @@ window.compareVersions = function(a, b){
           function fn$(oC_){
             return function(){
               var avatarID, ref$, ref1$;
-              console.log("[p0ne custom avatars] Avatar Cell click", this);
               avatarID = this.model.get("id");
               if (!p0ne._avatars[avatarID] || p0ne._avatars[avatarID].inInventory) {
                 oC_.apply(this, arguments);
@@ -11035,30 +11400,53 @@ window.compareVersions = function(a, b){
           }
         }
       });
-    });
-    module('ppCASStatusRing', {
-      settings: 'dev',
-      help: 'shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).\ngreen: connected\norange: connecting\nred: disconnected',
-      setup: function(arg$){
-        var addListener, $footerAvi;
-        addListener = arg$.addListener;
-        $footerAvi = $('#footer-user .thumb');
-        addListener(API, 'ppCAS:connected', function(){
-          $footerAvi.css({
-            borderColor: 'limegreen'
+      module('ppCASStatusRing', {
+        settings: 'dev',
+        help: 'shows whether or not you are connected to the ppCAS (plug_p0ne Custom Avatar Server) by drawing a ring around your avatar in the footer (below the chat).\ngreen: connected\norange: connecting\nred: disconnected',
+        setup: function(arg$){
+          var addListener, ref$, this$ = this;
+          addListener = arg$.addListener;
+          this.$footerAvi = $('#footer-user .thumb');
+          addListener(API, 'ppCAS:connected', function(){
+            this$.$footerAvi.css({
+              borderColor: 'limegreen'
+            });
           });
-        });
-        addListener(API, 'ppCAS:connecting', function(){
-          $footerAvi.css({
-            borderColor: 'orange'
+          addListener(API, 'ppCAS:connecting', function(){
+            this$.$footerAvi.css({
+              borderColor: 'orange'
+            });
           });
-        });
-        addListener(API, 'ppCAS:disconnected', function(){
-          $footerAvi.css({
-            borderColor: 'red'
+          addListener(API, 'ppCAS:disconnected', function(){
+            this$.$footerAvi.css({
+              borderColor: 'red'
+            });
           });
-        });
-      }
+          switch ((ref$ = customAvatars.socket) != null && ref$.readyState) {
+          case 0:
+            this.$footerAvi.css({
+              borderColor: 'orange'
+            });
+            break;
+          case 1:
+            this.$footerAvi.css({
+              borderColor: 'limegreen'
+            });
+            break;
+          default:
+            this.$footerAvi.css({
+              borderColor: 'red'
+            });
+          }
+        },
+        disable: function(){
+          if (this.$footerAvi) {
+            this.$footerAvi.css({
+              borderColor: ''
+            });
+          }
+        }
+      });
     });
     /*@source p0ne.settings.ls */
     /**
@@ -11154,7 +11542,7 @@ window.compareVersions = function(a, b){
             } else {
               debugClosingDur = 500;
               $ppP.appendTo($ppM);
-              if (!this$._settings.expert) {
+              if (this$._settings.expert) {
                 $ppW.addClass('p0ne-settings-expert');
               } else {
                 $ppW.removeClass('p0ne-settings-expert');
@@ -11263,8 +11651,8 @@ window.compareVersions = function(a, b){
           panelIconTimeout = sleep(200, function(){
             return panelIconTimeout = 0;
           });
-          $this = $(this).closest('.p0ne-settings-item');
-          module = $this.data('module');
+          $this = $(this);
+          module = $this.closest('.p0ne-settings-item').data('module');
           console.log("[p0ne-settings-panel-icon] clicked", panelIconTimeout, !!module._$settingsPanel, (ref$ = module._$settingsPanel) != null ? ref$.open : void 8, (ref1$ = module._$settingsPanel) != null ? ref1$.wrapper : void 8);
           if (!module._$settingsPanel) {
             module._$settingsPanel = {
@@ -11280,9 +11668,10 @@ window.compareVersions = function(a, b){
             module._$settingsPanel.wrapper.animate({
               left: offsetLeft - module._$settingsPanel.$el.width()
             }, function(){
-              return $(this).hide();
+              return module._$settingsPanel.wrapper.hide();
             });
             module._$settingsPanel.open = false;
+            $this.find('.icon').removeClass('icon-settings-white').addClass('icon-settings-grey');
           } else {
             module._$settingsPanel.wrapper.show().css({
               left: offsetLeft - module._$settingsPanel.$el.width()
@@ -11290,6 +11679,7 @@ window.compareVersions = function(a, b){
               left: offsetLeft
             });
             module._$settingsPanel.open = true;
+            $this.find('.icon').addClass('icon-settings-white').removeClass('icon-settings-grey');
           }
         });
         addListener($ppW, 'mouseover', '.p0ne-settings-has-more', function(){
@@ -11674,6 +12064,11 @@ window.compareVersions = function(a, b){
             cm = $cm();
             cm.scrollTop(cm.scrollTop() + d.height());
             $msg.find('.delete-button').remove();
+            $msg.find('.p0ne-img').each(function(){
+              var $a;
+              $a = $(this).parent();
+              $a.html($a.attr('href'));
+            });
             if (isLast) {
               return chat.lastType = 'p0ne-deleted';
             }
@@ -11733,7 +12128,7 @@ window.compareVersions = function(a, b){
           if (d.vote === -1 && d.user.uid !== userID) {
             console.log("%c" + formatUser(d.user, true) + " meh'd this song", 'color: #ff5a5a');
             if (this$._settings.instantWarn) {
-              appendChat($("<div class='cm system'><div class=box><i class='icon icon-chat-system'></i></div><div class='msg text'>" + formatUserHTML(d.user, true) + " meh'd this song!</div></div>"));
+              appendChat($("<div class='cm p0ne-notif p0ne-meh-warning'><i class='icon icon-chat-system'></i><div class='msg text'>" + formatUserHTML(d.user, true) + " meh'd this song!</div></div>"));
             }
           }
         });
@@ -12095,9 +12490,9 @@ window.compareVersions = function(a, b){
     module('p0neHelp', {
       optional: ['currentMedia'],
       require: ['automute', 'p0neSettings'],
-      setup: function(arg$){
-        var $create, css, automute, i, steps, p0neSettings, $ppW, $ppI, $pp0, $hdButton, $snoozeBtn, $el, screens, $nextBtn, $steps, $screen, $screens, $navDots, blinkingInterval, $blinkingEl, this$ = this;
-        $create = arg$.$create, css = arg$.css;
+      setup: function(aux){
+        var $create, css, automute, i, steps, p0neSettings, $ppW, $ppI, $pp0, $hdButton, $snoozeBtn, $el, screens, $screen, $screens, $navDots, $nextBtn, $steps, blinkingInterval, $blinkingEl, listeners, this$ = this;
+        $create = aux.$create, css = aux.css;
         automute = p0ne.modules.automute;
         steps = {};
         this.screenClose = $.noop;
@@ -12108,7 +12503,7 @@ window.compareVersions = function(a, b){
         $pp0 = $ppI.find('.p0ne-icon-sub');
         $hdButton = $('#playback .hd');
         $snoozeBtn = $('#playback .snooze');
-        $el = $create("<div class=wt-cover></div><div class='container wt-p0' id=walkthrough><div class='step fade-in wt-p0-welcome' data-screen=welcome><h2>Welcome to</h2><div class=wt-p0-title><div class=wt-p0-title-p>p</div><div class=wt-p0-title-lug_p>lug_p</div><div class='wt-p0-0 wt-p0-title-0'>0</div><div class=wt-p0-title-ne>ne</div></div><button class='wt-p0-next continue'>&nbsp;</button></div><div class='step fade-in wt-p0-settings' data-screen=settings><h1>Settings</h1><p>To open/close the plug_p0ne settings, click the <div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div> icon in the top left</p><p class=wt-p0-settings-closed>click the icon now!</p><p class=wt-p0-settings-open>Good job! Let's move on.</p><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-dblclick2mention' data-screen=dblclick2mention><h1>dblclick2mention</h1><p>Most of plug_p0ne's awesome features are not immediately obvious.<br>Let's try out some, to see what we can do with plug_p<span class=wt-p0-0>0</span>ne.</p><p>One of best is the so called \"DblClick username to Mention\", which let's you @mention others simply by double clicking their usernames (e.g. in their chat messages or join/leave notifications, but it works just about everywhere).<br>This is great to quickly greet friends, for example.</p><p>[insert image]<!-- <img src='...'> --></p><button class='wt-p0-next continue'>next</button></div><div class='step fade-in wt-p0-stream-settings' data-screen=stream-settings><h1>Stream Settings</h1><p>plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br><i class='icon icon-stream-video'></i> Video,<br><i class='icon icon-stream-audio'></i> Audio-Only and<br><i class='icon icon-stream-off'></i> Stream-Off (no video/sound).</p><p>You can click the icons in the top-middle to change between the modes.</p><button class='wt-p0-next continue'>next</button></div><div class='step fade-in wt-p0-automute' data-screen=automute><h1>Automute</h1><p>You can also <b>automute</b> songs you really dislike. This way, they will automatically get muted whenever they are played.</p><p>To add a song to automute, do the following:<ol class=wt-p0-steps><li>Click on <b class=snooze-btn><i class='icon icon-stream-off'></i> Snooze</b> to snooze the current song (stop the video/song)</li><li>When snoozed, the snooze button will turn into an automute -add or -remove button</li></ol></p><p>Let's try it out!<br>(don't worry, we can undo it right away)</p><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-automute2' data-screen=automute2><h1>Automute</h1><p>Removing songs from the automute list is also easy:<ol class=wt-p0-steps><li>open the settings panel. (<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>)</li><li>open the group \"" + automute.settings + "\"</li><li>click on the <i class='icon icon-settings-white'></i>icon next to \"automute\"</li><li>move your mouse over any song in the list and click the <i class='icon icon-clear-input'></i> icon on the song you want to remove from the list</li></ol></p><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-end' data-screen=end><h1>END!</h1><p>Alright that's it!<br>Hopefully you'll have some fun with plug_p0ne!</p><p>Just play around with the settings to find some more great features. :3</p><button class='wt-p0-next continue'>finish</button></div><div class=nav><i class=selected></i><i></i><i></i><i></i><i></i><i></i><i></i><button class='wt-p0-skip wt-p0-next'>skip walkthrough</button</div></div>").on('click', '.wt-p0-button', function(){
+        $el = $create("<div class=wt-cover></div><div class='container wt-p0' id=walkthrough><div class='step fade-in wt-p0-welcome' data-screen=welcome><h2>Welcome to</h2><div class=wt-p0-title><div class=wt-p0-title-p>p</div><div class=wt-p0-title-lug_p>lug_p</div><div class='wt-p0-0 wt-p0-title-0'>0</div><div class=wt-p0-title-ne>ne</div></div><button class='wt-p0-next continue'>&nbsp;</button></div><div class='step fade-in wt-p0-settings' data-screen=settings><h1>Settings</h1><p>To open/close the plug_p0ne settings, click the <div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div> icon in the top left</p><p class=wt-p0-settings-closed>click the icon now!</p><p class=wt-p0-settings-open>Good job! Let's move on.</p><button class='wt-p0-back'>back</button><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-dblclick2mention' data-screen=dblclick2mention><h1>dblclick2mention</h1><p>Most of plug_p0ne's awesome features are not immediately obvious.<br>Let's try out some, to see what we can do with plug_p<span class=wt-p0-0>0</span>ne.</p><p>One of best is the so called \"DblClick username to Mention\", which let's you @mention others simply by double clicking their usernames (e.g. in their chat messages or join/leave notifications, but it works just about everywhere).<br>This is great to quickly greet friends, for example.</p><p>[insert image]<!-- <img src='...'> --></p><button class='wt-p0-back'>back</button><button class='wt-p0-next continue'>next</button></div><div class='step fade-in wt-p0-stream-settings' data-screen=stream-settings><h1>Stream Settings</h1><p>plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br><i class='icon icon-stream-video'></i> Video,<br><i class='icon icon-stream-audio'></i> Audio-Only and<br><i class='icon icon-stream-off'></i> Stream-Off (no video/sound).</p><p>You can click the icons in the top-middle to change between the modes.</p><button class='wt-p0-back'>back</button><button class='wt-p0-next continue'>next</button></div><div class='step fade-in wt-p0-automute' data-screen=automute><h1>Automute</h1><p>You can also <b>automute</b> songs you really dislike. This way, they will automatically get muted whenever they are played.</p><p>To add a song to automute, do the following:<ol class=wt-p0-steps><li>Click on <b class=snooze-btn><i class='icon icon-stream-off'></i> Snooze</b> to snooze the current song (stop the video/song)</li><li>When snoozed, the snooze button will turn into an automute -add or -remove button</li></ol></p><p>Let's try it out!<br>(don't worry, we can undo it right away)</p><button class='wt-p0-back'>back</button><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-automute2' data-screen=automute2><h1>Automute</h1><p>Removing songs from the automute list is also easy:<ol class=wt-p0-steps><li>open the settings panel. (<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>)</li><li>open the group \"" + automute.settings + "\"</li><li>click on the <i class='icon icon-settings-white'></i>icon next to \"automute\"</li><li>move your mouse over any song in the list and click the <i class='icon icon-clear-input'></i> icon on the song you want to remove from the list</li></ol></p><button class='wt-p0-back'>back</button><button class=wt-p0-next>skip</button></div><div class='step fade-in wt-p0-info-footer' data-screen=info-footer><h1>Info Footer</h1><p>One last thing, plug_p0ne replaces the footer (the section below the chat) with something more useful.<br>To get to the Settings, the Shop or your Inventory, simply click anywhere on the footer.</p><p>The Info Footer only will work for logged in users, though.</p><button class='wt-p0-back'>back</button><button class='wt-p0-next continue'>next</button></div><div class='step fade-in wt-p0-end' data-screen=end><h1>END!</h1><p>Alright that's it!<br>Hopefully you'll have some fun with plug_p0ne!</p><p>Just play around with the settings to find some more great features. :3</p><button class='wt-p0-back'>back</button><button class='wt-p0-next continue'>finish</button></div><div class=nav><i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i><button class='wt-p0-skip'>skip walkthrough</button</div></div>").on('click', '.wt-p0-button', function(){
           var $this;
           $this = $(this);
           return $this.trigger("button-" + $this.index() + " button-" + $this.text());
@@ -12117,6 +12512,8 @@ window.compareVersions = function(a, b){
           return false;
         }).on('click', '.wt-p0-next', function(){
           nextScreen(i + 1);
+        }).on('click', '.wt-p0-back', function(){
+          nextScreen(i - 1);
         }).on('click', '.nav i', function(){
           nextScreen($(this).index());
         }).appendTo($app);
@@ -12131,15 +12528,15 @@ window.compareVersions = function(a, b){
               $screen.addClass('revealed');
               return sleep(3000, function(){
                 if (i === 0) {
-                  $nextBtn_.text("continue");
+                  $nextBtn_.text("next");
                 }
               });
             });
           }, function(){
-            var $divClosed, $divOpen, cb;
+            var $divClosed, $divOpen;
             $divClosed = $el.find('.wt-p0-settings-closed');
             $divOpen = $el.find('.wt-p0-settings-open');
-            $ppI.on('click', cb = function(){
+            addListener($ppI, 'click', function(){
               if (!p0neSettings.groupToggles.p0neSettings) {
                 $divClosed.show();
                 $divOpen.hide();
@@ -12164,10 +12561,8 @@ window.compareVersions = function(a, b){
                 blinking($nextBtn);
                 return accomplished();
               }
-            });
-            cb();
+            })();
             return this$.screenClose = function(){
-              $ppI.off('click', cb);
               return p0neSettings.toggleMenu(false);
             };
           }, function(){}, function(){
@@ -12175,9 +12570,9 @@ window.compareVersions = function(a, b){
             $playback = $('#playback');
             return blinking($hdButton);
           }, function(){
-            var m, cb1, cb2, cb3;
+            var m;
             if (typeof currentMedia != 'undefined' && currentMedia !== null) {
-              API.on('advance', cb1 = function(){
+              addListener(API, 'advance', function(){
                 if (!(m = currentMedia.get('media'))) {
                   currentMedia.set(new Backbone.Model({
                     cid: 'wZZ7oFKsKzY',
@@ -12190,16 +12585,16 @@ window.compareVersions = function(a, b){
                 } else {
                   step(isSnoozed() ? 2 : 1);
                 }
-              });
+              })();
               cb1();
             }
-            API.on('p0ne:changeMode', cb2 = function(m){
+            addListener(API, 'p0ne:changeMode', function(m){
               step(m === 'off' ? 2 : 1);
             });
             if (isSnoozed()) {
               step(2);
             }
-            $snoozeBtn.on('click', cb3 = function(){
+            addListener($snoozeBtn, 'click', function(){
               console.log("smooze [sic]", automute.songlist[API.getMedia().cid]);
               if (automute.songlist[API.getMedia().cid]) {
                 accomplished();
@@ -12210,8 +12605,6 @@ window.compareVersions = function(a, b){
               if (m) {
                 currentMedia.set('media', m);
               }
-              API.off('advance', cb1).off('p0ne:changeMode', cb2);
-              $snoozeBtn.off('click', cb3);
             };
           }, function(){
             var $spI, $summary, test, cb1, cb2, settingsPanel, cb3;
@@ -12221,7 +12614,7 @@ window.compareVersions = function(a, b){
               return $spI;
             };
             blinking($ppI);
-            $ppI.on('click', cb1 = function(){
+            addListener($ppI, 'click', cb1 = function(){
               if (!p0neSettings.groupToggles.p0neSettings) {
                 step(1);
                 $screen.css({
@@ -12243,7 +12636,7 @@ window.compareVersions = function(a, b){
                 cb2();
               }
             });
-            $summary.on('click', cb2 = function(){
+            addListener($summary, 'click', cb2 = function(){
               requestAnimationFrame(function(){
                 if (!p0neSettings.groupToggles[automute.settings]) {
                   step(2);
@@ -12268,7 +12661,7 @@ window.compareVersions = function(a, b){
                 }
               });
             });
-            automute._$settings.on('click', '.p0ne-settings-panel-icon', cb3 = function(){
+            addListener(automute._$settings, 'click', '.p0ne-settings-panel-icon', cb3 = function(){
               requestAnimationFrame(function(){
                 var ref$;
                 if (!((ref$ = automute._$settingsPanel) != null && ref$.open)) {
@@ -12301,7 +12694,8 @@ window.compareVersions = function(a, b){
                     if (settingsPanel) {
                       settingsPanel.off('click', '.song-remove', accomplished);
                     }
-                    settingsPanel = automute._$settingsPanel.wrapper.on('click', '.icon-clear-input', accomplished);
+                    settingsPanel = automute._$settingsPanel;
+                    addListener(settingsPanel, 'click', '.icon-clear-input', accomplished);
                   }
                   blinking();
                 }
@@ -12309,24 +12703,29 @@ window.compareVersions = function(a, b){
             });
             cb1();
             return this$.screenClose = function(){
-              var ref$;
-              $ppI.off('click', cb1);
-              $summary.off('click', cb2);
-              if ((ref$ = automute._$settings) != null) {
-                ref$.off('click', cb3);
-              }
               if ($spI != null) {
                 $spI.css({
                   boxShadow: '',
                   borderRadius: ''
                 });
               }
-              if (settingsPanel != null) {
-                settingsPanel.off('click', '.icon-clear-input', accomplished);
-              }
               return p0neSettings.toggleMenu(false);
             };
-          }, function(){}, bind$(this, 'disable')
+          }, function(){
+            var cb;
+            addListener($footerUser, 'click', cb = function(){
+              if ($(this).hasClass('menu')) {
+                $screen.css({
+                  right: 20
+                });
+              } else {
+                $screen.css({
+                  right: -330
+                });
+              }
+            });
+            return cb();
+          }, function(){}, this.disable
         ];
         /**  other interesting things to show:
          * avoid history-play
@@ -12345,11 +12744,18 @@ window.compareVersions = function(a, b){
         }).click(function(){
           alert("No you doozie!\nclick the REAL snooze button above ;)");
         });
-        nextScreen(0);
+        aux.addListener($ppI, 'click', function(){
+          $app.removeClass("wt-p0-settings-mode-0 wt-p0-settings-mode-1 wt-p0-settings-mode-2").addClass("wt-p0-settings-mode-" + $pp0.text());
+        });
         function nextScreen(num){
+          var i$, ref$, len$, ref1$, target, args;
           this$.screenClose();
           $navDots.eq(i).removeClass('selected');
           blinking();
+          for (i$ = 0, len$ = (ref$ = listeners).length; i$ < len$; ++i$) {
+            ref1$ = ref$[i$], target = ref1$[0], args = ref1$[1];
+            target.off.apply(target, args);
+          }
           i = num;
           $screen = $screens.eq(i);
           $nextBtn = $screen.find('.wt-p0-next');
@@ -12379,10 +12785,18 @@ window.compareVersions = function(a, b){
         function blinkingCB(){
           $blinkingEl.p0neFx('blink');
         }
-        return blinkingCB;
+        listeners = [];
+        function addListener(target){
+          var args;
+          args = slice$.call(arguments, 1);
+          target.on.apply(target, args);
+          listeners[listeners.length] = [target, args];
+          return args[args.length - 1];
+        }
+        return nextScreen(0);
       },
       disable: function(){
-        $app.removeClass("wt-p0-screen-" + this.screenClass).removeClass('is-wt-p0');
+        $app.removeClass("is-wt-p0 wt-p0-settings-mode-0 wt-p0-settings-mode-1 wt-p0-settings-mode-2 wt-p0-screen-" + this.screenClass);
         this.screenClose();
       }
     });
@@ -12425,7 +12839,7 @@ window.compareVersions = function(a, b){
     module('sandboxBackboneEvents', {
       optional: ['_$context'],
       setup: function(arg$){
-        var replace, slice;
+        var replace, slice, i$, ref$, len$, name;
         replace = arg$.replace;
         slice = Array.prototype.slice;
         replace(Backbone.Events, 'trigger', function(){
@@ -12481,19 +12895,18 @@ window.compareVersions = function(a, b){
             }
           };
         });
-        replace(API, '_name', function(){
-          return 'API';
-        });
-        replace(API, 'trigger', function(){
+        for (i$ = 0, len$ = (ref$ = ['API', '_$context', 'Layout']).length; i$ < len$; ++i$) {
+          name = ref$[i$];
+          if (window[name]) {
+            replace(window[name], '_name', fn$);
+            replace(window[name], 'trigger', fn1$);
+          }
+        }
+        function fn$(){
+          return name;
+        }
+        function fn1$(){
           return Backbone.Events.trigger;
-        });
-        if (typeof _$context != 'undefined' && _$context !== null) {
-          replace(_$context, '_name', function(){
-            return '_$context';
-          });
-          replace(_$context, 'trigger', function(){
-            return Backbone.Events.trigger;
-          });
         }
       }
     });
@@ -12568,21 +12981,16 @@ window.compareVersions = function(a, b){
     #            LOG GRABBERS            #
     ####################################*/
     module('logGrabbers', {
-      require: ['votes'],
+      require: ['grabEvent'],
       setup: function(arg$){
         var addListener, replace, grabbers, hasGrabber;
         addListener = arg$.addListener, replace = arg$.replace;
         grabbers = {};
         hasGrabber = false;
-        replace(votes, 'grab', function(g_){
-          return function(uid){
-            var u;
-            u = getUser(uid);
-            console.info(getTime() + " [logGrabbers] " + formatUser(u, user.isStaff) + " grabbed this song");
-            grabbers[uid] = u.username;
-            hasGrabber = true;
-            return g_.call(this, uid);
-          };
+        addListener(API, 'p0ne:grab', function(u){
+          console.info(getTime() + " [logGrabbers] " + formatUser(u, user.isStaff) + " grabbed this song");
+          grabbers[u.id] = u.username;
+          hasGrabber = true;
         });
         addListener(API, 'advance', function(){
           var name;
@@ -14131,7 +14539,11 @@ window.compareVersions = function(a, b){
           if (typeof appendChat == 'function') {
             appendChat("<div class='cm p0ne-notif p0ne-notif-loaded'>plug_p0ne v" + p0ne.version + " loaded " + (typeof getTimestamp == 'function' ? getTimestamp() : void 8) + "</div>");
           }
-          return console.timeEnd("[p0ne] completly loaded");
+          console.timeEnd("[p0ne] completly loaded");
+          if (typeof _$context != 'undefined' && _$context !== null) {
+            _$context.trigger('p0ne:loaded', p0ne);
+          }
+          return API.trigger('p0ne:loaded', p0ne);
         }
       }
     });

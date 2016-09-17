@@ -51,11 +51,9 @@ module \sandboxBackboneEvents, do
                     args.unshift(type); [a,b,c]=args
                     type = \all
 
-        replace API, \_name, !-> return \API
-        replace API, \trigger, !-> return Backbone.Events.trigger
-        if _$context?
-            replace _$context, \_name, !-> return \_$context
-            replace _$context, \trigger, !-> return Backbone.Events.trigger
+        for name in <[ API _$context Layout ]> when window[name]
+            replace window[name], \_name, !-> return name
+            replace window[name], \trigger, !-> return Backbone.Events.trigger
 
 /*####################################
 #           LOG EVERYTHING           #
@@ -122,16 +120,14 @@ module \logEventsToConsole, do
 #            LOG GRABBERS            #
 ####################################*/
 module \logGrabbers, do
-    require: <[ votes ]>
+    require: <[ grabEvent ]>
     setup: ({addListener, replace}) !->
         grabbers = {}
         hasGrabber = false
-        replace votes, \grab, (g_) !-> return (uid) !->
-            u = getUser(uid)
+        addListener API, \p0ne:grab, (u) !->
             console.info "#{getTime!} [logGrabbers] #{formatUser u, user.isStaff} grabbed this song"
-            grabbers[uid] = u.username
+            grabbers[u.id] = u.username
             hasGrabber := true
-            return g_.call(this, uid)
         addListener API, \advance, !->
             if grabbers
                 console.log "[logGrabbers] the last song was grabbed by #{humanList [name for ,name of grabbers]}"

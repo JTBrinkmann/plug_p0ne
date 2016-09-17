@@ -127,6 +127,11 @@ module \disableChatDelete, do
                 cm.scrollTop cm.scrollTop! + d.height!
                 $msg .find \.delete-button .remove! # remove delete button
 
+                # revert inline images
+                $msg .find '.p0ne-img' .each !->
+                    $a = $ this .parent!
+                    $a .html $a.attr(\href)
+
                 if isLast
                     chat.lastType = \p0ne-deleted
 
@@ -182,8 +187,8 @@ module \warnOnMehers, do
                 console.log "%c#{formatUser d.user, true} meh'd this song", 'color: #ff5a5a'
                 if @_settings.instantWarn
                     appendChat $ "
-                        <div class='cm system'>
-                            <div class=box><i class='icon icon-chat-system'></i></div>
+                        <div class='cm p0ne-notif p0ne-meh-warning'>
+                            <i class='icon icon-chat-system'></i>
                             <div class='msg text'>
                                 #{formatUserHTML d.user, true} meh'd this song!
                             </div>

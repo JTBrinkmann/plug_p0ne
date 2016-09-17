@@ -25,3 +25,5 @@ _.defer !->
 
             appendChat? "<div class='cm p0ne-notif p0ne-notif-loaded'>plug_p0ne v#{p0ne.version} loaded #{getTimestamp?!}</div>"
             console.timeEnd "[p0ne] completly loaded"
+            _$context?.trigger \p0ne:loaded, p0ne
+            API.trigger \p0ne:loaded, p0ne
