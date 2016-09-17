@@ -246,7 +246,7 @@ module \fixStuckDJ, do
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
         addListener API, \advance, (d) !~>
-            console.log "#{getTime!} [API.advance]"
+            console.log "#{getTime!} [API.advance]", @timer
             clearTimeout @timer
             if d.media
                 @timer = sleep d.media.duration*1_000s_to_ms + 2_000ms, fixStuckDJ
@@ -257,6 +257,7 @@ module \fixStuckDJ, do
             console.warn "[fixNoAdvance] song seems to be stuck, trying to fix…"
 
         m = API.getMedia! ||{}
+        console.log "#{getTime!} [unstuck]", @timer, m, API.getTimeRemaining!
         ajax \GET, \rooms/state, do
             error: (data) !~>
                 console.error "[fixNoAdvance] cannot load room data:", status, data
@@ -332,21 +333,25 @@ module \fixStuckDJButton, do
     require: <[ _$context ]>
     setup: ({addListener}) !->
         $djbtn = $ \#dj-button
-        fixTimeout = false
+        fixTimeout = 0
         do addListener _$context, \djButton:update, !->
-            spinning = $djbtn.find \.spinner .length == 0
-            if fixTimeout and spinning
+            notSpinning = $djbtn.find \.spinner .length == 0
+            console.log "[djButton:update]", notSpinning, fixTimeout
+            if fixTimeout and notSpinning
+                fixTimeout := 0
                 clearTimeout fixTimeout
             else if not fixTimeout
                 fixTimeout := sleep 5_000ms, !->
-                    fixTimeout := false
+                    fixTimeout := 0
                     if $djbtn.find \.spinner .length != 0
-                        console.log "[djButton:update] force joining", true, fixTimeout
+                        console.log "[djButton:update] force joining", fixTimeout
                         ajax \GET, \rooms/state, (d) !->
                             d = d.data.0
                             if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
                                 chatWarn "fixing stuck the DJ button", "fixStuckDJButton"
                                 forceJoin!
+                    else
+                        console.log "[djButton:update] NOT force joining", fixTimeout
 
 
 /*####################################
@@ -608,6 +613,15 @@ module \fixPlaylists, do
 
         playlists?.sort! # force redrawing
 
+module \fixPlaylistSort, do
+    help: '''
+        This module improves the automatic playlist sorting, to handle playlists with numbers better.
+        e.g. it will sort playlists named 
+    '''
+    require: <[ playlists ]>
+    setup: ({replace}) !->
+        replace playlists, \comparator, !-> return (as, bs) !->
+            return naturalSorter(as.attributes.name, bs.attributes.name)
 
 /*####################################
 #          FIX POPOUT CLOSE          #

@@ -72,8 +72,12 @@ String::define \endsWith, (str) !->
     return true
 String::define \replaceSansHTML, (rgx, rpl) !->
     # this acts like .replace, but avoids HTML tags and their content
-    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) !->
-        return "#{pre .replace(rgx, rpl)}#post"
+    if typeof rpl == \function
+        return this .replace /(.+?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post, i) !->
+            return "#{pre .replace(rgx, !-> &[*-2] += i; return rpl ...)}#{post}"
+    else
+        return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) !->
+            return "#{pre .replace(rgx, rpl)}#post"
 
 for Constr in [String, Array]
     Constr::define \has, (needle) !-> return -1 != @indexOf needle
@@ -551,15 +555,15 @@ window <<<<
 
     getUserData: (user, cb) !->
         if typeof user != \number
-            user = getUser user
-        return $.get "/_/users/#user"
+            user = getUser user .id
+        return $.getJSON "/_/users/#user"
             .then ({[data]:data}:arg) !->
-                if cb
-                    return data
-                else
-                    console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+                console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+                return data
             .fail !->
                 console.warn "couldn't get userdata for user with id '#{id}'"
+
+            .then cb
 
     $djButton: $ \#dj-button
     mute: !->
@@ -631,12 +635,45 @@ window <<<<
                         type: format.type || \video
                         resolution: resolutions[startI + i]
         return ytItags
+    parseYTDuration: do !->
+        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
+            0        /* placeholder */,
+            31104000 /* year   (360*24*60*60) */,
+            2592000  /* month  (30*24*60*60) */,
+            604800   /* week   (24*60*60*7) */,
+            86400    /* day    (24*60*60) */,
+            3600     /* hour   (60*60) */,
+            60       /* minute (60) */,
+            1        /* second (1) */
+        ]
+        return (str) !->
+            duration = 0
+            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec str
+                for t, i in that when +t
+                    duration += t * multiplicators[i]
+            return duration
 
-    mediaSearch: (query) !->
+    songListCollection: (songList) !->
+        # wrap media objects if supplied as plain Objects
+        if songList?.length
+            if songList.0
+                for m in songList when +m.id == 0
+                    delete m.id
+                return new Backbone.Collection(songList)
+            else if not songList.models?.0?.attributes
+                for m,i in songList.models
+                    songList.models[i] = new Backbone.Model(m)
+        else if not songList?.models
+            return new Backbone.Collection()
+        return songList
+
+    openPlaylistDrawer: !->
         # open playlist drawer
         $ '#playlist-button .icon-playlist'
             .click! # will silently fail if playlist is already open, which is desired
 
+    mediaSearch: (query) !->
+        openPlaylistDrawer!
         $ \#search-input-field
             .val query # enter search string
             .trigger do # start search
@@ -749,21 +786,8 @@ window <<<<
                     &key=#{p0ne.YOUTUBE_V3_KEY}"
                     .fail fail
                     .success ({items}) !->
-                        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
-                            0        /* placeholder */,
-                            31104000 /* year   (360*24*60*60) */,
-                            2592000  /* month  (30*24*60*60) */,
-                            604800   /* week   (24*60*60*7) */,
-                            86400    /* day    (24*60*60) */,
-                            3600     /* hour   (60*60) */,
-                            60       /* minute (60) */,
-                            1        /* second (1) */
-                        ]
                         for d in items
-                            duration = 0
-                            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec d.contentDetails.duration
-                                for t, i in that when +t
-                                    duration += t * multiplicators[i]
+                            duration = parseYTDuration(d.contentDetails.duration)
                             addResult queries.1[d.id], d.id, do
                                     format:       1
                                     data:         d
@@ -1721,6 +1745,8 @@ for id, m of require.s.contexts._.defined when m
         moduleName = \searchManager
     | m.settings =>
         moduleName = \settings
+    | m.SHOW == \ShowDialogEvent:show =>
+        moduleName = \ShowDialogEvent
     | m.ack =>
         moduleName = \socketEvents
     | m.sc =>
@@ -1769,6 +1795,8 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \MediaPanel
                 | m::id == \playback =>
                     moduleName = \Playback
+                | m::id == \dialog-playlist-create =>
+                    moduleName = \PlaylistCreateDialog
                 | m::listClass == \playlist-media =>
                     moduleName = \PlaylistItemList
                     export PlaylistItemRow = m::RowClass
@@ -1781,6 +1809,8 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \RoomHistory
                 | m::vote =>
                     moduleName = \RoomUserRow
+                | m::onQueryUpdate =>
+                    moduleName = \SearchHeader
                 | m::listClass == \search =>
                     moduleName = \SearchList
                     export PlaylistMediaList = m.__super__.constructor
@@ -1788,6 +1818,10 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \SuggestionView
                 | m::onAvatar =>
                     moduleName = \WaitlistRow
+                | m::getURL =>
+                    moduleName = \YtPlaylistItemService
+                | m::sortByName =>
+                    moduleName = \YtPlaylistService
                 | m::onVideos =>
                     moduleName = \YtSearchService
                 | m::execute?.toString!.has("/media/insert") =>

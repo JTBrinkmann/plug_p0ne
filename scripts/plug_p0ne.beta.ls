@@ -43,7 +43,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.9
+    version: \1.9.0
     lastCompatibleVersion: \1.8.8.2 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1141,8 +1141,12 @@ String::define \endsWith, (str) !->
     return true
 String::define \replaceSansHTML, (rgx, rpl) !->
     # this acts like .replace, but avoids HTML tags and their content
-    return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) !->
-        return "#{pre .replace(rgx, rpl)}#post"
+    if typeof rpl == \function
+        return this .replace /(.+?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post, i) !->
+            return "#{pre .replace(rgx, !-> &[*-2] += i; return rpl ...)}#{post}"
+    else
+        return this .replace /(.*?)(<(?:br>|.*?>.*?<\/\w+>|.*?\/>)|$)/gi, (,pre, post) !->
+            return "#{pre .replace(rgx, rpl)}#post"
 
 for Constr in [String, Array]
     Constr::define \has, (needle) !-> return -1 != @indexOf needle
@@ -1620,15 +1624,15 @@ window <<<<
 
     getUserData: (user, cb) !->
         if typeof user != \number
-            user = getUser user
-        return $.get "/_/users/#user"
+            user = getUser user .id
+        return $.getJSON "/_/users/#user"
             .then ({[data]:data}:arg) !->
-                if cb
-                    return data
-                else
-                    console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+                console.log "[userdata]", data, (if data.level >= 5 then "https://plug.dj/@/#{encodeURI data.slug}")
+                return data
             .fail !->
                 console.warn "couldn't get userdata for user with id '#{id}'"
+
+            .then cb
 
     $djButton: $ \#dj-button
     mute: !->
@@ -1700,12 +1704,45 @@ window <<<<
                         type: format.type || \video
                         resolution: resolutions[startI + i]
         return ytItags
+    parseYTDuration: do !->
+        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
+            0        /* placeholder */,
+            31104000 /* year   (360*24*60*60) */,
+            2592000  /* month  (30*24*60*60) */,
+            604800   /* week   (24*60*60*7) */,
+            86400    /* day    (24*60*60) */,
+            3600     /* hour   (60*60) */,
+            60       /* minute (60) */,
+            1        /* second (1) */
+        ]
+        return (str) !->
+            duration = 0
+            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec str
+                for t, i in that when +t
+                    duration += t * multiplicators[i]
+            return duration
 
-    mediaSearch: (query) !->
+    songListCollection: (songList) !->
+        # wrap media objects if supplied as plain Objects
+        if songList?.length
+            if songList.0
+                for m in songList when +m.id == 0
+                    delete m.id
+                return new Backbone.Collection(songList)
+            else if not songList.models?.0?.attributes
+                for m,i in songList.models
+                    songList.models[i] = new Backbone.Model(m)
+        else if not songList?.models
+            return new Backbone.Collection()
+        return songList
+
+    openPlaylistDrawer: !->
         # open playlist drawer
         $ '#playlist-button .icon-playlist'
             .click! # will silently fail if playlist is already open, which is desired
 
+    mediaSearch: (query) !->
+        openPlaylistDrawer!
         $ \#search-input-field
             .val query # enter search string
             .trigger do # start search
@@ -1818,21 +1855,8 @@ window <<<<
                     &key=#{p0ne.YOUTUBE_V3_KEY}"
                     .fail fail
                     .success ({items}) !->
-                        multiplicators = [ /* from https://github.com/nezasa/iso8601-js-period/blob/master/iso8601.js */
-                            0        /* placeholder */,
-                            31104000 /* year   (360*24*60*60) */,
-                            2592000  /* month  (30*24*60*60) */,
-                            604800   /* week   (24*60*60*7) */,
-                            86400    /* day    (24*60*60) */,
-                            3600     /* hour   (60*60) */,
-                            60       /* minute (60) */,
-                            1        /* second (1) */
-                        ]
                         for d in items
-                            duration = 0
-                            if /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec d.contentDetails.duration
-                                for t, i in that when +t
-                                    duration += t * multiplicators[i]
+                            duration = parseYTDuration(d.contentDetails.duration)
                             addResult queries.1[d.id], d.id, do
                                     format:       1
                                     data:         d
@@ -2790,6 +2814,8 @@ for id, m of require.s.contexts._.defined when m
         moduleName = \searchManager
     | m.settings =>
         moduleName = \settings
+    | m.SHOW == \ShowDialogEvent:show =>
+        moduleName = \ShowDialogEvent
     | m.ack =>
         moduleName = \socketEvents
     | m.sc =>
@@ -2838,6 +2864,8 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \MediaPanel
                 | m::id == \playback =>
                     moduleName = \Playback
+                | m::id == \dialog-playlist-create =>
+                    moduleName = \PlaylistCreateDialog
                 | m::listClass == \playlist-media =>
                     moduleName = \PlaylistItemList
                     export PlaylistItemRow = m::RowClass
@@ -2850,6 +2878,8 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \RoomHistory
                 | m::vote =>
                     moduleName = \RoomUserRow
+                | m::onQueryUpdate =>
+                    moduleName = \SearchHeader
                 | m::listClass == \search =>
                     moduleName = \SearchList
                     export PlaylistMediaList = m.__super__.constructor
@@ -2857,6 +2887,10 @@ for id, m of require.s.contexts._.defined when m
                     moduleName = \SuggestionView
                 | m::onAvatar =>
                     moduleName = \WaitlistRow
+                | m::getURL =>
+                    moduleName = \YtPlaylistItemService
+                | m::sortByName =>
+                    moduleName = \YtPlaylistService
                 | m::onVideos =>
                     moduleName = \YtSearchService
                 | m::execute?.toString!.has("/media/insert") =>
@@ -3876,6 +3910,57 @@ module \p0neCSS, do
                 @loadStyle url
                 @urlMap[url] = i
 
+
+
+/* open a dialog to let the user create a playlist with a user-selected name */
+module \createPlaylistDialog, do
+    require: <[ ShowDialogEvent _$context ]>
+    module: (songList, defaultName) !->
+        _$context.trigger do
+            ShowDialogEvent.SHOW
+            ,evt = new ShowDialogEvent do
+                ShowDialogEvent.SHOW
+                ,new PlaylistCreateDialog media: songListCollection(songList).models
+        if defaultName
+            requestAnimationFrame !->
+                requestAnimationFrame !->
+                    evt.dialog.$field .val defaultName
+                    evt.dialog.onKeyUp!
+
+/* opens a list of songs in the playlist drawer */
+module \mediaListShow, do
+    require: <[ pl SearchList SearchHeader ]>
+    module: (title, songList, icon) !->
+        list = new SearchList()
+        header = new SearchHeader()
+
+        # compatibility check
+        songList = songListCollection(songList)
+
+        # render list
+        list.collection = songList
+        pl.show(header, list)
+        header.setTitle title
+        $icon = header .$el .find \.icon
+            .removeClass!
+        if window.createPlaylistDialog
+            header .$el .append do
+                $ "<div class='button import-button'><span>#{Lang?.import.importThis || 'Import This Playlist'}</span></div>"
+                    .on \click, !->
+                        createPlaylistDialog(songList, title)
+        if icon
+            $icon
+                .addClass(icon)
+                .css do
+                    top: 13px
+                    left: 12px
+        list.render!
+
+        # open playlist drawer (if not open already)
+        openPlaylistDrawer!
+
+
+
 _.defer !-> # because for some reason the event listener doesn't get attached otherwise
     module \p0neNotifHelper, do
         require: <[ chatDomEvents ]>
@@ -4104,7 +4189,7 @@ module \socketListeners, do
             forEach(onRoomJoinQueue2)
             onRoomJoinQueue2 := []
 
-        for let event in <[ send dispatchEvent close ]>
+        for let event in <[ send dispatchEvent ]>
             #console.log "[socketListeners] injecting into Socket::#event"
             replace Socket::, event, (e_) !-> return !->
                 try
@@ -4422,7 +4507,7 @@ module \fixStuckDJ, do
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
         addListener API, \advance, (d) !~>
-            console.log "#{getTime!} [API.advance]"
+            console.log "#{getTime!} [API.advance]", @timer
             clearTimeout @timer
             if d.media
                 @timer = sleep d.media.duration*1_000s_to_ms + 2_000ms, fixStuckDJ
@@ -4433,6 +4518,7 @@ module \fixStuckDJ, do
             console.warn "[fixNoAdvance] song seems to be stuck, trying to fix…"
 
         m = API.getMedia! ||{}
+        console.log "#{getTime!} [unstuck]", @timer, m, API.getTimeRemaining!
         ajax \GET, \rooms/state, do
             error: (data) !~>
                 console.error "[fixNoAdvance] cannot load room data:", status, data
@@ -4508,21 +4594,25 @@ module \fixStuckDJButton, do
     require: <[ _$context ]>
     setup: ({addListener}) !->
         $djbtn = $ \#dj-button
-        fixTimeout = false
+        fixTimeout = 0
         do addListener _$context, \djButton:update, !->
-            spinning = $djbtn.find \.spinner .length == 0
-            if fixTimeout and spinning
+            notSpinning = $djbtn.find \.spinner .length == 0
+            console.log "[djButton:update]", notSpinning, fixTimeout
+            if fixTimeout and notSpinning
+                fixTimeout := 0
                 clearTimeout fixTimeout
             else if not fixTimeout
                 fixTimeout := sleep 5_000ms, !->
-                    fixTimeout := false
+                    fixTimeout := 0
                     if $djbtn.find \.spinner .length != 0
-                        console.log "[djButton:update] force joining", true, fixTimeout
+                        console.log "[djButton:update] force joining", fixTimeout
                         ajax \GET, \rooms/state, (d) !->
                             d = d.data.0
                             if (d.currentDJ == userID or d.waitingDJs .lastIndexOf(userID) != -1)
                                 chatWarn "fixing stuck the DJ button", "fixStuckDJButton"
                                 forceJoin!
+                    else
+                        console.log "[djButton:update] NOT force joining", fixTimeout
 
 
 /*####################################
@@ -4784,6 +4874,15 @@ module \fixPlaylists, do
 
         playlists?.sort! # force redrawing
 
+module \fixPlaylistSort, do
+    help: '''
+        This module improves the automatic playlist sorting, to handle playlists with numbers better.
+        e.g. it will sort playlists named 
+    '''
+    require: <[ playlists ]>
+    setup: ({replace}) !->
+        replace playlists, \comparator, !-> return (as, bs) !->
+            return naturalSorter(as.attributes.name, bs.attributes.name)
 
 /*####################################
 #          FIX POPOUT CLOSE          #
@@ -4858,6 +4957,108 @@ module \playlistCacheUpdate, do
                 API.trigger \p0ne:playlistCache:update, e.id
             else
                 oS_.call this, e
+
+/*@source p0ne.fix-yt-import.ls */
+module \fixYtImport, do
+    setup: ({replace}) !->
+        #= YtPlaylistService =
+        replace YtPlaylistService::, \load !-> return (e, t) ->
+            console.log "[YT Playlist Import] loading", e
+            @username = e; @callback = t; @start = 1; @data = []; @nextPageToken = ""
+            $.getJSON "https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=#{@username}&key=#{p0ne.YOUTUBE_V3_KEY}"
+                .then do
+                    (d) !~>
+                        @channelID = d.items.0?.id
+                        console.log "got channelID", @channelID
+                        if @channelID
+                            @next!
+                        else
+                            @onError "user not found", d
+                    ,@~onError
+
+        replace YtPlaylistService::, \next, !-> return !->
+            console.log "[YT Playlist Import] loading page", @nextPageToken
+            clearTimeout(@timeoutID) if @timeoutID
+            $.getJSON "https://www.googleapis.com/youtube/v3/playlists?part=contentDetails,snippet&fields=items(contentDetails,id,snippet(title)),nextPageToken&maxResults=50&channelId=#{@channelID}&pageToken=#{@nextPageToken}&key=#{p0ne.YOUTUBE_V3_KEY}"
+                .then @~onComplete, @~onError
+
+        replace YtPlaylistService::, \deserialize, !-> return (e) !->
+            console.log "[YT Playlist Import] deserializing", e
+            @nextPageToken = e.nextPageToken
+            l = @data.length
+            for pl, i in e.items
+                @data[l+i] =
+                    playlistID: pl.id
+                    name: "#{pl.snippet.title} (#{pl.contentDetails.itemCount})"
+                    count: pl.contentDetails.itemCount
+                    username: @username
+
+        replace YtPlaylistService::, \onComplete, !-> return (e) !->
+            try
+                @deserialize e
+            catch err
+                console.error "[YT Playlist Import] parsing error", err.messageAndStack, e
+            console.log("[YT Playlist Import] onComplete", e, e.nextPageToken)
+            if @data?.length
+                if @nextPageToken
+                    @timeoutID = sleep 200ms, @~next
+                else
+                    @data.sort @sortByName
+                    @callback @data
+            else
+                _$context.dispatch new AlertEvent(AlertEvent.ALERT, Lang.alerts.youtubeError, Lang.alerts.pleaseTryAgain)
+                @callback []
+
+
+        #= YtPlaylistItemService =
+        replace YtPlaylistItemService::, \next, !-> return !->
+            @nextPageToken = @nextPageToken || ""
+            console.log "[YT PlaylistItems Import] loading page", @nextPageToken
+            clearTimeout(@timeoutID) if @timeoutID
+            $.getJSON "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&fields=items/contentDetails/videoId,nextPageToken&maxResults=50&playlistId=#{@query}&pageToken=#{@nextPageToken}&key=#{p0ne.YOUTUBE_V3_KEY}"
+                .then do
+                    (d) !~>
+                        if d.items?.length
+                            ids = []
+                            for id,i in d.items
+                                ids[i] = id.contentDetails.videoId
+                            @nextPageToken = d.nextPageToken
+                            $.getJSON "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&fields=items(id,snippet(title,channelTitle),contentDetails/duration),nextPageToken&id=#{ids.join(",")}&key=#{p0ne.YOUTUBE_V3_KEY}"
+                                .then @~onComplete, @~onError
+                    ,@~onError
+            @nextPageToken = ""
+
+        replace YtPlaylistItemService::, \deserialize, !-> return (e) !->
+            console.log "[YT PlaylistItems Import] deserializing", e
+            l = @data.length
+            for m, i in e.items
+                authorTitle = auxiliaries.authorTitle(m.snippet.title)
+                @data[l+i] =
+                    format: 1
+                    cid: m.id
+                    duration: parseYTDuration(m.contentDetails.duration)
+                    author: authorTitle.author || m.snippet.channelTitle
+                    title: authorTitle.title
+                    image: "https://i.ytimg.com/vi/#{m.id}/default.jpg"
+                    index: i
+                    id: "#i" # why plug? why?
+
+        replace YtPlaylistItemService::, \onComplete, !-> return (e) !->
+            try
+                @deserialize e
+            catch err
+                console.error "[YT PlaylistItems Import] parsing error", err.messageAndStack, e
+
+            console.log "[YT PlaylistItems Import] onComplete", e, e.nextPageToken
+            if @data?.length
+                if @nextPageToken
+                    @timeoutID = sleep 200ms, @~next
+                else
+                    @eliminateDuplicates!
+                    @callback @data
+            else
+                _$context.dispatch new AlertEvent(AlertEvent.ALERT, Lang.alerts.youtubeError, Lang.alerts.pleaseTryAgain)
+                @callback []
 
 /*@source p0ne.stream.ls */
 /**
@@ -6271,7 +6472,7 @@ module \userlistIcons, do
 /*####################################
 #        DBLCLICK to @MENTION        #
 ####################################*/
-/*note: this is also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
+/*note: this also makes usernames clickable in many other parts of plug.dj & other plug_p0ne modules */
 module \chatDblclick2Mention, do
     require: <[ chat simpleFixes ]>
     #optional: <[ PopoutListener ]>
@@ -6312,10 +6513,10 @@ module \chatDblclick2Mention, do
             else
                 clearTimeout chatDblclick2Mention.timer
                 chatDblclick2Mention.timer = 0
-                name = e.target.textContent
+                name = this.textContent
                 if name.0 == "@"
                     name .= substr 1
-                (PopoutView?.chat || chat).onInputMention e.target.textContent
+                (PopoutView?.chat || chat).onInputMention name
 
         $cms = get$cms!
         for [ctx, $el, attr, boundAttr] in [ [chat, $cms.find(\.un), \onFromClick, \fromClickBind],  [WaitlistRow::, $('#waitlist .user'), \onDJClick, \clickBind],  [RoomUserRow::, $('#user-lists .user'), \onClick, \clickBind] ]
@@ -6332,10 +6533,10 @@ module \chatDblclick2Mention, do
 
         replace WaitlistRow::, \draw, (d_) !-> return !->
             d_.call(this)
-            @$el.attr \uid, @model.id
+            @$el.data \uid, @model.id
         replace RoomUserRow::, \draw, (d_) !-> return !->
             d_.call(this)
-            @$el.attr \uid, @model.id
+            @$el.data \uid, @model.id
 
         # instead of individual event listeners, we use a delegated event (which offers better performance)
         addListener chatDomEvents, \click, \.un, newFromClick
@@ -7548,7 +7749,7 @@ module \chatYoutubeThumbnails, do
         addListener API, \p0ne:chat:link, ({pre, protocol, url, onload}) !->
             yt = YT_REGEX .exec(protocol+url)
             if yt and (yt = yt.1)
-                console.log "[inline-img]", "[YouTube #yt] #url ==> https://i.ytimg.com/vi/#yt/default.jpg"
+                console.log "[p0ne_yt_preview]", "#url ==> https://i.ytimg.com/vi/#yt/default.jpg"
                 if window.mediaLookupCache[yt]
                     media = auxiliaries.authorTitle(that.title)
                     media.author ||= that.uploader.name
@@ -7615,11 +7816,13 @@ module \customChatNotificationTrigger, do
                 return "<span class=p0ne-trigger-word>#word</span>"
             playChatSound! if mentioned
         if window.user_
-            addListener window.user_, \change:username, @~updateRegexp
+            addListener window.user_, \change:rawun, @~updateRegexp
         @updateRegexp!
 
     updateRegexp: !->
-        return if @_settings.triggerwords .length == 0
+        if @_settings.triggerwords .length == 0
+            @hasUsernameTrigger = false
+            return
         triggerwords = []; l=0
         for triggerword in @_settings.triggerwords
             triggerword = triggerword |> htmlEscape |> escapeRegExp
@@ -7716,7 +7919,7 @@ module \animatedUI, do
         replace Dialog::, \close, (close_) !-> return !->
             @$el?.removeClass \opaque
             @animate = $.noop
-            sleep 200ms, !~> close_.call this
+            sleep 180ms, !~> close_.call this
             return this
 
 
@@ -7996,6 +8199,7 @@ module \djIconChat, do
 ####################################*/
 module \draggableDialog, do
     require: <[ Dialog ]>
+    optional: <[ chatDomEvents ]>
     displayName: 'Draggable Dialog'
     settings: \look&feel
     setup: ({addListener, replace, css}) !->
@@ -8088,6 +8292,15 @@ module \draggableDialog, do
             $body
                 .off \mousemove, mousemove
                 .off \mouseup, mouseup
+
+        #compatibility fix with Lightbox Images
+        if window.chatDomEvents
+            addListener chatDomEvents, \click, '.p0ne-img, .p0ne-img-filtered', (e) !->
+                if not lightsout
+                    $dialogContainer
+                        .addClass \lightsout
+                        .find \.icon-unlocked
+                            .removeClass \icon-unlocked .addClass \icon-locked
     disable: !->
         @stopDragging?!
         $ '#dialog-container .dialog' .css position: \static
@@ -8488,6 +8701,7 @@ module \roomTheme, do
  * @copyright (c) 2015 J.-T. Brinkmann
 */
 console.log "~~~~~~~ p0ne.customcolors.picker ~~~~~~~"
+/*
 if not window.staff
     staff =
         loading: $.Deferred!
@@ -8497,7 +8711,7 @@ if not window.staff
         for u in d when u.username
             staff[u.id] = u{role, gRole, sub, username, badge}
         l.resolve!
-
+*/
 /*####################################
 #           CUSTOM  COLORS           #
 ####################################*/
@@ -10479,11 +10693,12 @@ module \afkTimer, do
     settingsSimple: true
     displayName: "Show Idle Time"
     help: '''
-        This module shows how long users have been inactive in the User- and Waitlist-Panel.
-        "Being active"
+        This module shows how long since users have last been by adding a timer to the User- and Waitlist-Panel.
+        It also adds the number of inactive users in the waitlist to the waitlist button. (updated every minute)
+        "Being active" means sending chat, changing your name, gifting someone, grabbing or doing moderator things.
     '''
     _settings:
-        lastActivity: {}
+        lastActivity: {} # this is for caching, not meant to be an actual setting
         highlightOver: 43.min
 
     setup: ({addListener, $create, replace},, m_) !->
@@ -10491,11 +10706,9 @@ module \afkTimer, do
         settings = @_settings
         start = Date.now!
         if m_
-            console.log "m_ =", m_
             @start = m_.start
             lastActivity = m_._settings.lastActivity ||{}
         else
-            console.log "args", arguments
             @start = start
             if @_settings.lastActivity?.0 + 60_000ms > Date.now!
                 lastActivity = @_settings.lastActivity
@@ -10550,6 +10763,7 @@ module \afkTimer, do
                         #$waitlistBtn .removeClass \p0ne-toolbar-highlight
                         $afkCount .clear!
                     lastAfkCount := afkCount
+        addListener API, \waitListUpdate, updateAfkCount
         updateAfkCount!
 
         # UI
@@ -10639,17 +10853,22 @@ console.log "~~~~~~~ p0ne.userHistory ~~~~~~~"
 #            USER HISTORY            #
 ####################################*/
 module \userHistory, do
-    require: <[ userRollover RoomHistory backbone ]>
+    require: <[ userRollover RoomHistory backbone chat ]>
     help: '''
         Shows another user's song history when clicking on their username in the user-rollover.
 
         Due to technical restrictions, only Youtube songs can be shown.
     '''
-    setup: ({addListener, replace, css}) !->
+    setup: ({addListener, replace, css, $create}) !->
         css \userHistory, '#user-rollover .username { cursor: pointer }'
 
-        addListener $(\body), \click, '#user-rollover .username', !->
-            $ '#history-button.selected' .click! # hide history if already open
+        #== UI ==
+        userRollover.$histBtn = $create "<i class='icon icon-history-white p0ne-user-history-btn'></i>"
+        replace userRollover, \showModal, (sM_) !-> return !->
+          @$histBtn.appendTo @$meta
+          sM_ .call(this)
+
+        addListener $body, \click, '.p0ne-user-history-btn', !->
             user = userRollover.user
             userID = user.id
             username = user.get \username
@@ -10666,6 +10885,13 @@ module \userHistory, do
             else
                 loadUserHistory user
 
+        /*
+        P0neHistHeader = _.extend(SearchHeader, {
+          template: SearchHeader.prototype.template.replace("icon-search", "icon-search icon-history-white")
+        })
+         */
+
+        #== Handler ==
         function loadUserHistory user
             $.get "https://plug.dj/@/#{user.get \slug}"
                 .fail !->
@@ -10673,11 +10899,11 @@ module \userHistory, do
                 .then (d) !->
                     userRollover.cleanup!
                     songs = new backbone.Collection()
-                    d.replace /<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<span class="name">(.*?)<\/span>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, (,img, author, roomName, positive, grabs, negative, listeners) !->
+                    d.replace /<div class="row">\s*<img src="(.*)"\/>\s*<div class="meta">\s*<span class="author">(.*?)<\/span>\s*<a.+?><span class="name">(.*?)<\/span><\/a>[\s\S]*?positive"><\/i><span>(\d+)<\/span>[\s\S]*?grabs"><\/i><span>(\d+)<\/span>[\s\S]*?negative"><\/i><span>(\d+)<\/span>[\s\S]*?listeners"><\/i><span>(\d+)<\/span>/g, (,img, author, roomName, positive, grabs, negative, listeners) !->
                         if cid = /\/vi\/(.{11})\//.exec(img)
                             cid = cid.1
                             [title, author] = author.split " - "
-                            songs.add new backbone.Model do
+                            songs.add do /*new backbone.Model do
                                 user: {id: user.id, username: "in #roomName"}
                                 room: {name: roomName}
                                 score:
@@ -10686,19 +10912,20 @@ module \userHistory, do
                                     negative: negative
                                     listeners: listeners
                                     skipped: 0
-                                media: new backbone.Model do
+                                media: new backbone.Model do*/
                                     format: 1
                                     cid: cid
                                     author: author
                                     title: title
                                     image: httpsify(img)
                     console.info "#{getTime!} [userHistory] loaded history for #{user.get \username}", songs
-                    export songs, d
-                    replace RoomHistory::, \collection, !-> return songs
-                    _$context.trigger \show:history
-                    <-! requestAnimationFrame
-                    RoomHistory::.collection = RoomHistory::.collection_
-                    console.log "#{getTime!} [userHistory] restoring room's proper history"
+
+                    #= show song list in playlist drawer =
+                    # open playlist drawer
+                    $ '#playlist-button .icon-playlist'
+                        .click! # will silently fail if playlist is already open, which is desired
+
+                    mediaListShow "#{user.get \username}'s history", songs
 
 /*@source p0ne.help.ls */
 /**

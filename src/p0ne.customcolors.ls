@@ -6,6 +6,7 @@
  * @copyright (c) 2015 J.-T. Brinkmann
 */
 console.log "~~~~~~~ p0ne.customcolors.picker ~~~~~~~"
+/*
 if not window.staff
     staff =
         loading: $.Deferred!
@@ -15,7 +16,7 @@ if not window.staff
         for u in d when u.username
             staff[u.id] = u{role, gRole, sub, username, badge}
         l.resolve!
-
+*/
 /*####################################
 #           CUSTOM  COLORS           #
 ####################################*/
