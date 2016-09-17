@@ -31,6 +31,7 @@ module \customColorsPicker, do
         $el = cc?._$settingsPanel?.wrapper
         return if not cc or not $el
         @rows = {}
+        var key
 
         @lang = Lang.roles with
             friend: Lang.userList.friend
@@ -41,7 +42,7 @@ module \customColorsPicker, do
 
 
         #== Render UI ==
-        loadStyle "#{p0ne.host}/css/customcolors.css"
+        loadStyle "#{p0ne.host}/css/customcolors.css?r=3"
         $el
             .addClass \p0ne-cc-settings
             .css left: $(\.p0ne-settings).width!
@@ -138,9 +139,11 @@ module \customColorsPicker, do
                         break
                     if removeUserCache
                         delete cc.users[row_key]
+                        delete ccp.rows[row_key]
                         $row.remove!
                     #ToDo show notification that row didn't get removed because user is still in roomTheme
                 if key == row_key
+                    key := ""
                     ccp.close!
                 cc.updateCSS!
                 e.stopImmediatePropagation!
@@ -164,7 +167,7 @@ module \customColorsPicker, do
                 ccp.sugg.check("@#{@value}", @value.length+1)
                 ccp.sugg.updateSuggestions!
         export @sugg = new SuggestionView()
-        @sugg.$el.appendTo @$add
+        @sugg.$el .insertBefore @$add.children!.first!
         @sugg
             .render!
             .on \refocus, !->
@@ -357,10 +360,7 @@ module \customColorsPicker, do
         defaultIconURL = getIcon('', true).url
 
         #=== general ===
-        $cp = $ \.colorpicker
         $cpp = $cp .find \.p0ne-ccp-color
-        $un = $ '.p0ne-cc-user .name:last'
-        #uid = $ \.p0ne-cc-userid:last .text!
         $contentName  = $cp .find \.p0ne-ccp-content-name
         $contentImage = $cp .find \.p0ne-ccp-content-image
 
@@ -434,7 +434,7 @@ module \customColorsPicker, do
                 | \default =>
                     customColor := getHex!
                     $hex
-                        .val currentColor
+                        .val styleDefault.color
                         .trigger \input
                     nameCustomMode := \default # change nameCustomMode afterwards to make the input listener not reset it immediately
                 | \custom =>
@@ -481,12 +481,12 @@ module \customColorsPicker, do
                 # set to false
                 font[btn] = false
                 $this .removeClass 'p0ne-ccp-btn-selected p0ne-ccp-btn-default p0ne-ccp-btn-default-selected'
-            else if font[btn] = not $this.hasClass \p0ne-ccp-btn-default
-                # set to default
-                delete font[btn]
-                $this .addClass \p0ne-ccp-btn-selected
-                if font[btn] # default value is in font.__proto__[btn]
-                    $this .addClass \p0ne-ccp-btn-default-selected
+                /*else if font[btn] = not $this.hasClass \p0ne-ccp-btn-default
+                    # set to default
+                    delete font[btn]
+                    $this .addClass \p0ne-ccp-btn-selected
+                    if styleDefault.font[btn] # default value is in font.__proto__[btn]
+                        $this .addClass \p0ne-ccp-btn-default-selected */
             else
                 # set to true
                 font[btn] = true
@@ -675,7 +675,7 @@ module \customColorsPicker, do
                 drag_pos.top  = e.pageY + image.y
 
         var urlUpdateTimeout
-        addListener $cp, \input, '.p0ne-ccp-group-image input', ->
+        addListener $cp, 'input keyup', '.p0ne-ccp-group-image input', ->
             return if checkImageCustomMode!
             console.log "input", this, @value
             if $ this .parent! .hasClass \p0ne-ccp-image-url
@@ -779,17 +779,13 @@ module \customColorsPicker, do
                 imageMode := \badge
                 image := badge
                 $badgeGroup .show!
-            | \default => if image.default
-                imageCustomMode[imageMode] := \default
-                image := image.default
-            | \custom => if image.custom
-                imageCustomMode[imageMode] := \custom
-                image := image.custom
-            console.log "set image mode", mode, image
-            if imageCustomMode[imageMode] == \none
-                $contentImage .addClass \disabled
-            else
-                $contentImage .removeClass \disabled
+            | otherwise =>
+                switch imageCustomMode[imageMode] := mode
+                | \default =>
+                    image := styleDefault[imageMode]
+                | \custom =>
+                    image := customImage[imageMode]
+            console.log "set image mode", imageMode, "=>", mode, image
 
             $imageCustomToggles
                 .removeClass \selected
@@ -846,7 +842,11 @@ module \customColorsPicker, do
 
         function checkImageCustomMode
             if imageCustomMode[imageMode] == \default
-                image := image.custom <<< image
+                image := customImage[imageMode] <<< image
+                if imageMode == \icon
+                    icon := image
+                else
+                    badge := image
                 imageCustomMode[imageMode] = \custom
                 $imageCustomToggles
                     .removeClass \selected
@@ -865,7 +865,9 @@ module \customColorsPicker, do
         # => resized/recolored image upload to imgur?
         #show image load time
         #warn on long loading time (slow host, large GIF, …)
-        var scope, key, $row #, uid
+        var scope, $row #, uid, key
+        var styleDefault
+        customImage = {}
         @loadData = loadData = (scopeName, key_, $row_) !->
             /* note: the reason we clone$ the variables (font, icon, badge)
              * is so that the initial values are stored in the prototype of the
@@ -877,7 +879,7 @@ module \customColorsPicker, do
             scope := cc.scopes[scopeName]
             data = scope[key]
             $row := $row_
-            console.log "loading data", scopeName, key, data
+            console.info "loading data", scopeName, key, data
             if key of cc.roles
                 uid := 0
                 $cp .addClass \p0ne-ccp-nobadge
@@ -893,51 +895,54 @@ module \customColorsPicker, do
             delete scope[key] # removing temporarily
             try
                 # try catch to avoid permanently losing scope[key]
-                if uid
-                    styleDefault = customColors.getUserStyle(key, true)
+                if not uid
+                    styleDefault := customColors.getRoleStyle(key, true)
                 else
-                    styleDefault = customColors.getRoleStyle(key, true)
+                    styleDefault := customColors.getUserStyle(key, true)
+
+                    #= BADGE =
+                    badgeTemplate = ->
+                    if uid
+                        switch typeof styleDefault.badge
+                        | \string =>
+                            imageCustomMode.badge = \default
+                            styleDefault.badge = getIcon("bdg bdg-#{styleDefault.badge} #{styleDefault.badge[*-1]}", true)
+                            styleDefault.badge.w = styleDefault.badge.h = 30px
+                        | \object =>
+                            imageCustomMode.badge = \default
+                            styleDefault.badge = styleDefault.badge
+                        | otherwise =>
+                            imageCustomMode.badge = \none
+                            styleDefault.badge =
+                                w: 30px
+                                h: 30px
+                                #default: true
+                                #disabled: true
+
                 console.log "styleDefault", styleDefault
+                styleDefault.color ?.= substr(1)
 
                 #= ICON =
                 iconTemplate = ->
                 switch typeof styleDefault.icon
                 | \string =>
                     imageCustomMode.icon = \default
-                    iconTemplate::default = getIcon(styleDefault.icon, true)
+                    styleDefault.icon = getIcon(styleDefault.icon, true)
                 | \object =>
                     imageCustomMode.icon = \default
-                    iconTemplate::default = styleDefault.icon
+                    if styleDefault.icon.url == \default
+                        styleDefault.icon.url = defaultIconURL
                 | otherwise =>
                     imageCustomMode.icon = \none
-                    iconTemplate::default = # white heart
+                    styleDefault.icon = # white heart
                         url: defaultIconURL
                         x: 105px
                         y: 350px
 
-                #= BADGE =
-                badgeTemplate = ->
-                if uid
-                    switch typeof styleDefault.badge
-                    | \string =>
-                        imageCustomMode.badge = \default
-                        badgeTemplate::default = getIcon("bdg bdg-#{styleDefault.badge} #{styleDefault.badge[*-1]}", true)
-                        badgeTemplate::default.w = badgeTemplate::default.h = 30px
-                    | \object =>
-                        imageCustomMode.badge = \default
-                        badgeTemplate::default = styleDefault.badge
-                    | otherwise =>
-                        imageCustomMode.badge = \none
-                        badgeTemplate::default =
-                            default: true
-                            disabled: true
-                            w: 30px
-                            h: 30px
-                else
-                    imageCustomMode.badge = \none
-                    badgeTemplate::default = {}
             catch err
                 console.error "failed to create icon or badge template", err.messageAndStack
+                scope[key] = data
+                return
             # restore custom settings
             scope[key] = data
 
@@ -947,15 +952,22 @@ module \customColorsPicker, do
                 $hex .val currentColor:=data.color.substr(1)
             else
                 nameCustomMode := \default
-                $hex .val currentColor:=styleDefault.color?.substr(1)
+                $hex .val currentColor:=styleDefault.color
             customColor := currentColor
 
-            font := {+b, -i, -u}
-            for btn, state of data.font
-                if font[btn] = state
-                    $font[btn] .addClass \p0ne-ccp-btn-selected
-                else
-                    $font[btn] .removeClass \p0ne-ccp-btn-selected
+            font := data.font || {+b, -i, -u}
+            if font.b != false
+                $font.b .removeClass \p0ne-ccp-btn-selected
+            else
+                $font.b .addClass \p0ne-ccp-btn-selected
+            if font.i
+                $font.i .addClass \p0ne-ccp-btn-selected
+            else
+                $font.i .removeClass \p0ne-ccp-btn-selected
+            if font.u
+                $font.u .addClass \p0ne-ccp-btn-selected
+            else
+                $font.u .removeClass \p0ne-ccp-btn-selected
             font := ^^font
 
 
@@ -966,44 +978,44 @@ module \customColorsPicker, do
                 imageCustomMode.icon = \none
                 fallthrough
             | \undefined =>
-                iconTemplate ::= iconTemplate::default
+                iconTemplate ::= styleDefault.icon
             | \string =>
                 imageCustomMode.icon = \custom
                 iconTemplate ::= getIcon(data.icon, true)
             | \object =>
                 imageCustomMode.icon = \custom
                 iconTemplate ::= data.icon
-            iconTemplate::w = iconTemplate::h = iconTemplate::default.w = iconTemplate::default.h = 15px
-            icon := iconTemplate::default.custom = new iconTemplate
+            iconTemplate::w = iconTemplate::h = styleDefault.icon.w = styleDefault.icon.h = 15px
+            icon := customImage.icon = new iconTemplate
             if imageCustomMode.icon != \custom
-                icon := icon.default
+                icon := styleDefault.icon
 
-
-            #= BADGE =
-            console.log "typeof data.badge", typeof data.badge
-            switch typeof data.badge
-            | \boolean => # false
-                imageCustomMode.badge = \custom
-                fallthrough
-            | \undefined =>
-                badgeTemplate ::= badgeTemplate::default
-                /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
-                getUserData data.uid, (d) ->
-                    console.log "[customColors] loaded user data", data.uid, data.name, d
-                    badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
-                    badgeTemplate::default = true
-                    badgeTemplate::w = badgeTemplate::h = 30px*/
-            | \string =>
-                imageCustomMode.badge = \custom
-                badgeTemplate ::= getIcon("bdg bdg-#{data.badge} #{data.badge[*-1]}", true)
-                badgeTemplate::w = badgeTemplate::h = 30px
-            | \object =>
-                imageCustomMode.badge = \custom
-                badgeTemplate ::= data.badge
-            badge := badgeTemplate::default.custom = new badgeTemplate
-            if imageCustomMode.badge != \custom
-                badge := badge.default
-            #badge := data.badge || {default: true, url: "", x: 0px, y: 0px, w: 30px, h: 30px}
+            if uid
+                #= BADGE =
+                console.log "typeof data.badge", typeof data.badge
+                switch typeof data.badge
+                | \boolean => # false
+                    imageCustomMode.badge = \custom
+                    fallthrough
+                | \undefined =>
+                    badgeTemplate ::= styleDefault.badge
+                    /*console.log "[customColors] no badge specified, loading user data", data.uid, data.name, d
+                    getUserData data.uid, (d) ->
+                        console.log "[customColors] loaded user data", data.uid, data.name, d
+                        badgeTemplate:: = getIcon("bdg bdg-#{d.badge} #{d.badge[d.badge.length - 1]}", true)
+                        styleDefault.badge = true
+                        badgeTemplate::w = badgeTemplate::h = 30px*/
+                | \string =>
+                    imageCustomMode.badge = \custom
+                    badgeTemplate ::= getIcon("bdg bdg-#{data.badge} #{data.badge[*-1]}", true)
+                    badgeTemplate::w = badgeTemplate::h = 30px
+                | \object =>
+                    imageCustomMode.badge = \custom
+                    badgeTemplate ::= data.badge
+                badge := customImage.badge = new badgeTemplate
+                if imageCustomMode.badge != \custom
+                    badge := styleDefault.badge
+                #badge := data.badge || {default: true, url: "", x: 0px, y: 0px, w: 30px, h: 30px}
 
             if $cp .find \.p0ne-ccp-tab-icon .hasClass \p0ne-ccp-tab-selected
                 setImageMode \icon
@@ -1011,6 +1023,7 @@ module \customColorsPicker, do
                 setImageMode \badge
 
             console.log "imageCustomMode", imageCustomMode.icon, imageCustomMode.badge
+            console.info "==>", test!
 
             # UI
             $nameCustomToggles
@@ -1024,6 +1037,7 @@ module \customColorsPicker, do
                 .click!
 
             $cp.show!
+            sleep 200ms, cc~updateCSS
 
 
 
@@ -1105,9 +1119,10 @@ module \customColorsPicker, do
         updateCSS = ->
             clearTimeout updateCSSTimeout
             updateCSSTimeout := sleep 200ms, ->
-                badge_ = badge[imageCustomMode.badge] || badge
-                if \srcW not of badge_
-                    badge_ = void
+                if uid
+                    badge_ = badge[imageCustomMode.badge] || badge
+                    if \srcW not of badge_
+                        badge_ = void
                 style = cc[if uid then \calcCSSUser else \calcCSSRole] do
                     key
                     color: "##{getHex!}"
@@ -1126,28 +1141,18 @@ module \customColorsPicker, do
             try
                 style = scope[key]
 
-                hex = getHex!
-                if hex != currentColor
-                    style.color = "##hex"
+                hex = "##{getHex!}"
+                console.info "[save]", key, hex, font, icon, badge
+                if hex != styleDefault.color
+                    style.color = hex
                 else
                     delete style.color
 
-                style.font = {+b, -i, -u}
-                for k in <[ b i u ]> when font.hasOwnProperty k
-                    hasCustomFont = true
-                    style.font[k] = font[k]
-                if not hasCustomFont
-                    delete style.font
+                style.font = {} <<< font
 
                 switch imageCustomMode.icon
                 | \custom =>
-                    icon_ = icon[imageCustomMode.icon] || icon
-                    for k in <[ url x y ]> when icon_.hasOwnProperty k
-                        hasCustomIcon = true
-                        style.icon = icon_{url, x, y}
-                        break
-                    if not hasCustomIcon
-                        delete style.icon
+                    style.icon = {}<<<<icon
                 | \default =>
                     delete style.icon
                 | \none => if uid or cc.roles[key].icon
@@ -1155,13 +1160,7 @@ module \customColorsPicker, do
 
                 switch uid && imageCustomMode.badge
                 | \custom =>
-                    badge_ = badge[imageCustomMode.badge] || badge
-                    for k in <[ url x y w h ]> when badge_.hasOwnProperty k
-                        hasCustomBadge = true
-                        style.badge = badge_{url, x, y, w, h, srcW, srcH}
-                        break
-                    if not hasCustomBadge
-                        delete style.badge
+                    style.badge = {}<<<<badge
                 | \default =>
                     delete style.badge
                 | \none =>
@@ -1176,15 +1175,15 @@ module \customColorsPicker, do
                             <div class=p0ne-cc-userid>#{style.uid}</div>
                         </div>
                     </div>"*/
-                $css .text ""
 
                 if uid
                     cc.users[uid].css = cc.calcCSSUser(uid)
                 else
                     cc.roles[key].css = cc.calcCSSRole(key)
 
-                cc.updateCSS!
-                tmpCSS := true
+                #$css .text ""
+                #cc.updateCSS!
+                #tmpCSS := true
                 /*if not tmpCSS
                     tmpCSS := true
                     $css .text ""
@@ -1192,38 +1191,7 @@ module \customColorsPicker, do
             catch err
                 console.error "Error while saving custom colors for #key", err.messageAndStack
         export test = ->
-            return {image, defaultIconURL, currentColor, customColor, color, colorHSV, font, nameCustomMode, icon, badge, scale, imageMode, imageCustomMode, imagePicker, imageEl, scope, key, uid, snapToGrid}
-
-        # SAMPLE DATA
-        /*
-        loadData {}, do
-            name: "MᗣD Pᗣᗧ•••MᗣN"
-            uid: 3947647 # MᗣD Pᗣᗧ•••MᗣN
-            #uid: 4103672 # The Sensational Stallion
-            roles: <[ manager ]>
-            badge:
-                url: "http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png"
-                x:  0px
-                y:  0px
-                w: 30px
-                h: 30px
-                srcW: 30px
-                srcH: 30px
-            color: \#D35w
-            font: {+b, -i, +u}
-            icon:
-                url: "https://cdn.plug.dj/_/static/images/icons.d8b5eb442b3acb5ccfbbe2541b9db0756e45beba.png" # DUMMY
-                x:  15px
-                y: 365px
-            badge:
-                url: "https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png" # ponies
-                x: 140px
-                y: 210px
-                w:  70px
-                h:  70px
-                srcW: 280px
-                srcH: 700px
-            */
+            return {styleDefault, customImage,   $css, image, defaultIconURL, currentColor, customColor, color, colorHSV, font, nameCustomMode, icon, badge, scale, imageMode, imageCustomMode, imagePicker, imageEl, scope, key, uid, snapToGrid}
 
 
         export loadData
@@ -1311,5 +1279,15 @@ module \customColorsPicker, do
             .insertBefore $inserBeforeEl
 
     disable: !->
-        @cc?._$settingsPanel?.wrapper?.html ""
+        @cc?._$settingsPanel?.wrapper?
+            .html ""
+            .off!
+
+
+
+/*# sample badge spritesets
+http://png-2.findicons.com/files/icons/1187/pickin_time/32/eggplant.png
+https://a.thumbs.redditmedia.com/H-RxCNGKM9YqzbW-5SVWcEn7Fvjy4rlo9cAZXVuv718.png
+https://fimplug.net/theme/images/badges.png
+*/
 

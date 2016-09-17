@@ -42,7 +42,7 @@ console.time? "[p0ne] completly loaded"
 p0ne_ = window.p0ne
 window.p0ne =
     #== Constants ==
-    version: \1.8.3
+    version: \1.8.6.2
     lastCompatibleVersion: \1.8.0 /* see below */
     host: 'https://cdn.p0ne.com'
     SOUNDCLOUD_KEY: \aff458e0e87cfbc1a2cde2f8aeb98759
@@ -1062,6 +1062,7 @@ ColorPickerHide:h.hidePicker,ColorPickerShow:h.showPicker,ColorPickerSetColor:h.
 
 export $window = $ window
 export $body = $ document.body
+export $app = $ \#app
 
 /**/ # RequireJS fix
 window.require = window.requirejs
@@ -1537,6 +1538,7 @@ window <<<<
                 sleep 1_000ms, delay
             else
                 # note: playlist changes will return 503 errors after ca. 15 requests per 10 seconds (plus some delay) so we'll add some more delay to ensure stability
+                # playlist updates will trigger floodAPI after 20 reqs within 40s (maybe the timespan is larger)
                 window.floodAPI_counter++; sleep 15_000ms, !-> window.floodAPI_counter--
                 req = $.ajax options
                     .then def.resolve, def.reject, def.progress
@@ -1607,7 +1609,9 @@ window <<<<
         if not currentMedia
             console.error "[p0ne /stream] cannot change stream - failed to require() the module 'currentMedia'"
         else
-            return database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            res = database?.settings.streamDisabled = (val != true and (val == false or currentMedia.get(\streamDisabled)))
+            refresh!
+            return res
     join: !->
         # for this, performance might be essential
         # return $ '#dj-button.is-wait' .click! .length != 0
@@ -2372,15 +2376,15 @@ window <<<<
                 .replace /^={5,}$/mg, "<hr class='song-description-hr-double' />"
                 .replace /^[\-~_]{5,}$/mg, "<hr class='song-description-hr' />"
                 .replace /^[\[\-=~_]+.*?[\-=~_\]]+$/mg, "<b class='song-description-heading'>$&</b>"
-                .replace /(.?)([\(\)])(.?)/g, (x,a,b,c) !->
-                    if "=^".indexOf(x) == -1 or a == ":"
+                .replace /(.?)(\(|\))(.?)/g, (x,a,b,c) !->
+                    if x.hasAny ['=', '^']  or  a == ":" or c == ":"
                         return x
                     else if b == \(
                         lvl++
                         return "#a<i class='song-description-comment'>(#c" if lvl == 1
-                    else if lvl
-                            lvl--
-                            return "#a)</i>#c" if lvl == 0
+                    else if lvl > 0
+                        lvl--
+                        return "#a)</i>#c" if lvl == 0
                     return x
             return pre if not url
             return "#pre<a href='#url' target=_blank>#url</a>#{post||''}"
@@ -2517,11 +2521,12 @@ window <<<<
             info += ")"
         if fromClass
             fromClass = " #{getRank(user, true)}"
+            fromClass += " you" if user.id == userID
         else
             fromClass = ""
 
         # user.rawun should be HTML escaped, < and > are not allowed in usernames (checked serverside)
-        return "#rank<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#{user.rawun}</span> #{flag user.language}#{info ||''}"
+        return "<span class='un p0ne-name#fromClass' data-uid='#{user.id}'>#rank <span class=name>#{user.rawun}</span> #{flag user.language}#{info ||''}</span>"
 
     formatUserSimple: (user) !->
         return "<span class=un data-uid='#{user.id}'>#{user.username}</span>"
@@ -2580,6 +2585,8 @@ window <<<<
             user = role: user
         else if typeof user != \object
             user = getUser(user)
+        else if \attributes of user
+            user .= toJSON!
         if not user or user.role == -1
             return if defaultToGhost then \ghost else \regular
         else if user.gRole
@@ -2657,45 +2664,46 @@ if err
 #          REQUIRE MODULES           #
 ####################################*/
 /* requireHelper(moduleName, testFn) */
-requireHelper \users, (.onRole)
-requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
-requireHelper \playlists, (.activeMedia)
+requireHelper \ActivateEvent, (.ACTIVATE)
+requireHelper \AlertEvent, (._name == \AlertEvent)
 requireHelper \auxiliaries, (.deserializeMedia)
+requireHelper \Avatar, (.AUDIENCE)
+requireHelper \avatarAuxiliaries, (.getAvatarUrl)
+requireHelper \backbone, (.Events), id: \backbone
+requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
+requireHelper \chatAuxiliaries, (.sendChat)
+requireHelper \Curate, (.::?.execute?.toString!.has("/media/insert"))
+requireHelper \currentMedia, (.updateElapsedBind)
+requireHelper \currentPlaylistMedia, (\currentFilter of)
 requireHelper \database, (.settings)
-requireHelper \socketEvents, (.ack)
+requireHelper \FriendsList, (.::?.className == \friends)
+requireHelper \Layout, (.getSize)
+requireHelper \MediaPanel, (.::?.onPlaylistVisible)
 requireHelper \permissions, (.canModChat)
 requireHelper \Playback, (.::?.id == \playback)
-requireHelper \PopoutView, (\$document of)
-requireHelper \MediaPanel, (.::?.onPlaylistVisible)
+requireHelper \playlists, (.activeMedia)
 requireHelper \PlugAjax, (.::?.hasOwnProperty \permissionAlert)
-requireHelper \backbone, (.Events), id: \backbone
-requireHelper \roomLoader, (.onVideoResize)
-requireHelper \Layout, (.getSize)
-requireHelper \popMenu, (.className == \pop-menu)
-requireHelper \ActivateEvent, (.ACTIVATE)
-requireHelper \votes, (.attributes?.grabbers)
-requireHelper \chatAuxiliaries, (.sendChat)
-requireHelper \tracker, (.identify)
-requireHelper \currentMedia, (.updateElapsedBind)
-requireHelper \settings, (.settings)
-requireHelper \soundcloud, (.sc)
 requireHelper \plugUrls, (.scThumbnail)
-requireHelper \searchAux, (.ytSearch)
-requireHelper \searchManager, (._search)
-requireHelper \SearchList, (.::?.listClass == \search)
-requireHelper \YtSearchService, (.::?.onVideos)
-requireHelper \AlertEvent, (._name == \AlertEvent)
-requireHelper \userRollover, (.id == \user-rollover)
-requireHelper \booth, (.attributes?.hasOwnProperty \shouldCycle)
-requireHelper \currentPlaylistMedia, (\currentFilter of)
-requireHelper \userList, (.id == \user-lists)
-requireHelper \FriendsList, (.::?.className == \friends)
-requireHelper \RoomUserRow, (.::?.vote)
-requireHelper \WaitlistRow, (.::?.onAvatar)
+requireHelper \popMenu, (.className == \pop-menu)
+requireHelper \PopoutView, (\$document of)
 requireHelper \room, (.attributes?.hostID)
 requireHelper \RoomHistory, (it) !-> return it::?.listClass == \history and it::hasOwnProperty \listClass
-requireHelper \avatarAuxiliaries, (.getAvatarUrl)
-requireHelper \Avatar, (.AUDIENCE)
+requireHelper \roomLoader, (.onVideoResize)
+requireHelper \RoomUserRow, (.::?.vote)
+requireHelper \searchAux, (.ytSearch)
+requireHelper \SearchList, (.::?.listClass == \search)
+requireHelper \searchManager, (._search)
+requireHelper \settings, (.settings)
+requireHelper \socketEvents, (.ack)
+requireHelper \soundcloud, (.sc)
+requireHelper \SuggestionView, (.::?id == \chat-suggestion)
+requireHelper \tracker, (.identify)
+requireHelper \userList, (.id == \user-lists)
+requireHelper \userRollover, (.id == \user-rollover)
+requireHelper \users, (.onRole)
+requireHelper \votes, (.attributes?.grabbers)
+requireHelper \WaitlistRow, (.::?.onAvatar)
+requireHelper \YtSearchService, (.::?.onVideos)
 #requireHelper \AvatarList, (._byId?.admin01)
 
 if requireHelper \emoticons, (.emojify)
@@ -3001,6 +3009,10 @@ window.module = (name, data) !->
                 module = !->
                     return fn.apply module, arguments
                 module <<<< data
+                # what what, functions apparently don't like the .name property
+                Object.defineProperty module, \name, do
+                    get: !-> return name
+                    #set: (newName) !-> name := newName
             else if typeof module == \object
                 module <<<< data
             else
@@ -4204,6 +4216,8 @@ module \fixStuckDJ, do
     '''
     _settings:
         verbose: true
+    tries: 0
+    MAX_TRIES: 10
     setup: ({replace, addListener}, fixStuckDJ) !->
         @timer := sleep 5_000ms, fixStuckDJ if API.getTimeRemaining! == 0s and API.getMedia!
 
@@ -4222,8 +4236,12 @@ module \fixStuckDJ, do
         ajax \GET, \rooms/state, do
             error: (data) !~>
                 console.error "[fixNoAdvance] cannot load room data:", status, data
-                @timer := sleep 10_000ms, fixStuckDJ
+                if not @disabled and @tries < @MAX_TRIES
+                    @timer := sleep 10_000ms, fixStuckDJ
+                else
+                    @tries = 0
             success: (data) !~>
+                @tries = 0
                 data.0.playback ||= {}
                 if m.id == data.0.playback?.media?.id
                     console.log "[fixNoAdvance] the same song is still playing."
@@ -4532,6 +4550,23 @@ module \fixPopoutChatClose, do
         addListener API, \popout:open, (window_) !->
             window_.onbeforeunload = PopoutView~close
 
+module \fixNullUser, do
+    settings: \fixes
+    require: <[ _$context ]>
+    disabled: true
+    setup: ({addListener, replace}) !->
+        addListener _$context, \user:join, cb = (u) !->
+            if not u.get \username
+                console.info "fixed null user", u.id
+                name = "null (#{u.id})"
+                u.set \username, name
+                u.set \rawun, name
+                u.set \language, \en
+                u.set \slug, \null
+        if users?
+            for u in users.models
+                cb(u)
+
 /*@source p0ne.stream.ls */
 /**
  * Modules for Audio-Only stream and stream settings for plug_p0ne
@@ -4548,8 +4583,8 @@ module \fixPopoutChatClose, do
    and due to them sharing a lot of code
 */
 module \streamSettings, do
-    #settings: \dev
-    #displayName: 'Stream-Settings'
+    settings: \dev
+    displayName: 'Stream-Settings'
     require: <[ app Playback currentMedia database _$context ]>
     optional: <[ database plugUrls ]>
     audioOnly: false
@@ -5015,7 +5050,7 @@ module \chatCommands, do
                     try
                         cmd.callback(c)
                     catch err
-                        chatWarn "<div>#{err.message}</div>", "error while executing #c"
+                        chatWarn "<div>#{err.message}</div>", "error while executing #c", true
                         console.error "[chatCommand] #c"
                         throw err
                 else
@@ -5099,7 +5134,7 @@ module \chatCommands, do
         stream:
             parameters: " [on|off]"
             description: "enable/disable the stream (just '/stream' toggles it)"
-            callback: !->
+            callback: (c) !->
                 if currentMedia?
                     # depending on the parameter, this return true ("on"), false ("off") and defaults to "toggle"
                     stream c.has \on || not (c.has(\off) || \toggle)
@@ -5505,6 +5540,7 @@ module \autojoin, do
     '''
     settings: \base
     settingsVip: true
+    settingsSimple: true
     disabled: true
     disableCommand: true
     optional: <[ _$context booth socketListeners ]>
@@ -5605,6 +5641,7 @@ module \autowoot, do
     '''
     settings: \base
     settingsVip: true
+    settingsSimple: true
     disabled: true
     disableCommand: true
     optional: <[ chatDomEvents ]>
@@ -5650,7 +5687,13 @@ module \autowoot, do
 #              AUTOMUTE              #
 ####################################*/
 module \automute, do
+    displayName: "Automute"
+    settings: \base
+    settingsSimple: true
     optional: <[ streamSettings ]>
+    help: '''
+        automatically set songs from the "mute list" to silent, so you don't have to hear them when they get played. Useful for tracks that you don't like but that often get played.
+    '''
     _settings:
         songlist: {}
 
@@ -5660,6 +5703,7 @@ module \automute, do
         addListener API, \advance, (d) !~>
             if (media := d.media) and @songlist[media.cid]
                 console.info "[automute] '#{media.author} - #{media.title}' is in automute list. Automuting…"
+                chatWarn "This song is automuted", \automute
                 #muteonce!
                 snooze!
 
@@ -5716,7 +5760,7 @@ module \automute, do
             if media.toJSON
                 media = media.toJSON!
             if not media.cid or not \author of media
-                throw new TypeError "invalid arguments for automute(media, isAdd=)"
+                throw new TypeError "invalid arguments for automute(media, isAdd*)"
         else
             # default `media` to current media
             media = API.getMedia!
@@ -5727,6 +5771,7 @@ module \automute, do
         $msg = $ "<div class='p0ne-automute-notif'>"
         if isAdd # add to automute list
             @songlist[media.cid] = media
+            @createRow media.cid
             $msg
                 .text "+ automute #{media.author} - #{media.title}"
                 .addClass \p0ne-automute-added
@@ -5735,10 +5780,52 @@ module \automute, do
             $msg
                 .text "- automute #{media.author} - #{media.title}'"
                 .addClass \p0ne-automute-removed
+            if $row = @$rows[media.cid]
+                $row .css transform: 'scale(0)', height: 0px
+                sleep 500ms, !->
+                    $row .remove!
         $msg .append getTimestamp!
         appendChat $msg
         if media.cid == API.getMedia!?.cid
             @updateBtn!
+
+    $rows: {}
+    settingsPanel: (@$el, automute) !->
+        for cid of @songlist
+            @createRow cid
+        $el
+            .on \mouseover, '.song-format-2 .load-sc', !->
+                mediaLookup {format: 2, cid: $(this).closest(\row).data(\cid)} .then (d) !~>
+                    $(this)
+                        .attr \href, d.url
+                        .removeClass \load-sc
+            .on \click, \.song-remove, !->
+                $row = $(this).closest \.row
+                automute automute.songlist[$(this).closest(\.row).data(\cid)], false /*remove*/
+            .parent! .css height: \100%
+    createRow: (cid) !-> if @$el
+        song = @songlist[cid]
+        if song.format == 1  # YouTube
+            mediaURL = "http://youtube.com/watch?v=#{song.cid}"
+            loadSC = ""
+        else # if media.format == 2 # SoundCloud
+            mediaURL = "https://soundcloud.com/search?q=#{encodeURIComponent song.author+' - '+song.title}"
+            loadSC = " load-sc"
+        @$rows[cid] = $ "
+            <div class='row song-format-#{song.format}' data-cid='#cid'>
+                <div class=song-thumb-wrapper>
+                    <img class=song-thumb src='#{song.image}'>
+                    <span class=song-duration>#{mediaTime song.duration}</span>
+                </div>
+                <div class=meta>
+                    <div class=author title='#{song.author}'>#{song.author}</div>
+                    <div class=title title='#{song.title}'>#{song.title}</div>
+                </div>
+                <div class='song-remove btn'><i class='icon icon-clear-input'></i></div>
+                <a class='song-open btn #loadSC' href='#mediaURL' target='_blank'><i class='icon icon-chat-popout'></i></a>
+            </div>
+        "
+            .appendTo @$el
 
     disable: !->
         $ '#playback .snooze'
@@ -5752,6 +5839,7 @@ module \automute, do
 module \afkAutorespond, do
     displayName: 'AFK Autorespond'
     settings: \base
+    settingsSimple: true
     settingsVip: true
     _settings:
         message: "I'm AFK at the moment"
@@ -5832,6 +5920,15 @@ module \joinLeaveNotif, do
                 event = event_
                 if not reuseNotif = (chat?.lastType == CHAT_TYPE and $lastNotif)
                     lastUsers := {}
+
+                # temporary fix, until plug takes care of unnamed accounts
+                /*if not u.username
+                    u.username = "unnamed (#{u.id})"
+                    u.language = "en"
+                    console.info "[userJoin]", u
+                else
+                    console.log "[userJoin]", u
+                */
 
 
                 title = ''
@@ -6090,7 +6187,10 @@ module \etaTimer, do
                 sum -= lastSongDur
                 sum += d.media.duration
                 lastSongDur := API.getHistory![l - 1].media.duration
-            # note: we don't trigger updateETA() because each advance is accompanied with a waitListUpdate
+
+            if API.getWaitList!.length == 0
+                updateETA!
+            # note: we otherwise don't trigger updateETA() because usually each advance is accompanied with a waitListUpdate
         if _$context?
             addListener _$context, \room:joined, updateETA
 
@@ -6258,6 +6358,7 @@ module \waitlistUserPopup, do
 module \boothAlert, do
     displayName: 'Booth Alert'
     settings: \base
+    settingsSimple: true
     help: '''
         Play a notification sound before you are about to play
     '''
@@ -6654,7 +6755,7 @@ module \chatMessageClasses, do
                     uid .= substr(0, 7)
                     return if not uid
                     $this = $ this
-                    if fromUser = users.get uid
+                    if fromUser = getUser(uid)
                         role = getRank(fromUser, true)
                         #if role != \ghost
                         fromRole = "from-#role"
@@ -6701,6 +6802,7 @@ module \unreadChatNotif, do
     require: <[ _$context chatDomEvents chatPlugin ]>
     bottomMsg: $!
     settings: \chat
+    settingsSimple: true
     displayName: 'Mark Unread Chat'
     setup: ({addListener}) !->
         unreadCount = 0
@@ -6804,6 +6906,7 @@ module \chatInlineImages, do
     require: <[ chatPlugin ]>
     settings: \chat
     settingsVip: true
+    settingsSimple: true
     displayName: 'Inline Images'
     help: '''
         Converts image links to images in the chat, so you can see a preview.
@@ -7106,6 +7209,7 @@ module \chatYoutubeThumbnails, do
 module \customChatNotificationTrigger, do
     displayName: 'Notification Trigger Words'
     settings: \chat
+    settingsSimple: true
     _settings:
         triggerwords: if (tmp=user.username.split(' ')).length then tmp else []
     disabled: true
@@ -7166,7 +7270,7 @@ module \customChatNotificationTrigger, do
 
 module \p0neStylesheet, do
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=48"
+        loadStyle "#{p0ne.host}/css/plug_p0ne.css?r=51"
 
 /*
 window.moduleStyle = (name, d) !->
@@ -7191,10 +7295,11 @@ window.moduleStyle = (name, d) !->
 #            FIMPLUG THEME           #
 ####################################*/
 module \fimplugTheme, do
-    settings: \look&feel
     displayName: "Brinkie's fimplug Theme"
+    settings: \look&feel
+    disabled: true
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/fimplug.css?r=29"
+        loadStyle "#{p0ne.host}/css/fimplug.css?r=30"
 
 
 /*####################################
@@ -7226,6 +7331,7 @@ module \animatedUI, do
 module \fixHiRes, do
     displayName: "☢ Fix high resolutions"
     settings: \fixes
+    disabled: true
     help: '''
         This will fix some odd looking things on larger screens
         NOTE: This is WORK IN PROGESS! Right now it doesn't help much.
@@ -7243,6 +7349,7 @@ module \fixHiRes, do
 module \playlistIconView, do
     displayName: "Playlist Grid View"
     settings: \look&feel
+    settingsSimple: true
     help: '''
         Shows songs in the playlist and history panel in an icon view instead of the default list view.
     '''
@@ -7456,7 +7563,6 @@ module \legacyFooter, do
         Restore the old look of the footer (the thing below the chat) and transform it into a more useful information panel.
         To get to the settings etc, click anywhere on the panel.
     '''
-    disabled: true
     setup: ({addListener}) !->
         # most of this module's magic is in the CSS
         $body .addClass \legacy-footer
@@ -7627,6 +7733,7 @@ module \emojiPack, do
 module \customBackground, do
     displayName: 'Custom Background'
     settings: \look&feel
+    settingsSimple: true
     help: '''
         This module lets you change the background image of plug.dj
 
@@ -7651,7 +7758,7 @@ module \customBackground, do
             else
                 @css \customBackground, """
                     \#app { background: transparent !important }\n
-                    \#app .app-right { background: rgba(0,0,0, 0.8) !important; }
+                    \#app .app-right { background: #0a0a0a !important; }
                     \#app \#avatars-container::before { content: "" !important; }
                     \#app .room-background { background-image: url(#{@_settings.background}) !important; display: block !important; }\n
                 """
@@ -7762,6 +7869,7 @@ module \roomTheme, do
     require: <[ roomSettings ]>
     optional: <[ roomLoader ]>
     settings: \look&feel
+    settingsSimple: true
     help: '''
         Applies the room theme, if this room has one.
         Room Settings and thus a Room Theme can be added by (co-) hosts of the room.
@@ -7909,11 +8017,6 @@ module \roomTheme, do
 
 
 /*@source p0ne.customcolors.ls */
-#DEBUG
-window.clear = (obj) !-> for k of obj then delete obj[k]
-
-requireHelper \SuggestionView, (.::?id == \chat-suggestion)
-
 if not window.staff
     staff =
         loading: $.Deferred!
@@ -7930,6 +8033,7 @@ if not window.staff
 module \customColors, do
     displayName: "☢ Custom Colours"
     settings: \look&feel
+    settingsSimple: true
     help: """
         Change colours of usernames, depending on their role.
 
@@ -7963,17 +8067,17 @@ module \customColors, do
             test: !-> …
             css: "…" # cache
         */
-        you:        color: \#ffdd6f, test: (.id == userID)
-        regular:    color: \#777f92, icon: false, test: (.role == 0)
-        friend:     test: (.friend)
-        subscriber: color: \#c59840, icon: \icon-chat-subscriber, test: (.sub)
-        dj:         color: \#ac76ff, icon: \icon-chat-dj, perRoom: true, test: (.role == 1)
-        bouncer:    color: \#ac76ff, icon: \icon-chat-bouncer, perRoom: true, test: (.role == 2)
-        manager:    color: \#ac76ff, icon: \icon-chat-manager, perRoom: true, test: (.role == 3)
-        cohost:     color: \#ac76ff, icon: \icon-chat-host, perRoom: true, test: (.role == 4)
-        host:       color: \#ac76ff, icon: \icon-chat-host, perRoom: true, test: (.role == 5)
-        ambassador: color: \#89be6c, icon: \icon-chat-ambassador, test: (u) !-> return 0 < u.gRole < 5
-        admin:      color: \#42a5dc, icon: \icon-chat-admin, test: (.gRole == 5)
+        you:        color: \#FFDD6F, test: (.id == userID)
+        regular:    color: \#777F92, icon: false, test: (.role == 0)
+        friend:     color: \#777F92, test: (.friend)
+        subscriber: color: \#C59840, icon: \icon-chat-subscriber, test: (.sub)
+        dj:         color: \#AC76FF, icon: \icon-chat-dj, perRoom: true, test: (.role == 1)
+        bouncer:    color: \#AC76FF, icon: \icon-chat-bouncer, perRoom: true, test: (.role == 2)
+        manager:    color: \#AC76FF, icon: \icon-chat-manager, perRoom: true, test: (.role == 3)
+        cohost:     color: \#AC76FF, icon: \icon-chat-host, perRoom: true, test: (.role == 4)
+        host:       color: \#AC76FF, icon: \icon-chat-host, perRoom: true, test: (.role == 5)
+        ambassador: color: \#89BE6C, icon: \icon-chat-ambassador, test: (u) !-> return 0 < u.gRole < 5
+        admin:      color: \#42A5DC, icon: \icon-chat-admin, test: (.gRole == 5)
     users: {}
     /*    <uid>:
             css: "…" # cache
@@ -7994,7 +8098,10 @@ module \customColors, do
         @scopes.globalCustomRole = @_settings.global.roles
         @scopes.globalCustomUser = @_settings.global.users
         do @addListener _$context, \room:joined, ~>
-            @room = @_settings.perRoom[slug = getRoomSlug!] ||= {userRole: {}, users: {}, roles: {}}
+            slug = getRoomSlug!
+            @room = @_settings.perRoom[slug] ||= {
+                userRole: {}, users: {}, roles: {}
+            }
             #@scopes.roomCustomUser = @room.users
             #@scopes.roomCustomRole = @room.roles
             @scopes.roomThemeRole = {}
@@ -8023,7 +8130,9 @@ module \customColors, do
                 ccp.disable!.enable!
 
     updateCSS: !->
-        cpKey = colorPicker?.key
+        ccp = p0ne.modules.customColorsPicker
+        if ccp and not ccp.disabled
+            cpKey = "#{ccp.key}"
         styles = ""
         for key, data of @roles when key != cpKey
             styles += data.css
@@ -8045,9 +8154,10 @@ module \customColors, do
                     \#app \#waitlist .#{role.icon} + span,
                     \#app \#user-rollover .#{role.icon} + span,
                 "
+            if roleName != \regular
+                styles += "\#app .p0ne-name.#roleName,"
             styles += "
-                \#app \#chat .from-#roleName .un,
-                \#app .p0ne-name.#roleName {
+                \#app \#chat .from-#roleName .un {
                     color: #{style.color};
                     #{if not font.b then 'font-weight: normal;' else ''}
                     #{if font.i then 'font-style: italic;' else ''}
@@ -8077,17 +8187,22 @@ module \customColors, do
 
     calcCSSUser: (uid, style) !->
         style ||= @getUserStyle(uid)
-        styles = "/*= #{uid} (#{@_settings.users[uid]}) =*/"
+        styles = "/*= #{uid} (#{@_settings.users[uid].username}) =*/"
 
         if style.color
-            font = style.font ||{}
+            color = "color: #{style.color};"
+        if style.font
+            font = "
+                    #{if not style.font.b then 'font-weight: normal;' else ''}
+                    #{if style.font.i then 'font-style: italic;' else ''}
+                    #{if style.font.u then 'text-decoration: underline;' else ''}
+            "
+        if color || font
             styles += "
                 \#app \#chat .fromID-#uid .un,
-                \#app .p0ne-uid-#uid .p0ne-name {
-                    color: #{style.color};
-                    #{if not font.b then 'font-weight: normal;' else ''}
-                    #{if font.i then 'font-style: italic;' else ''}
-                    #{if font.u then 'text-decoration: underline;' else ''}
+                \#app .p0ne-uid-#uid .p0ne-name .name {
+                    #{color ||''}
+                    #{font  ||''}
                 }
             "
 
@@ -8101,6 +8216,7 @@ module \customColors, do
 
         if bdg = style.badge
             styles += "
+                .p0ne-uid-#uid .bdg,
                 .fromID-#uid .bdg {
                     background: url(#{bdg.url}) #{-30px * bdg.x / bdg.w}px #{-30px * bdg.y / bdg.h}px / #{bdg.srcW*30px/bdg.w ||30}px #{bdg.srcH*30px/bdg.h ||30}px
                 }
@@ -8167,6 +8283,7 @@ module \songNotif, do
     require: <[ chatDomEvents ]>
     optional: <[ _$context chat users database auxiliaries app popMenu ]>
     settings: \base
+    settingsSimple: true
     displayName: 'Chat Song Notifications'
     help: '''
         Shows notifications for playing songs in the chat.
@@ -8204,7 +8321,7 @@ module \songNotif, do
                         .text modUsername
 
         #== apply stylesheets ==
-        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=18"
+        loadStyle "#{p0ne.host}/css/p0ne.notif.css?r=19"
 
 
         #== show current song ==
@@ -8414,7 +8531,7 @@ module \songNotif, do
             </div>
             #{getTimestamp!}
             <div class='song-stats'></div>
-            <div class='song-dj un'></div>
+            <div class='song-dj'></div>
             <b class='song-title'></b>
             <span class='song-author'></span>
             <div class='song-description-btn'>Description</div>
@@ -8423,8 +8540,7 @@ module \songNotif, do
         @$div .find \.song-title .text title .prop \title, title
         @$div .find \.song-author .text author
         @$div .find \.song-dj
-            .text d.dj.username
-            .data \uid, d.dj.id
+            .html formatUserHTML d.dj, user.isStaff, getRank(d.dj)
 
         appendChat @$div
         if media.format == 2 # SoundCloud
@@ -8452,12 +8568,13 @@ module \songNotif, do
 window.Notification ||= window.webkitNotification
 module \songNotifPopup, do
     displayName: 'Desktop Song Notifications'
+    settings: \base
+    disabled: true
     help: '''
         Shows a small popup notifications on song changes.
     '''
     screenshot: 'https://i.imgur.com/wCrDhvb.png'
-    settings: \base
-    disabled: true
+
     require: <[ Notification ]>
     setup: ({addListener}) !->
         Notification.requestPermission!
@@ -8706,6 +8823,7 @@ require <[ sockjs ]>, (SockJS) !->
         optional: <[ user_ _$context ]>
         displayName: 'Custom Avatars'
         settings: \base
+        settingsSimple: true
         disabled: true
         help: '''
             This adds a few custom avatars to plug.dj
@@ -8726,7 +8844,10 @@ require <[ sockjs ]>, (SockJS) !->
             p0ne._avatars = {}
 
             avatarID = API.getUser!.avatarID
-            hasNewAvatar = @_settings.vanillaAvatarID == avatarID
+            if @_settings.vanillaAvatarID
+                @hasNewAvatar = @_settings.vanillaAvatarID != avatarID
+            else
+                @_settings.vanillaAvatarID = avatarID
 
             # - display custom avatars
             replace avatarAuxiliaries, \getAvatarUrl, (gAU_) !-> return (avatarID, type) !->
@@ -8803,26 +8924,28 @@ require <[ sockjs ]>, (SockJS) !->
             @removeAvatar = (avatarID, replace) !->
                 for u in users.models
                     if u.get(\avatarID) == avatarID
-                        u.set(\avatarID, u.get(\avatarID_))
+                        u.set(\avatarID, u.get(\vanillaAvatarID))
                 delete p0ne._avatars[avatarID]
 
 
 
             # - set avatarID to custom value
-            @changeAvatar = (userID, avatarID) !~>
-                if not (u = users.get(userID)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
-                    console.warn "[p0ne custom avatars] can't load user or avatar: '#userID', '#avatarID'"
+            @changeAvatar = (uid, avatarID) !~>
+                if not (u = users.get(uid)) or not (avatar = p0ne._avatars[avatarID]) and not (avatarID = u.vanillaAvatarID)
+                    console.warn "[p0ne custom avatars] can't load user or avatar: '#uid', '#avatarID'"
                     return
 
 
-                if not avatar.permissions or API.hasPermissions(userID, avatar.permissions)
+                if not avatar.permissions or API.hasPermissions(uid, avatar.permissions)
                     if not u.get \vanillaAvatarID
                         u.set \vanillaAvatarID, u.get(\avatarID)
                     u.set \avatarID, avatarID
                 else
-                    console.warn "user with ID #userID doesn't have permissions for avatar '#{avatarID}'"
+                    console.warn "user with ID #uid doesn't have permissions for avatar '#{avatarID}'"
 
-                if userID == userID
+                if uid == userID
+                    if p0ne._avatars[avatarID]?.isVanilla
+                        @_settings.vanillaAvatarID = avatarID
                     @_settings.avatarID = avatarID
 
             @updateAvatarStore = !->
@@ -8937,26 +9060,15 @@ require <[ sockjs ]>, (SockJS) !->
             $.ajax do
                 url: '/_/store/inventory/avatars'
                 success: (d) !~>
-                    avatarIDs = []; l=0
                     for avatar in d.data
-                        avatarIDs[l++] = avatar.id
-                        if not  p0ne._avatars[avatar.id]
+                        if not p0ne._avatars[avatar.id]
                             _internal_addAvatar do
                                 avatarID: avatar.id
                                 isVanilla: true
                                 category: avatar.category
                         p0ne._avatars[avatar.id] .inInventory = true
-                            #..category = d.category
                     @updateAvatarStore!
-                    /*requireAll (m) !->
-                        return if not m._models or not m._events?.reset
-                        m_avatarIDs = ""
-                        for el, i in m._models
-                            return if avatarIDs[i] != el
-                    */
 
-            if not hasNewAvatar and @_settings.avatarID
-                @changeAvatar(userID, that)
 
 
 
@@ -8968,7 +9080,7 @@ require <[ sockjs ]>, (SockJS) !->
             if _$context? and user_?
                 addListener _$context, \ack, !->
                     replace user_, \set, (s_) !-> return (obj, val) !->
-                        if obj.avatarID and obj.avatarID == @.get \avatarID_
+                        if obj.avatarID and obj.avatarID == @.get \vanillaAvatarID
                             delete obj.avatarID
                         return s_.call this, obj, val
                 addListener _$context, \UserEvent:friends, !->
@@ -9141,9 +9253,10 @@ require <[ sockjs ]>, (SockJS) !->
                     @addAvatar avatarID, avatar
 
                 if @_settings.avatarID of avatars
-                    @socket.emit \changeAvatarID, user.avatarID
-                else
-                    @socket.emit \changeAvatarID, null
+                    @changeAvatar userID, @_settings.avatarID
+                    @socket.emit \changeAvatarID, @_settings.avatarID
+                /*else if not @hasNewAvatar and @_settings.avatarID of avatars
+                    @socket.emit \changeAvatarID, @_settings.avatarID*/
                 requestAnimationFrame initUsers if @socket.users
 
             @socket.on \users, (users) !~>
@@ -9210,9 +9323,8 @@ require <[ sockjs ]>, (SockJS) !->
             for avatarID, avi of p0ne._avatars
                 avi.inInventory = false
             @updateAvatarStore!
-            for ,user of users.models when user.attributes.avatarID_
+            for ,user of users.models when user.get \vanillaAvatarID
                 user.set \avatarID, that
-        #chatWarn "custom avatar script loaded. type '/ppCAS <url>' into chat to connect to an avatar server :horse:", "ppCAS"
 
 module \ppCASStatusRing, do
     settings: \dev
@@ -9246,6 +9358,7 @@ module \ppCASStatusRing, do
 module \p0neSettings, do
     _settings:
         groupToggles: {p0neSettings: true, base: true}
+        expert: false
     setup: ({$create, addListener}, p0neSettings, oldModule) !->
         groupToggles = @groupToggles = @_settings.groupToggles ||= {p0neSettings: true, base: true}
 
@@ -9263,7 +9376,8 @@ module \p0neSettings, do
             .fadeOut 0
 
         #debug
-        $ppS .addClass \p0ne-settings-showall
+        if @_settings.expert
+            $ppW .addClass \p0ne-settings-expert
         #@<<<<{$ppP, $ppM, $ppI}
 
         #= add "simple" settings =
@@ -9280,6 +9394,14 @@ module \p0neSettings, do
                 <div class=p0ne-settings-help-btn>help</div>
                 <div class=p0ne-settings-expert-toggle>show all options</div>
             </div>"
+            .on \click, \.p0ne-settings-help-btn, !->
+                p0ne.modules.p0neHelp?.enable!
+            .on \click, \.p0ne-settings-expert-toggle, !~>
+                if @_settings.expert = not @_settings.expert
+                    $ppW .addClass \p0ne-settings-expert
+                else
+                    $ppW .removeClass \p0ne-settings-expert
+                updateSize!
             .appendTo $ppS
 
         #= add toggles for existing modules =
@@ -9288,13 +9410,20 @@ module \p0neSettings, do
             module._$settingsPanel?.wrapper .appendTo $ppM
 
 
-        do addListener API, \p0ne:stylesLoaded, !~> requestAnimationFrame !~>
-            for group, $el of @groups # when @_settings.groupToggles[group]
-                $el .trigger \p0ne:resize
+        do addListener API, \p0ne:stylesLoaded, updateSize
+
+        !~function updateSize
+            cb = !~>
+                for group, $el of @groups # when @_settings.groupToggles[group]
+                    $el .trigger \p0ne:resize
+                for group, $el of @groups # when @_settings.groupToggles[group]
+                    $el .trigger \p0ne:resize
+            requestAnimationFrame cb
+            sleep 2_000ms, cb
 
 
         #= DEBUG =
-        debugMode = 0
+        debugMode = if groupToggles.p0neSettings then 0 else -1
         debugClosingDur = 500ms
 
         #= add DOM event listeners =
@@ -9309,15 +9438,19 @@ module \p0neSettings, do
 
                 if debugMode == 2
                     debugClosingDur := 0ms
-                    @$vip.hide!
                     $ppP .appendTo $ppW
+                    $ppW .addClass \p0ne-settings-expert
                 else
                     debugClosingDur := 500ms
-                    @$vip.show!
                     $ppP .appendTo $ppM
+                    if not @_settings.expert
+                        $ppW .addClass \p0ne-settings-expert
+                    else
+                        $ppW .removeClass \p0ne-settings-expert
 
                 for group, $el of @groups when @_settings.groupToggles[group]
-                    if not keepOpen
+                    if keepOpen
+                        @_settings.groupToggles[group] = false
                         $el .removeClass \open .css height: 30px
                     else
                         keepOpen = group
@@ -9327,10 +9460,11 @@ module \p0neSettings, do
                     @groups.base .find \.p0ne-settings-summary .click!
 
                 sleep debugClosingDur, !~>
-                    for group, $el of @groups when @_settings.groupToggles[group]
-                        if not groupToggles[group] and group != keepOpen
-                            groupToggles[group] = false
+                    for group, $el of @groups
+                        if not groupToggles[group]
                             $el .addClass \closed
+                        else
+                            $el .trigger \p0ne:resize
 
         # toggle groups
         addListener $body, \click, \.p0ne-settings-summary, throttle 200ms, (e) !->
@@ -9530,6 +9664,7 @@ module \p0neSettings, do
 
 
     groups: {}
+    groupEmpty: {}
     moderationGroup: $!
     addModule: (module, module_) !->
         if module.settings
@@ -9545,6 +9680,7 @@ module \p0neSettings, do
                 itemClasses += ' p0ne-settings-has-more'
             itemClasses += ' p0ne-settings-has-extra' if module.settingsExtra
             itemClasses += ' p0ne-settings-item-enabled' if not module.disabled
+            itemClasses += ' p0ne-settings-item-expert' if not module.settingsSimple
 
             if module.settingsVip
                 # VIP settings get their special place
@@ -9559,7 +9695,7 @@ module \p0neSettings, do
                     .insertBefore @$ppInfo
                 $s.items = $ '<div class=p0ne-settings-items>' .appendTo $s
                 if @_settings.groupToggles[module.settings]
-                    $s .addClass \open
+                    $s  .addClass \open
                 else
                     $s
                         .addClass \closed
@@ -9574,6 +9710,8 @@ module \p0neSettings, do
                     $s .find \.p0ne-settings-summary .click!
             # otherwise we already created the settings group
 
+            if not module.settingsVip and not @groupEmpty[module.settings] and (@groupEmpty[module.settings] = module.settingsSimple)
+                $s .addClass \p0ne-settings-has-simple
             # create the module's settings element and append it to the settings group
             # note: $create doesn't have to be used, because the resulting elements are appended to a $create'd element
             module._$settings = $ "
@@ -9675,6 +9813,7 @@ module \warnOnHistory, do
     displayName: 'Warn on History'
     moderator: true
     settings: \moderation
+    settingsSimple: true
     setup: ({addListener}) !->
         addListener API, \advance, (d) !~> if d.media
             hist = API.getHistory!
@@ -9707,6 +9846,7 @@ module \disableChatDelete, do
     moderator: true
     displayName: 'Show deleted messages'
     settings: \moderation
+    settingsSimple: true
     setup: ({replace_$Listener, addListener, $createPersistent, css}) !->
         css \disableChatDelete, '
             .deleted {
@@ -9768,6 +9908,7 @@ module \chatDeleteOwnMessages, do
     moderator: true
     #displayName: 'Delete Own Messages'
     #settings: \moderation
+    settingsSimple: true
     setup: ({addListener}) !->
         $cm! .find "fromID-#{userID}"
             .addClass \deletable
@@ -9792,6 +9933,7 @@ module \warnOnMehers, do
     moderator: true
     displayName: 'Warn on Mehers'
     settings: \moderation
+    settingsSimple: true
     _settings:
         instantWarn: false
         maxMehs: 3
@@ -9887,6 +10029,7 @@ module \afkTimer, do
     optional: <[ socketListeners app userList _$context ]>
     moderator: true
     settings: \moderation
+    settingsSimple: true
     displayName: "Show Idle Time"
     help: '''
         This module shows how long users have been inactive in the User- and Waitlist-Panel.
@@ -10108,6 +10251,388 @@ module \userHistory, do
                     <-! requestAnimationFrame
                     RoomHistory::.collection = RoomHistory::.collection_
                     console.log "#{getTime!} [userHistory] restoring room's proper history"
+
+/*@source p0ne.help.ls */
+/**
+ * Tutorial and help GUI for plug_p0ne
+ *
+ * @author jtbrinkmann aka. Brinkie Pie
+ * @license MIT License
+ * @copyright (c) 2015 J.-T. Brinkmann
+ */
+
+module \p0neHelp, do
+    optional: <[ currentMedia ]>
+    require: <[ automute p0neSettings ]>
+    setup: ({$create, css}) ->
+        #== create CSS ==
+        #ToDo move this to plug_p0ne.css
+        #css \p0neHelp, ""
+
+        automute = p0ne.modules.automute
+        var i
+        steps = {}
+        @screenClose = $.noop
+
+        p0neSettings = p0ne.modules.p0neSettings
+        automute = p0ne.modules.automute
+        $ppW = p0neSettings.$ppW
+        $ppI = $ppW.parent! .find '.p0ne-icon:first'
+        $pp0 = $ppI .find \.p0ne-icon-sub
+        $hdButton = $ '#playback .hd'
+        $snoozeBtn = $ '#playback .snooze'
+        #== create DOM elements ==
+        $el = $create "
+            <div class=wt-cover></div>
+            <div class='container wt-p0' id=walkthrough>
+                <div class='step fade-in wt-p0-welcome' data-screen=welcome>
+                    <h2>Welcome to</h2>
+                    <div class=wt-p0-title>
+                        <div class=wt-p0-title-p>p</div>
+                        <div class=wt-p0-title-lug_p>lug_p</div>
+                        <div class='wt-p0-0 wt-p0-title-0'>0</div>
+                        <div class=wt-p0-title-ne>ne</div>
+                    </div>
+
+                    <button class='wt-p0-next continue'>&nbsp;</button>
+                </div>
+
+                <div class='step fade-in wt-p0-settings' data-screen=settings>
+                    <h1>Settings</h1>
+                    <p>
+                        To open/close the plug_p0ne settings, click the <div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div> icon in the top left
+                    </p>
+
+                    <p class=wt-p0-settings-closed>
+                        click the icon now!
+                    </p>
+                    <p class=wt-p0-settings-open>
+                        Good job! Let's move on.
+                    </p>
+                    <button class=wt-p0-next>skip</button>
+                </div>
+
+                <div class='step fade-in wt-p0-dblclick2mention' data-screen=dblclick2mention>
+                    <h1>dblclick2mention</h1>
+                    <p>
+                        Most of plug_p0ne's awesome features are not immediately obvious.<br>
+                        Let's try out some, to see what we can do with plug_p<span class=wt-p0-0>0</span>ne.
+                    </p>
+                    <p>
+                        One of best is the so called \"DblClick username to Mention\", which let's you @mention others simply by double clicking their usernames (e.g. in their chat messages or join/leave notifications, but it works just about everywhere).<br>
+                        This is great to quickly greet friends, for example.
+                    </p>
+                    <p>
+                        [insert image]<!-- <img src='...'> -->
+                    </p>
+
+                    <button class='wt-p0-next continue'>next</button>
+                </div>
+
+                <div class='step fade-in wt-p0-stream-settings' data-screen=stream-settings>
+                    <h1>Stream Settings</h1>
+                    <p>
+                        plug_p0ne adds a new audio-only mode to videos and let's you quickly switch between<br><i class='icon icon-stream-video'></i> Video,<br><i class='icon icon-stream-audio'></i> Audio-Only and<br><i class='icon icon-stream-off'></i> Stream-Off (no video/sound).
+                    </p>
+                    <p>
+                        You can click the icons in the top-middle to change between the modes.
+                    </p>
+
+                    <button class='wt-p0-next continue'>next</button>
+                </div>
+
+                <div class='step fade-in wt-p0-automute' data-screen=automute>
+                    <h1>Automute</h1>
+                    <p>
+                        You can also <b>automute</b> songs you really dislike. This way, they will automatically get muted whenever they are played.
+                    </p>
+                    <p>
+                        To add a song to automute, do the following:
+                        <ol class=wt-p0-steps>
+                            <li>Click on <b class=snooze-btn><i class='icon icon-stream-off'></i> Snooze</b> to snooze the current song (stop the video/song)</li>
+                            <li>When snoozed, the snooze button will turn into an automute -add or -remove button</li>
+                        </ol>
+                    </p>
+                    <p>
+                        Let's try it out!<br>
+                        (don't worry, we can undo it right away)
+                    </p>
+
+                    <button class=wt-p0-next>skip</button>
+                </div>
+
+                <div class='step fade-in wt-p0-automute2' data-screen=automute2>
+                    <h1>Automute</h1>
+                    <p>
+                        Removing songs from the automute list is also easy:
+                        <ol class=wt-p0-steps>
+                            <li>open the settings panel. (<div class=p0ne-icon>p<div class=p0ne-icon-sub>0</div></div>)</li>
+                            <li>open the group \"#{automute.settings}\"</li>
+                            <li>click on the <i class='icon icon-settings-white'></i>icon next to \"automute\"</li>
+                            <li>move your mouse over any song in the list and click the <i class='icon icon-clear-input'></i> icon on the song you want to remove from the list</li>
+                        </ol>
+                    </p>
+
+                    <button class=wt-p0-next>skip</button>
+                </div>
+
+                <div class='step fade-in wt-p0-end' data-screen=end>
+                    <h1>END!</h1>
+                    <p>
+                        Alright that's it!<br>
+                        Hopefully you'll have some fun with plug_p0ne!
+                    </p>
+                    <p>
+                        Just play around with the settings to find some more great features. :3
+                    </p>
+
+                    <button class='wt-p0-next continue'>finish</button>
+                </div>
+
+                <div class=nav>
+                    <i class=selected></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <button class='wt-p0-skip wt-p0-next'>skip walkthrough</button
+                </div>
+            </div>
+        "
+            .on \click, \.wt-p0-button, ->
+                $this = $ this
+                $this .trigger "button-#{$this.index!} button-#{$this.text!}"
+            .on \click, \.wt-p0-skip, !~>
+                @disable!
+                return false
+            .on \click, \.wt-p0-next, !-> nextScreen(i+1)
+            .on \click, '.nav i', !->
+                nextScreen $(this).index!
+            .appendTo $app
+        $app .addClass \is-wt-p0
+
+
+        #== show help screens ==
+        #ToDo @screenClose(), accomplished(), step(num)
+        screens = [
+            ~> # welcome
+                $screen .removeClass \revealed
+                $nextBtn_ = $nextBtn
+                p0neSettings.toggleMenu(false)
+                sleep 2_000ms ~>
+                    $screen .addClass \revealed
+                    sleep 3_000ms, !-> if i == 0
+                        $nextBtn_
+                            .text "continue"
+
+            ~> # settings icon
+                $divClosed = $el .find \.wt-p0-settings-closed
+                $divOpen = $el .find \.wt-p0-settings-open
+                $ppI.on \click, cb = ~>
+                    if not p0neSettings.groupToggles.p0neSettings
+                        $divClosed .show!; $divOpen .hide!
+                        $screen .css left: ""
+                        blinking($ppI)
+                    else
+                        blinking!
+                        $divClosed .hide!; $divOpen .show!
+                        if $pp0.text! == \2 #DEBUG
+                            $screen .css left: 160px, top: 100px
+                        else
+                            $screen .css left: $ppW.width! + 20px
+                        blinking $nextBtn
+                        accomplished!
+                cb!
+
+                @screenClose = ~>
+                    $ppI .off \click, cb
+                    p0neSettings.toggleMenu(false)
+
+            ~> # dblclick2mention
+
+            ~> # Stream Settings
+                $playback = $ \#playback
+                blinking $hdButton
+
+            ~> # Automute
+                var m
+                if currentMedia?
+                    API.on \advance, cb1 = !->
+                        if not m := currentMedia.get \media
+                            currentMedia .set new Backbone.Model do
+                                cid: \wZZ7oFKsKzY
+                                format: 1
+                                author: "plug_p0ne test"
+                                title: "Nyan Cat 1h"
+                                duration: 36001
+                                image: "https://i.ytimg.com/vi/wZZ7oFKsKzY/default.jpg"
+                        else
+                            step(if isSnoozed! then 2 else 1)
+                    cb1!
+
+                API.on \p0ne:changeMode, cb2 = (m) !~>
+                    step(if m == \off then 2 else 1)
+                if isSnoozed!
+                    step(2)
+
+                $snoozeBtn
+                    .on \click, cb3 = !~>
+                        console.log "smooze [sic]", automute.songlist[API.getMedia!.cid]
+                        if automute.songlist[API.getMedia!.cid]
+                            accomplished!
+
+                blinking $snoozeBtn
+
+                @screenClose = !->
+                    if m
+                        currentMedia.set \media, m
+                    API
+                        .off \advance, cb1
+                        .off \p0ne:changeMode, cb2
+                    $snoozeBtn .off \click, cb3
+
+            ~> # Automute (remove)
+                $spI = automute._$settings.find '.p0ne-settings-panel-icon .icon'
+                $summary = p0neSettings.groups[automute.settings].find \.p0ne-settings-summary
+                export test = -> $spI
+                # step 1
+                blinking $ppI
+                $ppI.on \click, cb1 = !~>
+                    if not p0neSettings.groupToggles.p0neSettings
+                        step(1)
+                        $screen .css left: ""
+                    else
+                        step(2)
+                        if $pp0.text! == \2 #DEBUG
+                            $screen .css left: 160px, top: 150px
+                        else
+                            $screen .css left: $ppW.width! + 20px
+                        blinking $summary
+                        cb2!
+
+                # step 2
+                $summary .on \click, cb2 = !~> requestAnimationFrame !~>
+                    if not p0neSettings.groupToggles[automute.settings]
+                        step(2)
+                        $spI .css boxShadow: '', borderRadius: ''
+                        blinking $summary
+                    else
+                        step(3)
+                        if $pp0.text! == \2 #DEBUG
+                            $screen .css left: 580px
+                        blinking!
+                        $spI .css do
+                                boxShadow: '0 0 25px white'
+                                borderRadius: \50%
+                        cb3!
+
+                # step 3
+                var settingsPanel
+                automute._$settings .on \click, \.p0ne-settings-panel-icon, cb3 = !~> requestAnimationFrame !~>
+                    if not automute._$settingsPanel?.open
+                        step(3)
+                        $spI .css do
+                            boxShadow: '0 0 25px white'
+                            borderRadius: \50%
+                        if $pp0.text! == \2 #DEBUG
+                            $screen .css left: 580px
+                    else
+                        step(4)
+                        $spI .css boxShadow: '', borderRadius: ''
+
+
+                        # step 4
+                        if $pp0.text! == \2 #DEBUG
+                            $screen .css left: 100px
+                        else
+                            $screen .css left: $ppW.width! + 520px
+                        if settingsPanel != automute._$settingsPanel
+                            if settingsPanel
+                                settingsPanel .off \click, \.song-remove, accomplished
+                            #ToDo add dummy song to automute list, if it's empty
+                            settingsPanel := automute._$settingsPanel
+                                .wrapper .on \click, \.icon-clear-input, accomplished
+                        blinking!
+
+                cb1!
+
+                @screenClose = ~>
+                    $ppI .off \click, cb1
+                    $summary .off \click, cb2
+                    automute._$settings? .off \click, cb3
+                    $spI? .css boxShadow: '', borderRadius: ''
+                    settingsPanel?.off \click, \.icon-clear-input, accomplished
+                    p0neSettings.toggleMenu(false)
+
+            ~> # End
+            @~disable
+
+        ]
+        /**  other interesting things to show:
+         * avoid history-play
+         * song-notif
+         * user-history
+         *
+         * moderator-only stuff
+         *      - AFK Timer
+         */
+
+
+        var $nextBtn, $steps
+        $screen = $()
+        $screens = $el .find \.step
+        $navDots = $el .find '.nav i'
+        $el .find '.wt-p0-steps li:first' .addClass \selected
+
+        $el .find \.snooze-btn
+            .css background: $app.find('#playback .snooze').css(\background)
+            .click !->
+                # using alerts is disencouraged, but it's kinda a quick fix.
+                alert "No you doozie!\nclick the REAL snooze button above ;)"
+
+        nextScreen(0)
+
+        !~function nextScreen num
+            @screenClose!
+            $navDots.eq(i) .removeClass \selected
+            blinking!
+
+            i := num
+            $screen  := $screens.eq(i)
+            $nextBtn := $screen .find \.wt-p0-next
+            $steps   := $screen .find '.wt-p0-steps li'
+            $navDots.eq(i) .addClass \selected
+
+            $app
+                .removeClass "wt-p0-screen-#{@screenClass}"
+                .addClass    "wt-p0-screen-#{@screenClass = $screen.data \screen}"
+            steps[i] || = 1
+            @screenClose = $.noop
+            screens[i]!
+
+        !function step num
+            $screen
+                .removeClass "wt-p0-step-#{steps[i]}"
+                .addClass    "wt-p0-step-#{num}"
+            $steps.eq(steps[i] - 1) .removeClass \selected
+            $steps.eq(num - 1)      .addClass    \selected
+            steps[i] := num
+        !function accomplished
+            $steps.eq(steps[i] - 1) .removeClass \selected
+            $nextBtn
+                .text "continue"
+                .addClass \continue
+
+        var blinkingInterval, $blinkingEl
+        !function blinking $el
+            clearInterval(blinkingInterval)
+            if $blinkingEl := $el
+                blinkingInterval := setInterval(blinkingCB, 3_000ms)
+        !function blinkingCB
+            $blinkingEl .p0neFx \blink
+
+    disable: !->
+        $app
+            .removeClass "wt-p0-screen-#{@screenClass}"
+            .removeClass \is-wt-p0
+        @screenClose!
+
 
 /*@source p0ne.dev.ls */
 /**
@@ -10469,6 +10994,23 @@ window <<<<
             if d.match /manifest.*/
                 API.trigger \p0ne:avatarsloaded, JSON.parse that[0].substr(11, that[0].length-12)
 
+    showAllAvatarThumbs: !->
+        $el = $ \#avatar-thumb-test
+        if $el.length == 0
+            $el = $ '<div id=avatar-thumb-test>'
+                .appendTo \body
+                .css do
+                    position: \absolute, top: 54px, right: 345px, width: 400px, zIndex: 99999999999, background: \#222
+                .click !-> $el.remove!
+        avis = {}
+        for id, avi of p0ne._avatars when not avi.isVanilla
+            avis[avi.category] ||= "<h4>#{avi.category}</h4>"
+            avis[avi.category] += "<div class='thumb medium' title='#id' style='position: relative; display: inline-block'><div class=background></div><i class='avi avi-#id'></i></div>"
+        res = ""
+        for ,str of avis
+            res += str
+        $el.html res
+
     parseYTGetVideoInfo: (d, onlyStripHTML) !->
         #== Parser ==
         # useful for debugging mediaDownload()
@@ -10521,6 +11063,19 @@ window <<<<
                 try v = decompress v
             size += (v ||'').length / 524288to_mb # x.length * 16bits / 8to_b / 1024to_kb / 1024to_mb
         return size
+
+    formatCSS: (css) !->
+        return css.replace /(\s*)(?:(\/\*.*?\*\/)|(@media .*?)\{(.*?)\}|(.*?)\{(.*?)\})/g, (,ws, comment, mQuery,mContent, selector,css) !->
+            ws ||= "\n"
+            if comment?
+                return "#ws#comment\n"
+            else if mQuery?
+                return "#ws#mQuery\n\{\n\t#{formatCSS(mContent).split("\n").join("\n\t")}\n\}"
+            else if selector?
+                return """
+                    #ws#{selector .replace(/\s*,\s*/g, ',\n')} \{
+                    #{css.replace(/;\s*/g, ';\n\t').replace(/^\s*(\w+):\s*/gm, '\t$1: ').replace(/\s*$/, '')}
+                    \}\n\n"""
 
 if not window.chrome
     # little fix for non-WebKit browsers to allow copying data to the clipboard
@@ -10914,11 +11469,12 @@ module \ponifiedLang, do
     setup: ({replace, css}) !->
         # ponies
         replaceMap =
+            user: 'pony'
+            person: 'pony'
             people: 'ponies'
             People: 'Ponies'
-            user: 'pony'
             Nobody: 'Nopony'
-            woots: "Squees"
+            woot: "squee"
             Woot: "Squee"
             Points: "Bits"
 
@@ -10928,9 +11484,10 @@ module \ponifiedLang, do
             Manager: 'Royal Guard Captain'
             "Co-Host": 'Alicorn'
             Host: 'Alicorn Princess'
+            "Community staff": "Local VIP Ponies"
             staff: 'VIP Pony List'
         regx = //\b(#{Object.keys replaceMap .join '|'})(s?|)\b//g
-        console.group "[ponifiedLang] dynamically replacing words"
+        console.groupCollapsed "[ponifiedLang] dynamically replacing words"
         for ,group of Lang
             for k,v of group when k[*-1] != "_" and v
                 v2 = v.replace regx, (,a, b) !->
@@ -10939,6 +11496,8 @@ module \ponifiedLang, do
                     replace group, k, !-> return v2
                     console.log "\treplacing '#v' with '#{group[k]}'"
         console.groupEnd!
+        console.log Lang.dashboard.people
+        console.log Lang.roles.host
 
         # roles
         replace Lang.roles, \none, !-> return "Mudpony"
@@ -11336,37 +11895,40 @@ module \fimstats, do
 ####################################*/
 module \bpm, do
     require: <[ chatPlugin ]>
+    disabled: true
     displayName: 'Better Ponymotes'
     settings: \pony
     _settings:
         showNSFW: false
-    module: (str) ->
-        if not str
-            console.error "bpm(null)"
+    module: (str) !->
         return @bpm str
 
-    setup: ({addListener, $create}, {_settings}) ->
+    setup: ({addListener, $create, addCommand}, {_settings}) !->
         host = window.p0ne?.host or "https://cdn.p0ne.com"
 
         /*== external sources ==*/
         if not window.emote_map
             window.emote_map = {}
-            $.getScript "#host/scripts/bpm-resources.js" .then ->
-                API .trigger \p0ne_emotes_map
+            $.getScript "#host/scripts/bpm-resources.js"
+                .then !->
+                    API .trigger \p0ne_emotes_map
+                .fail !~>
+                    API.chatLog "Better Ponymotes failed to load ponimote data"
+                    @disable!
         else
             <- requestAnimationFrame
             API .trigger \p0ne_emotes_map
 
         $create "
             <div id='bpm-resources'>
-                <link rel='stylesheet' href='#host/css/bpmotes.css?last-update=2015-02-15' type='text/css'>
-                <link rel='stylesheet' href='#host/css/emote-classes.css?last-update=2015-06-02' type='text/css'>
-                <link rel='stylesheet' href='#host/css/combiners-nsfw.css?last-update=2015-01-30' type='text/css'>
-                <link rel='stylesheet' href='#host/css/gif-animotes.css?last-update=2015-06-02' type='text/css'>
+                <link rel='stylesheet' href='#host/css/bpmotes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/emote-classes.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/combiners-nsfw.css' type='text/css'>
+                <link rel='stylesheet' href='#host/css/gif-animotes.css' type='text/css'>
                 #{if \webkitAnimation of document.body.style
-                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css?last-update=2015-03-09' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-webkit.css' type='text/css'>"
                 else
-                    "<link rel='stylesheet' href='#host/css/extracss-pure.css?last-update=2015-03-09' type='text/css'>"
+                    "<link rel='stylesheet' href='#host/css/extracss-pure.css' type='text/css'>"
                 }
             </div>
         "
@@ -11390,7 +11952,7 @@ module \bpm, do
          * have to match each other.
          */
         /*                 [](/  <   emote   >   <     alt-text    >  )*/
-        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:["']([^"]*)["'])?\)/g
+        EMOTE_REGEXP = /\[\]\(\/([\w:!#\/\-]+)\s*(?:&#3[49];([^"]*)&#3[49];)?\)/g
 
 
         /*== auxiliaries ==*/
@@ -11405,7 +11967,7 @@ module \bpm, do
             \# : \_hash_
             \/ : \_slash_
         function sanitize_emote s
-            return s.toLowerCase!.replace /[!:#\/]/g, (c) -> return sanitize_map[c]
+            return s.toLowerCase!.replace /[!:#\/]/g, (c) !-> return sanitize_map[c]
 
         function lookup_core_emote name, altText
             # Refer to bpgen.py:encode() for the details of this encoding
@@ -11474,8 +12036,8 @@ module \bpm, do
             # usually though, there shouldn't be ponymotes in links / inline images / converted ponymotes
             if str .has("[](/")
                 # avoid replacing emotes in HTML tags
-                return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) ~>
-                    nonHTML .= replace EMOTE_REGEXP, (_, parts, altText) ->
+                return "#str" .replace /(.*?)(?:<.*?>)?/, (,nonHTML, html) !~>
+                    nonHTML .= replace EMOTE_REGEXP, (_, parts, altText) !->
                         parts .= split '-'
                         name = parts.0
                         info = lookup_core_emote name, altText
@@ -11489,9 +12051,8 @@ module \bpm, do
             */
 
         #== main BPM plugin ==
-        @bpm = (str) ->
-            console.error "bpm(null) [2]" if not str
-            str .replace EMOTE_REGEXP, (all, parts, altText) ->
+        @bpm = (str) !->
+            return str .replace EMOTE_REGEXP, (all, parts, altText) !->
                 parts .= split '-'
                 name = parts.0
                 info = lookup_core_emote name, altText
@@ -11501,44 +12062,72 @@ module \bpm, do
                     return convert_emote_element info, parts, all
 
         #== integration ==
-        addListener (window._$context || API), \chat:plugin, (msg) ->
+        addListener (window._$context || API), \p0ne:chat:plugin, (msg) !->
             msg.message = bpm(msg.message)
 
-        addListener \once, API, \p0ne_emotes_map, ->
+        addListener \once, API, \p0ne_emotes_map, !->
             console.info "[bpm] loaded"
 
             #== ponify old messages ==
-            $cms! .find '.text' .html ->
+            $cms! .find \.text .html !->
                 return bpm @innerHTML
 
             #== Autocomplete integration ==
             /* add autocomplete if/when plug_p0ne and plug_p0ne.autocomplete are loaded */
-            cb = ->
+            cb = !->
                 AUTOCOMPLETE_REGEX = /^\[\]\(\/([\w#\\!\:\/]+)(\s*["'][^"']*["'])?(\))?/
                 addAutocompletion? do
                     name: "Ponymotes"
                     data: Object.keys(emote_map)
                     pre: "[]"
-                    check: (str, pos) ->
+                    check: (str, pos) !->
                         if !str[pos+2] or str[pos+2] == "(" and (!str[pos+3] or str[pos+3] == "(/")
                             temp = AUTOCOMPLETE_REGEX.exec(str.substr(pos))
                             if temp
                                 @data = temp.2 || ''
                                 return true
                         return false
-                    display: (items) ->
+                    display: (items) !->
                         return [{value: "[](/#emote)", image: bpm("[](/#emote)")} for emote in items]
-                    insert: (suggestion) ->
+                    insert: (suggestion) !->
                         return "#{suggestion.substr(0, suggestion.length - 1)}#{@data})"
             if window.addAutocompletion
                 cb!
             else
                 addListener \once, API, \p0ne:autocomplete, cb
 
+        # add /Chat Commands
+        addCommand \bpm, do
+            aliases: <[ ponymote ]>
+            parameters: " emotename or [](/emotename)"
+            description: "checks if the emote exists and sends it if so"
+            callback: (str) !->
+                if str = /^\/bpm (?:^\/\[\]\(\/(.*?)(-.*?)?\)|(.*)(-.*?)?)/i .exec str
+                    if str.1
+                        emote = str.1
+                        str = "#emote#{str.2}"
+                    else
+                        emote = str.3
+                        str = "#emote#{str.4}"
+                    if emote of emote_map
+                        API.sendChat bpm("[](/#str)")
+        addCommand \reloadBPM, do
+            description: "reloads the BPM database."
+            callback: (str) !->
+                if str = /^\/bpm (?:^\/\[\]\(\/(.*?)(-.*?)?\)|(.*)(-.*?)?)/i .exec str
+                    if str.1
+                        emote = str.1
+                        str = "#emote#{str.2}"
+                    else
+                        emote = str.3
+                        str = "#emote#{str.4}"
+                    if emote of emote_map
+                        API.sendChat bpm("[](/#str)")
 
-    disable: (revertPonimotes) ->
+
+    disable: (revertPonimotes) !->
         if revertPonimotes
-            $cms! .find \.bpm-emote .replaceWith ->
+            $cms! .find \.bpm-emote .replaceWith !->
                 flags = ""
                 for class_ in this.classList || this.className.split(/s+/)
                     if class_.startsWith \bpmote-
