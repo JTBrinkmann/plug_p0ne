@@ -73,14 +73,15 @@ module \songNotif, do
                 $el = $ this
                 $notif = $el.closest \.p0ne-song-notif
                 id = $notif.data \id
+                cid = $notif.data \cid
                 format = $notif.data \format
-                console.log "[add from notif]", $notif, id, format
+                console.log "[add from notif]", $notif, id, format, cid
 
                 msgOffset = $notif .offset!
                 $el.offset = !-> # to fix position
                     return { left: msgOffset.left + 17px, top: msgOffset.top + 18px }
 
-                obj = { id: id, format: 1yt }
+                obj = { id: id, format: format, cid: cid }
                 obj.get = (name) !->
                     return this[name]
                 obj.media = obj
@@ -274,7 +275,7 @@ module \songNotif, do
         @$div .find \.song-title .text title .prop \title, title
         @$div .find \.song-author .text author
         @$div .find \.song-dj
-            .html formatUserHTML d.dj, user.isStaff, getRank(d.dj)
+            .html formatUserHTML d.dj, true, {+flag}
 
         appendChat @$div
         if media.format == 2 # SoundCloud

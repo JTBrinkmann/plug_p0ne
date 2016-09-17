@@ -447,16 +447,6 @@ module \joinLeaveNotif, do
                 if not reuseNotif = (chat?.lastType == CHAT_TYPE and $lastNotif)
                     lastUsers := {}
 
-                # temporary fix, until plug takes care of unnamed accounts
-                /*if not u.username
-                    u.username = "unnamed (#{u.id})"
-                    u.language = "en"
-                    console.info "[userJoin]", u
-                else
-                    console.log "[userJoin]", u
-                */
-
-
                 title = ''
                 if reuseNotif and lastUsers[u.id] and joinLeaveNotif._settings.mergeSameUser
                     if event == \userJoin != lastUsers[u.id].event
@@ -468,7 +458,7 @@ module \joinLeaveNotif, do
 
                 $msg = $ "
                     <div class=p0ne-notif-#{cssClasses[event]} data-uid=#{u.id} #title>
-                        #{formatUserHTML u, user.isStaff, false}
+                        #{formatUserHTML u, true, {+lvl, +flag, +warning}}
                         #{getTimestamp!}
                     </div>
                     "
@@ -716,7 +706,7 @@ module \etaTimer, do
 
             if API.getWaitList!.length == 0
                 updateETA!
-            # note: we otherwise don't trigger updateETA() because usually each advance is accompanied with a waitListUpdate
+                # note: we otherwise don't trigger updateETA() because usually each advance is accompanied with a waitListUpdate
         if _$context?
             addListener _$context, \room:joined, updateETA
 
@@ -751,21 +741,26 @@ module \etaTimer, do
         ~function updateETA
             # update what the ETA timer says
             #clearTimeout @timer
+            skipCalcETA = false
             p = API.getWaitListPosition()
             if p == 0
                 $etaText .text "you are next DJ!"
                 $etaTime .text ''
-                return
+                skipCalcETA = true
             else if p == -1
                 if API.getDJ!?.id == userID
                     $etaText .text "you are DJ!"
                     $etaTime .text ''
-                    return
+                    skipCalcETA = true
                 else
                     if 0 == (p = API.getWaitList! .length)
                         $etaText .text 'Join now to '
                         $etaTime .text "DJ instantly"
-                        return
+                        skipCalcETA = true
+            if skipCalcETA
+                $nextMediaLabel .css right: $eta.width! - 50px
+                return
+
             # calculate average duration
             eta_ = (API.getTimeRemaining!  +  sum * p / l)
             eta = eta_ / 60 |> Math.round
@@ -778,7 +773,8 @@ module \etaTimer, do
                     $etaTime .text "#{~~(eta / 60)}h #{eta % 60}min"
                 else
                     $etaTime .text "#eta min"
-                $nextMediaLabel .css right: $eta.width! - 50px
+                forceSkipBtnWidth = if p0ne.modules.forceSkipButton?.disabled then 50px else 0px
+                $nextMediaLabel .css right: $eta.width! - forceSkipBtnWidth
 
                 # setup timer to update ETA
                 if eta_ > 0 # when disconnecting from the socket, it might be that API.getTimeRemaining! returns a negative number
@@ -808,17 +804,17 @@ module \votelist, do
 
         addListener $(\#woot), \mouseenter, changeFilter 'left: 0', (userlist) !->
             for u in API.getAudience! when u.vote == +1
-                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+                userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
             return userlist
 
         addListener $(\#grab), \mouseenter, changeFilter 'left: 50%; transform: translateX(-50%)', (userlist) !->
             for u in API.getAudience! when u.grab
-                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+                userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
             return userlist
 
         addListener $(\#meh), \mouseenter, changeFilter 'right: 0', (userlist) !-> if user.isStaff
             for u in API.getAudience! when u.vote == -1
-                userlist += "<div>#{formatUserHTML(u, false, true)}</div>"
+                userlist += "<div>#{formatUserHTML u, true, {+flag}}</div>"
             return userlist
 
 
@@ -953,10 +949,29 @@ module \boothAlert, do
         $el .css do
             paddingLeft: 15px
 
+module \notifyOnGrabbers, do
+    require: <[ grabEvent ]>
+    setup: ({addListener, replace}) !->
+        addListener API, \p0ne:grab, (u) !->
+            if not grabs[u.id]
+                notifs[u.id] = appendChat $ "
+                    <div class='cm p0ne-notif p0ne-grab-notif'>
+                        <i class='icon icon-grab'></i>
+                        <div class='msg text'>
+                            #{formatUserHTML d.user, true}
+                        </div>
+                    </div>"
+                grabs[u.id] = 1
+            else
+                if grabs[u.id] == 1
+                    notifs[u.id] = $ '<span class=p0ne-grab-notif-count>'
+                        .appendTo notifs[u.id]
+                notifs[u.id] .text = " (x#{grabs[u.id]++})"
 
 /*####################################
 #         AVOID HISTORY PLAY         #
 ####################################*/
+/*
 module \avoidHistoryPlay, do
     settings: \base
     displayName: '☢ Avoid History Plays'
@@ -991,6 +1006,7 @@ module \avoidHistoryPlay, do
                         beforeID: -1
                         ids: [nextSong.id]
         do @checkOnNextAdv = checkOnNextAdv
+*/
 
 /*####################################
 #         WARN ON PAGE LEAVE         #
@@ -1004,3 +1020,76 @@ module \warnOnPageLeave, do
             # Chrome shows the text + "Are you sure you want to leave the page? [Leave this page] [Stay on this page]"
             # Firefox always shows "This page is asking you to confirm that you want to leave - data you have entered may not be saved. [Leave Page] [Stay on Page]"
             return "[plug_p0ne Warn on Leaving plug.dj] \n(you can disable this warning in the settings under #{@settings .toUpperCase!} > #{@displayName})"
+
+module \notifyOnLevelUp, do
+    displayName: "Show Friends' Level-Ups"
+    settings: \base
+    require: <[ socketListeners ]>
+    setup: ({addListener}) !->
+        addListener API, \socket:userUpdate, ({p}) !->
+            if p.level and (u = getUser(p.i))?.friend
+                chatWarn "<b>#{formatUserSimple u}</b> just reached level #{p.level}!", "Friend Level-Up", true
+
+module \maintenanceCountdown, do
+    require: <[ socketListeners ]>
+    setup: ({addListener}) !->
+        @timer = 0
+        addListener API, \socket:plugMaintenanceAlert, ({p:remainingMinutes}) !~>
+            @$el = $ '#footer-user .name' .css color: \orange
+            @$bck = @$el.children!
+            clearInterval @timer
+            @timer = repeat 60_000ms, updateRemaining
+            do ~!function updateRemaining
+                if remainingMinutes > 1
+                    @$el .text "plug.dj going down in ca. #{remainingMinutes--} min"
+                else
+                    @$el .text "plug.dj going down in soonish"
+                    clearInterval @timer
+                    @timer = 0
+                    sleep 5.min, !~> if not @timer
+                            @$el
+                                .html ""
+                                .append @$bck
+    disable: !->
+        clearInterval @timer
+        @$el?
+            .css color: ''
+            .html ""
+            .append $bck
+
+module \grabMenuHighlight, do
+    require: <[ popMenu playlistCachePatch ]>
+    setup: ({replace}) !->
+        replace popMenu, \show, (s_) !-> return (t,n,r) !->
+            @media = n
+            if @isShowing
+                @draw!
+            s_.call(this, t,n,r)
+
+        replace popMenu, \drawRow, (dR_) !-> return (e) !->
+            row = dR_.call(this, e)
+            matches = 0
+            if playlistCache._data.1.p[e.id].items[@media.0.get \cid] # we don't use .get() for performance reasons
+                row.$el.addClass \p0ne-pl-has-media
+            else if playlists?.get(e.id).get(\count) == 200
+                row.$el.addClass \p0ne-pl-is-full
+
+        replace popMenu, \drawRowBind, !-> return popMenu~drawRow
+
+module \playlistMenuHighlight, do
+    require: <[ playlistMenu playlistCacheEvent ]>
+    setup: ({addListener}) !->
+        for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
+            row.inCache = true
+            row.$el.addClass \p0ne-pl-cached
+
+        addListener API, \p0ne:playlistCache:update, (playlistID) !->
+            for row in playlistMenu.rows when row.model.id == playlistID
+                if not row.inCache
+                    row.inCache = true
+                    row.$el.addClass \p0ne-pl-cached
+                break
+    disable: !->
+        for row in playlistMenu.rows when playlistCache._data.1.p[row.model.id]
+            delete row.inCache
+            row.$el.removeClass \p0ne-pl-cached

@@ -29,7 +29,6 @@ module \p0neSettings, do
             .appendTo $ppM
             .fadeOut 0
 
-        #debug
         if @_settings.expert
             $ppW .addClass \p0ne-settings-expert
         #@<<<<{$ppP, $ppM, $ppI}
@@ -97,7 +96,7 @@ module \p0neSettings, do
                 else
                     debugClosingDur := 500ms
                     $ppP .appendTo $ppM
-                    if not @_settings.expert
+                    if @_settings.expert
                         $ppW .addClass \p0ne-settings-expert
                     else
                         $ppW .removeClass \p0ne-settings-expert
@@ -178,8 +177,8 @@ module \p0neSettings, do
             panelIconTimeout := sleep 200ms, ->
                 panelIconTimeout := 0
 
-            $this = $ this .closest \.p0ne-settings-item
-            module = $this .data \module
+            $this = $ this
+            module = $this .closest \.p0ne-settings-item .data \module
             console.log "[p0ne-settings-panel-icon] clicked", panelIconTimeout, !!module._$settingsPanel, module._$settingsPanel?.open, module._$settingsPanel?.wrapper
             if not module._$settingsPanel
                 module._$settingsPanel =
@@ -194,14 +193,20 @@ module \p0neSettings, do
                 module._$settingsPanel.wrapper
                     .animate do
                         left: offsetLeft - module._$settingsPanel.$el.width!
-                        -> $(this).hide!
+                        -> module._$settingsPanel.wrapper .hide!
                 module._$settingsPanel.open = false
+                $this .find \.icon
+                    .removeClass \icon-settings-white
+                    .addClass \icon-settings-grey
             else # open panel
                 module._$settingsPanel.wrapper
                     .show!
                     .css left: offsetLeft - module._$settingsPanel.$el.width!
                     .animate left: offsetLeft
                 module._$settingsPanel.open = true
+                $this .find \.icon
+                    .addClass \icon-settings-white
+                    .removeClass \icon-settings-grey
 
         addListener $ppW, \mouseover, \.p0ne-settings-has-more, !->
             $this = $ this

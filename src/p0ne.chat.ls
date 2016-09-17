@@ -301,16 +301,18 @@ module \chatMessageClasses, do
 
 
             if message.user = getUser(uid)
-                rank = getRank(message.user, true)
+                message.addClass getUserClasses(message.user, true, true)
+
+                /*rank = getRank(message.user, true)
                 if uid == userID
                     message.addClass \from-you
-                    also = \-also
+                    #also = \-also
                 else
                     message.addClass "from-#rank"
                 message.addClass \from-staff if message.user.role > 1 or message.user.gRole
                 if rank == \regular
                     message.addClass \from-subscriber if message.user.sub
-                    message.addClass \from-friend if message.user.friend
+                    message.addClass \from-friend if message.user.friend*/
 
 
 /*####################################
@@ -455,14 +457,18 @@ module \chatInlineImages, do
                             return 'class='+(q||'\'')+'p0ne-img-filtered '+cl+(if q then '' else '\'')
                     else
                         pre = "class=p0ne-img-filtered #pre"
-                    return "<a #pre src='#img'>#{completeURL .replace(@regexpCache[msg.hasFilterWord], '<span class=p0ne-img-filterword>$&</span>')}</a>"
+                    if msg.hasFilterWord
+                        content = completeURL .replace(@regexpCache[msg.hasFilterWord] ||= //#{escapeRegExp msg.hasFilterWord}//ig, '<span class=p0ne-img-filterword>$&</span>')
+                    else
+                        content = completeURL
+                    return "<a #pre src='#img'>#content</a>"
                 else
                     console.log "[inline-img]", "#completeURL ==> #img"
                     return "<a #pre><img src='#img' class=p0ne-img #onload #onerror></a>"
             else
                 return false
         addListener API, \p0ne:chat:plugin, (msg) !~> if msg.hasFilterWord
-            msg.message .= replaceSansHTML (@regexpCache[msg.hasFilterWord] ||= //#{escapeRegExp msg.hasFilterWord}//ig), "<span class=p0ne-img-filterword>$&</span>"
+            msg.message .= replaceSansHTML (@regexpCache[msg.hasFilterWord]), "<span class=p0ne-img-filterword>$&</span>"
     # (the revision suffix is required for some blogspot images; e.g. http://vignette2.wikia.nocookie.net/moth-ponies/images/d/d4/MOTHPONIORIGIN.png/revision/latest)
     #           <URL stuff><        image suffix           >< image.php>< hires ><  revision suffix >< query/hash >
     regDirect: /^[^\#\?]+(?:\.(?:jpg|jpeg|gif|png|webp|apng)|image\.php)(?:@\dx)?(?:\/revision\/\w+)?(?:\?.*|\#.*)?$/i

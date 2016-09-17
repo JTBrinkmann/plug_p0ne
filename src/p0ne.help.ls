@@ -9,7 +9,7 @@
 module \p0neHelp, do
     optional: <[ currentMedia ]>
     require: <[ automute p0neSettings ]>
-    setup: ({$create, css}) ->
+    setup: ({$create, css}:aux) ->
         #== create CSS ==
         #ToDo move this to plug_p0ne.css
         #css \p0neHelp, ""
@@ -54,6 +54,7 @@ module \p0neHelp, do
                     <p class=wt-p0-settings-open>
                         Good job! Let's move on.
                     </p>
+                    <button class='wt-p0-back'>back</button>
                     <button class=wt-p0-next>skip</button>
                 </div>
 
@@ -71,6 +72,7 @@ module \p0neHelp, do
                         [insert image]<!-- <img src='...'> -->
                     </p>
 
+                    <button class='wt-p0-back'>back</button>
                     <button class='wt-p0-next continue'>next</button>
                 </div>
 
@@ -83,6 +85,7 @@ module \p0neHelp, do
                         You can click the icons in the top-middle to change between the modes.
                     </p>
 
+                    <button class='wt-p0-back'>back</button>
                     <button class='wt-p0-next continue'>next</button>
                 </div>
 
@@ -103,6 +106,7 @@ module \p0neHelp, do
                         (don't worry, we can undo it right away)
                     </p>
 
+                    <button class='wt-p0-back'>back</button>
                     <button class=wt-p0-next>skip</button>
                 </div>
 
@@ -118,7 +122,22 @@ module \p0neHelp, do
                         </ol>
                     </p>
 
+                    <button class='wt-p0-back'>back</button>
                     <button class=wt-p0-next>skip</button>
+                </div>
+
+                <div class='step fade-in wt-p0-info-footer' data-screen=info-footer>
+                    <h1>Info Footer</h1>
+                    <p>
+                        One last thing, plug_p0ne replaces the footer (the section below the chat) with something more useful.<br>
+                        To get to the Settings, the Shop or your Inventory, simply click anywhere on the footer.
+                    </p>
+                    <p>
+                        The Info Footer only will work for logged in users, though.
+                    </p>
+
+                    <button class='wt-p0-back'>back</button>
+                    <button class='wt-p0-next continue'>next</button>
                 </div>
 
                 <div class='step fade-in wt-p0-end' data-screen=end>
@@ -131,12 +150,13 @@ module \p0neHelp, do
                         Just play around with the settings to find some more great features. :3
                     </p>
 
+                    <button class='wt-p0-back'>back</button>
                     <button class='wt-p0-next continue'>finish</button>
                 </div>
 
                 <div class=nav>
-                    <i class=selected></i><i></i><i></i><i></i><i></i><i></i><i></i>
-                    <button class='wt-p0-skip wt-p0-next'>skip walkthrough</button
+                    <i class=selected></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i> <i></i>
+                    <button class='wt-p0-skip'>skip walkthrough</button
                 </div>
             </div>
         "
@@ -147,6 +167,7 @@ module \p0neHelp, do
                 @disable!
                 return false
             .on \click, \.wt-p0-next, !-> nextScreen(i+1)
+            .on \click, \.wt-p0-back, !-> nextScreen(i-1)
             .on \click, '.nav i', !->
                 nextScreen $(this).index!
             .appendTo $app
@@ -164,12 +185,12 @@ module \p0neHelp, do
                     $screen .addClass \revealed
                     sleep 3_000ms, !-> if i == 0
                         $nextBtn_
-                            .text "continue"
+                            .text "next"
 
             ~> # settings icon
                 $divClosed = $el .find \.wt-p0-settings-closed
                 $divOpen = $el .find \.wt-p0-settings-open
-                $ppI.on \click, cb = ~>
+                do addListener $ppI, \click, ~>
                     if not p0neSettings.groupToggles.p0neSettings
                         $divClosed .show!; $divOpen .hide!
                         $screen .css left: ""
@@ -183,10 +204,8 @@ module \p0neHelp, do
                             $screen .css left: $ppW.width! + 20px
                         blinking $nextBtn
                         accomplished!
-                cb!
 
                 @screenClose = ~>
-                    $ppI .off \click, cb
                     p0neSettings.toggleMenu(false)
 
             ~> # dblclick2mention
@@ -198,7 +217,7 @@ module \p0neHelp, do
             ~> # Automute
                 var m
                 if currentMedia?
-                    API.on \advance, cb1 = !->
+                    do addListener API,  \advance, !->
                         if not m := currentMedia.get \media
                             currentMedia .set new Backbone.Model do
                                 cid: \wZZ7oFKsKzY
@@ -211,13 +230,12 @@ module \p0neHelp, do
                             step(if isSnoozed! then 2 else 1)
                     cb1!
 
-                API.on \p0ne:changeMode, cb2 = (m) !~>
+                addListener API, \p0ne:changeMode, (m) !~>
                     step(if m == \off then 2 else 1)
                 if isSnoozed!
                     step(2)
 
-                $snoozeBtn
-                    .on \click, cb3 = !~>
+                addListener $snoozeBtn, \click, !~>
                         console.log "smooze [sic]", automute.songlist[API.getMedia!.cid]
                         if automute.songlist[API.getMedia!.cid]
                             accomplished!
@@ -227,10 +245,6 @@ module \p0neHelp, do
                 @screenClose = !->
                     if m
                         currentMedia.set \media, m
-                    API
-                        .off \advance, cb1
-                        .off \p0ne:changeMode, cb2
-                    $snoozeBtn .off \click, cb3
 
             ~> # Automute (remove)
                 $spI = automute._$settings.find '.p0ne-settings-panel-icon .icon'
@@ -238,7 +252,7 @@ module \p0neHelp, do
                 export test = -> $spI
                 # step 1
                 blinking $ppI
-                $ppI.on \click, cb1 = !~>
+                addListener $ppI, \click, cb1 = !~>
                     if not p0neSettings.groupToggles.p0neSettings
                         step(1)
                         $screen .css left: ""
@@ -252,7 +266,7 @@ module \p0neHelp, do
                         cb2!
 
                 # step 2
-                $summary .on \click, cb2 = !~> requestAnimationFrame !~>
+                addListener $summary, \click, cb2 = !~> requestAnimationFrame !~>
                     if not p0neSettings.groupToggles[automute.settings]
                         step(2)
                         $spI .css boxShadow: '', borderRadius: ''
@@ -269,7 +283,7 @@ module \p0neHelp, do
 
                 # step 3
                 var settingsPanel
-                automute._$settings .on \click, \.p0ne-settings-panel-icon, cb3 = !~> requestAnimationFrame !~>
+                addListener automute._$settings, \click, \.p0ne-settings-panel-icon, cb3 = !~> requestAnimationFrame !~>
                     if not automute._$settingsPanel?.open
                         step(3)
                         $spI .css do
@@ -292,22 +306,25 @@ module \p0neHelp, do
                                 settingsPanel .off \click, \.song-remove, accomplished
                             #ToDo add dummy song to automute list, if it's empty
                             settingsPanel := automute._$settingsPanel
-                                .wrapper .on \click, \.icon-clear-input, accomplished
+                            addListener settingsPanel, \click, \.icon-clear-input, accomplished
                         blinking!
 
                 cb1!
 
                 @screenClose = ~>
-                    $ppI .off \click, cb1
-                    $summary .off \click, cb2
-                    automute._$settings? .off \click, cb3
                     $spI? .css boxShadow: '', borderRadius: ''
-                    settingsPanel?.off \click, \.icon-clear-input, accomplished
                     p0neSettings.toggleMenu(false)
 
-            ~> # End
-            @~disable
+            ~> # Info Footer
+                addListener $footerUser, \click, cb = !->
+                    if $(this).hasClass \menu
+                        $screen .css right: 20px;
+                    else
+                        $screen .css right: -330px;
+                cb!
 
+            ~> # End
+            @disable # already bound
         ]
         /**  other interesting things to show:
          * avoid history-play
@@ -319,7 +336,6 @@ module \p0neHelp, do
          */
 
 
-        var $nextBtn, $steps
         $screen = $()
         $screens = $el .find \.step
         $navDots = $el .find '.nav i'
@@ -331,12 +347,20 @@ module \p0neHelp, do
                 # using alerts is disencouraged, but it's kinda a quick fix.
                 alert "No you doozie!\nclick the REAL snooze button above ;)"
 
-        nextScreen(0)
 
+        aux.addListener $ppI, \click, !~> #DEBUG
+            $app
+                .removeClass "wt-p0-settings-mode-0 wt-p0-settings-mode-1 wt-p0-settings-mode-2"
+                .addClass "wt-p0-settings-mode-#{$pp0.text!}"
+
+
+        var $nextBtn, $steps
         !~function nextScreen num
             @screenClose!
             $navDots.eq(i) .removeClass \selected
             blinking!
+            for [target, args] in listeners
+                target.off .apply target, args
 
             i := num
             $screen  := $screens.eq(i)
@@ -372,8 +396,15 @@ module \p0neHelp, do
         !function blinkingCB
             $blinkingEl .p0neFx \blink
 
+        listeners = []
+        !function addListener target, ...args
+            target.on .apply target, args
+            listeners[*] = [target, args]
+            return args[*-1]
+
+        nextScreen(0)
+
+
     disable: !->
-        $app
-            .removeClass "wt-p0-screen-#{@screenClass}"
-            .removeClass \is-wt-p0
+        $app .removeClass "is-wt-p0 wt-p0-settings-mode-0 wt-p0-settings-mode-1 wt-p0-settings-mode-2 wt-p0-screen-#{@screenClass}"
         @screenClose!

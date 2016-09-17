@@ -103,8 +103,8 @@ module \playlistIconView, do
             return
         const CELL_HEIGHT = 185px # keep in sync with plug_p0ne.css
         const CELL_WIDTH = 160px
-        replace PlaylistItemList::, \onResize, !-> return !->
-            @@@__super__.onResize .call this
+        replace PlaylistItemList::, \onResize, !-> return (layout) !->
+            @@@__super__.onResize .call this, layout
             newCellsPerRow = ~~((@$el.width! - 10px) / CELL_WIDTH)
             newVisibleRows = Math.ceil(2rows + @$el.height!/CELL_HEIGHT) * newCellsPerRow
             if newVisibleRows != @visibleRows or newCellsPerRow != @cellsPerRow
@@ -132,25 +132,27 @@ module \playlistIconView, do
                     @$container.append(@$lastRow)
 
 
+        # opening playlist drawer animation fix
+        replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return $.noop
+        #for e, i in Layout._events.resize when e.callback == pl.list.resizeBind
+
         if pl?.list?.rows
-            # onResize hook
-            Layout
-                .off \resize, pl.list.resizeBind
-                .resize replace(pl.list, \resizeBind, !~> return pl.list~onResize)
+            pl.show(new pl.header.constructor(), new pl.list.constructor())
+            /*# onResize hook
+            replace pl.list, \resizeBind, !-> return _.bind pl.list, \onResize
+            for e, i in Layout._events.resize when e.callback == pl.list.resizeBind
+                replace e, \callback, !-> return pl.list.resizeBind
 
             # onScroll hook
             pl.list.$el
                 .off \jsp-scroll-y, pl.list.scrollBind
                 .on \jsp-scroll-y, replace(pl.list, \scrollBind, !~> return pl.list~onScroll)
-
-            # opening playlist drawer animation fix
-            replaceListener _$context, \anim:playlist:progress, PlaylistItemList, !~> return !~>
                 #pl.list.onResize! if pl.list.$el
 
             # to force rerender
             delete pl.list.currentRow
             pl.list.onResize Layout.getSize!
-            pl.list.onScroll?!
+            pl.list.onScroll?!*/
         else
             console.warn "no pl"
 
@@ -202,11 +204,9 @@ module \playlistIconView, do
 
     disableLate: !->
         # using disableLate so that `pl.scrollBind` is already reset
-        console.info "#{getTime!} [playlistIconView] disabling"
         $body .removeClass \playlist-icon-view
-        pl?.list?.$el?
-            .off \jsp-scroll-y
-            .on \jsp-scroll-y, pl.list.scrollBind
+        if pl?.list?.rows
+            pl.show(new pl.header.constructor(), new pl.list.constructor())
 
 
         /*
@@ -252,18 +252,15 @@ module \videoPlaceholderImage, do
     setup: ({addListener}) !->
         $room = $ \#room
         $playbackImg = $ \#playback-container
-        addListener API, \advance, updatePic
+        addListener API, 'advance p0ne:reconnected room:joined', updatePic
         updatePic media: API.getMedia!
 
         function updatePic d
             if not d.media
-                #console.log "[Video Placeholder Image] hide"
                 $playbackImg .css backgroundColor: \transparent, backgroundImage: \none
             else if d.media.format == 1  # YouTube
-                #console.log "[Video Placeholder Image] #img"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(https://i.ytimg.com/vi/#{d.media.cid}/0.jpg)"
             else # SoundCloud
-                #console.log "[Video Placeholder Image] #{d.media.image}"
                 $playbackImg .css backgroundColor: \#000, backgroundImage: "url(#{d.media.image})"
     disable: !->
         $ \#playback-container .css backgroundColor: \transparent, backgroundImage: \none
@@ -449,11 +446,11 @@ module \draggableDialog, do
 #             EMOJI PACK             #
 ####################################*/
 module \emojiPack, do
-    displayName: '☢ Emoji Pack [Google]'
+    displayName: 'Emoji Pack'
     settings: \look&feel
     disabled: true
     help: '''
-        Replace all emojis with the one from Google (for Android Lollipop).
+        Replace all emojis with the one from Google (for Android Lollipop) or Twitter.
 
         Emojis are are the little images that show up for example when you write ":eggplant:" in the chat. <span class="emoji emoji-1f346"></span>
     '''
@@ -464,7 +461,28 @@ module \emojiPack, do
         # possible future emoji packs are: Twitter's and EmojiOne's (and native browser)
         # by default, plug.dj uses Apple's emojipack
     setup: ({loadStyle}) !->
-        loadStyle "#{p0ne.host}/css/temp.#{@_settings.pack}-emoji.css"
+        loadStyle "#{p0ne.host}/css/#{@_settings.pack}.emoji.css"
+
+    settingsExtra: ($el) !->
+        emojiPack = this
+        var resetTimer
+        $ "
+            <form>
+                <label>
+                    <input type=radio name=max-mehs value=google> Google
+                </label><br>
+                <label>
+                    <input type=radio name=max-mehs value=twitter> Twitter
+                </label>
+            </form>"
+            .on \click, \input:radio, !->
+                if @checked
+                    emojiPack._settings.pack = @value
+                    emojiPack.disable!.enable!
+            .appendTo $el
+            .find "input[value=#{emojiPack._settings.pack}]" .attr \checked, \checked
+        $el .css do
+            paddingLeft: 15px
 
 
 /*####################################

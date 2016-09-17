@@ -15,7 +15,7 @@ module \chatCommands, do
     optional: <[ currentMedia ]>
     setup: ({addListener},,cC_) !->
         addListener API, \chatCommand, (c) !~>
-            if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1])
+            if (cmd=@_commands[/^\/(\w+)/.exec(c)?.1 .toLowerCase!])
                 console.log "/chatCommand", cmd, cmd.moderation
                 if (not cmd.moderation or user.gRole or cmd.moderation == true and user.isStaff or user.role >= cmd.moderation)
                     try

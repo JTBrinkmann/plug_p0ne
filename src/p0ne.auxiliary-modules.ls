@@ -38,8 +38,8 @@ module \PopoutListener, do
     require: <[ PopoutView ]>
     optional: <[ _$context ]>
     setup: ({replace}) !->
-        # also works with chatDomEvents.on \click, \.un, !-> example!
-        # even thought cb.callback becomes \.un and cb.context becomes !-> example!
+        # also works with chatDomEvents.on \click, \.un, exampleFn
+        # even thought cb.callback becomes \.un and cb.context becomes exampleFn
         replace PopoutView, \render, (r_) !-> return !->
             r_ ...
             _$context?.trigger \popout:open, PopoutView._window, PopoutView
@@ -73,6 +73,8 @@ module \chatDomEvents, do
             @_events[*] = arguments
             cm .on.apply cm, arguments
             PopoutView.chat.$el .on.apply PopoutView.chat.$el, arguments if PopoutView.chat
+            if &1 == '.p0ne-notif .badge-box'
+                console.info "[TEST] .p0ne-notif .badge-box", arguments, cm
         @off = !->
             isAnyMatch = false
             i = -1
@@ -94,6 +96,33 @@ module \chatDomEvents, do
                 #cm .off event, cb.callback, cb.context #ToDo test if this is necessary
                 console.log "[chatDomEvents] adding listener", cm, cb
                 cm .on .apply cm, cb
+
+module \grabEvent, do
+    require: <[ votes ]>
+    setup: ({replace}) !->
+        replace votes, \grab, (g_) !-> return (uid) !->
+            _$context?.trigger \p0ne:vote:grab, getUser(uid)
+            g_.call(this, uid)
+            API.trigger \p0ne:vote:grab, getUser(uid)
+
+module \playlistCachePatch, do
+    require: <[ playlistCache ]>
+    setup: ({replace}) !->
+        parse = JSON.parse
+        try
+            JSON.parse = (str) !-> return playlistCache._data = parse(str)
+            playlistCache.ready(userID)
+        catch err
+            console.error "error patching playlistCache", err.messageAndStack
+        JSON.parse = parse
+
+module \playlistCacheEvent, do
+    require: <[ playlistCache ]>
+    setup: ({replace}) !->
+        replace playlistCache, \mediaUpdate, (mU_) !-> return (playlistID) !->
+            mU_ .call this, playlistID
+            _$context?.trigger \p0ne:playlistCache:update, playlistID
+            API.trigger \p0ne:playlistCache:update, playlistID
 
 module \grabMedia, do
     require: <[ playlists auxiliaries ]>
@@ -262,7 +291,7 @@ module \p0neCSS, do
 
         if p0neCSS_
             res = ""
-            for n,css of styles
+            for n,css of @styles
                 res += "/*== #n ==*/\n#css\n\n"
             if res
                 $el       .first! .text res
@@ -271,3 +300,12 @@ module \p0neCSS, do
             for url, i of p0neCSS_.urlMap
                 @loadStyle url
                 @urlMap[url] = i
+
+_.defer !->
+    module \p0neNotifHelper, do
+        require: <[ chatDomEvents ]>
+        setup: ({addListener}) !->
+            addListener chatDomEvents, \click, '.p0ne-notif .badge-box', !->
+                console.info "[TEST]", '.p0ne-notif .badge-box {event}', this, it
+                $this = $ this .closest \.p0ne-notif
+                    .slideUp !-> $this.remove!

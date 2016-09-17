@@ -565,6 +565,23 @@ module \ytPagedSearch, do
                 @errorBind
             #window.ga and window.ga("send", "event", "Search")
 
+module \fixPlaylists, do
+    help: '
+        This fixes some issues with the playlist drawer.
+        <ul>
+            <li>right clicking on a playlist\'s name opens it</li>
+            <li>releasing the middle mouse button (scroll wheel) over a playlist\'s name opens it</li>
+        </ul>
+    '
+    require: <[ PlaylistListRow ]>
+    setup: ({replace}) !->
+        replace PlaylistListRow::events, \click, !-> return PlaylistListRow::events.mouseup
+        replace PlaylistListRow::events, \mouseup, !-> return !->
+            if @options.parent.selectedRows?.length
+                @onRowRelease!
+
+        playlists?.sort! # force redrawing
+
 module \fixPopoutChatClose, do
     require: <[ PopoutListener ]>
     setup: ({addListener}) !->
@@ -577,7 +594,7 @@ module \fixNullUser, do
     disabled: true
     setup: ({addListener, replace}) !->
         addListener _$context, \user:join, cb = (u) !->
-            if not u.get \username
+            if u.get(\rawun) == null
                 console.info "fixed null user", u.id
                 name = "null (#{u.id})"
                 u.set \username, name
@@ -585,5 +602,7 @@ module \fixNullUser, do
                 u.set \language, \en
                 u.set \slug, \null
         if users?
-            for u in users.models
-                cb(u)
+            do addListener _$context, \ack, !->
+                sleep 2_000ms, !->
+                    for u in users.models
+                        cb(u)
